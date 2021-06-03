@@ -1,6 +1,6 @@
 use std::ffi::CStr;
 
-pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const i8> {
+pub(crate) unsafe fn _get_raw_strings(strings: Vec<&str>) -> Vec<*const i8> {
     strings
         .iter()
         .map(|s| CStr::from_bytes_with_nul_unchecked(s.as_bytes()).as_ptr())
