@@ -8,4 +8,6 @@ pub enum HothamError {
     EmptyListError,
     #[error("The version of Vulkan or OpenXR is not supported")]
     UnsupportedVersionError,
+    #[error("The format provided is not supported for this operation")]
+    InvalidFormatError,
 }
