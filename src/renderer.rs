@@ -1,4 +1,4 @@
-use std::mem::size_of;
+use std::{ffi::CStr, mem::size_of};
 
 use crate::{
     frame::Frame, hotham_error::HothamError, swapchain::Swapchain, vulkan_context::VulkanContext,
@@ -16,6 +16,7 @@ pub(crate) struct Renderer {
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     render_pass: vk::RenderPass,
+    frame_index: usize,
 }
 
 impl Drop for Renderer {
@@ -27,6 +28,7 @@ impl Drop for Renderer {
             self.context
                 .device
                 .destroy_render_pass(self.render_pass, None);
+            self.context.device.destroy_pipeline(self.pipeline, None);
         }
     }
 }
@@ -39,7 +41,7 @@ impl Renderer {
         system: xr::SystemId,
         params: &ProgramInitialization,
     ) -> Result<Self> {
-        println!("Creating renderer..");
+        println!("[HOTHAM_INIT] Creating renderer..");
         let swapchain = Swapchain::new(xr_session, xr_instance, system)?;
         let pipeline_layout = create_pipeline_layout(&vulkan_context)?;
         let render_pass = create_render_pass(&vulkan_context)?;
@@ -52,6 +54,8 @@ impl Renderer {
         )?;
         let frames = create_frames(&vulkan_context)?;
 
+        println!("[HOTHAM_INIT] Done! Renderer initialised!");
+
         Ok(Self {
             swapchain,
             context: vulkan_context,
@@ -59,20 +63,43 @@ impl Renderer {
             pipeline,
             pipeline_layout,
             render_pass,
+            frame_index: 0,
         })
     }
 
+    pub fn draw(&mut self) -> Result<()> {
+        self.frame_index += 1 % 3;
+        let frame = &self.frames[self.frame_index];
+        let submit_info = self.build_queue_submit(frame)?;
+        let fence = frame.fence;
+        unsafe {
+            self.context
+                .device
+                .queue_submit(self.context.graphics_queue, &[submit_info], fence)
+        }?;
+
+        Ok(())
+    }
+
     pub fn update(&self, vertices: &Vec<Vertex>, indices: &Vec<u32>) -> () {
-        println!("Vertices are now: {:?}", vertices);
-        println!("Indices are now: {:?}", indices);
+        println!("[HOTHAM_TEST] Vertices are now: {:?}", vertices);
+        println!("[HOTHAM_TEST] Indices are now: {:?}", indices);
+    }
+
+    pub fn build_queue_submit(&self, frame: &Frame) -> Result<vk::SubmitInfo> {
+        todo!()
     }
 }
 
 fn create_frames(vulkan_context: &VulkanContext) -> Result<Vec<Frame>> {
-    todo!()
+    print!("[HOTHAM_INIT] Creating frames..");
+    let frames = Vec::new();
+    println!(" ..done!");
+    Ok(frames)
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
+    print!("[HOTHAM_INIT] Creating render pass..");
     let color_attachment = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
         .samples(vk::SampleCountFlags::TYPE_1)
@@ -138,21 +165,20 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .subpasses(&subpasses)
         .dependencies(&dependencies);
 
-    unsafe {
-        vulkan_context
-            .device
-            .create_render_pass(&create_info, None)
-            .map_err(Into::into)
-    }
+    let render_pass = unsafe { vulkan_context.device.create_render_pass(&create_info, None) }?;
+    print!("Done!");
+
+    Ok(render_pass)
 }
 
 fn create_pipeline(
     vulkan_context: &VulkanContext,
-    layout: vk::PipelineLayout,
+    pipeline_layout: vk::PipelineLayout,
     params: &ProgramInitialization,
     swapchain_resolution: &vk::Extent2D,
     render_pass: vk::RenderPass,
 ) -> Result<vk::Pipeline> {
+    print!("[HOTHAM_INIT] Creating pipeline..");
     // Build up the state of the pipeline
 
     // Vertex shader stage
@@ -163,8 +189,12 @@ fn create_pipeline(
             .device
             .create_shader_module(&vertex_shader_create_info, None)
     }?;
+
+    let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
+
     let vertex_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(vk::ShaderStageFlags::VERTEX)
+        .name(main.clone())
         .module(vertex_shader)
         .build();
 
@@ -178,8 +208,11 @@ fn create_pipeline(
     }?;
     let fragment_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(vk::ShaderStageFlags::FRAGMENT)
+        .name(main)
         .module(fragment_shader)
         .build();
+
+    let stages = [vertex_stage, fragment_stage];
 
     // Vertex input state
     let vertex_binding_description = vk::VertexInputBindingDescription::builder()
@@ -210,8 +243,11 @@ fn create_pipeline(
     let viewports = [viewport];
 
     // Scissors
-    let mut scissor = vk::Rect2D::default();
-    scissor.extent = *swapchain_resolution;
+    let offset = vk::Offset2D { x: 0, y: 0 };
+    let scissor = vk::Rect2D::builder()
+        .extent(*swapchain_resolution)
+        .offset(offset)
+        .build();
     let scissors = [scissor];
 
     let viewport_state = vk::PipelineViewportStateCreateInfo::builder()
@@ -239,26 +275,58 @@ fn create_pipeline(
         .depth_bounds_test_enable(false)
         .stencil_test_enable(false);
 
+    // Color blend state
+    let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
+        .color_write_mask(
+            vk::ColorComponentFlags::R
+                | vk::ColorComponentFlags::G
+                | vk::ColorComponentFlags::B
+                | vk::ColorComponentFlags::A,
+        )
+        .blend_enable(false)
+        .build();
+
+    let color_blend_attachments = [color_blend_attachment];
+
+    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
+        .logic_op_enable(false)
+        .attachments(&color_blend_attachments);
+
     let create_info = vk::GraphicsPipelineCreateInfo::builder()
-        .stages(&[vertex_stage, fragment_stage])
+        .stages(&stages)
         .vertex_input_state(&vertex_input_state)
         .input_assembly_state(&input_assembly_state)
         .viewport_state(&viewport_state)
         .rasterization_state(&rasterization_state)
         .multisample_state(&multisample_state)
         .depth_stencil_state(&depth_stencil_state)
-        .layout(layout)
+        .color_blend_state(&color_blend_state)
+        .layout(pipeline_layout)
         .render_pass(render_pass)
+        .subpass(0)
         .build();
+
+    let create_infos = [create_info];
 
     let mut pipelines = unsafe {
         vulkan_context.device.create_graphics_pipelines(
             vk::PipelineCache::null(),
-            &[create_info],
+            &create_infos,
             None,
         )
     }
     .map_err(|(_, r)| r)?;
+
+    unsafe {
+        vulkan_context
+            .device
+            .destroy_shader_module(vertex_shader, None);
+        vulkan_context
+            .device
+            .destroy_shader_module(fragment_shader, None);
+    }
+
+    print!(".. done!");
 
     pipelines.pop().ok_or(HothamError::EmptyListError.into())
 }
