@@ -18,6 +18,7 @@ impl Swapchain {
         xr_instance: &Instance,
         system: SystemId,
     ) -> Result<Self> {
+        print!("[HOTHAM_INIT] Creating swapchain..");
         let views = xr_instance.enumerate_view_configuration_views(system, VIEW_TYPE)?;
         let resolution = vk::Extent2D {
             width: views[0].recommended_image_rect_width,
@@ -41,6 +42,8 @@ impl Swapchain {
             .into_iter()
             .map(vk::Image::from_raw)
             .collect::<Vec<_>>();
+
+        println!("..done!");
 
         Ok(Self {
             handle,
