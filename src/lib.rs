@@ -19,11 +19,11 @@ use crate::vulkan_context::VulkanContext;
 
 mod frame;
 mod hotham_error;
+mod image;
 mod renderer;
 mod swapchain;
 mod util;
 mod vulkan_context;
-mod image;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
@@ -74,7 +74,7 @@ impl<P> App<P>
 where
     P: Program,
 {
-    pub fn new(program: P) -> Result<Self> {
+    pub fn new(program: P) -> HothamResult<Self> {
         let params = program.init();
         println!("[HOTHAM_APP] Initialised program with {:?}", params);
         let (xr_instance, system) = create_xr_instance()?;
@@ -92,9 +92,10 @@ where
         })
     }
 
-    pub fn run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> HothamResult<()> {
         let should_quit = self.should_quit.clone();
-        ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))?;
+        ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
+            .map_err(anyhow::Error::new)?;
 
         while !self.should_quit.load(Ordering::Relaxed) {
             // Tell the program to update its geometry
