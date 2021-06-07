@@ -4,7 +4,7 @@ use hotham_error::HothamError;
 use openxr as xr;
 use renderer::Renderer;
 use std::{path::Path, thread::sleep, time::Duration};
-use xr::{vulkan::SessionCreateInfo, Session, Vulkan};
+use xr::{vulkan::SessionCreateInfo, FrameStream, FrameWaiter, Session, Vulkan};
 
 use crate::vulkan_context::VulkanContext;
 
@@ -17,6 +17,7 @@ mod vulkan_context;
 
 pub type Result<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
+pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
 pub const VIEW_COUNT: u32 = 2;
 pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIMARY_STEREO;
 
@@ -40,6 +41,24 @@ impl Vertex {
     }
 }
 
+impl Vertex {
+    pub fn attribute_descriptions() -> Vec<vk::VertexInputAttributeDescription> {
+        let position = vk::VertexInputAttributeDescription::builder()
+            .binding(0)
+            .location(0)
+            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .build();
+
+        let colour = vk::VertexInputAttributeDescription::builder()
+            .binding(0)
+            .location(1)
+            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .build();
+
+        vec![position, colour]
+    }
+}
+
 impl<P> App<P>
 where
     P: Program,
@@ -53,8 +72,8 @@ where
             xr_instance.enumerate_environment_blend_modes(system, VIEW_TYPE)?[0];
 
         let vulkan_context = VulkanContext::create_from_xr_instance(&xr_instance, system)?;
-        let xr_session = create_xr_session(&xr_instance, system, &vulkan_context)?;
-        let renderer = Renderer::new(vulkan_context, &xr_session)?;
+        let (xr_session, _, _) = create_xr_session(&xr_instance, system, &vulkan_context)?;
+        let renderer = Renderer::new(vulkan_context, &xr_session, &xr_instance, system, &params)?;
 
         Ok(Self {
             program,
@@ -81,8 +100,8 @@ fn create_xr_session(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
     vulkan_context: &VulkanContext,
-) -> Result<Session<Vulkan>> {
-    let (session, _, _) = unsafe {
+) -> Result<(Session<Vulkan>, FrameWaiter, FrameStream<Vulkan>)> {
+    unsafe {
         xr_instance.create_session(
             system,
             &SessionCreateInfo {
@@ -93,9 +112,8 @@ fn create_xr_session(
                 queue_index: 0,
             },
         )
-    }?;
-
-    Ok(session)
+    }
+    .map_err(|e| e.into())
 }
 
 fn create_xr_instance() -> Result<xr::Instance> {
