@@ -17,6 +17,15 @@ pub(crate) struct VulkanContext {
     pub queue_family_index: u32,
 }
 
+// NOTE: OpenXR created the instance / device etc. and is therefore the owner. We'll let it do the cleanup.
+impl Drop for VulkanContext {
+    fn drop(&mut self) {
+        unsafe {
+            self.device.destroy_command_pool(self.command_pool, None);
+        }
+    }
+}
+
 impl VulkanContext {
     pub fn create_from_xr_instance(
         xr_instance: &xr::Instance,
