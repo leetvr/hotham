@@ -4,7 +4,15 @@ use cgmath::Vector3;
 use hotham_error::HothamError;
 use openxr as xr;
 use renderer::Renderer;
-use std::{path::Path, thread::sleep, time::Duration};
+use std::{
+    path::Path,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread::sleep,
+    time::Duration,
+};
 use xr::{vulkan::SessionCreateInfo, FrameStream, FrameWaiter, Session, Vulkan};
 
 use crate::vulkan_context::VulkanContext;
@@ -20,11 +28,12 @@ pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
 pub const VIEW_COUNT: u32 = 2;
+pub const SWAPCHAIN_LENGTH: usize = 3;
 pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIMARY_STEREO;
 
 pub struct App<P: Program> {
     program: P,
-    should_quit: bool,
+    should_quit: Arc<AtomicBool>,
     renderer: Renderer,
     xr_instance: openxr::Instance,
     xr_session: Session<Vulkan>,
@@ -66,10 +75,9 @@ where
 {
     pub fn new(program: P) -> Result<Self> {
         let params = program.init();
-        println!("Initialised program with {:?}", params);
+        println!("[HOTHAM_APP] Initialised program with {:?}", params);
         let (xr_instance, system) = create_xr_instance()?;
 
-        println!("..uh.. hello?");
         let vulkan_context = VulkanContext::create_from_xr_instance(&xr_instance, system)?;
         let (xr_session, _, _) = create_xr_session(&xr_instance, system, &vulkan_context)?;
         let renderer = Renderer::new(vulkan_context, &xr_session, &xr_instance, system, &params)?;
@@ -77,21 +85,29 @@ where
         Ok(Self {
             program,
             renderer,
-            should_quit: false,
+            should_quit: Arc::new(AtomicBool::from(false)),
             xr_instance,
             xr_session,
         })
     }
 
-    pub fn run(&self) -> () {
-        while !&self.should_quit {
+    pub fn run(&mut self) -> Result<()> {
+        let should_quit = self.should_quit.clone();
+        ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))?;
+
+        while !self.should_quit.load(Ordering::Relaxed) {
             // Tell the program to update its geometry
             let (vertices, indices) = self.program.update();
 
             // Push the updated geometry back into Vulkan
             self.renderer.update(vertices, indices);
+
+            // Now draw an image
+            self.renderer.draw()?;
             sleep(Duration::from_secs(1))
         }
+
+        Ok(())
     }
 }
 

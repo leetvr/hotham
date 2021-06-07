@@ -15,6 +15,7 @@ pub(crate) struct VulkanContext {
     pub device: Device,
     pub command_pool: vk::CommandPool,
     pub queue_family_index: u32,
+    pub graphics_queue: vk::Queue,
 }
 
 // NOTE: OpenXR created the instance / device etc. and is therefore the owner. We'll let it do the cleanup.
@@ -31,6 +32,7 @@ impl VulkanContext {
         xr_instance: &xr::Instance,
         system: xr::SystemId,
     ) -> Result<Self> {
+        print!("[HOTHAM_VULKAN] Creating VulkanContext..");
         let vk_target_version_xr = xr::Version::new(1, 1, 0);
 
         let requirements = xr_instance.graphics_requirements::<xr::Vulkan>(system)?;
@@ -49,7 +51,6 @@ impl VulkanContext {
 
         let create_info = vk::InstanceCreateInfo::builder().application_info(&app_info);
 
-        println!("Creating instance..");
         let instance_handle = unsafe {
             xr_instance.create_vulkan_instance(
                 system,
@@ -66,7 +67,6 @@ impl VulkanContext {
             )
         };
 
-        println!("Creating physical device..");
         let physical_device = vk::PhysicalDevice::from_raw(
             xr_instance.vulkan_graphics_device(system, instance_handle)? as _,
         );
@@ -86,11 +86,11 @@ impl VulkanContext {
                 .ok_or(HothamError::EmptyListError)?
         };
 
-        let graphics_queue = vk::DeviceQueueCreateInfo::builder()
+        let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
             .queue_family_index(queue_family_index)
             .queue_priorities(&[1.0])
             .build();
-        let queue_create_infos = [graphics_queue];
+        let queue_create_infos = [graphics_queue_create_info];
         let multiview = &mut vk::PhysicalDeviceVulkan11Features {
             multiview: vk::TRUE,
             ..Default::default()
@@ -100,7 +100,6 @@ impl VulkanContext {
             ..Default::default()
         };
 
-        println!("Creating device");
         let device_create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&queue_create_infos)
             .push_next(separate_depth_stencil_layouts)
@@ -119,6 +118,8 @@ impl VulkanContext {
         let device =
             unsafe { Device::load(instance.fp_v1_0(), vk::Device::from_raw(device_handle as _)) };
 
+        let graphics_queue = unsafe { device.get_device_queue(queue_family_index, 0) };
+
         let command_pool = unsafe {
             device.create_command_pool(
                 &vk::CommandPoolCreateInfo::builder()
@@ -131,6 +132,8 @@ impl VulkanContext {
             )
         }?;
 
+        println!(" ..done!");
+
         Ok(Self {
             entry,
             instance,
@@ -138,6 +141,7 @@ impl VulkanContext {
             physical_device,
             command_pool,
             queue_family_index,
+            graphics_queue,
         })
     }
 }

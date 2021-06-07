@@ -10,6 +10,7 @@ version = "0.1.0"
 anyhow = "1.0"
 ash = "0.32"
 cgmath = "0.18"
+ctrlc = {version = "3", features = ["termination"]}
 openxr = {features = ["static"], version = "0.14.0"}
 thiserror = "1.0"
 winit = "0.24"
