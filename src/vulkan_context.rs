@@ -1,4 +1,5 @@
-use crate::{hotham_error::HothamError, Result, COLOR_FORMAT};
+use crate::{hotham_error::HothamError, image::Image, Result, COLOR_FORMAT, DEPTH_FORMAT};
+use anyhow::anyhow;
 use ash::{
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk::{self, Handle},
@@ -150,7 +151,7 @@ impl VulkanContext {
         image: &vk::Image,
         format: vk::Format,
     ) -> Result<vk::ImageView> {
-        // TODO: populate
+        let aspect_mask = get_aspect_mask(format)?;
         let create_info = vk::ImageViewCreateInfo::builder()
             .view_type(vk::ImageViewType::TYPE_2D)
             .format(format)
@@ -161,25 +162,107 @@ impl VulkanContext {
                 a: vk::ComponentSwizzle::A,
             })
             .subresource_range(vk::ImageSubresourceRange {
-                aspect_mask: vk::ImageAspectFlags::COLOR,
+                aspect_mask,
                 base_mip_level: 0,
                 level_count: 1,
                 base_array_layer: 0,
-                layer_count: 1, // todo: multiview?
+                layer_count: 1, // TODO: multiview?
             })
             .image(*image);
         unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
     }
 
-    pub fn create_image(&self, format: vk::Format) -> Result<(vk::Image, vk::DeviceMemory)> {
-        let create_info = vk::ImageCreateInfo::builder();
+    pub fn create_image(&self, format: vk::Format, extent: &vk::Extent2D) -> Result<Image> {
+        let usage = get_usage(format)?;
+        let create_info = vk::ImageCreateInfo::builder()
+            .format(format)
+            .image_type(vk::ImageType::TYPE_2D)
+            .extent(vk::Extent3D {
+                height: extent.height,
+                width: extent.width,
+                depth: 1,
+            })
+            .mip_levels(1)
+            .array_layers(1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .usage(usage)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE); // TODO: multiview;
         let image = unsafe { self.device.create_image(&create_info, None) }?;
 
-        let allocate_info = vk::MemoryAllocateInfo::builder();
-        let image_memory = unsafe { self.device.allocate_memory(&allocate_info, None) }?;
+        let device_memory = self.allocate_image_memory(image)?;
 
-        Ok((image, image_memory))
+        unsafe { self.device.bind_image_memory(image, device_memory, 0) }?;
+
+        let image_view = self.create_image_view(&image, format)?;
+
+        Ok(Image::new(image, image_view, device_memory, *extent))
     }
+
+    fn allocate_image_memory(&self, image: vk::Image) -> Result<vk::DeviceMemory> {
+        let memory_requirements = unsafe { self.device.get_image_memory_requirements(image) };
+        let properties = vk::MemoryPropertyFlags::DEVICE_LOCAL;
+
+        // Get memory requirements
+        let memory_type_index =
+            self.find_memory_type(memory_requirements.memory_type_bits, properties)?;
+
+        let allocate_info = vk::MemoryAllocateInfo::builder()
+            .memory_type_index(memory_type_index)
+            .allocation_size(memory_requirements.size);
+
+        unsafe { self.device.allocate_memory(&allocate_info, None) }.map_err(Into::into)
+    }
+
+    pub fn find_memory_type(
+        &self,
+        type_filter: u32,
+        properties: vk::MemoryPropertyFlags,
+    ) -> Result<u32> {
+        let device_memory_properties = unsafe {
+            self.instance
+                .get_physical_device_memory_properties(self.physical_device)
+        };
+        for i in 0..device_memory_properties.memory_type_count {
+            let has_type = type_filter & (1 << i) != 0;
+            let has_properties = device_memory_properties.memory_types[i as usize]
+                .property_flags
+                .contains(properties);
+            if has_type && has_properties {
+                return Ok(i);
+            }
+        }
+
+        Err(anyhow!(
+            "Could not find a valid memory type for {:?}",
+            properties
+        ))
+    }
+}
+
+fn get_usage(format: vk::Format) -> Result<vk::ImageUsageFlags> {
+    if format == COLOR_FORMAT {
+        return Ok(vk::ImageUsageFlags::COLOR_ATTACHMENT);
+    }
+
+    if format == DEPTH_FORMAT {
+        return Ok(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT);
+    }
+
+    return Err(HothamError::InvalidFormatError.into());
+}
+
+fn get_aspect_mask(format: vk::Format) -> Result<vk::ImageAspectFlags> {
+    if format == COLOR_FORMAT {
+        return Ok(vk::ImageAspectFlags::COLOR);
+    }
+
+    if format == DEPTH_FORMAT {
+        return Ok(vk::ImageAspectFlags::DEPTH);
+    }
+
+    return Err(HothamError::InvalidFormatError.into());
 }
 
 impl Debug for VulkanContext {

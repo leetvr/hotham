@@ -23,6 +23,7 @@ mod renderer;
 mod swapchain;
 mod util;
 mod vulkan_context;
+mod image;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
