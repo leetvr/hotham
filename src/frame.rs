@@ -7,7 +7,8 @@ use anyhow::Result;
 pub(crate) struct Frame {
     pub fence: vk::Fence,
     pub command_buffer: vk::CommandBuffer,
-    pub frame_buffer: vk::Framebuffer,
+    pub framebuffer: vk::Framebuffer,
+    pub swapchain_image_view: vk::ImageView,
 }
 
 impl Frame {
@@ -32,6 +33,7 @@ impl Frame {
             device.allocate_command_buffers(
                 &vk::CommandBufferAllocateInfo::builder()
                     .command_buffer_count(1)
+                    .level(vk::CommandBufferLevel::PRIMARY)
                     .command_pool(command_pool),
             )
         }?
@@ -52,7 +54,23 @@ impl Frame {
         Ok(Self {
             fence,
             command_buffer,
-            frame_buffer,
+            framebuffer: frame_buffer,
+            swapchain_image_view,
         })
+    }
+
+    pub fn destroy(&self, vulkan_context: &VulkanContext) {
+        unsafe {
+            vulkan_context
+                .device
+                .destroy_framebuffer(self.framebuffer, None);
+            vulkan_context.device.destroy_fence(self.fence, None);
+            vulkan_context
+                .device
+                .free_command_buffers(vulkan_context.command_pool, &[self.command_buffer]);
+            vulkan_context
+                .device
+                .destroy_image_view(self.swapchain_image_view, None)
+        }
     }
 }
