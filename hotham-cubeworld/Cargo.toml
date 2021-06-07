@@ -1,0 +1,15 @@
+[package]
+authors = ["Kane Rogers <kane.m.rogers@gmail.com>"]
+build = "build.rs"
+edition = "2018"
+name = "hotham-cubeworld"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cgmath = "0.18"
+hotham = {path = "../hotham"}
+
+[build-dependencies]
+shaderc = "0.7"
