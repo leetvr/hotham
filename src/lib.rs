@@ -1,3 +1,4 @@
+use anyhow::Result;
 use ash::{version::InstanceV1_0, vk};
 use cgmath::Vector3;
 use hotham_error::HothamError;
@@ -15,7 +16,7 @@ mod swapchain;
 mod util;
 mod vulkan_context;
 
-pub type Result<T> = std::result::Result<T, HothamError>;
+pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
 pub const VIEW_COUNT: u32 = 2;
@@ -66,11 +67,9 @@ where
     pub fn new(program: P) -> Result<Self> {
         let params = program.init();
         println!("Initialised program with {:?}", params);
-        let xr_instance = create_xr_instance()?;
-        let system = xr_instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
-        let _environment_blend_mode =
-            xr_instance.enumerate_environment_blend_modes(system, VIEW_TYPE)?[0];
+        let (xr_instance, system) = create_xr_instance()?;
 
+        println!("..uh.. hello?");
         let vulkan_context = VulkanContext::create_from_xr_instance(&xr_instance, system)?;
         let (xr_session, _, _) = create_xr_session(&xr_instance, system, &vulkan_context)?;
         let renderer = Renderer::new(vulkan_context, &xr_session, &xr_instance, system, &params)?;
@@ -116,7 +115,7 @@ fn create_xr_session(
     .map_err(|e| e.into())
 }
 
-fn create_xr_instance() -> Result<xr::Instance> {
+fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = xr::Entry::linked();
     let xr_app_info = openxr::ApplicationInfo {
         application_name: "Hotham Cubeworld",
@@ -127,7 +126,8 @@ fn create_xr_instance() -> Result<xr::Instance> {
     let mut required_extensions = xr::ExtensionSet::default();
     required_extensions.khr_vulkan_enable2 = true;
     let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
-    Ok(instance)
+    let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
+    Ok((instance, system))
 }
 
 #[derive(Debug, Clone)]
