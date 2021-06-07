@@ -84,9 +84,14 @@ impl VulkanContext {
             multiview: vk::TRUE,
             ..Default::default()
         };
+        let separate_depth_stencil_layouts = &mut vk::PhysicalDeviceVulkan12Features {
+            separate_depth_stencil_layouts: vk::TRUE,
+            ..Default::default()
+        };
 
         let device_create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&queue_create_infos)
+            .push_next(separate_depth_stencil_layouts)
             .push_next(multiview);
 
         let device_handle = unsafe {

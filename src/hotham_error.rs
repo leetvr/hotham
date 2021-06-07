@@ -4,6 +4,11 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum HothamError {
+    #[error("IO Error:")]
+    IOError {
+        #[from]
+        source: std::io::Error,
+    },
     #[error("Vulkan instance error:")]
     VulkanInstanceError {
         #[from]
