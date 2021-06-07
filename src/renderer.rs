@@ -18,6 +18,19 @@ pub(crate) struct Renderer {
     render_pass: vk::RenderPass,
 }
 
+impl Drop for Renderer {
+    fn drop(&mut self) {
+        unsafe {
+            self.context
+                .device
+                .destroy_pipeline_layout(self.pipeline_layout, None);
+            self.context
+                .device
+                .destroy_render_pass(self.render_pass, None);
+        }
+    }
+}
+
 impl Renderer {
     pub(crate) fn new(
         vulkan_context: VulkanContext,
@@ -253,7 +266,9 @@ fn create_pipeline(
 fn read_spv_from_path(path: &std::path::Path) -> Result<Vec<u32>> {
     let mut file = std::fs::File::open(path)
         .with_context(|| format!("Failed to read SPV file at {:?}", path))?;
-    ash::util::read_spv(&mut file).map_err(|e| e.into())
+    ash::util::read_spv(&mut file)
+        .with_context(|| format!("Unable to read SPV file at {:?}", path))
+        .map_err(|e| e.into())
 }
 
 fn create_pipeline_layout(vulkan_context: &VulkanContext) -> Result<vk::PipelineLayout> {
