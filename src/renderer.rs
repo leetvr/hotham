@@ -4,6 +4,7 @@ use crate::{
     frame::Frame, hotham_error::HothamError, swapchain::Swapchain, vulkan_context::VulkanContext,
     ProgramInitialization, Result, Vertex, COLOR_FORMAT, DEPTH_FORMAT,
 };
+use anyhow::Context;
 use ash::{version::DeviceV1_0, vk};
 use openxr as xr;
 use xr::Vulkan;
@@ -25,6 +26,7 @@ impl Renderer {
         system: xr::SystemId,
         params: &ProgramInitialization,
     ) -> Result<Self> {
+        println!("Creating renderer..");
         let swapchain = Swapchain::new(xr_session, xr_instance, system)?;
         let pipeline_layout = create_pipeline_layout(&vulkan_context)?;
         let render_pass = create_render_pass(&vulkan_context)?;
@@ -77,7 +79,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
-        .final_layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL)
+        .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         .build();
 
     let attachments = [color_attachment, depth_attachment];
@@ -90,9 +92,10 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
 
     let depth_stencil_attachment = vk::AttachmentReference::builder()
         .attachment(1)
-        .layout(vk::ImageLayout::DEPTH_ATTACHMENT_OPTIMAL);
+        .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     let subpass = vk::SubpassDescription::builder()
+        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
         .color_attachments(&color_attachments)
         .depth_stencil_attachment(&depth_stencil_attachment)
         .build();
@@ -244,11 +247,12 @@ fn create_pipeline(
     }
     .map_err(|(_, r)| r)?;
 
-    pipelines.pop().ok_or(HothamError::EmptyListError)
+    pipelines.pop().ok_or(HothamError::EmptyListError.into())
 }
 
 fn read_spv_from_path(path: &std::path::Path) -> Result<Vec<u32>> {
-    let mut file = std::fs::File::open(path)?;
+    let mut file = std::fs::File::open(path)
+        .with_context(|| format!("Failed to read SPV file at {:?}", path))?;
     ash::util::read_spv(&mut file).map_err(|e| e.into())
 }
 
