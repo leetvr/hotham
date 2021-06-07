@@ -1,8 +1,8 @@
-use std::{ffi::CStr, mem::size_of};
+use std::{ffi::CStr, mem::size_of, ptr::swap};
 
 use crate::{
     frame::Frame, hotham_error::HothamError, swapchain::Swapchain, vulkan_context::VulkanContext,
-    ProgramInitialization, Result, Vertex, COLOR_FORMAT, DEPTH_FORMAT,
+    ProgramInitialization, Result, Vertex, COLOR_FORMAT, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
 };
 use anyhow::Context;
 use ash::{version::DeviceV1_0, vk};
@@ -11,7 +11,7 @@ use xr::Vulkan;
 
 pub(crate) struct Renderer {
     context: VulkanContext,
-    swapchain: Swapchain,
+    _swapchain: Swapchain,
     frames: Vec<Frame>,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
@@ -52,12 +52,16 @@ impl Renderer {
             &swapchain.resolution,
             render_pass,
         )?;
-        let frames = create_frames(&vulkan_context)?;
+
+        let (depth_image, depth_image_memory, depth_image_view) =
+            create_depth_image(&vulkan_context)?;
+
+        let frames = create_frames(&vulkan_context, &render_pass, &swapchain, &depth_image_view)?;
 
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
         Ok(Self {
-            swapchain,
+            _swapchain: swapchain,
             context: vulkan_context,
             frames,
             pipeline,
@@ -68,10 +72,12 @@ impl Renderer {
     }
 
     pub fn draw(&mut self) -> Result<()> {
-        self.frame_index += 1 % 3;
+        self.frame_index = (self.frame_index + 1) % SWAPCHAIN_LENGTH;
         let frame = &self.frames[self.frame_index];
         let submit_info = self.build_queue_submit(frame)?;
         let fence = frame.fence;
+
+        // TODO OpenXR stuff
         unsafe {
             self.context
                 .device
@@ -91,11 +97,38 @@ impl Renderer {
     }
 }
 
-fn create_frames(vulkan_context: &VulkanContext) -> Result<Vec<Frame>> {
+fn create_depth_image(
+    vulkan_context: &VulkanContext,
+) -> Result<(vk::Image, vk::DeviceMemory, vk::ImageView)> {
+    let (depth_image, depth_image_memory) = vulkan_context.create_image(DEPTH_FORMAT)?;
+    let depth_image_view = vulkan_context.create_image_view(&depth_image, DEPTH_FORMAT)?;
+
+    Ok((depth_image, depth_image_memory, depth_image_view))
+}
+
+fn create_frames(
+    vulkan_context: &VulkanContext,
+    render_pass: &vk::RenderPass,
+    swapchain: &Swapchain,
+    depth_image_view: &vk::ImageView,
+) -> Result<Vec<Frame>> {
     print!("[HOTHAM_INIT] Creating frames..");
-    let frames = Vec::new();
-    println!(" ..done!");
-    Ok(frames)
+    swapchain
+        .images
+        .iter()
+        .flat_map(|i| vulkan_context.create_image_view(i, COLOR_FORMAT))
+        .map(|i| {
+            // create image view
+            Frame::new(
+                vulkan_context,
+                *render_pass,
+                swapchain.resolution,
+                i,
+                *depth_image_view,
+            )
+        })
+        .collect::<Result<Vec<Frame>>>()
+        .map_err(|e| e.into())
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
