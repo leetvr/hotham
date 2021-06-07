@@ -1,4 +1,4 @@
-use crate::{hotham_error::HothamError, Result};
+use crate::{hotham_error::HothamError, Result, COLOR_FORMAT};
 use ash::{
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk::{self, Handle},
@@ -143,6 +143,42 @@ impl VulkanContext {
             queue_family_index,
             graphics_queue,
         })
+    }
+
+    pub fn create_image_view(
+        &self,
+        image: &vk::Image,
+        format: vk::Format,
+    ) -> Result<vk::ImageView> {
+        // TODO: populate
+        let create_info = vk::ImageViewCreateInfo::builder()
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(format)
+            .components(vk::ComponentMapping {
+                r: vk::ComponentSwizzle::R,
+                g: vk::ComponentSwizzle::G,
+                b: vk::ComponentSwizzle::B,
+                a: vk::ComponentSwizzle::A,
+            })
+            .subresource_range(vk::ImageSubresourceRange {
+                aspect_mask: vk::ImageAspectFlags::COLOR,
+                base_mip_level: 0,
+                level_count: 1,
+                base_array_layer: 0,
+                layer_count: 1, // todo: multiview?
+            })
+            .image(*image);
+        unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
+    }
+
+    pub fn create_image(&self, format: vk::Format) -> Result<(vk::Image, vk::DeviceMemory)> {
+        let create_info = vk::ImageCreateInfo::builder();
+        let image = unsafe { self.device.create_image(&create_info, None) }?;
+
+        let allocate_info = vk::MemoryAllocateInfo::builder();
+        let image_memory = unsafe { self.device.allocate_memory(&allocate_info, None) }?;
+
+        Ok((image, image_memory))
     }
 }
 

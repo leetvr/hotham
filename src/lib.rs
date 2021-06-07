@@ -35,8 +35,8 @@ pub struct App<P: Program> {
     program: P,
     should_quit: Arc<AtomicBool>,
     renderer: Renderer,
-    xr_instance: openxr::Instance,
-    xr_session: Session<Vulkan>,
+    _xr_instance: openxr::Instance,
+    _xr_session: Session<Vulkan>,
 }
 
 #[derive(Clone, Debug)]
@@ -86,8 +86,8 @@ where
             program,
             renderer,
             should_quit: Arc::new(AtomicBool::from(false)),
-            xr_instance,
-            xr_session,
+            _xr_instance: xr_instance,
+            _xr_session: xr_session,
         })
     }
 
