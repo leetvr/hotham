@@ -19,12 +19,18 @@ pub(crate) struct Renderer {
     render_pass: vk::RenderPass,
     frame_index: usize,
     depth_image: Image,
+    render_area: vk::Rect2D,
+    _vertices: Vec<Vertex>,
+    indices: Vec<u32>,
 }
 
 impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
             self.depth_image.destroy(&self.context);
+            for frame in self.frames.drain(..) {
+                frame.destroy(&self.context);
+            }
             self.context
                 .device
                 .destroy_pipeline_layout(self.pipeline_layout, None);
@@ -46,13 +52,17 @@ impl Renderer {
     ) -> Result<Self> {
         println!("[HOTHAM_INIT] Creating renderer..");
         let swapchain = Swapchain::new(xr_session, xr_instance, system)?;
+        let render_area = vk::Rect2D {
+            extent: swapchain.resolution,
+            offset: vk::Offset2D::default(),
+        };
         let pipeline_layout = create_pipeline_layout(&vulkan_context)?;
         let render_pass = create_render_pass(&vulkan_context)?;
         let pipeline = create_pipeline(
             &vulkan_context,
             pipeline_layout,
             params,
-            &swapchain.resolution,
+            &render_area,
             render_pass,
         )?;
 
@@ -71,13 +81,20 @@ impl Renderer {
             render_pass,
             frame_index: 0,
             depth_image,
+            render_area,
+            indices: params.indices.clone(),
+            vertices: params.vertices.clone(),
         })
     }
 
     pub fn draw(&mut self) -> Result<()> {
         self.frame_index = (self.frame_index + 1) % SWAPCHAIN_LENGTH;
         let frame = &self.frames[self.frame_index];
-        let submit_info = self.build_queue_submit(frame)?;
+        self.prepare_frame(frame)?;
+        let command_buffer = frame.command_buffer;
+        let submit_info = vk::SubmitInfo::builder()
+            .command_buffers(&[command_buffer])
+            .build();
         let fence = frame.fence;
 
         // TODO OpenXR stuff
@@ -90,13 +107,54 @@ impl Renderer {
         Ok(())
     }
 
+    pub fn prepare_frame(&self, frame: &Frame) -> Result<()> {
+        let device = &self.context.device;
+        let command_buffer = frame.command_buffer;
+        let framebuffer = frame.framebuffer;
+        let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
+            .render_pass(self.render_pass)
+            .framebuffer(framebuffer)
+            .render_area(self.render_area)
+            .clear_values(&[
+                vk::ClearValue {
+                    color: vk::ClearColorValue {
+                        float32: [0.0, 0.0, 0.0, 1.0],
+                    },
+                },
+                vk::ClearValue {
+                    depth_stencil: vk::ClearDepthStencilValue {
+                        depth: 0.0,
+                        stencil: 0,
+                    },
+                },
+            ]);
+        unsafe {
+            device.begin_command_buffer(
+                command_buffer,
+                &vk::CommandBufferBeginInfo::builder()
+                    .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+            )?;
+            device.cmd_begin_render_pass(
+                command_buffer,
+                &render_pass_begin_info,
+                vk::SubpassContents::INLINE,
+            );
+            device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline,
+            );
+            device.cmd_draw_indexed(command_buffer, self.indices.len() as _, 1, 0, 0, 1);
+            device.cmd_end_render_pass(command_buffer);
+            device.end_command_buffer(command_buffer)?;
+        };
+
+        Ok(())
+    }
+
     pub fn update(&self, vertices: &Vec<Vertex>, indices: &Vec<u32>) -> () {
         println!("[HOTHAM_TEST] Vertices are now: {:?}", vertices);
         println!("[HOTHAM_TEST] Indices are now: {:?}", indices);
-    }
-
-    pub fn build_queue_submit(&self, frame: &Frame) -> Result<vk::SubmitInfo> {
-        todo!()
     }
 }
 
@@ -107,7 +165,7 @@ fn create_frames(
     depth_image: &Image,
 ) -> Result<Vec<Frame>> {
     print!("[HOTHAM_INIT] Creating frames..");
-    swapchain
+    let frames = swapchain
         .images
         .iter()
         .flat_map(|i| vulkan_context.create_image_view(i, COLOR_FORMAT))
@@ -121,8 +179,9 @@ fn create_frames(
                 depth_image.view,
             )
         })
-        .collect::<Result<Vec<Frame>>>()
-        .map_err(|e| e.into())
+        .collect::<Result<Vec<Frame>>>()?;
+    println!(" ..done!");
+    Ok(frames)
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
@@ -193,7 +252,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .dependencies(&dependencies);
 
     let render_pass = unsafe { vulkan_context.device.create_render_pass(&create_info, None) }?;
-    print!("Done!");
+    println!("..done!");
 
     Ok(render_pass)
 }
@@ -202,7 +261,7 @@ fn create_pipeline(
     vulkan_context: &VulkanContext,
     pipeline_layout: vk::PipelineLayout,
     params: &ProgramInitialization,
-    swapchain_resolution: &vk::Extent2D,
+    render_area: &vk::Rect2D,
     render_pass: vk::RenderPass,
 ) -> Result<vk::Pipeline> {
     print!("[HOTHAM_INIT] Creating pipeline..");
@@ -262,20 +321,15 @@ fn create_pipeline(
     let viewport = vk::Viewport {
         x: 0.0,
         y: 0.0,
-        width: swapchain_resolution.width as _,
-        height: swapchain_resolution.height as _,
+        width: render_area.extent.width as _,
+        height: render_area.extent.height as _,
         min_depth: 0.0,
         max_depth: 1.0,
     };
     let viewports = [viewport];
 
     // Scissors
-    let offset = vk::Offset2D { x: 0, y: 0 };
-    let scissor = vk::Rect2D::builder()
-        .extent(*swapchain_resolution)
-        .offset(offset)
-        .build();
-    let scissors = [scissor];
+    let scissors = [*render_area];
 
     let viewport_state = vk::PipelineViewportStateCreateInfo::builder()
         .viewports(&viewports)
@@ -353,7 +407,7 @@ fn create_pipeline(
             .destroy_shader_module(fragment_shader, None);
     }
 
-    print!(".. done!");
+    println!(".. done!");
 
     pipelines.pop().ok_or(HothamError::EmptyListError.into())
 }
