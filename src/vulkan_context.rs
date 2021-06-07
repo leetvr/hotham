@@ -28,7 +28,7 @@ impl VulkanContext {
         if vk_target_version_xr < requirements.min_api_version_supported
             || vk_target_version_xr.major() > requirements.max_api_version_supported.major()
         {
-            return Err(HothamError::UnsupportedVersionError);
+            return Err(HothamError::UnsupportedVersionError.into());
         }
 
         let entry = unsafe { Entry::new() }?;
@@ -40,6 +40,7 @@ impl VulkanContext {
 
         let create_info = vk::InstanceCreateInfo::builder().application_info(&app_info);
 
+        println!("Creating instance..");
         let instance_handle = unsafe {
             xr_instance.create_vulkan_instance(
                 system,
@@ -56,6 +57,7 @@ impl VulkanContext {
             )
         };
 
+        println!("Creating physical device..");
         let physical_device = vk::PhysicalDevice::from_raw(
             xr_instance.vulkan_graphics_device(system, instance_handle)? as _,
         );
@@ -89,6 +91,7 @@ impl VulkanContext {
             ..Default::default()
         };
 
+        println!("Creating device");
         let device_create_info = vk::DeviceCreateInfo::builder()
             .queue_create_infos(&queue_create_infos)
             .push_next(separate_depth_stencil_layouts)
