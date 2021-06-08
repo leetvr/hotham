@@ -475,12 +475,6 @@ unsafe extern "system" fn create_session(
     create_info: *const SessionCreateInfo,
     session: *mut Session,
 ) -> Result {
-    let create_info = *create_info;
-    println!(
-        "Create session called with with {:?}",
-        create_info.system_id
-    );
-
     let mut s = Box::new(HothamSession::default());
     s.test = 42;
     let s = Box::into_raw(s) as *const _;
