@@ -5,8 +5,9 @@ use ash::{
     vk::{self, Handle},
     Device, Entry, Instance,
 };
-use openxr::{self as xr};
+use openxr as xr;
 use std::{fmt::Debug, intrinsics::transmute};
+use std::{mem::size_of, ptr::copy};
 
 #[derive(Clone)]
 pub(crate) struct VulkanContext {
@@ -200,19 +201,26 @@ impl VulkanContext {
         Ok(Image::new(image, image_view, device_memory, *extent))
     }
 
-    fn allocate_image_memory(&self, image: vk::Image) -> Result<vk::DeviceMemory> {
-        let memory_requirements = unsafe { self.device.get_image_memory_requirements(image) };
-        let properties = vk::MemoryPropertyFlags::DEVICE_LOCAL;
+    pub fn create_buffer_with_data<T: Sized>(
+        &self,
+        data: &Vec<T>,
+        usage: vk::BufferUsageFlags,
+    ) -> Result<(vk::Buffer, vk::DeviceMemory)> {
+        let device = &self.device;
+        let size = (size_of::<T>() * data.len()) as _;
+        let buffer_create_info = vk::BufferCreateInfo::builder()
+            .size(size)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .usage(usage);
 
-        // Get memory requirements
-        let memory_type_index =
-            self.find_memory_type(memory_requirements.memory_type_bits, properties)?;
+        let buffer = unsafe { device.create_buffer(&buffer_create_info, None) }?;
+        let device_memory = self.allocate_buffer_memory(buffer)?;
+        unsafe { device.bind_buffer_memory(buffer, device_memory, 0) }?;
+        let dst =
+            unsafe { device.map_memory(device_memory, 0, size, vk::MemoryMapFlags::empty()) }?;
+        unsafe { copy(data.as_ptr(), dst as *mut _, data.len()) };
 
-        let allocate_info = vk::MemoryAllocateInfo::builder()
-            .memory_type_index(memory_type_index)
-            .allocation_size(memory_requirements.size);
-
-        unsafe { self.device.allocate_memory(&allocate_info, None) }.map_err(Into::into)
+        Ok((buffer, device_memory))
     }
 
     pub fn find_memory_type(
@@ -238,6 +246,35 @@ impl VulkanContext {
             "Could not find a valid memory type for {:?}",
             properties
         ))
+    }
+
+    fn allocate_buffer_memory(&self, buffer: vk::Buffer) -> Result<vk::DeviceMemory> {
+        let memory_requirements = unsafe { self.device.get_buffer_memory_requirements(buffer) };
+        let properties =
+            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
+        self.allocate_memory(memory_requirements, properties)
+    }
+
+    fn allocate_image_memory(&self, image: vk::Image) -> Result<vk::DeviceMemory> {
+        let memory_requirements = unsafe { self.device.get_image_memory_requirements(image) };
+        let properties = vk::MemoryPropertyFlags::DEVICE_LOCAL;
+        self.allocate_memory(memory_requirements, properties)
+    }
+
+    fn allocate_memory(
+        &self,
+        memory_requirements: vk::MemoryRequirements,
+        properties: vk::MemoryPropertyFlags,
+    ) -> Result<vk::DeviceMemory> {
+        // Get memory requirements
+        let memory_type_index =
+            self.find_memory_type(memory_requirements.memory_type_bits, properties)?;
+
+        let allocate_info = vk::MemoryAllocateInfo::builder()
+            .memory_type_index(memory_type_index)
+            .allocation_size(memory_requirements.size);
+
+        unsafe { self.device.allocate_memory(&allocate_info, None) }.map_err(Into::into)
     }
 }
 
