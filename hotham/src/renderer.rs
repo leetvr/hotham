@@ -11,8 +11,8 @@ use openxr as xr;
 use xr::Vulkan;
 
 pub(crate) struct Renderer {
+    swapchain: Swapchain,
     context: VulkanContext,
-    _swapchain: Swapchain,
     frames: Vec<Frame>,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
@@ -53,11 +53,13 @@ impl Renderer {
         vulkan_context: VulkanContext,
         xr_session: &xr::Session<Vulkan>,
         xr_instance: &xr::Instance,
+        xr_swapchain: &xr::Swapchain<Vulkan>,
+        swapchain_resolution: vk::Extent2D,
         system: xr::SystemId,
         params: &ProgramInitialization,
     ) -> Result<Self> {
         println!("[HOTHAM_INIT] Creating renderer..");
-        let swapchain = Swapchain::new(xr_session, xr_instance, system)?;
+        let swapchain = Swapchain::new(xr_swapchain, swapchain_resolution)?;
         let render_area = vk::Rect2D {
             extent: swapchain.resolution,
             offset: vk::Offset2D::default(),
@@ -88,7 +90,7 @@ impl Renderer {
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
         Ok(Self {
-            _swapchain: swapchain,
+            swapchain,
             context: vulkan_context,
             frames,
             pipeline,
