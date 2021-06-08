@@ -184,7 +184,7 @@ impl VulkanContext {
                 depth: 1,
             })
             .mip_levels(1)
-            .array_layers(1)
+            .array_layers(2)
             .tiling(vk::ImageTiling::OPTIMAL)
             .initial_layout(vk::ImageLayout::UNDEFINED)
             .usage(usage)
