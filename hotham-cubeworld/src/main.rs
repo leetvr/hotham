@@ -22,8 +22,9 @@ impl Cubeworld {
 
 impl Program for Cubeworld {
     fn init(&self) -> ProgramInitialization {
-        let vertex_shader = Path::new("src/shaders/cube.vert.spv");
-        let fragment_shader = Path::new("src/shaders/cube.frag.spv");
+        // TODO: This should be somehow relative to hotham-cubeworld already
+        let vertex_shader = Path::new("hotham-cubeworld/src/shaders/cube.vert.spv");
+        let fragment_shader = Path::new("hotham-cubeworld/src/shaders/cube.frag.spv");
 
         ProgramInitialization {
             vertices: &self.vertices,
