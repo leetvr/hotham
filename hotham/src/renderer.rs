@@ -83,7 +83,7 @@ impl Renderer {
             depth_image,
             render_area,
             indices: params.indices.clone(),
-            vertices: params.vertices.clone(),
+            _vertices: params.vertices.clone(),
         })
     }
 
