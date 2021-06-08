@@ -11,10 +11,10 @@ struct Cubeworld {
 
 impl Cubeworld {
     fn new() -> Self {
-        let v1 = Vertex::new(vec3(-0.5, -0.5, 1.0), vec3(1.0, 0.0, 0.0));
-        let v2 = Vertex::new(vec3(0.5, -0.5, 1.0), vec3(1.0, 0.0, 0.0));
-        let v3 = Vertex::new(vec3(0.5, 0.5, 1.0), vec3(0.0, 0.0, 1.0));
-        let v4 = Vertex::new(vec3(-0.5, 0.5, 1.0), vec3(0.0, 1.0, 0.0));
+        let v1 = Vertex::new(vec3(-0.5, -0.5, 0.0), vec3(1.0, 0.0, 0.0));
+        let v2 = Vertex::new(vec3(0.5, -0.5, 0.0), vec3(1.0, 0.0, 0.0));
+        let v3 = Vertex::new(vec3(0.5, 0.5, 0.0), vec3(0.0, 0.0, 1.0));
+        let v4 = Vertex::new(vec3(-0.5, 0.5, 0.0), vec3(0.0, 1.0, 0.0));
         let vertices = vec![v1, v2, v3, v4];
         let indices = vec![0, 1, 2, 2, 3, 0];
         Self { vertices, indices }
