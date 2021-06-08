@@ -1,6 +1,5 @@
 use anyhow::Result;
 use ash::{version::InstanceV1_0, vk};
-use cgmath::Vector3;
 use hotham_error::HothamError;
 use openxr as xr;
 use renderer::Renderer;
@@ -13,7 +12,12 @@ use std::{
     thread::sleep,
     time::Duration,
 };
-use xr::{vulkan::SessionCreateInfo, FrameStream, FrameWaiter, Session, Vulkan};
+use xr::{
+    vulkan::SessionCreateInfo, EventDataBuffer, FrameStream, FrameWaiter, Session, SessionState,
+    Swapchain, SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Vulkan,
+};
+
+pub use vertex::Vertex;
 
 use crate::vulkan_context::VulkanContext;
 
@@ -24,6 +28,7 @@ mod image;
 mod renderer;
 mod swapchain;
 mod util;
+mod vertex;
 mod vulkan_context;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
@@ -37,38 +42,13 @@ pub struct App<P: Program> {
     program: P,
     should_quit: Arc<AtomicBool>,
     renderer: Renderer,
-    _xr_instance: openxr::Instance,
-    _xr_session: Session<Vulkan>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Vertex {
-    position: Vector3<f32>,
-    color: Vector3<f32>,
-}
-
-impl Vertex {
-    pub fn new(position: Vector3<f32>, color: Vector3<f32>) -> Self {
-        Self { position, color }
-    }
-}
-
-impl Vertex {
-    pub fn attribute_descriptions() -> Vec<vk::VertexInputAttributeDescription> {
-        let position = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(0)
-            .format(vk::Format::R32G32B32_SFLOAT)
-            .build();
-
-        let colour = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(1)
-            .format(vk::Format::R32G32B32_SFLOAT)
-            .build();
-
-        vec![position, colour]
-    }
+    xr_instance: openxr::Instance,
+    xr_session: Session<Vulkan>,
+    xr_state: SessionState,
+    xr_swapchain: Swapchain<Vulkan>,
+    event_buffer: EventDataBuffer,
+    frame_waiter: FrameWaiter,
+    frame_stream: FrameStream<Vulkan>,
 }
 
 impl<P> App<P>
@@ -81,15 +61,32 @@ where
         let (xr_instance, system) = create_xr_instance()?;
 
         let vulkan_context = VulkanContext::create_from_xr_instance(&xr_instance, system)?;
-        let (xr_session, _, _) = create_xr_session(&xr_instance, system, &vulkan_context)?;
-        let renderer = Renderer::new(vulkan_context, &xr_session, &xr_instance, system, &params)?;
+        let (xr_session, frame_waiter, frame_stream) =
+            create_xr_session(&xr_instance, system, &vulkan_context)?; // TODO: Extract to XRContext
+        let swapchain_resolution = get_swapchain_resolution(&xr_instance, system)?;
+        let xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution)?;
+
+        let renderer = Renderer::new(
+            vulkan_context,
+            &xr_session,
+            &xr_instance,
+            &xr_swapchain,
+            swapchain_resolution,
+            system,
+            &params,
+        )?;
 
         Ok(Self {
             program,
             renderer,
             should_quit: Arc::new(AtomicBool::from(false)),
-            _xr_instance: xr_instance,
-            _xr_session: xr_session,
+            xr_instance,
+            xr_session,
+            xr_swapchain,
+            xr_state: SessionState::IDLE,
+            event_buffer: Default::default(),
+            frame_stream,
+            frame_waiter,
         })
     }
 
@@ -99,19 +96,85 @@ where
             .map_err(anyhow::Error::new)?;
 
         while !self.should_quit.load(Ordering::Relaxed) {
+            let current_state = self.poll_xr_event()?;
+            if current_state == SessionState::IDLE {
+                sleep(Duration::from_secs(1));
+                continue;
+            }
+
+            if current_state == SessionState::EXITING {
+                break;
+            }
+
             // Tell the program to update its geometry
             let (vertices, indices) = self.program.update();
 
             // Push the updated geometry back into Vulkan
             self.renderer.update(vertices, indices);
 
-            // Now draw an image
-            self.renderer.draw()?;
-            sleep(Duration::from_secs(1))
+            // Wait for a frame to become available from the runtime
+            let frame_state = self.frame_waiter.wait()?;
+            if frame_state.should_render {
+                // Now draw an image
+                self.renderer.draw()?;
+            }
         }
 
         Ok(())
     }
+
+    fn poll_xr_event(&mut self) -> Result<SessionState> {
+        loop {
+            match self.xr_instance.poll_event(&mut self.event_buffer)? {
+                Some(xr::Event::SessionStateChanged(session_changed)) => {
+                    let new_state = session_changed.state();
+
+                    if self.xr_state == SessionState::IDLE && new_state == SessionState::READY {
+                        self.xr_session.begin(VIEW_TYPE)?;
+                    }
+
+                    println!("[HOTHAM_POLL_EVENT] State is now {:?}", new_state);
+                    self.xr_state = new_state;
+                }
+                Some(_) => {}
+                None => break,
+            }
+        }
+
+        Ok(self.xr_state)
+    }
+}
+
+fn get_swapchain_resolution(
+    xr_instance: &xr::Instance,
+    system: xr::SystemId,
+) -> Result<vk::Extent2D> {
+    let views = xr_instance.enumerate_view_configuration_views(system, VIEW_TYPE)?;
+    let resolution = vk::Extent2D {
+        width: views[0].recommended_image_rect_width,
+        height: views[0].recommended_image_rect_height,
+    };
+
+    Ok(resolution)
+}
+
+fn create_xr_swapchain(
+    xr_session: &Session<Vulkan>,
+    resolution: &vk::Extent2D,
+) -> Result<Swapchain<Vulkan>> {
+    xr_session
+        .create_swapchain(&SwapchainCreateInfo {
+            create_flags: SwapchainCreateFlags::EMPTY,
+            usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
+            format: COLOR_FORMAT.as_raw() as u32,
+            sample_count: 1,
+            width: resolution.width,
+            height: resolution.height,
+            face_count: 1,
+            array_size: VIEW_COUNT,
+            mip_count: 1,
+        })
+        .map_err(Into::into)
 }
 
 fn create_xr_session(
