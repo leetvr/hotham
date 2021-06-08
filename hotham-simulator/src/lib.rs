@@ -1515,15 +1515,17 @@ unsafe extern "system" fn end_frame(
 
     let ext = khr::Swapchain::new(instance, device);
 
-    println!(
-        "[HOTHAM_SIMULATOR] About to present frame {}",
-        state.frame_count
-    );
-    ext.queue_present(queue, &present_info).unwrap();
-    println!("[HOTHAM_SIMULATOR] done! Probably?");
-
-    state.frame_count += 1;
-    Result::SUCCESS
+    match ext.queue_present(queue, &present_info) {
+        Ok(_) => {
+            println!("[HOTHAM_SIMULATOR] done! Probably?");
+            state.frame_count += 1;
+            Result::SUCCESS
+        }
+        Err(e) => {
+            eprintln!("[HOTHAM_SIMULATOR] !ERROR RENDERING FRAME! {:?}", e);
+            Result::ERROR_VALIDATION_FAILURE
+        }
+    }
 }
 
 unsafe extern "system" fn request_exit_session(_session: Session) -> Result {
