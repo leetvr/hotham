@@ -3,7 +3,7 @@ use std::{ffi::CStr, mem::size_of, u64};
 use crate::{
     buffer::Buffer, frame::Frame, hotham_error::HothamError, image::Image, swapchain::Swapchain,
     vulkan_context::VulkanContext, ProgramInitialization, Result, Vertex, COLOR_FORMAT,
-    DEPTH_FORMAT, SWAPCHAIN_LENGTH,
+    DEPTH_FORMAT,
 };
 use anyhow::Context;
 use ash::{version::DeviceV1_0, vk};
@@ -11,7 +11,7 @@ use openxr as xr;
 use xr::Vulkan;
 
 pub(crate) struct Renderer {
-    swapchain: Swapchain,
+    _swapchain: Swapchain,
     context: VulkanContext,
     frames: Vec<Frame>,
     pipeline_layout: vk::PipelineLayout,
@@ -51,11 +51,8 @@ impl Drop for Renderer {
 impl Renderer {
     pub(crate) fn new(
         vulkan_context: VulkanContext,
-        xr_session: &xr::Session<Vulkan>,
-        xr_instance: &xr::Instance,
         xr_swapchain: &xr::Swapchain<Vulkan>,
         swapchain_resolution: vk::Extent2D,
-        system: xr::SystemId,
         params: &ProgramInitialization,
     ) -> Result<Self> {
         println!("[HOTHAM_INIT] Creating renderer..");
@@ -90,7 +87,7 @@ impl Renderer {
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
         Ok(Self {
-            swapchain,
+            _swapchain: swapchain,
             context: vulkan_context,
             frames,
             pipeline,
@@ -104,11 +101,12 @@ impl Renderer {
         })
     }
 
-    pub fn draw(&mut self) -> Result<()> {
+    pub fn draw(&mut self, frame_index: usize) -> Result<()> {
         let device = &self.context.device;
-        self.frame_index = (self.frame_index + 1) % SWAPCHAIN_LENGTH;
-        let frame = &self.frames[self.frame_index];
+        let frame = &self.frames[frame_index];
+
         self.prepare_frame(frame)?;
+
         let command_buffer = frame.command_buffer;
         let submit_info = vk::SubmitInfo::builder()
             .command_buffers(&[command_buffer])
@@ -116,7 +114,6 @@ impl Renderer {
         let fence = frame.fence;
         let fences = [fence];
 
-        // TODO OpenXR stuff
         unsafe {
             device.reset_fences(&fences)?;
             device.queue_submit(self.context.graphics_queue, &[submit_info], fence)?;
@@ -147,6 +144,7 @@ impl Renderer {
                     },
                 },
             ]);
+
         unsafe {
             device.begin_command_buffer(
                 command_buffer,

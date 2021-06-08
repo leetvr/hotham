@@ -13,8 +13,9 @@ use std::{
     time::Duration,
 };
 use xr::{
-    vulkan::SessionCreateInfo, EventDataBuffer, FrameStream, FrameWaiter, Session, SessionState,
-    Swapchain, SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Vulkan,
+    vulkan::SessionCreateInfo, EventDataBuffer, FrameStream, FrameWaiter, ReferenceSpaceType,
+    Session, SessionState, Swapchain, SwapchainCreateFlags, SwapchainCreateInfo,
+    SwapchainUsageFlags, Vulkan,
 };
 
 pub use vertex::Vertex;
@@ -37,6 +38,7 @@ pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
 pub const VIEW_COUNT: u32 = 2;
 pub const SWAPCHAIN_LENGTH: usize = 3;
 pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIMARY_STEREO;
+pub const BLEND_MODE: xr::EnvironmentBlendMode = xr::EnvironmentBlendMode::OPAQUE;
 
 pub struct App<P: Program> {
     program: P,
@@ -46,6 +48,8 @@ pub struct App<P: Program> {
     xr_session: Session<Vulkan>,
     xr_state: SessionState,
     xr_swapchain: Swapchain<Vulkan>,
+    xr_space: xr::Space,
+    swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<Vulkan>,
@@ -63,18 +67,12 @@ where
         let vulkan_context = VulkanContext::create_from_xr_instance(&xr_instance, system)?;
         let (xr_session, frame_waiter, frame_stream) =
             create_xr_session(&xr_instance, system, &vulkan_context)?; // TODO: Extract to XRContext
+        let xr_space =
+            xr_session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&xr_instance, system)?;
         let xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution)?;
 
-        let renderer = Renderer::new(
-            vulkan_context,
-            &xr_session,
-            &xr_instance,
-            &xr_swapchain,
-            swapchain_resolution,
-            system,
-            &params,
-        )?;
+        let renderer = Renderer::new(vulkan_context, &xr_swapchain, swapchain_resolution, &params)?;
 
         Ok(Self {
             program,
@@ -83,7 +81,9 @@ where
             xr_instance,
             xr_session,
             xr_swapchain,
+            xr_space,
             xr_state: SessionState::IDLE,
+            swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,
             frame_waiter,
@@ -97,6 +97,7 @@ where
 
         while !self.should_quit.load(Ordering::Relaxed) {
             let current_state = self.poll_xr_event()?;
+
             if current_state == SessionState::IDLE {
                 sleep(Duration::from_secs(1));
                 continue;
@@ -113,14 +114,66 @@ where
             self.renderer.update(vertices, indices);
 
             // Wait for a frame to become available from the runtime
-            let frame_state = self.frame_waiter.wait()?;
+            let (frame_state, swapchain_image_index) = self.begin_frame()?;
+
             if frame_state.should_render {
-                // Now draw an image
-                self.renderer.draw()?;
+                self.renderer.draw(swapchain_image_index)?;
             }
+
+            let (_view_flags, views) = self.xr_session.locate_views(
+                VIEW_TYPE,
+                frame_state.predicted_display_time,
+                &self.xr_space,
+            )?;
+
+            // TODO: Update view matrices
+
+            // Release the image back to OpenXR
+            self.end_frame(frame_state, &views)?;
         }
 
         Ok(())
+    }
+
+    fn begin_frame(&mut self) -> Result<(xr::FrameState, usize)> {
+        let frame_state = self.frame_waiter.wait()?;
+
+        let image_index = self.xr_swapchain.acquire_image()?;
+        self.xr_swapchain.wait_image(openxr::Duration::INFINITE)?;
+
+        Ok((frame_state, image_index as _))
+    }
+
+    fn end_frame(
+        &mut self,
+        frame_state: xr::FrameState,
+        views: &Vec<xr::View>,
+    ) -> openxr::Result<()> {
+        self.xr_swapchain.release_image()?;
+
+        let rect = xr::Rect2Di {
+            offset: xr::Offset2Di { x: 0, y: 0 },
+            extent: xr::Extent2Di {
+                width: self.swapchain_resolution.width as _,
+                height: self.swapchain_resolution.height as _,
+            },
+        };
+
+        self.frame_stream.end(
+            frame_state.predicted_display_time,
+            BLEND_MODE,
+            &[&xr::CompositionLayerProjection::new()
+                .space(&self.xr_space)
+                .views(&[xr::CompositionLayerProjectionView::new()
+                    .pose(views[0].pose)
+                    .fov(views[0].fov)
+                    .sub_image(
+                        xr::SwapchainSubImage::new()
+                            .swapchain(&self.xr_swapchain)
+                            .image_array_index(0)
+                            .image_rect(rect),
+                    )])],
+        )
     }
 
     fn poll_xr_event(&mut self) -> Result<SessionState> {
