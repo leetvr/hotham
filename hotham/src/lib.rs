@@ -17,6 +17,7 @@ use xr::{vulkan::SessionCreateInfo, FrameStream, FrameWaiter, Session, Vulkan};
 
 use crate::vulkan_context::VulkanContext;
 
+mod buffer;
 mod frame;
 mod hotham_error;
 mod image;
@@ -24,7 +25,6 @@ mod renderer;
 mod swapchain;
 mod util;
 mod vulkan_context;
-mod buffer;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
@@ -58,13 +58,13 @@ impl Vertex {
         let position = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(0)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R32G32B32_SFLOAT)
             .build();
 
         let colour = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(1)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R32G32B32_SFLOAT)
             .build();
 
         vec![position, colour]
