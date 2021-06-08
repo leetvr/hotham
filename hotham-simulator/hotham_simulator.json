@@ -3,6 +3,6 @@
   "runtime": {
     "api_version": "1.0",
     "name": "Hotham Simulator",
-    "library_path": ".\\target\\debug\\hotham_simulator.dll"
+    "library_path": "..\\target\\debug\\hotham_simulator.dll"
   }
 }
