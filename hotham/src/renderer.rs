@@ -27,6 +27,10 @@ pub(crate) struct Renderer {
 impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
+            self.context
+                .device
+                .queue_wait_idle(self.context.graphics_queue)
+                .expect("Unable to wait for queue to become idle!");
             self.depth_image.destroy(&self.context);
             self.vertex_buffer.destroy(&self.context);
             self.index_buffer.destroy(&self.context); // possible to get child resources to drop on their own??
