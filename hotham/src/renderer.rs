@@ -3,7 +3,7 @@ use std::{ffi::CStr, mem::size_of, u64};
 use crate::{
     buffer::Buffer, frame::Frame, hotham_error::HothamError, image::Image, swapchain::Swapchain,
     vulkan_context::VulkanContext, ProgramInitialization, Result, Vertex, COLOR_FORMAT,
-    DEPTH_FORMAT,
+    DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Context;
 use ash::{version::DeviceV1_0, vk};
@@ -278,10 +278,16 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .build();
     let dependencies = [dependency];
 
+    let view_masks = [!(!0 << VIEW_COUNT)];
+    let mut multiview = vk::RenderPassMultiviewCreateInfo::builder()
+        .view_masks(&view_masks)
+        .correlation_masks(&view_masks);
+
     let create_info = vk::RenderPassCreateInfo::builder()
         .attachments(&attachments)
         .subpasses(&subpasses)
-        .dependencies(&dependencies);
+        .dependencies(&dependencies)
+        .push_next(&mut multiview);
 
     let render_pass = unsafe { vulkan_context.device.create_render_pass(&create_info, None) }?;
     println!("..done!");
