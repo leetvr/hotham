@@ -17,7 +17,7 @@ pub(crate) struct Renderer {
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     render_pass: vk::RenderPass,
-    frame_index: usize,
+    pub frame_index: usize,
     depth_image: Image,
     render_area: vk::Rect2D,
     vertex_buffer: Buffer<Vertex>,
@@ -102,6 +102,7 @@ impl Renderer {
     }
 
     pub fn draw(&mut self, frame_index: usize) -> Result<()> {
+        self.frame_index += 1;
         let device = &self.context.device;
         let frame = &self.frames[frame_index];
 
