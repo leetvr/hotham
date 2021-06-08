@@ -458,7 +458,7 @@ unsafe extern "system" fn enumerate_environment_blend_modes(
 
 unsafe extern "system" fn get_system(
     _instance: Instance,
-    get_info: *const SystemGetInfo,
+    _get_info: *const SystemGetInfo,
     system_id: *mut SystemId,
 ) -> Result {
     *system_id = SystemId::from_raw(42);
