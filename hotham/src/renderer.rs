@@ -1,7 +1,7 @@
 use std::{ffi::CStr, mem::size_of};
 
 use crate::{
-    frame::Frame, hotham_error::HothamError, image::Image, swapchain::Swapchain,
+    buffer::Buffer, frame::Frame, hotham_error::HothamError, image::Image, swapchain::Swapchain,
     vulkan_context::VulkanContext, ProgramInitialization, Result, Vertex, COLOR_FORMAT,
     DEPTH_FORMAT, SWAPCHAIN_LENGTH,
 };
@@ -20,14 +20,16 @@ pub(crate) struct Renderer {
     frame_index: usize,
     depth_image: Image,
     render_area: vk::Rect2D,
-    _vertices: Vec<Vertex>,
-    indices: Vec<u32>,
+    vertex_buffer: Buffer<Vertex>,
+    index_buffer: Buffer<u32>,
 }
 
 impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
             self.depth_image.destroy(&self.context);
+            self.vertex_buffer.destroy(&self.context);
+            self.index_buffer.destroy(&self.context); // possible to get child resources to drop on their own??
             for frame in self.frames.drain(..) {
                 frame.destroy(&self.context);
             }
@@ -67,8 +69,17 @@ impl Renderer {
         )?;
 
         let depth_image = vulkan_context.create_image(DEPTH_FORMAT, &swapchain.resolution)?;
-
         let frames = create_frames(&vulkan_context, &render_pass, &swapchain, &depth_image)?;
+        let vertex_buffer = Buffer::new(
+            &vulkan_context,
+            &params.vertices,
+            vk::BufferUsageFlags::VERTEX_BUFFER,
+        )?;
+        let index_buffer = Buffer::new(
+            &vulkan_context,
+            &params.indices,
+            vk::BufferUsageFlags::INDEX_BUFFER,
+        )?;
 
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
@@ -82,8 +93,8 @@ impl Renderer {
             frame_index: 0,
             depth_image,
             render_area,
-            indices: params.indices.clone(),
-            _vertices: params.vertices.clone(),
+            vertex_buffer,
+            index_buffer,
         })
     }
 
@@ -99,6 +110,7 @@ impl Renderer {
 
         // TODO OpenXR stuff
         unsafe {
+            self.context.device.reset_fences(&[fence])?;
             self.context
                 .device
                 .queue_submit(self.context.graphics_queue, &[submit_info], fence)
@@ -144,7 +156,21 @@ impl Renderer {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline,
             );
-            device.cmd_draw_indexed(command_buffer, self.indices.len() as _, 1, 0, 0, 1);
+            device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.handle], &[0]);
+            device.cmd_bind_index_buffer(
+                command_buffer,
+                self.index_buffer.handle,
+                0,
+                vk::IndexType::UINT32,
+            );
+            device.cmd_draw_indexed(
+                command_buffer,
+                self.index_buffer.data.len() as _,
+                1,
+                0,
+                0,
+                1,
+            );
             device.cmd_end_render_pass(command_buffer);
             device.end_command_buffer(command_buffer)?;
         };
