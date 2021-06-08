@@ -154,7 +154,7 @@ impl VulkanContext {
     ) -> Result<vk::ImageView> {
         let aspect_mask = get_aspect_mask(format)?;
         let create_info = vk::ImageViewCreateInfo::builder()
-            .view_type(vk::ImageViewType::TYPE_2D)
+            .view_type(vk::ImageViewType::TYPE_2D_ARRAY)
             .format(format)
             .components(vk::ComponentMapping {
                 r: vk::ComponentSwizzle::R,
@@ -167,7 +167,7 @@ impl VulkanContext {
                 base_mip_level: 0,
                 level_count: 1,
                 base_array_layer: 0,
-                layer_count: 1, // TODO: multiview?
+                layer_count: 2,
             })
             .image(*image);
         unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
