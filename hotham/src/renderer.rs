@@ -175,7 +175,7 @@ impl Renderer {
                 1,
                 0,
                 0,
-                1,
+                0,
             );
             device.cmd_end_render_pass(command_buffer);
             device.end_command_buffer(command_buffer)?;
@@ -370,8 +370,8 @@ fn create_pipeline(
     // Rasterization state
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
-        .cull_mode(vk::CullModeFlags::NONE)
-        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+        .cull_mode(vk::CullModeFlags::BACK)
+        .front_face(vk::FrontFace::CLOCKWISE)
         .depth_clamp_enable(false)
         .rasterizer_discard_enable(false)
         .depth_bias_enable(false)
