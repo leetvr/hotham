@@ -472,7 +472,7 @@ unsafe extern "system" fn get_system(
 
 unsafe extern "system" fn create_session(
     _instance: Instance,
-    create_info: *const SessionCreateInfo,
+    _create_info: *const SessionCreateInfo,
     session: *mut Session,
 ) -> Result {
     let mut s = Box::new(HothamSession::default());
