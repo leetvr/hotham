@@ -1,0 +1,22 @@
+[package]
+authors = ["Kane Rogers <kane.m.rogers@gmail.com>"]
+build = "build.rs"
+edition = "2018"
+name = "hotham-simulator"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ash = "0.32"
+ash-window = "*"
+lazy_static = "1.4.0"
+openxr-sys = "0.8"
+winit = "0.25"
+
+[build-dependencies]
+bindgen = "*"
+shaderc = "0.7.2"
