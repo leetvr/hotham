@@ -1,4 +1,4 @@
-use std::{ffi::CStr, mem::size_of};
+use std::{ffi::CStr, mem::size_of, u64};
 
 use crate::{
     buffer::Buffer, frame::Frame, hotham_error::HothamError, image::Image, swapchain::Swapchain,
@@ -103,6 +103,7 @@ impl Renderer {
     }
 
     pub fn draw(&mut self) -> Result<()> {
+        let device = &self.context.device;
         self.frame_index = (self.frame_index + 1) % SWAPCHAIN_LENGTH;
         let frame = &self.frames[self.frame_index];
         self.prepare_frame(frame)?;
@@ -111,14 +112,14 @@ impl Renderer {
             .command_buffers(&[command_buffer])
             .build();
         let fence = frame.fence;
+        let fences = [fence];
 
         // TODO OpenXR stuff
         unsafe {
-            self.context.device.reset_fences(&[fence])?;
-            self.context
-                .device
-                .queue_submit(self.context.graphics_queue, &[submit_info], fence)
-        }?;
+            device.reset_fences(&fences)?;
+            device.queue_submit(self.context.graphics_queue, &[submit_info], fence)?;
+            device.wait_for_fences(&fences, true, u64::MAX)?;
+        };
 
         Ok(())
     }
