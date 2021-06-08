@@ -461,11 +461,6 @@ unsafe extern "system" fn get_system(
     get_info: *const SystemGetInfo,
     system_id: *mut SystemId,
 ) -> Result {
-    let get_info = *get_info;
-    println!(
-        "[HOTHAM_SIMULATOR] Get info called with {:?}",
-        get_info.form_factor
-    );
     *system_id = SystemId::from_raw(42);
     Result::SUCCESS
 }
@@ -1003,8 +998,11 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
     let (tx, rx) = channel();
     let window_thread_handle = thread::spawn(move || {
         let mut event_loop: EventLoop<()> = EventLoop::new_any_thread();
-        println!("[HOTHAM_SIMULATOR] Creating window..");
-        let visible = false;
+        let visible = true;
+        println!(
+            "[HOTHAM_SIMULATOR] Creating window with visible {}..",
+            visible
+        );
         let window = WindowBuilder::new()
             .with_inner_size(PhysicalSize::new(600, 600))
             .with_title("Hotham Simulator")
