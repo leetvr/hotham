@@ -205,23 +205,41 @@ impl VulkanContext {
         &self,
         data: *const T,
         usage: vk::BufferUsageFlags,
-        count: usize,
+        item_count: usize,
     ) -> Result<(vk::Buffer, vk::DeviceMemory)> {
-        let size = size_of::<T>() as _;
+        let buffer_size = (size_of::<T>() * item_count) as _;
         let device = &self.device;
         let buffer_create_info = vk::BufferCreateInfo::builder()
-            .size(size)
+            .size(buffer_size)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .usage(usage);
 
         let buffer = unsafe { device.create_buffer(&buffer_create_info, None) }?;
         let device_memory = self.allocate_buffer_memory(buffer)?;
         unsafe { device.bind_buffer_memory(buffer, device_memory, 0) }?;
-        let dst =
-            unsafe { device.map_memory(device_memory, 0, size, vk::MemoryMapFlags::empty()) }?;
-        unsafe { copy(data, dst as *mut _, count) };
+        self.update_buffer(data, item_count, device_memory)?;
 
         Ok((buffer, device_memory))
+    }
+
+    pub fn update_buffer<T: Sized>(
+        &self,
+        data: *const T,
+        item_count: usize,
+        device_memory: vk::DeviceMemory,
+    ) -> Result<()> {
+        let buffer_size = (size_of::<T>() * item_count) as _;
+        let dst = unsafe {
+            self.device
+                .map_memory(device_memory, 0, buffer_size, vk::MemoryMapFlags::empty())
+        }?;
+
+        unsafe {
+            copy(data, dst as *mut _, item_count);
+            self.device.unmap_memory(device_memory);
+        };
+
+        Ok(())
     }
 
     pub fn find_memory_type(
