@@ -203,11 +203,12 @@ impl VulkanContext {
 
     pub fn create_buffer_with_data<T: Sized>(
         &self,
-        data: &Vec<T>,
+        data: *const T,
         usage: vk::BufferUsageFlags,
+        count: usize,
     ) -> Result<(vk::Buffer, vk::DeviceMemory)> {
+        let size = size_of::<T>() as _;
         let device = &self.device;
-        let size = (size_of::<T>() * data.len()) as _;
         let buffer_create_info = vk::BufferCreateInfo::builder()
             .size(size)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -218,7 +219,7 @@ impl VulkanContext {
         unsafe { device.bind_buffer_memory(buffer, device_memory, 0) }?;
         let dst =
             unsafe { device.map_memory(device_memory, 0, size, vk::MemoryMapFlags::empty()) }?;
-        unsafe { copy(data.as_ptr(), dst as *mut _, data.len()) };
+        unsafe { copy(data, dst as *mut _, count) };
 
         Ok((buffer, device_memory))
     }
