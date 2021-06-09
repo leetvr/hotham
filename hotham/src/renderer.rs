@@ -165,7 +165,8 @@ impl Renderer {
     pub fn update_view_matrix(&mut self) -> Result<()> {
         let time_delta = (Instant::now() - self.render_start_time).as_secs_f32();
         let angle = Deg(90.0 * time_delta);
-        let model = Matrix4::from_angle_z(angle);
+        // let model = Matrix4::from_angle_z(angle);
+        let model = Matrix4::from_scale(1.0);
 
         let eye = Point3::new(2.0, 2.0, 2.0);
         let center = Point3::new(0.0, 0.0, 0.0);
@@ -176,13 +177,16 @@ impl Renderer {
         let aspect = self.swapchain.resolution.width / self.swapchain.resolution.height;
         let near = 0.1;
         let far = 10.0;
-        let projection = perspective(fovy, aspect as _, near, far);
+        let mut projection = perspective(fovy, aspect as _, near, far);
+        projection[1][1] *= -1.0;
 
         let view_matrix = ViewMatrix {
             model,
             view,
             projection,
         };
+
+        println!("[HOTHAM_VIEW_MATRIX] View matrix is now {:?}", view_matrix);
 
         self.uniform_buffer
             .update(&self.vulkan_context, &view_matrix, 1)?;
@@ -469,7 +473,7 @@ fn create_pipeline(
     // Rasterization state
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
-        .cull_mode(vk::CullModeFlags::BACK)
+        .cull_mode(vk::CullModeFlags::NONE)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)
@@ -487,7 +491,7 @@ fn create_pipeline(
     let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
         .depth_test_enable(true)
         .depth_write_enable(true)
-        .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
+        .depth_compare_op(vk::CompareOp::LESS)
         .depth_bounds_test_enable(false)
         .min_depth_bounds(0.0)
         .max_depth_bounds(1.0)
