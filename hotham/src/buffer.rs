@@ -23,7 +23,7 @@ where
     ) -> Result<Self> {
         let item_count = data.len();
         let (handle, device_memory) =
-            vulkan_context.create_buffer_with_data(data, usage, item_count)?;
+            vulkan_context.create_buffer_with_data(data.as_ptr(), usage, item_count)?;
 
         Ok(Self {
             handle,
