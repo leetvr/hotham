@@ -1,16 +1,22 @@
+use std::marker::PhantomData;
+
 use anyhow::Result;
 use ash::{version::DeviceV1_0, vk};
 
 use crate::vulkan_context::VulkanContext;
 
-pub(crate) struct Buffer {
+pub(crate) struct Buffer<T> {
     pub handle: vk::Buffer,
     pub device_memory: vk::DeviceMemory,
     pub item_count: usize,
+    pub _phantom: PhantomData<T>,
 }
 
-impl Buffer {
-    pub fn new_from_vec<T: Sized>(
+impl<T> Buffer<T>
+where
+    T: Sized,
+{
+    pub fn new_from_vec(
         vulkan_context: &VulkanContext,
         data: &Vec<T>,
         usage: vk::BufferUsageFlags,
@@ -23,10 +29,11 @@ impl Buffer {
             handle,
             device_memory,
             item_count,
+            _phantom: PhantomData,
         })
     }
 
-    pub fn new<T: Sized>(
+    pub fn new(
         vulkan_context: &VulkanContext,
         data: &T,
         usage: vk::BufferUsageFlags,
@@ -39,11 +46,22 @@ impl Buffer {
             handle,
             device_memory,
             item_count,
+            _phantom: PhantomData,
         })
+    }
+
+    pub fn update(
+        &mut self,
+        vulkan_context: &VulkanContext,
+        data: &T,
+        item_count: usize,
+    ) -> Result<()> {
+        self.item_count = item_count;
+        vulkan_context.update_buffer(data, item_count, self.device_memory)
     }
 }
 
-impl Buffer {
+impl<T> Buffer<T> {
     pub fn destroy(&self, vulkan_context: &VulkanContext) -> () {
         let device = &vulkan_context.device;
         unsafe {

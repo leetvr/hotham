@@ -2,9 +2,9 @@ use cgmath::{Matrix4, SquareMatrix};
 
 #[derive(Clone, Debug)]
 pub struct ViewMatrix {
-    model: Matrix4<f32>,
-    view: Matrix4<f32>,
-    projection: Matrix4<f32>,
+    pub model: Matrix4<f32>,
+    pub view: Matrix4<f32>,
+    pub projection: Matrix4<f32>,
 }
 
 impl Default for ViewMatrix {
