@@ -1,4 +1,4 @@
-use std::{ffi::CStr, mem::size_of, u64};
+use std::{ffi::CStr, mem::size_of, time::Instant, u64};
 
 use crate::{
     buffer::Buffer, frame::Frame, hotham_error::HothamError, image::Image, swapchain::Swapchain,
@@ -6,45 +6,54 @@ use crate::{
     DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Context;
-use ash::{version::DeviceV1_0, vk};
+use ash::{prelude::VkResult, version::DeviceV1_0, vk};
+use cgmath::{perspective, vec3, Deg, Matrix4, Point3};
 use openxr as xr;
 use xr::Vulkan;
 
 pub(crate) struct Renderer {
-    _swapchain: Swapchain,
-    context: VulkanContext,
+    swapchain: Swapchain,
+    vulkan_context: VulkanContext,
     frames: Vec<Frame>,
+    descriptor_set_layout: vk::DescriptorSetLayout,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     render_pass: vk::RenderPass,
     depth_image: Image,
     render_area: vk::Rect2D,
-    vertex_buffer: Buffer,
-    index_buffer: Buffer,
-    uniform_buffer: Buffer,
+    vertex_buffer: Buffer<Vertex>,
+    index_buffer: Buffer<u32>,
+    uniform_buffer: Buffer<ViewMatrix>,
+    render_start_time: Instant,
     pub frame_index: usize,
 }
 
 impl Drop for Renderer {
     fn drop(&mut self) {
         unsafe {
-            self.context
+            self.vulkan_context
                 .device
-                .queue_wait_idle(self.context.graphics_queue)
+                .queue_wait_idle(self.vulkan_context.graphics_queue)
                 .expect("Unable to wait for queue to become idle!");
-            self.depth_image.destroy(&self.context);
-            self.vertex_buffer.destroy(&self.context);
-            self.index_buffer.destroy(&self.context); // possible to get child resources to drop on their own??
+
+            self.vulkan_context
+                .device
+                .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
+            self.depth_image.destroy(&self.vulkan_context);
+            self.vertex_buffer.destroy(&self.vulkan_context);
+            self.index_buffer.destroy(&self.vulkan_context); // possible to get child resources to drop on their own??
             for frame in self.frames.drain(..) {
-                frame.destroy(&self.context);
+                frame.destroy(&self.vulkan_context);
             }
-            self.context
+            self.vulkan_context
                 .device
                 .destroy_pipeline_layout(self.pipeline_layout, None);
-            self.context
+            self.vulkan_context
                 .device
                 .destroy_render_pass(self.render_pass, None);
-            self.context.device.destroy_pipeline(self.pipeline, None);
+            self.vulkan_context
+                .device
+                .destroy_pipeline(self.pipeline, None);
         }
     }
 }
@@ -57,13 +66,19 @@ impl Renderer {
         params: &ProgramInitialization,
     ) -> Result<Self> {
         println!("[HOTHAM_INIT] Creating renderer..");
+
+        // Build swapchain
         let swapchain = Swapchain::new(xr_swapchain, swapchain_resolution)?;
         let render_area = vk::Rect2D {
             extent: swapchain.resolution,
             offset: vk::Offset2D::default(),
         };
-        let pipeline_layout = create_pipeline_layout(&vulkan_context)?;
+
+        let descriptor_set_layout = create_descriptor_set_layout(&vulkan_context)?;
+
+        // Pipeline, render pass
         let render_pass = create_render_pass(&vulkan_context)?;
+        let pipeline_layout = create_pipeline_layout(&vulkan_context, &[descriptor_set_layout])?;
         let pipeline = create_pipeline(
             &vulkan_context,
             pipeline_layout,
@@ -72,8 +87,13 @@ impl Renderer {
             render_pass,
         )?;
 
+        // Depth image, shared between frames
         let depth_image = vulkan_context.create_image(DEPTH_FORMAT, &swapchain.resolution)?;
+
+        // Create all the per-frame resources we need
         let frames = create_frames(&vulkan_context, &render_pass, &swapchain, &depth_image)?;
+
+        // Create buffers
         let vertex_buffer = Buffer::new_from_vec(
             &vulkan_context,
             &params.vertices,
@@ -84,6 +104,7 @@ impl Renderer {
             &params.indices,
             vk::BufferUsageFlags::INDEX_BUFFER,
         )?;
+
         let view_matrix = ViewMatrix::default();
         let uniform_buffer = Buffer::new(
             &vulkan_context,
@@ -94,9 +115,10 @@ impl Renderer {
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
         Ok(Self {
-            _swapchain: swapchain,
-            context: vulkan_context,
+            swapchain,
+            vulkan_context,
             frames,
+            descriptor_set_layout,
             pipeline,
             pipeline_layout,
             render_pass,
@@ -106,12 +128,15 @@ impl Renderer {
             vertex_buffer,
             index_buffer,
             uniform_buffer,
+            render_start_time: Instant::now(),
         })
     }
 
     pub fn draw(&mut self, frame_index: usize) -> Result<()> {
         self.frame_index += 1;
-        let device = &self.context.device;
+        self.update_view_matrix()?;
+
+        let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
 
         self.prepare_frame(frame)?;
@@ -125,15 +150,43 @@ impl Renderer {
 
         unsafe {
             device.reset_fences(&fences)?;
-            device.queue_submit(self.context.graphics_queue, &[submit_info], fence)?;
+            device.queue_submit(self.vulkan_context.graphics_queue, &[submit_info], fence)?;
             device.wait_for_fences(&fences, true, u64::MAX)?;
         };
 
         Ok(())
     }
 
+    pub fn update_view_matrix(&mut self) -> Result<()> {
+        let time_delta = (Instant::now() - self.render_start_time).as_secs_f32();
+        let angle = Deg(90.0 * time_delta);
+        let model = Matrix4::from_angle_z(angle);
+
+        let eye = Point3::new(2.0, 2.0, 2.0);
+        let center = Point3::new(0.0, 0.0, 0.0);
+        let up = vec3(0.0, 0.0, 1.0);
+        let view = Matrix4::look_at_lh(eye, center, up);
+
+        let fovy = Deg(45.0);
+        let aspect = self.swapchain.resolution.width / self.swapchain.resolution.height;
+        let near = 0.1;
+        let far = 10.0;
+        let projection = perspective(fovy, aspect as _, near, far);
+
+        let view_matrix = ViewMatrix {
+            model,
+            view,
+            projection,
+        };
+
+        self.uniform_buffer
+            .update(&self.vulkan_context, &view_matrix, 1)?;
+
+        Ok(())
+    }
+
     pub fn prepare_frame(&self, frame: &Frame) -> Result<()> {
-        let device = &self.context.device;
+        let device = &self.vulkan_context.device;
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
         let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
@@ -195,6 +248,24 @@ impl Renderer {
     pub fn update(&self, vertices: &Vec<Vertex>, indices: &Vec<u32>) -> () {
         println!("[HOTHAM_TEST] Vertices are now: {:?}", vertices);
         println!("[HOTHAM_TEST] Indices are now: {:?}", indices);
+    }
+}
+
+fn create_descriptor_set_layout(
+    vulkan_context: &VulkanContext,
+) -> VkResult<vk::DescriptorSetLayout> {
+    let binding = vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_count(1)
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .build();
+    let bindings = [binding];
+    let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
+
+    unsafe {
+        vulkan_context
+            .device
+            .create_descriptor_set_layout(&create_info, None)
     }
 }
 
@@ -472,11 +543,15 @@ fn read_spv_from_path(path: &std::path::Path) -> Result<Vec<u32>> {
         .map_err(|e| e.into())
 }
 
-fn create_pipeline_layout(vulkan_context: &VulkanContext) -> Result<vk::PipelineLayout> {
+fn create_pipeline_layout(
+    vulkan_context: &VulkanContext,
+    set_layouts: &[vk::DescriptorSetLayout],
+) -> Result<vk::PipelineLayout> {
     unsafe {
-        vulkan_context
-            .device
-            .create_pipeline_layout(&Default::default(), None)
+        vulkan_context.device.create_pipeline_layout(
+            &vk::PipelineLayoutCreateInfo::builder().set_layouts(set_layouts),
+            None,
+        )
     }
     .map_err(|e| e.into())
 }
