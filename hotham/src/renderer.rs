@@ -2,7 +2,7 @@ use std::{ffi::CStr, mem::size_of, u64};
 
 use crate::{
     buffer::Buffer, frame::Frame, hotham_error::HothamError, image::Image, swapchain::Swapchain,
-    vulkan_context::VulkanContext, ProgramInitialization, Result, Vertex, COLOR_FORMAT,
+    vulkan_context::VulkanContext, ProgramInitialization, Result, Vertex, ViewMatrix, COLOR_FORMAT,
     DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Context;
@@ -17,11 +17,12 @@ pub(crate) struct Renderer {
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     render_pass: vk::RenderPass,
-    pub frame_index: usize,
     depth_image: Image,
     render_area: vk::Rect2D,
-    vertex_buffer: Buffer<Vertex>,
-    index_buffer: Buffer<u32>,
+    vertex_buffer: Buffer,
+    index_buffer: Buffer,
+    uniform_buffer: Buffer,
+    pub frame_index: usize,
 }
 
 impl Drop for Renderer {
@@ -73,15 +74,21 @@ impl Renderer {
 
         let depth_image = vulkan_context.create_image(DEPTH_FORMAT, &swapchain.resolution)?;
         let frames = create_frames(&vulkan_context, &render_pass, &swapchain, &depth_image)?;
-        let vertex_buffer = Buffer::new(
+        let vertex_buffer = Buffer::new_from_vec(
             &vulkan_context,
             &params.vertices,
             vk::BufferUsageFlags::VERTEX_BUFFER,
         )?;
-        let index_buffer = Buffer::new(
+        let index_buffer = Buffer::new_from_vec(
             &vulkan_context,
             &params.indices,
             vk::BufferUsageFlags::INDEX_BUFFER,
+        )?;
+        let view_matrix = ViewMatrix::default();
+        let uniform_buffer = Buffer::new(
+            &vulkan_context,
+            &view_matrix,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
 
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
@@ -98,6 +105,7 @@ impl Renderer {
             render_area,
             vertex_buffer,
             index_buffer,
+            uniform_buffer,
         })
     }
 
@@ -171,7 +179,7 @@ impl Renderer {
             );
             device.cmd_draw_indexed(
                 command_buffer,
-                self.index_buffer.data.len() as _,
+                self.index_buffer.item_count as _,
                 1,
                 0,
                 0,

@@ -7,6 +7,7 @@ use openxr as xr;
 
 pub use app::App;
 pub use vertex::Vertex;
+pub use view_matrix::ViewMatrix;
 
 mod app;
 mod buffer;
@@ -18,6 +19,7 @@ mod swapchain;
 mod util;
 mod vertex;
 mod vulkan_context;
+mod view_matrix;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
