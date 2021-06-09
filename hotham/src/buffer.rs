@@ -1,9 +1,9 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, mem::size_of};
 
 use anyhow::Result;
 use ash::{version::DeviceV1_0, vk};
 
-use crate::vulkan_context::VulkanContext;
+use crate::{hotham_error::HothamError, vulkan_context::VulkanContext};
 
 pub(crate) struct Buffer<T> {
     pub handle: vk::Buffer,
@@ -59,6 +59,44 @@ where
         self.item_count = item_count;
         vulkan_context.update_buffer(data, item_count, self.device_memory)
     }
+
+    pub fn create_descriptor_set(
+        &self,
+        vulkan_context: &VulkanContext,
+        set_layouts: &[vk::DescriptorSetLayout],
+    ) -> Result<vk::DescriptorSet> {
+        let descriptor_set = unsafe {
+            vulkan_context.device.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::builder()
+                    .set_layouts(set_layouts)
+                    .descriptor_pool(vulkan_context.descriptor_pool),
+            )
+        }?
+        .pop()
+        .ok_or(HothamError::EmptyListError)?;
+
+        let buffer_info = vk::DescriptorBufferInfo::builder()
+            .buffer(self.handle)
+            .offset(0)
+            .range(size_of::<T>() as _)
+            .build();
+
+        let descriptor_write = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_set)
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .buffer_info(&[buffer_info])
+            .build();
+
+        unsafe {
+            vulkan_context
+                .device
+                .update_descriptor_sets(&[descriptor_write], &[])
+        };
+
+        Ok(descriptor_set)
+    }
 }
 
 impl<T> Buffer<T> {
@@ -66,7 +104,6 @@ impl<T> Buffer<T> {
         let device = &vulkan_context.device;
         unsafe {
             device.destroy_buffer(self.handle, None);
-            device.unmap_memory(self.device_memory);
             device.free_memory(self.device_memory, None);
         };
     }

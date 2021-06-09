@@ -1,4 +1,6 @@
-use crate::{hotham_error::HothamError, image::Image, Result, COLOR_FORMAT, DEPTH_FORMAT};
+use crate::{
+    hotham_error::HothamError, image::Image, Result, COLOR_FORMAT, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
+};
 use anyhow::anyhow;
 use ash::{
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
@@ -18,12 +20,15 @@ pub(crate) struct VulkanContext {
     pub command_pool: vk::CommandPool,
     pub queue_family_index: u32,
     pub graphics_queue: vk::Queue,
+    pub descriptor_pool: vk::DescriptorPool,
 }
 
 // NOTE: OpenXR created the instance / device etc. and is therefore the owner. We'll let it do the cleanup.
 impl Drop for VulkanContext {
     fn drop(&mut self) {
         unsafe {
+            self.device
+                .destroy_descriptor_pool(self.descriptor_pool, None);
             self.device.destroy_command_pool(self.command_pool, None);
         }
     }
@@ -134,6 +139,19 @@ impl VulkanContext {
             )
         }?;
 
+        let descriptor_pool = unsafe {
+            device.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::builder()
+                    .pool_sizes(&[vk::DescriptorPoolSize {
+                        ty: vk::DescriptorType::UNIFORM_BUFFER,
+                        descriptor_count: SWAPCHAIN_LENGTH as _,
+                        ..Default::default()
+                    }])
+                    .max_sets(SWAPCHAIN_LENGTH as _),
+                None,
+            )
+        }?;
+
         println!(" ..done!");
 
         Ok(Self {
@@ -144,6 +162,7 @@ impl VulkanContext {
             command_pool,
             queue_family_index,
             graphics_queue,
+            descriptor_pool,
         })
     }
 

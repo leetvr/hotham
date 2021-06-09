@@ -24,6 +24,7 @@ pub(crate) struct Renderer {
     vertex_buffer: Buffer<Vertex>,
     index_buffer: Buffer<u32>,
     uniform_buffer: Buffer<ViewMatrix>,
+    uniform_buffer_descriptor_set: vk::DescriptorSet,
     render_start_time: Instant,
     pub frame_index: usize,
 }
@@ -41,6 +42,7 @@ impl Drop for Renderer {
                 .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
             self.depth_image.destroy(&self.vulkan_context);
             self.vertex_buffer.destroy(&self.vulkan_context);
+            self.uniform_buffer.destroy(&self.vulkan_context);
             self.index_buffer.destroy(&self.vulkan_context); // possible to get child resources to drop on their own??
             for frame in self.frames.drain(..) {
                 frame.destroy(&self.vulkan_context);
@@ -111,6 +113,8 @@ impl Renderer {
             &view_matrix,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
+        let uniform_buffer_descriptor_set =
+            uniform_buffer.create_descriptor_set(&vulkan_context, &[descriptor_set_layout])?;
 
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
@@ -128,6 +132,7 @@ impl Renderer {
             vertex_buffer,
             index_buffer,
             uniform_buffer,
+            uniform_buffer_descriptor_set,
             render_start_time: Instant::now(),
         })
     }
@@ -223,6 +228,14 @@ impl Renderer {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline,
             );
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout,
+                0,
+                &[self.uniform_buffer_descriptor_set],
+                &[],
+            );
             device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.handle], &[0]);
             device.cmd_bind_index_buffer(
                 command_buffer,
@@ -257,6 +270,7 @@ fn create_descriptor_set_layout(
     let binding = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .build();
     let bindings = [binding];
