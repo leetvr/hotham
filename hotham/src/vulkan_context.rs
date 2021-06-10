@@ -328,7 +328,7 @@ fn get_aspect_mask(format: vk::Format) -> Result<vk::ImageAspectFlags> {
     }
 
     if format == DEPTH_FORMAT {
-        return Ok(vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL);
+        return Ok(vk::ImageAspectFlags::DEPTH);
     }
 
     return Err(HothamError::InvalidFormatError.into());
