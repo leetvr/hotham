@@ -175,12 +175,6 @@ impl VulkanContext {
         let create_info = vk::ImageViewCreateInfo::builder()
             .view_type(vk::ImageViewType::TYPE_2D_ARRAY)
             .format(format)
-            .components(vk::ComponentMapping {
-                r: vk::ComponentSwizzle::R,
-                g: vk::ComponentSwizzle::G,
-                b: vk::ComponentSwizzle::B,
-                a: vk::ComponentSwizzle::A,
-            })
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask,
                 base_mip_level: 0,
@@ -208,7 +202,7 @@ impl VulkanContext {
             .initial_layout(vk::ImageLayout::UNDEFINED)
             .usage(usage)
             .samples(vk::SampleCountFlags::TYPE_1)
-            .sharing_mode(vk::SharingMode::EXCLUSIVE); // TODO: multiview;
+            .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let image = unsafe { self.device.create_image(&create_info, None) }?;
 
         let device_memory = self.allocate_image_memory(image)?;
@@ -334,7 +328,7 @@ fn get_aspect_mask(format: vk::Format) -> Result<vk::ImageAspectFlags> {
     }
 
     if format == DEPTH_FORMAT {
-        return Ok(vk::ImageAspectFlags::DEPTH);
+        return Ok(vk::ImageAspectFlags::DEPTH | vk::ImageAspectFlags::STENCIL);
     }
 
     return Err(HothamError::InvalidFormatError.into());

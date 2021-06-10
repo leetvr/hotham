@@ -163,15 +163,17 @@ impl Renderer {
     }
 
     pub fn update_view_matrix(&mut self) -> Result<()> {
-        let time_delta = (Instant::now() - self.render_start_time).as_secs_f32();
+        let current_time = Instant::now();
+        let time_delta = current_time
+            .duration_since(self.render_start_time)
+            .as_secs_f32();
         let angle = Deg(90.0 * time_delta);
-        // let model = Matrix4::from_angle_z(angle);
-        let model = Matrix4::from_scale(1.0);
+        let model = Matrix4::from_angle_z(angle);
 
         let eye = Point3::new(2.0, 2.0, 2.0);
         let center = Point3::new(0.0, 0.0, 0.0);
         let up = vec3(0.0, 0.0, 1.0);
-        let view = Matrix4::look_at_lh(eye, center, up);
+        let view = Matrix4::look_at_rh(eye, center, up);
 
         let fovy = Deg(45.0);
         let aspect = self.swapchain.resolution.width / self.swapchain.resolution.height;
@@ -210,7 +212,7 @@ impl Renderer {
                 },
                 vk::ClearValue {
                     depth_stencil: vk::ClearDepthStencilValue {
-                        depth: 0.0,
+                        depth: 1.0,
                         stencil: 0,
                     },
                 },
@@ -299,7 +301,6 @@ fn create_frames(
         .iter()
         .flat_map(|i| vulkan_context.create_image_view(i, COLOR_FORMAT))
         .map(|i| {
-            // create image view
             Frame::new(
                 vulkan_context,
                 *render_pass,
@@ -345,14 +346,14 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .build();
     let color_attachments = [color_attachment_reference];
 
-    let depth_stencil_attachment = vk::AttachmentReference::builder()
+    let depth_stencil_reference = vk::AttachmentReference::builder()
         .attachment(1)
         .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     let subpass = vk::SubpassDescription::builder()
         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
         .color_attachments(&color_attachments)
-        .depth_stencil_attachment(&depth_stencil_attachment)
+        .depth_stencil_attachment(&depth_stencil_reference)
         .build();
     let subpasses = [subpass];
 
