@@ -1,4 +1,5 @@
 #version 450
+#extension GL_EXT_multiview : require
 
 layout (binding = 0) uniform sampler2DArray samplerView;
 
@@ -9,7 +10,7 @@ layout (constant_id = 0) const float VIEW_LAYER = 0.0f;
 
 void main() 
 {
-	const float alpha = 0.2;
+	const float alpha = 0.0;
 
 	vec2 p1 = vec2(2.0 * inUV - 1.0);
 	vec2 p2 = p1 / (1.0 - alpha * length(p1));
