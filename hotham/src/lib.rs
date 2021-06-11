@@ -18,8 +18,8 @@ mod renderer;
 mod swapchain;
 mod util;
 mod vertex;
-mod vulkan_context;
 mod view_matrix;
+mod vulkan_context;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
@@ -30,8 +30,8 @@ pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIM
 pub const BLEND_MODE: xr::EnvironmentBlendMode = xr::EnvironmentBlendMode::OPAQUE;
 
 pub trait Program {
-    fn update(&self) -> (&Vec<Vertex>, &Vec<u32>);
-    fn init(&self) -> ProgramInitialization;
+    fn update(&mut self) -> (&Vec<Vertex>, &Vec<u32>);
+    fn init(&mut self) -> ProgramInitialization;
 }
 
 #[derive(Debug, Clone)]
