@@ -38,7 +38,7 @@ impl<P> App<P>
 where
     P: Program,
 {
-    pub fn new(program: P) -> HothamResult<Self> {
+    pub fn new(mut program: P) -> HothamResult<Self> {
         let params = program.init();
         println!("[HOTHAM_APP] Initialised program with {:?}", params);
         let (xr_instance, system) = create_xr_instance()?;

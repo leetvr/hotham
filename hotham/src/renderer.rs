@@ -163,29 +163,26 @@ impl Renderer {
     }
 
     pub fn update_view_matrix(&mut self) -> Result<()> {
-        let current_time = Instant::now();
-        let time_delta = current_time
+        let delta_time = Instant::now()
             .duration_since(self.render_start_time)
             .as_secs_f32();
-        let angle = Deg(90.0 * time_delta);
-        let model = Matrix4::from_angle_z(angle);
+        // Camera (view)
+        let camera_location = Point3::new(0.0, 0.0, 5.0);
+        let camera_center = Point3::new(0.0, 0.0, 0.0);
+        let camera_up = vec3(0.0, 1.0, 0.0);
+        let view = Matrix4::look_at_rh(camera_location, camera_center, camera_up);
 
-        let eye = Point3::new(2.0, 2.0, 2.0);
-        let center = Point3::new(0.0, 0.0, 0.0);
-        let up = vec3(0.0, 0.0, 1.0);
-        let view = Matrix4::look_at_rh(eye, center, up);
-
+        // Projection
         let fovy = Deg(45.0);
         let aspect = self.swapchain.resolution.width / self.swapchain.resolution.height;
         let near = 0.1;
         let far = 10.0;
-        let mut projection = perspective(fovy, aspect as _, near, far);
-        projection[1][1] *= -1.0;
+        let projection = perspective(fovy, aspect as _, near, far);
 
         let view_matrix = ViewMatrix {
-            model,
             view,
             projection,
+            delta_time,
         };
 
         println!("[HOTHAM_VIEW_MATRIX] View matrix is now {:?}", view_matrix);
@@ -252,10 +249,10 @@ impl Renderer {
             device.cmd_draw_indexed(
                 command_buffer,
                 self.index_buffer.item_count as _,
+                2,
+                0,
+                0,
                 1,
-                0,
-                0,
-                0,
             );
             device.cmd_end_render_pass(command_buffer);
             device.end_command_buffer(command_buffer)?;
@@ -474,7 +471,7 @@ fn create_pipeline(
     // Rasterization state
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
-        .cull_mode(vk::CullModeFlags::NONE)
+        .cull_mode(vk::CullModeFlags::BACK)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)
