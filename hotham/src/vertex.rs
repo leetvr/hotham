@@ -1,14 +1,22 @@
 use ash::vk;
-use cgmath::Vector3;
+use cgmath::{vec3, Matrix4, Vector3};
+use rand::random;
 
+#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct Vertex {
-    position: Vector3<f32>,
-    color: Vector3<f32>,
+    pub position: Vector3<f32>,
+    pub color: Vector3<f32>,
 }
 
 impl Vertex {
-    pub fn new(position: Vector3<f32>, color: Vector3<f32>) -> Self {
+    pub fn new(position: Vector3<f32>, color: Vector3<f32>, transform: Matrix4<f32>) -> Self {
+        Self { position, color }
+    }
+
+    pub fn pos(position: Vector3<f32>) -> Self {
+        let color = vec3(random(), random(), random());
+        let transform = Matrix4::from_scale(1.0);
         Self { position, color }
     }
 }
