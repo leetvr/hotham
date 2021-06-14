@@ -24,17 +24,18 @@ use openxr_sys::{
     pfn,
     platform::{VkDevice, VkInstance, VkPhysicalDevice, VkResult},
     Action, ActionCreateInfo, ActionSet, ActionSetCreateInfo, ActionSpaceCreateInfo,
-    ActionStateGetInfo, ActionStatePose, ActionsSyncInfo, Duration, EnvironmentBlendMode,
-    EventDataBuffer, EventDataSessionStateChanged, Fovf, FrameBeginInfo, FrameEndInfo, FrameState,
-    FrameWaitInfo, GraphicsRequirementsVulkanKHR, Instance, InstanceCreateInfo, InstanceProperties,
-    InteractionProfileSuggestedBinding, Path, Posef, Quaternionf, ReferenceSpaceCreateInfo, Result,
-    Session, SessionActionSetsAttachInfo, SessionBeginInfo, SessionCreateInfo, SessionState, Space,
+    ActionStateBoolean, ActionStateFloat, ActionStateGetInfo, ActionStatePose, ActionsSyncInfo,
+    Duration, EnvironmentBlendMode, EventDataBuffer, EventDataSessionStateChanged, Fovf,
+    FrameBeginInfo, FrameEndInfo, FrameState, FrameWaitInfo, GraphicsRequirementsVulkanKHR,
+    Instance, InstanceCreateInfo, InstanceProperties, InteractionProfileSuggestedBinding, Path,
+    Posef, Quaternionf, ReferenceSpaceCreateInfo, ReferenceSpaceType, Result, Session,
+    SessionActionSetsAttachInfo, SessionBeginInfo, SessionCreateInfo, SessionState, Space,
     SpaceLocation, SpaceLocationFlags, StructureType, Swapchain, SwapchainCreateInfo,
     SwapchainImageAcquireInfo, SwapchainImageBaseHeader, SwapchainImageReleaseInfo,
-    SwapchainImageVulkanKHR, SwapchainImageWaitInfo, SystemGetInfo, SystemId, Time, Vector3f,
-    Version, View, ViewConfigurationType, ViewConfigurationView, ViewLocateInfo, ViewState,
-    ViewStateFlags, VulkanDeviceCreateInfoKHR, VulkanGraphicsDeviceGetInfoKHR,
-    VulkanInstanceCreateInfoKHR, TRUE,
+    SwapchainImageVulkanKHR, SwapchainImageWaitInfo, SystemGetInfo, SystemId, SystemProperties,
+    Time, Vector3f, Version, View, ViewConfigurationType, ViewConfigurationView, ViewLocateInfo,
+    ViewState, ViewStateFlags, VulkanDeviceCreateInfoKHR, VulkanGraphicsDeviceGetInfoKHR,
+    VulkanInstanceCreateInfoKHR, FALSE, TRUE,
 };
 use std::{
     ffi::{CStr, CString},
@@ -52,11 +53,15 @@ use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    platform::{run_return::EventLoopExtRunReturn, windows::EventLoopExtWindows},
+    platform::{
+        run_return::EventLoopExtRunReturn,
+        windows::{EventLoopExtWindows, WindowBuilderExtWindows},
+    },
     window::WindowBuilder,
 };
 
 static SWAPCHAIN_COLOUR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
+const NUM_VIEWS: usize = 1;
 
 struct State {
     vulkan_entry: Option<AshEntry>,
@@ -99,7 +104,7 @@ impl Default for State {
             vulkan_instance: None,
             physical_device: vk::PhysicalDevice::null(),
             device: None,
-            session_state: SessionState::IDLE,
+            session_state: SessionState::UNKNOWN,
             swapchain_fence: vk::Fence::null(),
             internal_swapchain: SwapchainKHR::null(),
             image_index: 4,
@@ -262,6 +267,7 @@ unsafe extern "system" fn create_vulkan_instance(
 
     let event_loop: EventLoop<()> = EventLoop::new_any_thread();
     let window = WindowBuilder::new()
+        .with_drag_and_drop(false)
         .with_visible(false)
         .build(&event_loop)
         .unwrap();
@@ -470,10 +476,7 @@ unsafe extern "system" fn create_session(
     _create_info: *const SessionCreateInfo,
     session: *mut Session,
 ) -> Result {
-    let mut s = Box::new(HothamSession::default());
-    s.test = 42;
-    let s = Box::into_raw(s) as *const _;
-    *session = Session::from_raw(s as _);
+    *session = Session::from_raw(42);
     Result::SUCCESS
 }
 
@@ -841,8 +844,13 @@ unsafe extern "system" fn poll_event(
     event_data: *mut EventDataBuffer,
 ) -> Result {
     let mut state = STATE.lock().unwrap();
+    let mut next_state = state.session_state.clone();
     if state.session_state == SessionState::IDLE {
-        state.session_state = SessionState::READY;
+        next_state = SessionState::READY;
+        state.has_event = true;
+    }
+    if state.session_state == SessionState::UNKNOWN {
+        next_state = SessionState::IDLE;
         state.has_event = true;
     }
 
@@ -851,11 +859,12 @@ unsafe extern "system" fn poll_event(
             ty: StructureType::EVENT_DATA_SESSION_STATE_CHANGED,
             next: ptr::null(),
             session: Session::from_raw(42),
-            state: state.session_state,
+            state: next_state,
             time: openxr_sys::Time::from_nanos(10),
         };
         copy_nonoverlapping(&data, transmute(event_data), 1);
         state.has_event = false;
+        state.session_state = next_state;
 
         Result::SUCCESS
     } else {
@@ -867,9 +876,9 @@ unsafe extern "system" fn begin_session(
     session: Session,
     _begin_info: *const SessionBeginInfo,
 ) -> Result {
-    let ptr = session.into_raw() as *mut HothamSession;
-    let s = Box::from_raw(ptr);
-    println!("[HOTHAM_SIMULATOR] This is fucking stupid {:?}", s);
+    // let ptr = session.into_raw() as *mut HothamSession;
+    // let s = Box::from_raw(ptr);
+    println!("[HOTHAM_SIMULATOR] Beginning session: {:?}", session);
     Result::SUCCESS
 }
 unsafe extern "system" fn wait_frame(
@@ -908,12 +917,18 @@ unsafe extern "system" fn enumerate_view_configuration_views(
     views: *mut ViewConfigurationView,
 ) -> Result {
     if view_capacity_input == 0 {
-        *view_count_output = 2;
+        *view_count_output = NUM_VIEWS as _;
         return Result::SUCCESS;
     }
 
-    let views = std::ptr::slice_from_raw_parts_mut(views, 2);
-    for i in 0..2 {
+    println!(
+        "[HOTHAM_SIMULATOR] enumerate_view_configuration_views called with: {}",
+        view_capacity_input
+    );
+
+    let views = std::ptr::slice_from_raw_parts_mut(views, NUM_VIEWS);
+
+    for i in 0..NUM_VIEWS {
         (*views)[i] = ViewConfigurationView {
             ty: StructureType::VIEW_CONFIGURATION_VIEW,
             next: null_mut(),
@@ -1007,6 +1022,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
             .with_inner_size(PhysicalSize::new(600, 600))
             .with_title("Hotham Simulator")
             .with_visible(visible)
+            .with_drag_and_drop(false)
             .build(&event_loop)
             .unwrap();
         println!("[HOTHAM_SIMULATOR] ..done.");
@@ -1096,6 +1112,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
         .expect("Unable to get swapchain images");
     state.internal_swapchain_image_views = create_swapchain_image_views(state);
 
+    println!("[HOTHAM_SIMULATOR] Creating descriptor sets..");
     state.descriptor_sets = create_descriptor_sets(state);
     println!("[HOTHAM_SIMULATOR] Creating render pass..");
     state.render_pass = create_render_pass(state);
@@ -1117,14 +1134,19 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
         .create_descriptor_pool(
             &vk::DescriptorPoolCreateInfo::builder()
                 .pool_sizes(&[vk::DescriptorPoolSize::builder()
-                    .descriptor_count(3)
-                    .ty(vk::DescriptorType::SAMPLER)
+                    .descriptor_count(9)
+                    .ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .build()])
-                .max_sets(3)
+                .max_sets(9)
                 .build(),
             None,
         )
         .expect("Unable to create desctiptor pool");
+
+    println!(
+        "[HOTHAM_SIMULATOR] Created descriptor pool {:?}",
+        descriptor_pool
+    );
 
     let bindings = [vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
@@ -1144,6 +1166,11 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
         .expect("Unable to create descriptor set layouts");
 
     let set_layouts = [layout, layout, layout];
+
+    println!(
+        "[HOTHAM_SIMULATOR] Allocating descriptor sets with layouts: {:?}",
+        set_layouts
+    );
 
     // allocate
     let descriptor_sets = device
@@ -1402,7 +1429,9 @@ unsafe extern "system" fn locate_space(
     *location = SpaceLocation {
         ty: StructureType::SPACE_LOCATION,
         next: null_mut(),
-        location_flags: SpaceLocationFlags::ORIENTATION_TRACKED,
+        location_flags: SpaceLocationFlags::ORIENTATION_TRACKED
+            | SpaceLocationFlags::POSITION_VALID
+            | SpaceLocationFlags::ORIENTATION_VALID,
         pose: Posef {
             orientation: Quaternionf::IDENTITY,
             position: Vector3f::default(),
@@ -1438,18 +1467,19 @@ unsafe extern "system" fn locate_views(
     view_count_output: *mut u32,
     views: *mut View,
 ) -> Result {
+    *view_count_output = NUM_VIEWS as _;
+
     if view_capacity_input == 0 {
-        *view_count_output = 2;
         return Result::SUCCESS;
     }
 
     *view_state = ViewState {
         ty: StructureType::VIEW_STATE,
         next: null_mut(),
-        view_state_flags: ViewStateFlags::ORIENTATION_VALID,
+        view_state_flags: ViewStateFlags::ORIENTATION_VALID | ViewStateFlags::POSITION_VALID,
     };
-    let views = slice::from_raw_parts_mut(views, 2);
-    for i in 0..2 {
+    let views = slice::from_raw_parts_mut(views, NUM_VIEWS);
+    for i in 0..NUM_VIEWS {
         views[i] = View {
             ty: StructureType::VIEW,
             next: null_mut(),
@@ -1561,6 +1591,90 @@ unsafe extern "system" fn destroy_instance(_instance: Instance) -> Result {
     Result::SUCCESS
 }
 
+unsafe extern "system" fn enumerate_view_configurations(
+    _instance: Instance,
+    _system_id: SystemId,
+    _view_configuration_type_capacity_input: u32,
+    view_configuration_type_count_output: *mut u32,
+    _view_configuration_types: *mut ViewConfigurationType,
+) -> Result {
+    *view_configuration_type_count_output = 0;
+    Result::SUCCESS
+}
+
+unsafe extern "system" fn enumerate_reference_spaces(
+    _session: Session,
+    space_capacity_input: u32,
+    space_count_output: *mut u32,
+    spaces: *mut ReferenceSpaceType,
+) -> Result {
+    *space_count_output = 1;
+    if space_capacity_input == 0 {
+        return Result::SUCCESS;
+    }
+
+    let spaces = slice::from_raw_parts_mut(spaces, 1);
+    spaces[0] = ReferenceSpaceType::STAGE;
+
+    Result::SUCCESS
+}
+
+unsafe extern "system" fn get_system_properties(
+    _instance: Instance,
+    _system_id: SystemId,
+    _properties: *mut SystemProperties,
+) -> Result {
+    Result::SUCCESS
+}
+
+unsafe extern "system" fn enumerate_swapchain_formats(
+    _session: Session,
+    format_capacity_input: u32,
+    format_count_output: *mut u32,
+    formats: *mut i64,
+) -> Result {
+    if format_capacity_input == 0 {
+        *format_count_output = 1;
+        return Result::SUCCESS;
+    }
+
+    *formats = SWAPCHAIN_COLOUR_FORMAT.as_raw() as i64;
+
+    Result::SUCCESS
+}
+
+unsafe extern "system" fn get_action_state_float(
+    _session: Session,
+    _get_info: *const ActionStateGetInfo,
+    state: *mut ActionStateFloat,
+) -> Result {
+    *state = ActionStateFloat {
+        ty: StructureType::ACTION_STATE_FLOAT,
+        next: ptr::null_mut(),
+        current_state: 0.0,
+        changed_since_last_sync: FALSE,
+        last_change_time: openxr_sys::Time::from_nanos(0),
+        is_active: TRUE,
+    };
+    Result::SUCCESS
+}
+
+unsafe extern "system" fn get_action_state_boolean(
+    _session: Session,
+    _get_info: *const ActionStateGetInfo,
+    state: *mut ActionStateBoolean,
+) -> Result {
+    *state = ActionStateBoolean {
+        ty: StructureType::ACTION_STATE_BOOLEAN,
+        next: ptr::null_mut(),
+        current_state: TRUE,
+        changed_since_last_sync: FALSE,
+        last_change_time: openxr_sys::Time::from_nanos(0),
+        is_active: TRUE,
+    };
+    Result::SUCCESS
+}
+
 type DummyFn = unsafe extern "system" fn() -> Result;
 
 #[no_mangle]
@@ -1660,6 +1774,18 @@ pub unsafe extern "C" fn get_instance_proc_addr(
         *function = transmute::<pfn::DestroySession, _>(destroy_session);
     } else if name == b"xrDestroyInstance" {
         *function = transmute::<pfn::DestroyInstance, _>(destroy_instance);
+    } else if name == b"xrEnumerateViewConfigurations" {
+        *function = transmute::<pfn::EnumerateViewConfigurations, _>(enumerate_view_configurations);
+    } else if name == b"xrEnumerateReferenceSpaces" {
+        *function = transmute::<pfn::EnumerateReferenceSpaces, _>(enumerate_reference_spaces);
+    } else if name == b"xrGetSystemProperties" {
+        *function = transmute::<pfn::GetSystemProperties, _>(get_system_properties);
+    } else if name == b"xrEnumerateSwapchainFormats" {
+        *function = transmute::<pfn::EnumerateSwapchainFormats, _>(enumerate_swapchain_formats);
+    } else if name == b"xrGetActionStateFloat" {
+        *function = transmute::<pfn::GetActionStateFloat, _>(get_action_state_float);
+    } else if name == b"xrGetActionStateBoolean" {
+        *function = transmute::<pfn::GetActionStateBoolean, _>(get_action_state_boolean);
     } else {
         let _name = String::from_utf8_unchecked(name.to_vec());
         // eprintln!("[HOTHAM_SIMULATOR] {} is unimplemented", name);

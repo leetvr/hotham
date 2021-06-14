@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use cgmath::{Matrix4, vec3};
+use cgmath::{vec3};
 use hotham::{App, HothamResult as Result, Program, ProgramInitialization, Vertex};
 
 #[derive(Debug, Clone)]
@@ -11,7 +11,7 @@ struct Cubeworld {
     cube_count: u32,
 }
 
-const CUBE_VERTICES: u32 = 8;
+// const CUBE_VERTICES: u32 = 8;
 
 impl Cubeworld {
     fn new() -> Self {
