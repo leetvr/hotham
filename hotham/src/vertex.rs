@@ -10,13 +10,13 @@ pub struct Vertex {
 }
 
 impl Vertex {
-    pub fn new(position: Vector3<f32>, color: Vector3<f32>, transform: Matrix4<f32>) -> Self {
+    pub fn new(position: Vector3<f32>, color: Vector3<f32>, _transform: Matrix4<f32>) -> Self {
         Self { position, color }
     }
 
     pub fn pos(position: Vector3<f32>) -> Self {
         let color = vec3(random(), random(), random());
-        let transform = Matrix4::from_scale(1.0);
+        let _transform = Matrix4::from_scale(1.0);
         Self { position, color }
     }
 }
