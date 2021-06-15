@@ -5,6 +5,10 @@
     non_camel_case_types
 )]
 mod openxr_loader;
+mod space_state;
+mod state;
+use crate::space_state::SpaceState;
+use crate::state::State;
 use ash::{
     extensions::khr,
     util::read_spv,
@@ -28,7 +32,7 @@ use openxr_sys::{
     Duration, EnvironmentBlendMode, EventDataBuffer, EventDataSessionStateChanged, Fovf,
     FrameBeginInfo, FrameEndInfo, FrameState, FrameWaitInfo, GraphicsRequirementsVulkanKHR,
     Instance, InstanceCreateInfo, InstanceProperties, InteractionProfileSuggestedBinding, Path,
-    Posef, Quaternionf, ReferenceSpaceCreateInfo, ReferenceSpaceType, Result, Session,
+    Posef, ReferenceSpaceCreateInfo, ReferenceSpaceType, Result, Session,
     SessionActionSetsAttachInfo, SessionBeginInfo, SessionCreateInfo, SessionState, Space,
     SpaceLocation, SpaceLocationFlags, StructureType, Swapchain, SwapchainCreateInfo,
     SwapchainImageAcquireInfo, SwapchainImageBaseHeader, SwapchainImageReleaseInfo,
@@ -37,6 +41,7 @@ use openxr_sys::{
     ViewState, ViewStateFlags, VulkanDeviceCreateInfoKHR, VulkanGraphicsDeviceGetInfoKHR,
     VulkanInstanceCreateInfoKHR, FALSE, TRUE,
 };
+use rand::random;
 use std::{
     ffi::{CStr, CString},
     fmt::Debug,
@@ -46,9 +51,10 @@ use std::{
     os::raw::c_char,
     ptr::{self, null_mut},
     slice,
-    sync::{atomic::AtomicBool, mpsc::channel, Arc, Mutex, MutexGuard},
-    thread::{self, JoinHandle},
+    sync::{atomic::Ordering::Relaxed, mpsc::channel, Mutex, MutexGuard},
+    thread,
 };
+use winit::event::{DeviceEvent, VirtualKeyCode};
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -63,151 +69,6 @@ use winit::{
 static SWAPCHAIN_COLOUR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 const NUM_VIEWS: usize = 1;
 
-struct State {
-    vulkan_entry: Option<AshEntry>,
-    vulkan_instance: Option<AshInstance>,
-    physical_device: vk::PhysicalDevice,
-    device: Option<Device>,
-    session_state: SessionState,
-    swapchain_fence: vk::Fence,
-    internal_swapchain: SwapchainKHR,
-    internal_swapchain_images: Vec<vk::Image>,
-    internal_swapchain_image_views: Vec<vk::ImageView>,
-    frame_count: usize,
-    image_index: u32,
-    present_queue: vk::Queue,
-    present_queue_family_index: u32,
-    command_pool: vk::CommandPool,
-    multiview_images: Vec<vk::Image>,
-    multiview_image_views: Vec<vk::ImageView>,
-    multiview_images_memory: Vec<vk::DeviceMemory>,
-    has_event: bool,
-    command_buffers: Vec<vk::CommandBuffer>,
-    pipelines: Vec<vk::Pipeline>,
-    render_pass: vk::RenderPass,
-    pipeline_layout: vk::PipelineLayout,
-    descriptor_sets: Vec<vk::DescriptorSet>,
-    descriptor_set_layout: vk::DescriptorSetLayout,
-    framebuffers: Vec<vk::Framebuffer>,
-    render_complete_semaphores: Vec<vk::Semaphore>,
-    close_window: Arc<AtomicBool>,
-    sampler: vk::Sampler,
-    descriptor_pool: vk::DescriptorPool,
-    surface: vk::SurfaceKHR,
-    window_thread_handle: Option<JoinHandle<()>>,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        State {
-            vulkan_entry: None,
-            vulkan_instance: None,
-            physical_device: vk::PhysicalDevice::null(),
-            device: None,
-            session_state: SessionState::UNKNOWN,
-            swapchain_fence: vk::Fence::null(),
-            internal_swapchain: SwapchainKHR::null(),
-            image_index: 4,
-            present_queue: vk::Queue::null(),
-            present_queue_family_index: 0,
-            command_pool: vk::CommandPool::null(),
-            internal_swapchain_images: Vec::new(),
-            multiview_images: Vec::new(),
-            multiview_images_memory: Vec::new(),
-            frame_count: 0,
-            has_event: false,
-            internal_swapchain_image_views: Default::default(),
-            multiview_image_views: Default::default(),
-            command_buffers: Default::default(),
-            pipelines: Default::default(),
-            render_pass: Default::default(),
-            pipeline_layout: Default::default(),
-            descriptor_sets: Default::default(),
-            descriptor_set_layout: Default::default(),
-            framebuffers: Default::default(),
-            render_complete_semaphores: Default::default(),
-            close_window: Default::default(),
-            sampler: vk::Sampler::null(),
-            descriptor_pool: vk::DescriptorPool::null(),
-            surface: vk::SurfaceKHR::null(),
-            window_thread_handle: None,
-        }
-    }
-}
-
-impl Debug for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("State")
-            .field(
-                "vulkan_instance",
-                &self
-                    .vulkan_instance
-                    .as_ref()
-                    .map(|i| i.handle().as_raw())
-                    .unwrap_or(0),
-            )
-            .finish()
-    }
-}
-
-impl State {
-    unsafe fn destroy(&mut self) {
-        println!("[HOTHAM_SIMULATOR] Destroy called..");
-        let device = self.device.take().unwrap();
-        device.device_wait_idle().unwrap();
-        let instance = self.vulkan_instance.take().unwrap();
-        let entry = self.vulkan_entry.take().unwrap();
-        device.queue_wait_idle(self.present_queue).unwrap();
-        for image in self.multiview_images.drain(..) {
-            device.destroy_image(image, None)
-        }
-        device.destroy_fence(self.swapchain_fence, None);
-        for memory in self.multiview_images_memory.drain(..) {
-            device.free_memory(memory, None)
-        }
-
-        device.destroy_command_pool(self.command_pool, None);
-        for semaphore in self.render_complete_semaphores.drain(..) {
-            device.destroy_semaphore(semaphore, None)
-        }
-
-        for image_view in self.internal_swapchain_image_views.drain(..) {
-            device.destroy_image_view(image_view, None)
-        }
-
-        for image_view in self.multiview_image_views.drain(..) {
-            device.destroy_image_view(image_view, None)
-        }
-
-        device.destroy_pipeline_layout(self.pipeline_layout, None);
-        for pipeline in self.pipelines.drain(..) {
-            device.destroy_pipeline(pipeline, None);
-        }
-
-        let swapchain_ext = khr::Swapchain::new(&instance, &device);
-        swapchain_ext.destroy_swapchain(self.internal_swapchain, None);
-
-        device.destroy_render_pass(self.render_pass, None);
-        device.destroy_sampler(self.sampler, None);
-        device.destroy_descriptor_set_layout(self.descriptor_set_layout, None);
-        device.destroy_descriptor_pool(self.descriptor_pool, None);
-        for framebuffer in self.framebuffers.drain(..) {
-            device.destroy_framebuffer(framebuffer, None)
-        }
-
-        let surface_ext = khr::Surface::new(&entry, &instance);
-        surface_ext.destroy_surface(self.surface, None);
-
-        device.destroy_device(None);
-        instance.destroy_instance(None);
-
-        self.close_window
-            .store(true, std::sync::atomic::Ordering::Relaxed);
-        self.window_thread_handle.take().unwrap().join().unwrap();
-        println!("[HOTHAM_SIMULATOR] All things are now destroyed");
-    }
-}
-
 lazy_static! {
     static ref STATE: Mutex<State> = Default::default();
 }
@@ -215,6 +76,12 @@ lazy_static! {
 #[derive(Debug, Clone, Default)]
 struct HothamSession {
     test: usize,
+}
+
+#[derive(Debug, Clone)]
+pub enum HothamInputEvent {
+    KeyboardInput { key: Option<VirtualKeyCode> },
+    MouseInput { x: f64, y: f64 },
 }
 
 #[no_mangle]
@@ -719,9 +586,10 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
             &render_pass_begin_info,
             vk::SubpassContents::INLINE,
         );
+
         let mut viewport = vk::Viewport::builder()
             .height(extent.height as _)
-            .width((extent.width / 2) as _)
+            .width((extent.width / (NUM_VIEWS as u32)) as _)
             .max_depth(1 as _)
             .min_depth(0 as _)
             .build();
@@ -745,13 +613,15 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
         device.cmd_draw(*command_buffer, 3, 1, 0, 0);
 
         // Right Eye
-        viewport.x = 300 as _;
-        scissor.offset.x = 300 as _;
-        device.cmd_set_viewport(*command_buffer, 0, &[viewport]);
-        device.cmd_set_scissor(*command_buffer, 0, &[scissor]);
+        if NUM_VIEWS > 1 {
+            viewport.x = extent.width as f32 / 2.0;
+            scissor.offset.x = extent.width as i32 / 2;
+            device.cmd_set_viewport(*command_buffer, 0, &[viewport]);
+            device.cmd_set_scissor(*command_buffer, 0, &[scissor]);
 
-        device.cmd_bind_pipeline(*command_buffer, pipeline_bind_point, pipelines[1]);
-        device.cmd_draw(*command_buffer, 3, 1, 0, 0);
+            device.cmd_bind_pipeline(*command_buffer, pipeline_bind_point, pipelines[1]);
+            device.cmd_draw(*command_buffer, 3, 1, 0, 0);
+        }
 
         device.cmd_end_render_pass(*command_buffer);
         device
@@ -777,15 +647,11 @@ unsafe extern "system" fn create_action_set(
 }
 
 unsafe extern "system" fn create_action(
-    action_set: ActionSet,
+    _action_set: ActionSet,
     _create_info: *const ActionCreateInfo,
-    action: *mut Action,
+    action_out: *mut Action,
 ) -> Result {
-    println!(
-        "[HOTHAM_SIMULATOR] Create action set called with {:?}",
-        action_set
-    );
-    *action = Action::from_raw(42);
+    *action_out = Action::from_raw(random());
     Result::SUCCESS
 }
 
@@ -793,22 +659,39 @@ unsafe extern "system" fn suggest_interaction_profile_bindings(
     _instance: Instance,
     _suggested_bindings: *const InteractionProfileSuggestedBinding,
 ) -> Result {
-    println!("[HOTHAM_SIMULATOR] Suggest interaction profile bindings called!");
+    // let suggested_bindings = *suggested_bindings;
+    // let bindings = slice::from_raw_parts(
+    //     (suggested_bindings).suggested_bindings,
+    //     (suggested_bindings).count_suggested_bindings as _,
+    // );
+
+    // for binding in bindings {}
+
     Result::SUCCESS
 }
 
 unsafe extern "system" fn string_to_path(
     _instance: Instance,
     path_string: *const c_char,
-    path: *mut Path,
+    path_out: *mut Path,
 ) -> Result {
-    let path_string = CStr::from_ptr(path_string);
-    println!(
-        "[HOTHAM_SIMULATOR] String to path called with {:?}",
-        path_string
-    );
-    *path = Path::from_raw(42);
-    Result::SUCCESS
+    match CStr::from_ptr(path_string).to_str() {
+        Ok(s) => {
+            let path = Path::from_raw(rand::random());
+            println!(
+                "[HOTHAM_SIMULATOR] Created path {:?} for {}",
+                path_string, s
+            );
+            STATE
+                .lock()
+                .unwrap()
+                .paths
+                .insert(path.clone(), s.to_string());
+            *path_out = path;
+            Result::SUCCESS
+        }
+        Err(_) => Result::ERROR_VALIDATION_FAILURE,
+    }
 }
 
 unsafe extern "system" fn attach_action_sets(
@@ -821,21 +704,89 @@ unsafe extern "system" fn attach_action_sets(
 
 unsafe extern "system" fn create_action_space(
     _session: Session,
-    _create_info: *const ActionSpaceCreateInfo,
-    space: *mut Space,
+    create_info: *const ActionSpaceCreateInfo,
+    space_out: *mut Space,
 ) -> Result {
-    println!("[HOTHAM_SIMULATOR] Create action space called");
-    *space = Space::from_raw(42);
+    let mut state = STATE.lock().unwrap();
+    let raw = random();
+    let space = Space::from_raw(raw);
+
+    match state
+        .paths
+        .get(&(*create_info).subaction_path)
+        .map(|s| s.as_str())
+    {
+        Some("/user/hand/left") => {
+            let mut space_state = SpaceState::new("Left Hand");
+            space_state.position = Vector3f {
+                x: -0.20,
+                y: 1.4,
+                z: -0.50,
+            };
+            println!(
+                "[HOTHAM_SIMULATOR] Created left hand space: {:?}, {:?}",
+                space_state, space
+            );
+            state.left_hand_space = raw;
+            state.spaces.insert(raw, space_state);
+        }
+        Some("/user/hand/right") => {
+            let mut space_state = SpaceState::new("Right Hand");
+            space_state.position = Vector3f {
+                x: 0.20,
+                y: 1.4,
+                z: -0.50,
+            };
+            println!(
+                "[HOTHAM_SIMULATOR] Created right hand space: {:?}, {:?}",
+                space_state, space
+            );
+            state.right_hand_space = raw;
+            state.spaces.insert(raw, space_state);
+        }
+        Some(path) => {
+            let space_state = SpaceState::new(path);
+            println!("[HOTHAM_SIMULATOR] Created space for path: {}", path);
+            state.spaces.insert(raw, space_state);
+        }
+        _ => {}
+    }
+
+    *space_out = space;
     Result::SUCCESS
 }
 
 unsafe extern "system" fn create_reference_space(
     _session: Session,
-    _create_info: *const ReferenceSpaceCreateInfo,
-    space: *mut Space,
+    create_info: *const ReferenceSpaceCreateInfo,
+    out_space: *mut Space,
 ) -> Result {
-    println!("[HOTHAM_SIMULATOR] Create reference space called");
-    *space = Space::from_raw(42);
+    let mut state = STATE.lock().unwrap();
+    let reference_space;
+    let create_info = *create_info;
+
+    // Our "reference space" is Stage with no rotation
+    if create_info.reference_space_type == ReferenceSpaceType::STAGE
+        && create_info.pose_in_reference_space.orientation.w != 1.0
+    {
+        // Magic value
+        reference_space = Space::from_raw(0);
+        println!(
+            "[HOTHAM_SIMULATOR] Stage reference space created: {:?}",
+            reference_space
+        );
+        state.reference_space = reference_space;
+    } else {
+        reference_space = Space::from_raw(random());
+    }
+
+    let mut space_state = SpaceState::new("Reference Space");
+    space_state.position = create_info.pose_in_reference_space.position;
+    space_state.orientation = create_info.pose_in_reference_space.orientation;
+
+    state.spaces.insert(reference_space.into_raw(), space_state);
+
+    *out_space = reference_space;
     Result::SUCCESS
 }
 
@@ -845,14 +796,32 @@ unsafe extern "system" fn poll_event(
 ) -> Result {
     let mut state = STATE.lock().unwrap();
     let mut next_state = state.session_state.clone();
-    if state.session_state == SessionState::IDLE {
-        next_state = SessionState::READY;
-        state.has_event = true;
-    }
     if state.session_state == SessionState::UNKNOWN {
         next_state = SessionState::IDLE;
         state.has_event = true;
     }
+    if state.session_state == SessionState::IDLE {
+        next_state = SessionState::READY;
+        state.has_event = true;
+    }
+    if state.session_state == SessionState::READY {
+        next_state = SessionState::SYNCHRONIZED;
+        state.has_event = true;
+    }
+    if state.session_state == SessionState::SYNCHRONIZED {
+        next_state = SessionState::VISIBLE;
+        state.has_event = true;
+    }
+    if state.session_state == SessionState::SYNCHRONIZED {
+        next_state = SessionState::FOCUSED;
+        state.has_event = true;
+    }
+    if state.session_state == SessionState::FOCUSED {}
+
+    // if state.session_state == SessionState::FOCUSED && state.frame_count > 1 {
+    //     next_state = SessionState::STOPPING;
+    //     state.has_event = true;
+    // }
 
     if state.has_event {
         let data = EventDataSessionStateChanged {
@@ -983,7 +952,7 @@ fn create_multiview_image_views(
                 .base_mip_level(0)
                 .level_count(1)
                 .base_array_layer(0)
-                .layer_count(2)
+                .layer_count(NUM_VIEWS as _)
                 .build();
 
             let create_info = vk::ImageViewCreateInfo::builder()
@@ -1010,7 +979,8 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
     let queue_family_index = state.present_queue_family_index;
     let close_window = state.close_window.clone();
 
-    let (tx, rx) = channel();
+    let (swapchain_tx, swapchain_rx) = channel();
+    let (event_tx, event_rx) = channel();
     let window_thread_handle = thread::spawn(move || {
         let mut event_loop: EventLoop<()> = EventLoop::new_any_thread();
         let visible = true;
@@ -1066,7 +1036,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
             "[HOTHAM_SIMULATOR] Created swapchain: {:?}. Sending..",
             swapchain
         );
-        tx.send((surface, swapchain)).unwrap();
+        swapchain_tx.send((surface, swapchain)).unwrap();
 
         if !visible {
             return;
@@ -1076,7 +1046,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
         event_loop.run_return(move |event, _, control_flow| {
             *control_flow = ControlFlow::Poll;
 
-            if close_window.load(std::sync::atomic::Ordering::Relaxed) {
+            if close_window.load(Relaxed) {
                 println!("[HOTHAM_SIMULATOR] Closed called!");
                 *control_flow = ControlFlow::Exit;
             }
@@ -1093,17 +1063,30 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_window_id) => {}
+                Event::DeviceEvent { event, .. } => match event {
+                    DeviceEvent::Key(k) => event_tx
+                        .send(HothamInputEvent::KeyboardInput {
+                            key: k.virtual_keycode,
+                        })
+                        .unwrap(),
+                    DeviceEvent::MouseMotion { delta: (y, x) } => event_tx
+                        .send(HothamInputEvent::MouseInput { x, y })
+                        .unwrap(),
+                    _ => {}
+                },
                 _ => (),
             }
         });
 
-        cl2.store(true, std::sync::atomic::Ordering::Relaxed);
+        cl2.store(true, Relaxed);
     });
-    let (surface, swapchain) = rx.recv().unwrap();
+    let (surface, swapchain) = swapchain_rx.recv().unwrap();
+
     println!("[HOTHAM_SIMULATOR] Received swapchain: {:?}", swapchain);
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
     let swapchain_ext = khr::Swapchain::new(&instance, device);
 
+    state.event_rx = Some(event_rx);
     state.surface = surface;
     state.window_thread_handle = Some(window_thread_handle);
     state.internal_swapchain = swapchain;
@@ -1332,7 +1315,7 @@ fn create_multiview_images(
         .image_type(vk::ImageType::TYPE_2D)
         .extent(extent)
         .mip_levels(1)
-        .array_layers(2)
+        .array_layers(NUM_VIEWS as _)
         .format(format)
         .tiling(tiling)
         .initial_layout(vk::ImageLayout::UNDEFINED)
@@ -1374,6 +1357,17 @@ fn create_multiview_images(
         device_memory.push(image_memory);
     }
 
+    for image in &images {
+        transition_image_layout(
+            device,
+            state.present_queue,
+            state.command_pool,
+            *image,
+            vk::ImageLayout::UNDEFINED,
+            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+        );
+    }
+
     (images, device_memory)
 }
 
@@ -1382,7 +1376,7 @@ unsafe extern "system" fn acquire_swapchain_image(
     _acquire_info: *const SwapchainImageAcquireInfo,
     index: *mut u32,
 ) -> Result {
-    println!("[HOTHAM_SIMULATOR] Acquire swapchain image called..");
+    // println!("[HOTHAM_SIMULATOR] Acquire swapchain image called..");
     let swapchain = vk::SwapchainKHR::from_raw(swapchain.into_raw());
     let state = STATE.lock().unwrap();
     let device = state.device.as_ref().unwrap();
@@ -1404,7 +1398,7 @@ unsafe extern "system" fn acquire_swapchain_image(
 
     let mut state = STATE.lock().unwrap();
     state.image_index = i;
-    println!("[HOTHAM_SIMULATOR] Done. Index is {}", i);
+    // println!("[HOTHAM_SIMULATOR] Done. Index is {}", i);
     Result::SUCCESS
 }
 
@@ -1421,23 +1415,29 @@ unsafe extern "system" fn dummy() -> Result {
 }
 
 unsafe extern "system" fn locate_space(
-    _space: Space,
+    space: Space,
     _base_space: Space,
     _time: Time,
-    location: *mut SpaceLocation,
+    location_out: *mut SpaceLocation,
 ) -> Result {
-    *location = SpaceLocation {
-        ty: StructureType::SPACE_LOCATION,
-        next: null_mut(),
-        location_flags: SpaceLocationFlags::ORIENTATION_TRACKED
-            | SpaceLocationFlags::POSITION_VALID
-            | SpaceLocationFlags::ORIENTATION_VALID,
-        pose: Posef {
-            orientation: Quaternionf::IDENTITY,
-            position: Vector3f::default(),
-        },
-    };
-    Result::SUCCESS
+    match STATE.lock().unwrap().spaces.get(&space.into_raw()) {
+        Some(ref space_state) => {
+            let pose = Posef {
+                position: space_state.position,
+                orientation: space_state.orientation,
+            };
+            *location_out = SpaceLocation {
+                ty: StructureType::SPACE_LOCATION,
+                next: null_mut(),
+                location_flags: SpaceLocationFlags::ORIENTATION_TRACKED
+                    | SpaceLocationFlags::POSITION_VALID
+                    | SpaceLocationFlags::ORIENTATION_VALID,
+                pose,
+            };
+            Result::SUCCESS
+        }
+        None => Result::ERROR_HANDLE_INVALID,
+    }
 }
 unsafe extern "system" fn get_action_state_pose(
     _session: Session,
@@ -1456,6 +1456,8 @@ unsafe extern "system" fn sync_actions(
     _session: Session,
     _sync_info: *const ActionsSyncInfo,
 ) -> Result {
+    STATE.lock().unwrap().update_actions();
+
     Result::SUCCESS
 }
 
@@ -1479,15 +1481,19 @@ unsafe extern "system" fn locate_views(
         view_state_flags: ViewStateFlags::ORIENTATION_VALID | ViewStateFlags::POSITION_VALID,
     };
     let views = slice::from_raw_parts_mut(views, NUM_VIEWS);
+    let state = STATE.lock().unwrap();
     for i in 0..NUM_VIEWS {
+        let pose = state.view_poses[i];
         views[i] = View {
             ty: StructureType::VIEW,
             next: null_mut(),
-            pose: Posef {
-                orientation: Quaternionf::IDENTITY,
-                position: Vector3f::default(),
+            pose,
+            fov: Fovf {
+                angle_down: -0.8,
+                angle_up: 0.8,
+                angle_left: -0.55,
+                angle_right: 0.55,
             },
-            fov: Fovf::default(),
         };
     }
 
@@ -1498,7 +1504,6 @@ unsafe extern "system" fn release_swapchain_image(
     _swapchain: Swapchain,
     _release_info: *const SwapchainImageReleaseInfo,
 ) -> Result {
-    println!("[HOTHAM_SIMULATOR] Release image called");
     Result::SUCCESS
 }
 
@@ -1547,7 +1552,14 @@ unsafe extern "system" fn end_frame(
 
     match ext.queue_present(queue, &present_info) {
         Ok(_) => {
-            println!("[HOTHAM_SIMULATOR] done! Probably?");
+            transition_image_layout(
+                device,
+                queue,
+                state.command_pool,
+                image,
+                vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+                vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            );
             state.frame_count += 1;
             Result::SUCCESS
         }
@@ -1582,12 +1594,11 @@ unsafe extern "system" fn destroy_swapchain(_swapchain: Swapchain) -> Result {
 }
 
 unsafe extern "system" fn destroy_session(_session: Session) -> Result {
-    STATE.lock().unwrap().destroy();
-
     Result::SUCCESS
 }
 
 unsafe extern "system" fn destroy_instance(_instance: Instance) -> Result {
+    STATE.lock().unwrap().destroy();
     Result::SUCCESS
 }
 
@@ -1656,6 +1667,14 @@ unsafe extern "system" fn get_action_state_float(
         last_change_time: openxr_sys::Time::from_nanos(0),
         is_active: TRUE,
     };
+    Result::SUCCESS
+}
+
+unsafe extern "system" fn end_session(_session: Session) -> Result {
+    let mut state = STATE.lock().unwrap();
+
+    state.session_state = SessionState::EXITING;
+    state.has_event = true;
     Result::SUCCESS
 }
 
@@ -1786,6 +1805,8 @@ pub unsafe extern "C" fn get_instance_proc_addr(
         *function = transmute::<pfn::GetActionStateFloat, _>(get_action_state_float);
     } else if name == b"xrGetActionStateBoolean" {
         *function = transmute::<pfn::GetActionStateBoolean, _>(get_action_state_boolean);
+    } else if name == b"xrEndSession" {
+        *function = transmute::<pfn::EndSession, _>(end_session);
     } else {
         let _name = String::from_utf8_unchecked(name.to_vec());
         // eprintln!("[HOTHAM_SIMULATOR] {} is unimplemented", name);
@@ -1879,14 +1900,14 @@ pub fn transition_image_layout(
     old_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
 ) {
-    println!("[HOTHAM_SIMULATOR] Transitioning image {:?}", image);
+    // println!("[HOTHAM_SIMULATOR] Transitioning image {:?}", image);
     let command_buffer = begin_single_time_commands(device, command_pool);
     let subresource_range = vk::ImageSubresourceRange::builder()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
         .base_mip_level(0)
         .level_count(1)
         .base_array_layer(0)
-        .layer_count(2)
+        .layer_count(NUM_VIEWS as _)
         .build();
 
     let (src_access_mask, dst_access_mask, src_stage, dst_stage) =
@@ -1918,7 +1939,7 @@ pub fn transition_image_layout(
         )
     };
     end_single_time_commands(device, queue, command_buffer, command_pool);
-    println!("[HOTHAM_SIMULATOR] Done transitioning image {:?}", image);
+    // println!("[HOTHAM_SIMULATOR] Done transitioning image {:?}", image);
 }
 
 pub fn begin_single_time_commands(
@@ -2009,6 +2030,17 @@ fn get_stage(
         );
     }
 
+    if old_layout == vk::ImageLayout::UNDEFINED
+        && new_layout == vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL
+    {
+        return (
+            vk::AccessFlags::empty(),
+            vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
+        );
+    }
+
     if old_layout == vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL
         && new_layout == vk::ImageLayout::PRESENT_SRC_KHR
     {
@@ -2028,6 +2060,17 @@ fn get_stage(
             vk::AccessFlags::SHADER_READ,
             vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
             vk::PipelineStageFlags::FRAGMENT_SHADER,
+        );
+    }
+
+    if old_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+        && new_layout == vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL
+    {
+        return (
+            vk::AccessFlags::SHADER_READ,
+            vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            vk::PipelineStageFlags::FRAGMENT_SHADER,
+            vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
         );
     }
 
