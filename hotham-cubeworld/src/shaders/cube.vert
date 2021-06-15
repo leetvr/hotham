@@ -34,6 +34,7 @@ mat4 translateVec(vec3 translate) {
 }
 
 layout(binding = 0) uniform UniformBufferObject {
+    mat4 model;
     mat4 view;
     mat4 projection;
     float deltaTime;
@@ -45,11 +46,6 @@ layout(location = 1) in vec3 inColor;
 layout(location = 0) out vec3 outColor;
 
 void main() {
-    mat4 translate = translateVec(vec3(1.0, 0.0, 0.0));
-    mat4 rotation = rotation3d(vec3(0.5, 1.0, 0.0), (1.0 * ubo.deltaTime));
-    mat4 scale = scaleVec(vec3(0.4));
-    mat4 transform = translate;
-    vec4 position = transform * vec4(inPosition, 1.0);
-    gl_Position = ubo.projection * ubo.view * position;
+    gl_Position = ubo.projection * ubo.view * ubo.model * vec4(inPosition, 1.0);
     outColor = inColor;
 }

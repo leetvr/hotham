@@ -92,12 +92,10 @@ where
             // Push the updated geometry back into Vulkan
             self.renderer.update(vertices, indices);
 
+            self.xr_session.sync_actions(&[])?;
+
             // Wait for a frame to become available from the runtime
             let (frame_state, swapchain_image_index) = self.begin_frame()?;
-
-            if frame_state.should_render {
-                self.renderer.draw(swapchain_image_index)?;
-            }
 
             let (_view_flags, views) = self.xr_session.locate_views(
                 VIEW_TYPE,
@@ -106,6 +104,11 @@ where
             )?;
 
             // TODO: Update view matrices
+            self.renderer.update_view_matrix(&views)?;
+
+            if frame_state.should_render {
+                self.renderer.draw(swapchain_image_index)?;
+            }
 
             // Release the image back to OpenXR
             self.end_frame(frame_state, &views)?;
