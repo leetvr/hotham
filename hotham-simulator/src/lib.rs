@@ -67,7 +67,7 @@ use winit::{
 };
 
 static SWAPCHAIN_COLOUR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
-const NUM_VIEWS: usize = 1;
+const NUM_VIEWS: usize = 2; // TODO: Make dynamic
 
 lazy_static! {
     static ref STATE: Mutex<State> = Default::default();
