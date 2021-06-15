@@ -13,8 +13,10 @@ crate-type = ["cdylib"]
 [dependencies]
 ash = "0.32"
 ash-window = "*"
+cgmath = "0.18"
 lazy_static = "1.4.0"
 openxr-sys = "0.8"
+rand = "0.8"
 winit = "0.25"
 
 [build-dependencies]
