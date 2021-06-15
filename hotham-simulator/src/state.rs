@@ -222,10 +222,10 @@ impl State {
         self.view_poses[0].orientation.x += x_rot;
         self.view_poses[0].orientation.y += y_rot;
         self.view_poses[0].orientation.w += x_rot;
-        self.spaces.get_mut(&left_hand).unwrap().position.z += z_delta;
-        self.spaces.get_mut(&left_hand).unwrap().position.x += x_delta;
-        self.spaces.get_mut(&right_hand).unwrap().position.z += z_delta;
-        self.spaces.get_mut(&right_hand).unwrap().position.x += x_delta;
+        // self.spaces.get_mut(&left_hand).unwrap().position.z += z_delta;
+        // self.spaces.get_mut(&left_hand).unwrap().position.x += x_delta;
+        // self.spaces.get_mut(&right_hand).unwrap().position.z += z_delta;
+        // self.spaces.get_mut(&right_hand).unwrap().position.x += x_delta;
 
         Some(())
     }

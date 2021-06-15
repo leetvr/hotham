@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::Context;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{perspective, vec3, Deg, Matrix4, Point3};
+use cgmath::{perspective, vec3, Deg, Matrix4, Point3, Quaternion, Rad, Rotation, SquareMatrix};
 use openxr as xr;
 use xr::Vulkan;
 
@@ -139,7 +139,6 @@ impl Renderer {
 
     pub fn draw(&mut self, frame_index: usize) -> Result<()> {
         self.frame_index += 1;
-        self.update_view_matrix()?;
 
         let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
@@ -162,14 +161,32 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn update_view_matrix(&mut self) -> Result<()> {
+    pub fn update_view_matrix(&mut self, views: &Vec<xr::View>) -> Result<()> {
         let delta_time = Instant::now()
             .duration_since(self.render_start_time)
             .as_secs_f32();
+
+        // Model
+        let scale = Matrix4::from_scale(0.5);
+        let rotation_y = Matrix4::from_angle_y(Deg(45.0 * delta_time));
+        let rotation_x = Matrix4::from_angle_x(Deg(1.0 * delta_time));
+        let translation = vec3(0.0, -4.6, -2.0);
+        let translate = Matrix4::from_translation(translation);
+        let model = translate * rotation_y * rotation_x * scale;
+
         // Camera (view)
-        let camera_location = Point3::new(0.0, 0.0, 5.0);
+        let orientation = views[0].pose.orientation;
+        let position = views[0].pose.position;
+
+        let camera_location = Point3::new(position.x, position.y, position.z + 0.1);
+        // let camera_location = Point3::new(0.0, 1.8, 1.0);
         let camera_center = Point3::new(0.0, 0.0, 0.0);
         let camera_up = vec3(0.0, 1.0, 0.0);
+        let camera_rotation =
+            Quaternion::new(orientation.x, orientation.y, orientation.z, orientation.w);
+        let direction = vec3(0.0, 0.0, 0.0);
+
+        // let view = Matrix4::look_to_rh(camera_location, direction, camera_up);
         let view = Matrix4::look_at_rh(camera_location, camera_center, camera_up);
 
         // Projection
@@ -180,12 +197,11 @@ impl Renderer {
         let projection = perspective(fovy, aspect as _, near, far);
 
         let view_matrix = ViewMatrix {
+            model,
             view,
             projection,
             delta_time,
         };
-
-        println!("[HOTHAM_VIEW_MATRIX] View matrix is now {:?}", view_matrix);
 
         self.uniform_buffer
             .update(&self.vulkan_context, &view_matrix, 1)?;
@@ -262,8 +278,8 @@ impl Renderer {
     }
 
     pub fn update(&self, vertices: &Vec<Vertex>, indices: &Vec<u32>) -> () {
-        println!("[HOTHAM_TEST] Vertices are now: {:?}", vertices);
-        println!("[HOTHAM_TEST] Indices are now: {:?}", indices);
+        // println!("[HOTHAM_TEST] Vertices are now: {:?}", vertices);
+        // println!("[HOTHAM_TEST] Indices are now: {:?}", indices);
     }
 }
 
