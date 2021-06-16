@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "..\\OpenXR-SDK-Source"
+		},
+		{
+			"path": "..\\..\\Documents\\Devlogs"
 		}
 	],
 	"settings": {}

@@ -214,8 +214,8 @@ impl State {
             }
         }
 
-        let left_hand = self.left_hand_space;
-        let right_hand = self.right_hand_space;
+        // let left_hand = self.left_hand_space;
+        // let right_hand = self.right_hand_space;
 
         self.view_poses[0].position.z += z_delta;
         self.view_poses[0].position.x += x_delta;

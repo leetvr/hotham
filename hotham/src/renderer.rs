@@ -1,13 +1,14 @@
 use std::{ffi::CStr, mem::size_of, time::Instant, u64};
 
 use crate::{
-    buffer::Buffer, frame::Frame, hotham_error::HothamError, image::Image, swapchain::Swapchain,
-    vulkan_context::VulkanContext, ProgramInitialization, Result, Vertex, ViewMatrix, COLOR_FORMAT,
-    DEPTH_FORMAT, VIEW_COUNT,
+    buffer::Buffer, camera::Camera, frame::Frame, hotham_error::HothamError, image::Image,
+    swapchain::Swapchain, vulkan_context::VulkanContext, ProgramInitialization, Result,
+    UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Context;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{perspective, vec3, Deg, Matrix4, Point3, Quaternion, Rad, Rotation, SquareMatrix};
+use cgmath::{perspective, vec3, Deg, Matrix4};
+use console::Term;
 use openxr as xr;
 use xr::Vulkan;
 
@@ -23,9 +24,10 @@ pub(crate) struct Renderer {
     render_area: vk::Rect2D,
     vertex_buffer: Buffer<Vertex>,
     index_buffer: Buffer<u32>,
-    uniform_buffer: Buffer<ViewMatrix>,
+    uniform_buffer: Buffer<UniformBufferObject>,
     uniform_buffer_descriptor_set: vk::DescriptorSet,
     render_start_time: Instant,
+    camera: Camera,
     pub frame_index: usize,
 }
 
@@ -107,7 +109,7 @@ impl Renderer {
             vk::BufferUsageFlags::INDEX_BUFFER,
         )?;
 
-        let view_matrix = ViewMatrix::default();
+        let view_matrix = UniformBufferObject::default();
         let uniform_buffer = Buffer::new(
             &vulkan_context,
             &view_matrix,
@@ -134,11 +136,13 @@ impl Renderer {
             uniform_buffer,
             uniform_buffer_descriptor_set,
             render_start_time: Instant::now(),
+            camera: Default::default(),
         })
     }
 
     pub fn draw(&mut self, frame_index: usize) -> Result<()> {
         self.frame_index += 1;
+        self.show_debug_info()?;
 
         let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
@@ -161,7 +165,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn update_view_matrix(&mut self, views: &Vec<xr::View>) -> Result<()> {
+    pub fn update_uniform_buffer(&mut self, views: &Vec<xr::View>) -> Result<()> {
         let delta_time = Instant::now()
             .duration_since(self.render_start_time)
             .as_secs_f32();
@@ -169,25 +173,13 @@ impl Renderer {
         // Model
         let scale = Matrix4::from_scale(0.5);
         let rotation_y = Matrix4::from_angle_y(Deg(45.0 * delta_time));
-        let rotation_x = Matrix4::from_angle_x(Deg(1.0 * delta_time));
+        let _rotation_x = Matrix4::from_angle_x(Deg(1.0 * delta_time));
         let translation = vec3(0.0, -4.6, -2.0);
         let translate = Matrix4::from_translation(translation);
-        let model = translate * rotation_y * rotation_x * scale;
+        let model = translate * rotation_y * scale;
 
-        // Camera (view)
-        let orientation = views[0].pose.orientation;
-        let position = views[0].pose.position;
-
-        let camera_location = Point3::new(position.x, position.y, position.z + 0.1);
-        // let camera_location = Point3::new(0.0, 1.8, 1.0);
-        let camera_center = Point3::new(0.0, 0.0, 0.0);
-        let camera_up = vec3(0.0, 1.0, 0.0);
-        let camera_rotation =
-            Quaternion::new(orientation.x, orientation.y, orientation.z, orientation.w);
-        let direction = vec3(0.0, 0.0, 0.0);
-
-        // let view = Matrix4::look_to_rh(camera_location, direction, camera_up);
-        let view = Matrix4::look_at_rh(camera_location, camera_center, camera_up);
+        // View (camera)
+        let view = self.camera.update_view_matrix(views, delta_time);
 
         // Projection
         let fovy = Deg(45.0);
@@ -196,7 +188,7 @@ impl Renderer {
         let far = 10.0;
         let projection = perspective(fovy, aspect as _, near, far);
 
-        let view_matrix = ViewMatrix {
+        let view_matrix = UniformBufferObject {
             model,
             view,
             projection,
@@ -277,9 +269,19 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn update(&self, vertices: &Vec<Vertex>, indices: &Vec<u32>) -> () {
+    pub fn update(&self, _vertices: &Vec<Vertex>, _indices: &Vec<u32>) -> () {
         // println!("[HOTHAM_TEST] Vertices are now: {:?}", vertices);
         // println!("[HOTHAM_TEST] Indices are now: {:?}", indices);
+    }
+
+    fn show_debug_info(&self) -> Result<()> {
+        let term = Term::stdout();
+        term.clear_screen()?;
+        term.write_line("[RENDER_DEBUG]")?;
+        term.write_line(&format!("[Frame]: {}", self.frame_index))?;
+        term.write_line(&format!("[Camera Position]: {:?}", self.camera))?;
+
+        Ok(())
     }
 }
 
