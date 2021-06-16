@@ -104,7 +104,7 @@ where
             )?;
 
             // TODO: Update view matrices
-            self.renderer.update_view_matrix(&views)?;
+            self.renderer.update_uniform_buffer(&views)?;
 
             if frame_state.should_render {
                 self.renderer.draw(swapchain_image_index)?;

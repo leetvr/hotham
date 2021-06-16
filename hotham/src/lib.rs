@@ -7,7 +7,7 @@ use openxr as xr;
 
 pub use app::App;
 pub use vertex::Vertex;
-pub use view_matrix::ViewMatrix;
+pub use uniform_buffer_object::UniformBufferObject;
 
 mod app;
 mod buffer;
@@ -18,8 +18,9 @@ mod renderer;
 mod swapchain;
 mod util;
 mod vertex;
-mod view_matrix;
+mod uniform_buffer_object;
 mod vulkan_context;
+mod camera;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;

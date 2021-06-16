@@ -587,13 +587,14 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
             vk::SubpassContents::INLINE,
         );
 
-        let mut viewport = vk::Viewport::builder()
+        let viewport = vk::Viewport::builder()
             .height(extent.height as _)
-            .width((extent.width / (NUM_VIEWS as u32)) as _)
+            // .width((extent.width / (NUM_VIEWS as u32)) as _)
+            .width(extent.width as _)
             .max_depth(1 as _)
             .min_depth(0 as _)
             .build();
-        let mut scissor = vk::Rect2D {
+        let scissor = vk::Rect2D {
             extent,
             ..Default::default()
         };
@@ -613,15 +614,15 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
         device.cmd_draw(*command_buffer, 3, 1, 0, 0);
 
         // Right Eye
-        if NUM_VIEWS > 1 {
-            viewport.x = extent.width as f32 / 2.0;
-            scissor.offset.x = extent.width as i32 / 2;
-            device.cmd_set_viewport(*command_buffer, 0, &[viewport]);
-            device.cmd_set_scissor(*command_buffer, 0, &[scissor]);
+        // if NUM_VIEWS > 1 {
+        //     viewport.x = extent.width as f32 / 2.0;
+        //     scissor.offset.x = extent.width as i32 / 2;
+        //     device.cmd_set_viewport(*command_buffer, 0, &[viewport]);
+        //     device.cmd_set_scissor(*command_buffer, 0, &[scissor]);
 
-            device.cmd_bind_pipeline(*command_buffer, pipeline_bind_point, pipelines[1]);
-            device.cmd_draw(*command_buffer, 3, 1, 0, 0);
-        }
+        //     device.cmd_bind_pipeline(*command_buffer, pipeline_bind_point, pipelines[1]);
+        //     device.cmd_draw(*command_buffer, 3, 1, 0, 0);
+        // }
 
         device.cmd_end_render_pass(*command_buffer);
         device
