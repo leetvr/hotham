@@ -209,19 +209,22 @@ impl State {
                 _ => {}
             },
             HothamInputEvent::MouseInput { x, y } => {
-                x_rot = (x * 0.001) as _;
+                x_rot = -(x * 0.001) as _;
                 y_rot = -(y * 0.001) as _;
             }
         }
 
+        let pose = &mut self.view_poses[0];
+        let orientation = &mut pose.orientation;
+        orientation.x = (orientation.x + x_rot).clamp(-1.0, 1.0);
+        orientation.y = (orientation.y + y_rot).clamp(-1.0, 1.0);
+
+        let position = &mut pose.position;
+        position.z += z_delta;
+        position.x += x_delta;
+
         // let left_hand = self.left_hand_space;
         // let right_hand = self.right_hand_space;
-
-        self.view_poses[0].position.z += z_delta;
-        self.view_poses[0].position.x += x_delta;
-        self.view_poses[0].orientation.x += x_rot;
-        self.view_poses[0].orientation.y += y_rot;
-        self.view_poses[0].orientation.w += x_rot;
         // self.spaces.get_mut(&left_hand).unwrap().position.z += z_delta;
         // self.spaces.get_mut(&left_hand).unwrap().position.x += x_delta;
         // self.spaces.get_mut(&right_hand).unwrap().position.z += z_delta;

@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "..\\..\\Documents\\Devlogs"
+		},
+		{
+			"path": "..\\Vulkan"
 		}
 	],
 	"settings": {}

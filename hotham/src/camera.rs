@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use cgmath::*;
 use openxr::View;
 
@@ -7,46 +8,78 @@ pub struct Camera {
     pub pitch: Rad<f32>,
     pub roll: Rad<f32>,
     pub yaw: Rad<f32>,
+    pub view_matrix: Matrix4<f32>,
+    pub direction: Vector3<f32>,
 }
 
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            position: Point3::origin(),
-            pitch: Rad(0.0),
-            roll: Rad(0.0),
-            yaw: Rad(0.0),
+            position: (0.0, 0.0, 1.0).into(),
+            pitch: Deg(0.0).into(),
+            roll: Deg(0.0).into(),
+            yaw: Deg(0.0).into(),
+            view_matrix: Matrix4::identity(),
+            direction: vec3(0.0, 0.0, 0.0),
         }
     }
 }
 
 impl Camera {
-    pub fn update_view_matrix(&mut self, views: &Vec<View>, _delta_time: f32) -> Matrix4<f32> {
+    pub fn update_view_matrix(
+        &mut self,
+        views: &Vec<View>,
+        _delta_time: f32,
+    ) -> Result<Matrix4<f32>> {
         // Convert values from OpenXR format
-        let orientation = views[0].pose.orientation;
-        let camera_rotation = Euler::from(Quaternion::new(
-            orientation.x,
-            orientation.y,
-            orientation.z,
-            orientation.w,
-        ));
-
+        let (camera_position, camera_rotation) = convert_view(&views[0]);
+        self.position = camera_position;
+        self.yaw = camera_rotation.y;
         self.pitch = camera_rotation.x;
-        self.roll = camera_rotation.y;
-        self.yaw = camera_rotation.z;
 
-        let position = views[0].pose.position;
-        self.position = Point3::new(position.x, position.y, position.z);
+        self.view_matrix = self.build_matrix();
 
-        // let camera_x = 0.0;
-        // let camera_y = 1.8;
-        // let camera_z = 0.1 + 0.001 * delta_time;
-
-        let camera_center = Point3::new(0.0, 0.0, 0.0);
-        let camera_up = vec3(0.0, 1.0, 0.0);
-        let _direction = vec3(self.yaw.0.cos(), self.pitch.0.sin(), self.roll.0.cos());
-
-        // Matrix4::look_to_rh(self.position, direction, camera_up);
-        Matrix4::look_at_rh(self.position, camera_center, camera_up)
+        self.sanity_check()?;
+        Ok(self.view_matrix)
     }
+
+    pub fn build_matrix(&self) -> Matrix4<f32> {
+        let rotation = Euler::new(self.pitch * -1.0, self.yaw * -1.0, self.roll * -1.0);
+        let rotation = Matrix4::from(Matrix3::from(rotation));
+
+        let translation = Matrix4::from_translation(self.position.to_vec() * -1.0);
+
+        rotation * translation
+    }
+
+    pub fn sanity_check(&self) -> Result<()> {
+        let numbers: &[f32; 16] = self.view_matrix.as_ref();
+        for n in numbers {
+            if n.is_nan() {
+                return Err(anyhow!("View matrix is broken: {:?}", self));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn convert_view(view: &View) -> (Point3<f32>, Euler<Rad<f32>>) {
+    let orientation = view.pose.orientation;
+    let orientation = Quaternion::new(orientation.w, orientation.x, orientation.y, orientation.z);
+    let rotation = Euler::from(orientation);
+
+    let position = view.pose.position;
+    let position = Point3::new(position.x, position.y, position.z);
+
+    return (position, rotation);
+}
+
+fn _working_matrix() -> Matrix4<f32> {
+    let up = vec3(0.0, 1.0, 0.0);
+    let camera_position = point3(0.0, 0.0, 1.0);
+    let camera_center = point3(0.0, 0.0, 0.0);
+    let direction = camera_center - camera_position;
+
+    Matrix4::look_to_rh(camera_position, direction, up)
 }
