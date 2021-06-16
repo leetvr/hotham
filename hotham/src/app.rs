@@ -102,12 +102,13 @@ where
                 frame_state.predicted_display_time,
                 &self.xr_space,
             )?;
-
-            // TODO: Update view matrices
-            self.renderer.update_uniform_buffer(&views)?;
+            let rotations = [10.0, -10.0];
 
             if frame_state.should_render {
-                self.renderer.draw(swapchain_image_index)?;
+                for r in &rotations {
+                    self.renderer.update_uniform_buffer(&views, *r)?;
+                    self.renderer.draw(swapchain_image_index)?;
+                }
             }
 
             // Release the image back to OpenXR
