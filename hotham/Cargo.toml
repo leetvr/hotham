@@ -10,6 +10,7 @@ version = "0.1.0"
 anyhow = "1.0"
 ash = "0.32"
 cgmath = "0.18"
+console = "0.14"
 ctrlc = {version = "3", features = ["termination"]}
 memoffset = "0.5.1"
 openxr = {features = ["static"], version = "0.14.0"}
