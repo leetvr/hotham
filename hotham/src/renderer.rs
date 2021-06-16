@@ -7,9 +7,10 @@ use crate::{
 };
 use anyhow::Context;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{perspective, vec3, Deg, Matrix4};
+use cgmath::{perspective, vec3, Deg, Matrix4, Quaternion, Rotation, Rotation3};
 use console::Term;
 use openxr as xr;
+use rand::Rng;
 use xr::Vulkan;
 
 pub(crate) struct Renderer {
@@ -167,32 +168,38 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn update_uniform_buffer(&mut self, views: &Vec<xr::View>) -> Result<()> {
+    pub fn update_uniform_buffer(&mut self, views: &Vec<xr::View>, rotation: f32) -> Result<()> {
         let delta_time = Instant::now()
             .duration_since(self.render_start_time)
             .as_secs_f32();
 
-        // Model
+        let rotation = rotation + (0.1 * delta_time);
         let scale = Matrix4::from_scale(0.5);
-        let rotation_y = Matrix4::from_angle_y(Deg(45.0 * delta_time));
-        let _rotation_x = Matrix4::from_angle_x(Deg(1.0 * delta_time));
-        let translation = vec3(0.0, -4.6, -2.0);
-        let translate = Matrix4::from_translation(translation);
-        let model = translate * rotation_y * scale;
+        let rotation_y = Matrix4::from_angle_y(Deg(10.0 * delta_time));
+        let rotation_x = Matrix4::from_angle_x(Deg(60.0));
+        let position = vec3(0.0, 1.8, -10.0);
+
+        let position = Quaternion::from_angle_x(Deg(rotation)).rotate_vector(position);
+        let position = Quaternion::from_angle_y(Deg(rotation)).rotate_vector(position);
+
+        let translate = Matrix4::from_translation(position);
+        let model = translate * rotation_y * rotation_x * scale;
 
         // View (camera)
-        let view = self.camera.update_view_matrix(views, delta_time);
+        let view = self.camera.update_view_matrix(views, delta_time)?;
+
+        let model_view = view * model;
 
         // Projection
         let fovy = Deg(45.0);
         let aspect = self.swapchain.resolution.width / self.swapchain.resolution.height;
-        let near = 0.1;
-        let far = 10.0;
-        let projection = perspective(fovy, aspect as _, near, far);
+        let near = 0.001;
+        let far = 1000.0;
+        let mut projection = perspective(fovy, aspect as _, near, far);
+        projection[1][1] *= -1.0;
 
         let uniform_buffer = UniformBufferObject {
-            model,
-            view,
+            model_view,
             projection,
             delta_time,
         };
@@ -286,7 +293,15 @@ impl Renderer {
         self.term
             .write_line(&format!("[Frame]: {}", self.frame_index))?;
         self.term
-            .write_line(&format!("[Camera Position]: {:?}", self.camera))?;
+            .write_line(&format!("[Camera Position]: {:?}", self.camera.position))?;
+        self.term.write_line(&format!(
+            "[Camera Orientation]: Pitch: {:?}, Yaw: {:?}, Roll: {:?}",
+            self.camera.pitch, self.camera.yaw, self.camera.roll
+        ))?;
+        self.term
+            .write_line(&format!("[Camera Direction]: {:?}", self.camera.direction))?;
+        self.term
+            .write_line(&format!("[View Matrix]: {:?}", self.camera.view_matrix))?;
         self.term.flush()?;
 
         Ok(())
@@ -498,7 +513,7 @@ fn create_pipeline(
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
         .cull_mode(vk::CullModeFlags::BACK)
-        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+        .front_face(vk::FrontFace::CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)
         .depth_bias_enable(false)

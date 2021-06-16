@@ -1,7 +1,7 @@
 {
     "rdocCaptureSettings": 1,
     "settings": {
-        "autoStart": false,
+        "autoStart": true,
         "commandLine": "",
         "environment": [
         ],

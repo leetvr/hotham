@@ -1,6 +1,6 @@
 ${env:RUST_BACKTRACE} = 1
 
-cargo build -p hotham-simulator
+cargo build
 if ($?) {
     # Set-Location ..\openxrs\openxr
     # cargo run --example vulkan

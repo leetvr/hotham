@@ -68,6 +68,8 @@ use winit::{
 
 static SWAPCHAIN_COLOUR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 const NUM_VIEWS: usize = 2; // TODO: Make dynamic
+const VIEWPORT_HEIGHT: u32 = 1000;
+const VIEWPORT_WIDTH: u32 = 1000;
 
 lazy_static! {
     static ref STATE: Mutex<State> = Default::default();
@@ -555,8 +557,8 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
     let command_buffers = device.allocate_command_buffers(&allocate_info).unwrap();
     let begin_info = vk::CommandBufferBeginInfo::builder().build();
     let extent = vk::Extent2D {
-        width: 600,
-        height: 600,
+        width: VIEWPORT_WIDTH as _,
+        height: VIEWPORT_HEIGHT as _,
     };
     let render_area = vk::Rect2D {
         offset: vk::Offset2D { x: 0, y: 0 },
@@ -820,6 +822,7 @@ unsafe extern "system" fn poll_event(
     if state.session_state == SessionState::FOCUSED {}
 
     // if state.session_state == SessionState::FOCUSED && state.frame_count > 1 {
+    // if state.session_state != SessionState::STOPPING && state.close_window.load(Relaxed) {
     //     next_state = SessionState::STOPPING;
     //     state.has_event = true;
     // }
@@ -902,10 +905,10 @@ unsafe extern "system" fn enumerate_view_configuration_views(
         (*views)[i] = ViewConfigurationView {
             ty: StructureType::VIEW_CONFIGURATION_VIEW,
             next: null_mut(),
-            recommended_image_rect_width: 600,
-            max_image_rect_width: 600,
-            recommended_image_rect_height: 600,
-            max_image_rect_height: 600,
+            recommended_image_rect_width: VIEWPORT_WIDTH as _,
+            max_image_rect_width: VIEWPORT_WIDTH as _,
+            recommended_image_rect_height: VIEWPORT_HEIGHT as _,
+            max_image_rect_height: VIEWPORT_HEIGHT as _,
             recommended_swapchain_sample_count: 3,
             max_swapchain_sample_count: 3,
         };
@@ -990,7 +993,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
             visible
         );
         let window = WindowBuilder::new()
-            .with_inner_size(PhysicalSize::new(600, 600))
+            .with_inner_size(PhysicalSize::new(VIEWPORT_WIDTH, VIEWPORT_HEIGHT))
             .with_title("Hotham Simulator")
             .with_visible(visible)
             .with_drag_and_drop(false)
@@ -998,8 +1001,8 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
             .unwrap();
         println!("[HOTHAM_SIMULATOR] ..done.");
         let extent = vk::Extent2D {
-            height: 600,
-            width: 600,
+            height: VIEWPORT_HEIGHT,
+            width: VIEWPORT_WIDTH,
         };
 
         println!("[HOTHAM_SIMULATOR] Creating surface..");
@@ -1257,8 +1260,8 @@ fn create_framebuffers(state: &mut MutexGuard<State>) -> Vec<vk::Framebuffer> {
             let create_info = vk::FramebufferCreateInfo::builder()
                 .render_pass(render_pass)
                 .attachments(attachments)
-                .width(600)
-                .height(600)
+                .width(VIEWPORT_WIDTH)
+                .height(VIEWPORT_HEIGHT)
                 .layers(1);
 
             unsafe { device.create_framebuffer(&create_info, None).unwrap() }
