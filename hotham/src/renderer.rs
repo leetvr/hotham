@@ -28,6 +28,7 @@ pub(crate) struct Renderer {
     uniform_buffer_descriptor_set: vk::DescriptorSet,
     render_start_time: Instant,
     camera: Camera,
+    term: Term,
     pub frame_index: usize,
 }
 
@@ -137,6 +138,7 @@ impl Renderer {
             uniform_buffer_descriptor_set,
             render_start_time: Instant::now(),
             camera: Default::default(),
+            term: Term::buffered_stdout(),
         })
     }
 
@@ -188,7 +190,7 @@ impl Renderer {
         let far = 10.0;
         let projection = perspective(fovy, aspect as _, near, far);
 
-        let view_matrix = UniformBufferObject {
+        let uniform_buffer = UniformBufferObject {
             model,
             view,
             projection,
@@ -196,7 +198,7 @@ impl Renderer {
         };
 
         self.uniform_buffer
-            .update(&self.vulkan_context, &view_matrix, 1)?;
+            .update(&self.vulkan_context, &uniform_buffer, 1)?;
 
         Ok(())
     }
@@ -275,11 +277,17 @@ impl Renderer {
     }
 
     fn show_debug_info(&self) -> Result<()> {
-        let term = Term::stdout();
-        term.clear_screen()?;
-        term.write_line("[RENDER_DEBUG]")?;
-        term.write_line(&format!("[Frame]: {}", self.frame_index))?;
-        term.write_line(&format!("[Camera Position]: {:?}", self.camera))?;
+        if self.frame_index % 90 != 0 {
+            return Ok(());
+        };
+
+        self.term.clear_screen()?;
+        self.term.write_line("[RENDER_DEBUG]")?;
+        self.term
+            .write_line(&format!("[Frame]: {}", self.frame_index))?;
+        self.term
+            .write_line(&format!("[Camera Position]: {:?}", self.camera))?;
+        self.term.flush()?;
 
         Ok(())
     }
