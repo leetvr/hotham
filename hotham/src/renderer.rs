@@ -11,7 +11,7 @@ use cgmath::{perspective, vec3, Deg, Matrix4, Quaternion, Rotation, Rotation3};
 use console::Term;
 use openxr as xr;
 
-use xr::Vulkan;
+use xr::{Vulkan, VulkanLegacy};
 
 pub(crate) struct Renderer {
     swapchain: Swapchain,
@@ -67,7 +67,7 @@ impl Drop for Renderer {
 impl Renderer {
     pub(crate) fn new(
         vulkan_context: VulkanContext,
-        xr_swapchain: &xr::Swapchain<Vulkan>,
+        xr_swapchain: &xr::Swapchain<VulkanLegacy>,
         swapchain_resolution: vk::Extent2D,
         params: &ProgramInitialization,
     ) -> Result<Self> {
