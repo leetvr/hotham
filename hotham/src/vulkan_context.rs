@@ -179,10 +179,44 @@ impl VulkanContext {
                 .get_vulkan_legacy_physical_device(system, transmute(vulkan_instance.handle()))
         }?;
         let physical_device = vk::PhysicalDevice::from_raw(physical_device as _);
-        let device =
-            create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device);
+        let (device, graphics_queue, queue_family_index) =
+            create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device)?;
 
-        todo!()
+        let command_pool = unsafe {
+            device.create_command_pool(
+                &vk::CommandPoolCreateInfo::builder()
+                    .queue_family_index(queue_family_index)
+                    .flags(
+                        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
+                            | vk::CommandPoolCreateFlags::TRANSIENT,
+                    ),
+                None,
+            )
+        }?;
+
+        let descriptor_pool = unsafe {
+            device.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::builder()
+                    .pool_sizes(&[vk::DescriptorPoolSize {
+                        ty: vk::DescriptorType::UNIFORM_BUFFER,
+                        descriptor_count: SWAPCHAIN_LENGTH as _,
+                        ..Default::default()
+                    }])
+                    .max_sets(SWAPCHAIN_LENGTH as _),
+                None,
+            )
+        }?;
+
+        Ok(Self {
+            entry: vulkan_entry,
+            instance: vulkan_instance,
+            physical_device,
+            device,
+            graphics_queue,
+            queue_family_index,
+            command_pool,
+            descriptor_pool,
+        })
     }
 
     pub fn create_image_view(
@@ -366,13 +400,19 @@ fn vulkan_init_legacy(instance: &xr::Instance, system: SystemId) -> Result<(AshI
     println!("[HOTHAM_VULKAN] Initialising Vulkan..");
     let app_name = CString::new("Hotham Cubeworld")?;
     let entry = unsafe { Entry::new()? };
-    let validation_layer = get_validation_layer();
-    let mut layer_names = get_layer_names(&entry)?;
+    let layer_names = get_layer_names(&entry)?;
     println!("[HOTHAM_VULKAN] Trying to use layers: {:?}", unsafe {
         parse_raw_strings(&layer_names)
     });
 
     let extension_names = unsafe { instance.get_vulkan_legacy_instance_extensions(system) }?;
+    println!("[HOTHAM_VULKAN] Trying to use extensions: {:?}", {
+        &extension_names
+    });
+    let extension_names = extension_names
+        .iter()
+        .map(|e| e.as_ptr())
+        .collect::<Vec<_>>();
 
     let app_info = vk::ApplicationInfo::builder()
         .application_name(&app_name)
@@ -394,10 +434,18 @@ pub fn create_vulkan_device_legacy(
     system: SystemId,
     vulkan_instance: &AshInstance,
     physical_device: vk::PhysicalDevice,
-) -> Result<(Device, vk::Queue)> {
+) -> Result<(Device, vk::Queue, u32)> {
     println!("[HOTHAM_VULKAN] Creating logical device.. ");
 
     let extension_names = unsafe { xr_instance.get_vulkan_legacy_device_extensions(system) }?;
+    println!(
+        "[HOTHAM_VULKAN] Using device extensions: {:?}",
+        extension_names
+    );
+    let extension_names = extension_names
+        .iter()
+        .map(|e| e.as_ptr())
+        .collect::<Vec<_>>();
     let queue_priorities = [1.0];
     let graphics_family_index = 0;
     let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
@@ -420,7 +468,7 @@ pub fn create_vulkan_device_legacy(
 
     println!("[HOTHAM_VULKAN] ..done");
 
-    Ok((device, graphics_queue))
+    Ok((device, graphics_queue, graphics_family_index))
 }
 
 fn get_layer_names(entry: &Entry) -> Result<Vec<*const c_char>> {
