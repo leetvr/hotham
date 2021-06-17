@@ -11,6 +11,12 @@
 		},
 		{
 			"path": "..\\Vulkan"
+		},
+		{
+			"path": "..\\openxrs"
+		},
+		{
+			"path": "..\\..\\Documents\\Learning\\quest-for-triangle"
 		}
 	],
 	"settings": {}

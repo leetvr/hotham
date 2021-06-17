@@ -7,13 +7,13 @@ pub(crate) unsafe fn _get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> 
         .collect::<Vec<_>>()
 }
 
-pub(crate) unsafe fn _parse_raw_strings(raw_strings: &[*const c_char]) -> Vec<&str> {
+pub(crate) unsafe fn parse_raw_strings(raw_strings: &[*const c_char]) -> Vec<&str> {
     raw_strings
         .iter()
-        .map(|s| _parse_raw_string(*s))
+        .map(|s| parse_raw_string(*s))
         .collect::<Vec<_>>()
 }
 
-pub(crate) unsafe fn _parse_raw_string(raw_string: *const c_char) -> &'static str {
+pub(crate) unsafe fn parse_raw_string(raw_string: *const c_char) -> &'static str {
     CStr::from_ptr(raw_string).to_str().unwrap()
 }

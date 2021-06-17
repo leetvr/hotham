@@ -2,10 +2,14 @@ use crate::{
     renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program, BLEND_MODE,
     COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
+use anyhow::anyhow;
 use anyhow::Result;
 use ash::{version::InstanceV1_0, vk};
 use openxr as xr;
 use std::{
+    ffi::CStr,
+    mem::transmute,
+    ptr::null,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -14,9 +18,10 @@ use std::{
     time::Duration,
 };
 use xr::{
-    vulkan::SessionCreateInfo, EventDataBuffer, FrameStream, FrameWaiter, ReferenceSpaceType,
-    Session, SessionState, Swapchain, SwapchainCreateFlags, SwapchainCreateInfo,
-    SwapchainUsageFlags, Vulkan,
+    sys::{pfn::InitializeLoaderKHR, LoaderInitInfoAndroidKHR},
+    vulkan::SessionCreateInfo,
+    EventDataBuffer, FrameStream, FrameWaiter, ReferenceSpaceType, Session, SessionState,
+    Swapchain, SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Vulkan,
 };
 
 pub struct App<P: Program> {
@@ -43,8 +48,7 @@ where
         println!("[HOTHAM_APP] Initialised program with {:?}", params);
 
         let (xr_instance, system) = create_xr_instance()?;
-
-        let vulkan_context = VulkanContext::create_from_xr_instance(&xr_instance, system)?;
+        let vulkan_context = create_vulkan_context(&xr_instance, system)?;
         let (xr_session, frame_waiter, frame_stream) =
             create_xr_session(&xr_instance, system, &vulkan_context)?; // TODO: Extract to XRContext
         let xr_space =
@@ -182,6 +186,24 @@ where
     }
 }
 
+#[cfg(not(target_os = "android"))]
+fn create_vulkan_context(
+    xr_instance: &xr::Instance,
+    system: xr::SystemId,
+) -> Result<VulkanContext, crate::hotham_error::HothamError> {
+    let vulkan_context = VulkanContext::create_from_xr_instance(xr_instance, system)?;
+    Ok(vulkan_context)
+}
+
+#[cfg(target_os = "android")]
+fn create_vulkan_context(
+    xr_instance: &xr::Instance,
+    system: xr::SystemId,
+) -> Result<VulkanContext, crate::hotham_error::HothamError> {
+    let vulkan_context = VulkanContext::create_from_xr_instance_legacy(xr_instance, system)?;
+    Ok(vulkan_context)
+}
+
 fn get_swapchain_resolution(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
@@ -244,7 +266,7 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
         engine_version: 1,
     };
     let mut required_extensions = xr::ExtensionSet::default();
-    required_extensions.khr_vulkan_enable2 = true;
+    required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
     let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
     Ok((instance, system))
@@ -253,6 +275,40 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
 #[cfg(target_os = "android")]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = xr::Entry::load()?;
+    unsafe {
+        let mut initialize_loader = None;
+        let get_instance_proc_addr = xr_entry.fp().get_instance_proc_addr;
+        println!("[HOTHAM_ANDROID] About to call get_instance_proc_addr..");
+
+        get_instance_proc_addr(
+            Default::default(),
+            CStr::from_bytes_with_nul_unchecked(b"xrInitializeLoaderKHR\0").as_ptr(),
+            &mut initialize_loader,
+        );
+
+        let initialize_loader = initialize_loader.ok_or(anyhow!(
+            "Couldn't get function pointer for xrInitialiseLoaderKHR"
+        ))?;
+        let initialize_loader: InitializeLoaderKHR = transmute(initialize_loader);
+
+        let native_activity = ndk_glue::native_activity();
+        let vm_ptr = native_activity.vm();
+        let context = native_activity.activity();
+
+        let loader_init_info = LoaderInitInfoAndroidKHR {
+            ty: LoaderInitInfoAndroidKHR::TYPE,
+            next: null(),
+            application_vm: vm_ptr as _,
+            application_context: context as _,
+        };
+
+        println!(
+            "[HOTHAM_ANDROID] Done! Calling loader init info with: {:?}",
+            loader_init_info.ty
+        );
+        initialize_loader(transmute(&loader_init_info));
+        println!("[HOTHAM_ANDROID] Done! Loader initialized.");
+    }
     let xr_app_info = openxr::ApplicationInfo {
         application_name: "Hotham Cubeworld",
         application_version: 1,
@@ -260,8 +316,10 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
         engine_version: 1,
     };
     let mut required_extensions = xr::ExtensionSet::default();
-    required_extensions.khr_vulkan_enable2 = true;
+    required_extensions.khr_vulkan_enable = true;
+    print!("[HOTHAM_ANDROID] Creating instance..");
     let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
+    println!(" ..done!");
     Ok((instance, system))
 }

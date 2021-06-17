@@ -22,7 +22,7 @@
 				"kind": "test",
 				"isDefault": true
 			},
-			"label": "Run tests"
+			"label": "Run Cubeworld on hotham-simulator",
 		},
 		{
 			"type": "shell",

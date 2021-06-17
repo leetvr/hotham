@@ -1,20 +1,22 @@
 use crate::{
-    hotham_error::HothamError, image::Image, Result, COLOR_FORMAT, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
+    hotham_error::HothamError, image::Image, util::parse_raw_strings, Result, COLOR_FORMAT,
+    DEPTH_FORMAT, SWAPCHAIN_LENGTH,
 };
 use anyhow::anyhow;
 use ash::{
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk::{self, Handle},
-    Device, Entry, Instance,
+    Device, Entry, Instance as AshInstance,
 };
 use openxr as xr;
-use std::{fmt::Debug, intrinsics::transmute};
+use std::{ffi::CString, fmt::Debug, intrinsics::transmute, os::raw::c_char};
 use std::{mem::size_of, ptr::copy};
+use xr::SystemId;
 
 #[derive(Clone)]
 pub(crate) struct VulkanContext {
     pub entry: Entry,
-    pub instance: Instance,
+    pub instance: AshInstance,
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub command_pool: vk::CommandPool,
@@ -35,14 +37,15 @@ impl Drop for VulkanContext {
 }
 
 impl VulkanContext {
+    #[cfg(not(target_os = "android"))]
     pub fn create_from_xr_instance(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
     ) -> Result<Self> {
-        print!("[HOTHAM_VULKAN] Creating VulkanContext..");
-        let vk_target_version_xr = xr::Version::new(1, 1, 0);
+        println!("[HOTHAM_VULKAN] Creating VulkanContext..");
+        let vk_target_version_xr = xr::Version::new(1, 2, 0);
 
-        let requirements = xr_instance.graphics_requirements::<xr::Vulkan>(system)?;
+        let requirements = xr_instance.graphics_requirements::<xr::VulkanLegacy>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
             || vk_target_version_xr.major() > requirements.max_api_version_supported.major()
         {
@@ -68,7 +71,7 @@ impl VulkanContext {
         .map_err(vk::Result::from_raw)?;
 
         let instance = unsafe {
-            Instance::load(
+            AshInstance::load(
                 entry.static_fn(),
                 vk::Instance::from_raw(instance_handle as _),
             )
@@ -164,6 +167,22 @@ impl VulkanContext {
             graphics_queue,
             descriptor_pool,
         })
+    }
+
+    pub fn create_from_xr_instance_legacy(
+        xr_instance: &xr::Instance,
+        system: xr::SystemId,
+    ) -> Result<Self> {
+        let (vulkan_instance, vulkan_entry) = vulkan_init_legacy(xr_instance, system)?;
+        let physical_device = unsafe {
+            xr_instance
+                .get_vulkan_legacy_physical_device(system, transmute(vulkan_instance.handle()))
+        }?;
+        let physical_device = vk::PhysicalDevice::from_raw(physical_device as _);
+        let device =
+            create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device);
+
+        todo!()
     }
 
     pub fn create_image_view(
@@ -341,4 +360,83 @@ impl Debug for VulkanContext {
             .field("instance", &"Vulkan Entry".to_string())
             .finish()
     }
+}
+
+fn vulkan_init_legacy(instance: &xr::Instance, system: SystemId) -> Result<(AshInstance, Entry)> {
+    println!("[HOTHAM_VULKAN] Initialising Vulkan..");
+    let app_name = CString::new("Hotham Cubeworld")?;
+    let entry = unsafe { Entry::new()? };
+    let validation_layer = get_validation_layer();
+    let mut layer_names = get_layer_names(&entry)?;
+    println!("[HOTHAM_VULKAN] Trying to use layers: {:?}", unsafe {
+        parse_raw_strings(&layer_names)
+    });
+
+    let extension_names = unsafe { instance.get_vulkan_legacy_instance_extensions(system) }?;
+
+    let app_info = vk::ApplicationInfo::builder()
+        .application_name(&app_name)
+        .api_version(vk::make_version(1, 0, 0));
+    let create_info = vk::InstanceCreateInfo::builder()
+        .application_info(&app_info)
+        .enabled_extension_names(&extension_names)
+        .enabled_layer_names(&layer_names);
+
+    let instance = unsafe { entry.create_instance(&create_info, None) }?;
+
+    println!("[HOTHAM_VULKAN] ..done");
+
+    Ok((instance, entry))
+}
+
+pub fn create_vulkan_device_legacy(
+    xr_instance: &xr::Instance,
+    system: SystemId,
+    vulkan_instance: &AshInstance,
+    physical_device: vk::PhysicalDevice,
+) -> Result<(Device, vk::Queue)> {
+    println!("[HOTHAM_VULKAN] Creating logical device.. ");
+
+    let extension_names = unsafe { xr_instance.get_vulkan_legacy_device_extensions(system) }?;
+    let queue_priorities = [1.0];
+    let graphics_family_index = 0;
+    let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
+        .queue_priorities(&queue_priorities)
+        .queue_family_index(graphics_family_index)
+        .build();
+
+    let queue_create_infos = [graphics_queue_create_info];
+
+    let physical_device_features = vk::PhysicalDeviceFeatures::builder();
+    let device_create_info = vk::DeviceCreateInfo::builder()
+        .queue_create_infos(&queue_create_infos)
+        .enabled_extension_names(&extension_names)
+        .enabled_features(&physical_device_features);
+
+    let device =
+        unsafe { vulkan_instance.create_device(physical_device, &device_create_info, None) }?;
+
+    let graphics_queue = unsafe { device.get_device_queue(graphics_family_index, 0) };
+
+    println!("[HOTHAM_VULKAN] ..done");
+
+    Ok((device, graphics_queue))
+}
+
+fn get_layer_names(entry: &Entry) -> Result<Vec<*const c_char>> {
+    Ok(entry
+        .enumerate_instance_layer_properties()?
+        .iter()
+        .map(|l| l.layer_name.as_ptr())
+        .collect::<Vec<_>>())
+}
+
+#[cfg(debug_assertions)]
+fn get_validation_layer() -> CString {
+    CString::new("VK_LAYER_KHRONOS_validation").unwrap()
+}
+
+#[cfg(not(debug_assertions))]
+fn get_validation_layers() -> Vec<CString> {
+    return Vec::new();
 }
