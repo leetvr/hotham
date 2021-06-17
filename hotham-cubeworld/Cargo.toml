@@ -23,6 +23,7 @@ apk_label = "Hotham Cubeworld"
 fullscreen = true
 libs = [
   "lib/libopenxr_loader.so",
+  "lib/libVkLayer_khronos_validation.so",
 ]
 target_sdk_version = 26
 
