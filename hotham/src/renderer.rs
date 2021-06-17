@@ -10,7 +10,7 @@ use ash::{prelude::VkResult, version::DeviceV1_0, vk};
 use cgmath::{perspective, vec3, Deg, Matrix4, Quaternion, Rotation, Rotation3};
 use console::Term;
 use openxr as xr;
-use rand::Rng;
+
 use xr::Vulkan;
 
 pub(crate) struct Renderer {
