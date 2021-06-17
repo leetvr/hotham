@@ -9,6 +9,7 @@ mod space_state;
 mod state;
 use crate::space_state::SpaceState;
 use crate::state::State;
+
 use ash::{
     extensions::khr,
     util::read_spv,
@@ -55,6 +56,8 @@ use std::{
     thread,
 };
 use winit::event::{DeviceEvent, VirtualKeyCode};
+
+#[cfg(target_os = "windows")]
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -87,6 +90,7 @@ pub enum HothamInputEvent {
 }
 
 #[no_mangle]
+#[cfg(target_os = "windows")]
 unsafe extern "C" fn enumerate_instance_extension_properties(
     _layerName: *const ::std::os::raw::c_char,
     propertyCapacityInput: u32,
@@ -120,6 +124,7 @@ unsafe extern "system" fn create_instance(
     Result::SUCCESS
 }
 
+#[cfg(target_os = "windows")]
 unsafe extern "system" fn create_vulkan_instance(
     _instance: Instance,
     create_info: *const VulkanInstanceCreateInfoKHR,
@@ -300,6 +305,7 @@ unsafe extern "system" fn get_vulkan_graphics_requirements(
     Result::SUCCESS
 }
 
+#[cfg(target_os = "windows")]
 unsafe extern "system" fn get_instance_properties(
     _instance: Instance,
     instance_properties: *mut InstanceProperties,
@@ -916,6 +922,7 @@ unsafe extern "system" fn enumerate_view_configuration_views(
     Result::SUCCESS
 }
 
+#[cfg(target_os = "windows")]
 unsafe extern "system" fn create_xr_swapchain(
     _session: Session,
     create_info: *const SwapchainCreateInfo,
@@ -974,6 +981,7 @@ fn create_multiview_image_views(
         .collect::<Vec<_>>()
 }
 
+#[cfg(target_os = "windows")]
 unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
     let entry = state.vulkan_entry.as_ref().unwrap().clone();
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
@@ -1701,6 +1709,7 @@ unsafe extern "system" fn get_action_state_boolean(
 type DummyFn = unsafe extern "system" fn() -> Result;
 
 #[no_mangle]
+#[cfg(target_os = "windows")]
 pub unsafe extern "C" fn get_instance_proc_addr(
     _instance: *mut XrInstance_T,
     name: *const i8,
@@ -1823,9 +1832,11 @@ pub unsafe extern "C" fn get_instance_proc_addr(
     Result::SUCCESS.into_raw()
 }
 
+#[cfg(target_os = "windows")]
 static GET_INSTANCE_PROC_ADDR: PFN_xrGetInstanceProcAddr = Some(get_instance_proc_addr);
 
 #[no_mangle]
+#[cfg(target_os = "windows")]
 pub unsafe extern "system" fn xrNegotiateLoaderRuntimeInterface(
     _loader_info: *const openxr_loader::XrNegotiateLoaderInfo,
     runtime_request: *mut openxr_loader::XrNegotiateRuntimeRequest,

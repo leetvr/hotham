@@ -41,6 +41,7 @@ where
     pub fn new(mut program: P) -> HothamResult<Self> {
         let params = program.init();
         println!("[HOTHAM_APP] Initialised program with {:?}", params);
+
         let (xr_instance, system) = create_xr_instance()?;
 
         let vulkan_context = VulkanContext::create_from_xr_instance(&xr_instance, system)?;
@@ -233,8 +234,25 @@ fn create_xr_session(
     .map_err(|e| e.into())
 }
 
+#[cfg(not(target_os = "android"))]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = xr::Entry::linked();
+    let xr_app_info = openxr::ApplicationInfo {
+        application_name: "Hotham Cubeworld",
+        application_version: 1,
+        engine_name: "Hotham",
+        engine_version: 1,
+    };
+    let mut required_extensions = xr::ExtensionSet::default();
+    required_extensions.khr_vulkan_enable2 = true;
+    let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
+    let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
+    Ok((instance, system))
+}
+
+#[cfg(target_os = "android")]
+fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
+    let xr_entry = xr::Entry::load()?;
     let xr_app_info = openxr::ApplicationInfo {
         application_name: "Hotham Cubeworld",
         application_version: 1,
