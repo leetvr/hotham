@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "..\\OpenXR-SDK-Source"
+		},
+		{
+			"path": "..\\..\\Documents\\Devlogs"
+		},
+		{
+			"path": "..\\Vulkan"
+		}
+	],
+	"settings": {}
+}

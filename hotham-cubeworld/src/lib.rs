@@ -4,8 +4,12 @@ use cubeworld::Cubeworld;
 use hotham::{App, HothamResult};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
-pub fn main() -> HothamResult<()> {
-    real_main()
+pub fn main() {
+    println!("[HOTHAM_CUBEWORLD_ANDROID] MAIN!");
+    match real_main() {
+        Err(e) => eprintln!("[HOTHAM_CUBEWORLD_ANDROID] - Error! {:?}", e),
+        Ok(()) => println!("[HOTHAM_CUBEWORLD_ANDROID] - Finished!"),
+    }
 }
 
 pub fn real_main() -> HothamResult<()> {

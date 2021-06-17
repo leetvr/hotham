@@ -5,7 +5,8 @@ edition = "2018"
 name = "hotham-cubeworld"
 version = "0.1.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+crate-type = ["lib", "cdylib"]
 
 [dependencies]
 cgmath = "0.18"
@@ -14,8 +15,16 @@ hotham = {path = "../hotham"}
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.3.0"
 
-[target.'cfg(target_os = "android")'.lib]
-crate-type = ["lib", "cdylib"]
-
 [build-dependencies]
 shaderc = "0.7"
+
+[package.metadata.android]
+apk_label = "Hotham Cubeworld"
+fullscreen = true
+libs = [
+  "lib/libopenxr_loader.so",
+]
+target_sdk_version = 26
+
+[[package.metadata.android.application.activity.intent_filter]]
+actions = ["com.oculus.intent.category.VR", "android.intent.category.LAUNCHER"]
