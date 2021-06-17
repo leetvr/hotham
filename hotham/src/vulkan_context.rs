@@ -173,6 +173,15 @@ impl VulkanContext {
         xr_instance: &xr::Instance,
         system: xr::SystemId,
     ) -> Result<Self> {
+        let vk_target_version_xr = xr::Version::new(1, 2, 0);
+
+        let requirements = xr_instance.graphics_requirements::<xr::VulkanLegacy>(system)?;
+        if vk_target_version_xr < requirements.min_api_version_supported
+            || vk_target_version_xr.major() > requirements.max_api_version_supported.major()
+        {
+            return Err(HothamError::UnsupportedVersionError.into());
+        }
+
         let (vulkan_instance, vulkan_entry) = vulkan_init_legacy(xr_instance, system)?;
         let physical_device = unsafe {
             xr_instance
@@ -447,7 +456,21 @@ pub fn create_vulkan_device_legacy(
         .map(|e| e.as_ptr())
         .collect::<Vec<_>>();
     let queue_priorities = [1.0];
-    let graphics_family_index = 0;
+    let graphics_family_index = unsafe {
+        vulkan_instance
+            .get_physical_device_queue_family_properties(physical_device)
+            .into_iter()
+            .enumerate()
+            .find_map(|(queue_family_index, info)| {
+                if info.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                    Some(queue_family_index as u32)
+                } else {
+                    None
+                }
+            })
+            .ok_or(HothamError::EmptyListError)?
+    };
+
     let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
         .queue_priorities(&queue_priorities)
         .queue_family_index(graphics_family_index)
@@ -477,14 +500,4 @@ fn get_layer_names(entry: &Entry) -> Result<Vec<*const c_char>> {
         .iter()
         .map(|l| l.layer_name.as_ptr())
         .collect::<Vec<_>>())
-}
-
-#[cfg(debug_assertions)]
-fn get_validation_layer() -> CString {
-    CString::new("VK_LAYER_KHRONOS_validation").unwrap()
-}
-
-#[cfg(not(debug_assertions))]
-fn get_validation_layers() -> Vec<CString> {
-    return Vec::new();
 }

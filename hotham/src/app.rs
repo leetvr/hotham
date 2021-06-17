@@ -17,9 +17,10 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+use xr::VulkanLegacy;
 use xr::{
     sys::{pfn::InitializeLoaderKHR, LoaderInitInfoAndroidKHR},
-    vulkan::SessionCreateInfo,
+    vulkan_legacy::SessionCreateInfo,
     EventDataBuffer, FrameStream, FrameWaiter, ReferenceSpaceType, Session, SessionState,
     Swapchain, SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Vulkan,
 };
@@ -29,14 +30,14 @@ pub struct App<P: Program> {
     should_quit: Arc<AtomicBool>,
     renderer: Renderer,
     xr_instance: openxr::Instance,
-    xr_session: Session<Vulkan>,
+    xr_session: Session<VulkanLegacy>,
     xr_state: SessionState,
-    xr_swapchain: Swapchain<Vulkan>,
+    xr_swapchain: Swapchain<VulkanLegacy>,
     xr_space: xr::Space,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
-    frame_stream: FrameStream<Vulkan>,
+    frame_stream: FrameStream<VulkanLegacy>,
 }
 
 impl<P> App<P>
@@ -201,6 +202,7 @@ fn create_vulkan_context(
     system: xr::SystemId,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
     let vulkan_context = VulkanContext::create_from_xr_instance_legacy(xr_instance, system)?;
+    println!("[HOTHAM_VULKAN] - Vulkan Context created successfully");
     Ok(vulkan_context)
 }
 
@@ -218,9 +220,9 @@ fn get_swapchain_resolution(
 }
 
 fn create_xr_swapchain(
-    xr_session: &Session<Vulkan>,
+    xr_session: &Session<VulkanLegacy>,
     resolution: &vk::Extent2D,
-) -> Result<Swapchain<Vulkan>> {
+) -> Result<Swapchain<VulkanLegacy>> {
     xr_session
         .create_swapchain(&SwapchainCreateInfo {
             create_flags: SwapchainCreateFlags::EMPTY,
@@ -240,8 +242,13 @@ fn create_xr_session(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
     vulkan_context: &VulkanContext,
-) -> Result<(Session<Vulkan>, FrameWaiter, FrameStream<Vulkan>)> {
-    unsafe {
+) -> Result<(
+    Session<VulkanLegacy>,
+    FrameWaiter,
+    FrameStream<VulkanLegacy>,
+)> {
+    println!("[HOTHAM] Creating session..");
+    Ok(unsafe {
         xr_instance.create_session(
             system,
             &SessionCreateInfo {
@@ -253,7 +260,8 @@ fn create_xr_session(
             },
         )
     }
-    .map_err(|e| e.into())
+    .unwrap())
+    // .map_err(|e| e.into())
 }
 
 #[cfg(not(target_os = "android"))]
