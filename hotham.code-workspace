@@ -14,10 +14,11 @@
 		},
 		{
 			"path": "..\\openxrs"
-		},
-		{
-			"path": "..\\..\\Documents\\Learning\\quest-for-triangle"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.associations": {
+			"algorithm": "cpp"
+		}
+	}
 }

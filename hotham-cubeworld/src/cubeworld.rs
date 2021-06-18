@@ -1,7 +1,7 @@
-use std::path::Path;
+use std::{io::Cursor};
 
 use cgmath::{vec3};
-use hotham::{Program, ProgramInitialization, Vertex};
+use hotham::{Program, ProgramInitialization, Vertex, read_spv_from_bytes, HothamResult as Result};
 
 #[derive(Debug, Clone)]
 pub struct Cubeworld {
@@ -37,19 +37,19 @@ impl Cubeworld {
 
 
 impl Program for Cubeworld {
-    fn init(&mut self) -> ProgramInitialization {
+    fn init(&mut self) -> Result<ProgramInitialization> {
         // TODO: This should be somehow relative to hotham-cubeworld already
-        let vertex_shader = Path::new("hotham-cubeworld/src/shaders/cube.vert.spv");
-        let fragment_shader = Path::new("hotham-cubeworld/src/shaders/cube.frag.spv");
+        let vertex_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.vert.spv")))?;
+        let fragment_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.frag.spv")))?;
 
         let (vertices, indices) = self.update();
 
-        ProgramInitialization {
+        Ok(ProgramInitialization {
             vertices,
             indices,
             vertex_shader,
             fragment_shader,
-        }
+        })
     }
 
     fn update(&mut self) -> (&Vec<Vertex>, &Vec<u32>) {
