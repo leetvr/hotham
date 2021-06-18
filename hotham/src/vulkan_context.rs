@@ -1,8 +1,8 @@
 use crate::{
-    hotham_error::HothamError, image::Image, util::parse_raw_strings, Result, COLOR_FORMAT,
-    DEPTH_FORMAT, SWAPCHAIN_LENGTH,
+    hotham_error::HothamError, image::Image, util::parse_raw_strings, COLOR_FORMAT, DEPTH_FORMAT,
+    SWAPCHAIN_LENGTH,
 };
-use anyhow::anyhow;
+use anyhow::{anyhow, Result};
 use ash::{
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk::{self, Handle},
@@ -425,7 +425,7 @@ fn vulkan_init_legacy(instance: &xr::Instance, system: SystemId) -> Result<(AshI
 
     let app_info = vk::ApplicationInfo::builder()
         .application_name(&app_name)
-        .api_version(vk::make_version(1, 0, 0));
+        .api_version(vk::make_version(1, 2, 0));
     let create_info = vk::InstanceCreateInfo::builder()
         .application_info(&app_info)
         .enabled_extension_names(&extension_names)
@@ -445,8 +445,11 @@ pub fn create_vulkan_device_legacy(
     physical_device: vk::PhysicalDevice,
 ) -> Result<(Device, vk::Queue, u32)> {
     println!("[HOTHAM_VULKAN] Creating logical device.. ");
+    let mut extension_names = unsafe { xr_instance.get_vulkan_legacy_device_extensions(system) }?;
+    unsafe {
+        extension_names.push(CString::from_vec_unchecked(b"VK_KHR_multiview".to_vec()));
+    }
 
-    let extension_names = unsafe { xr_instance.get_vulkan_legacy_device_extensions(system) }?;
     println!(
         "[HOTHAM_VULKAN] Using device extensions: {:?}",
         extension_names
@@ -479,10 +482,19 @@ pub fn create_vulkan_device_legacy(
     let queue_create_infos = [graphics_queue_create_info];
 
     let physical_device_features = vk::PhysicalDeviceFeatures::builder();
+    // TODO: Quest 2?
+    // physical_device_features.shader_storage_image_multisample(true);
+
+    let multiview = &mut vk::PhysicalDeviceVulkan11Features {
+        multiview: vk::TRUE,
+        ..Default::default()
+    };
+
     let device_create_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(&queue_create_infos)
         .enabled_extension_names(&extension_names)
-        .enabled_features(&physical_device_features);
+        .enabled_features(&physical_device_features)
+        .push_next(multiview);
 
     let device =
         unsafe { vulkan_instance.create_device(physical_device, &device_create_info, None) }?;

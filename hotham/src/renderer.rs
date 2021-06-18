@@ -2,16 +2,16 @@ use std::{ffi::CStr, mem::size_of, time::Instant, u64};
 
 use crate::{
     buffer::Buffer, camera::Camera, frame::Frame, hotham_error::HothamError, image::Image,
-    swapchain::Swapchain, vulkan_context::VulkanContext, ProgramInitialization, Result,
+    swapchain::Swapchain, vulkan_context::VulkanContext, ProgramInitialization,
     UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
-use anyhow::Context;
+use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{perspective, vec3, Deg, Matrix4, Quaternion, Rotation, Rotation3};
+use cgmath::{perspective, vec3, Deg, Euler, Matrix4, Quaternion, Rad, Rotation, Rotation3};
 use console::Term;
 use openxr as xr;
 
-use xr::{Vulkan, VulkanLegacy};
+use xr::VulkanLegacy;
 
 pub(crate) struct Renderer {
     swapchain: Swapchain,
@@ -145,6 +145,7 @@ impl Renderer {
 
     pub fn draw(&mut self, frame_index: usize) -> Result<()> {
         self.frame_index += 1;
+
         self.show_debug_info()?;
 
         let device = &self.vulkan_context.device;
@@ -174,16 +175,16 @@ impl Renderer {
             .as_secs_f32();
 
         let rotation = rotation + (0.1 * delta_time);
-        let scale = Matrix4::from_scale(0.5);
+        let scale = Matrix4::from_scale(0.4);
         let rotation_y = Matrix4::from_angle_y(Deg(10.0 * delta_time));
         let rotation_x = Matrix4::from_angle_x(Deg(60.0));
-        let position = vec3(0.0, 1.8, -10.0);
+        let position = vec3(0.0, 0.0, 0.0);
 
-        let position = Quaternion::from_angle_x(Deg(rotation)).rotate_vector(position);
-        let position = Quaternion::from_angle_y(Deg(rotation)).rotate_vector(position);
+        // let position = Quaternion::from_angle_x(Deg(rotation)).rotate_vector(position);
+        // let position = Quaternion::from_angle_y(Deg(rotation)).rotate_vector(position);
 
         let translate = Matrix4::from_translation(position);
-        let model = translate * rotation_y * rotation_x * scale;
+        let model = translate * scale;
 
         // View (camera)
         let view = self.camera.update_view_matrix(views, delta_time)?;
@@ -191,11 +192,13 @@ impl Renderer {
         let model_view = view * model;
 
         // Projection
-        let fovy = Deg(45.0);
-        let aspect = self.swapchain.resolution.width / self.swapchain.resolution.height;
+        let fovy = Rad(views[0].fov.angle_up - views[0].fov.angle_down);
+        let aspect =
+            self.swapchain.resolution.width as f32 / self.swapchain.resolution.height as f32;
         let near = 0.001;
         let far = 1000.0;
-        let mut projection = perspective(fovy, aspect as _, near, far);
+
+        let mut projection = perspective(fovy, aspect, near, far);
         projection[1][1] *= -1.0;
 
         let uniform_buffer = UniformBufferObject {
@@ -266,7 +269,7 @@ impl Renderer {
             device.cmd_draw_indexed(
                 command_buffer,
                 self.index_buffer.item_count as _,
-                2,
+                1,
                 0,
                 0,
                 1,
@@ -284,9 +287,10 @@ impl Renderer {
     }
 
     fn show_debug_info(&self) -> Result<()> {
-        if self.frame_index % 90 != 0 {
+        if self.frame_index % 72 != 0 {
             return Ok(());
         };
+        let e = Euler::from(self.camera.orientation);
 
         self.term.clear_screen()?;
         self.term.write_line("[RENDER_DEBUG]")?;
@@ -295,11 +299,11 @@ impl Renderer {
         self.term
             .write_line(&format!("[Camera Position]: {:?}", self.camera.position))?;
         self.term.write_line(&format!(
-            "[Camera Orientation]: Pitch: {:?}, Yaw: {:?}, Roll: {:?}",
-            self.camera.pitch, self.camera.yaw, self.camera.roll
+            "[Camera Orientation]: Pitch {:?}, Yaw: {:?}, Roll: {:?}",
+            Deg::from(e.x),
+            Deg::from(e.y),
+            Deg::from(e.z)
         ))?;
-        self.term
-            .write_line(&format!("[Camera Direction]: {:?}", self.camera.direction))?;
         self.term
             .write_line(&format!("[View Matrix]: {:?}", self.camera.view_matrix))?;
         self.term.flush()?;
@@ -442,7 +446,7 @@ fn create_pipeline(
     // Build up the state of the pipeline
 
     // Vertex shader stage
-    let vertex_code = read_spv_from_path(params.vertex_shader)?;
+    let vertex_code = &params.vertex_shader;
     let vertex_shader_create_info = vk::ShaderModuleCreateInfo::builder().code(&vertex_code);
     let vertex_shader = unsafe {
         vulkan_context
@@ -459,7 +463,7 @@ fn create_pipeline(
         .build();
 
     // Fragment shader stage
-    let fragment_code = read_spv_from_path(params.fragment_shader)?;
+    let fragment_code = &params.fragment_shader;
     let fragment_shader_create_info = vk::ShaderModuleCreateInfo::builder().code(&fragment_code);
     let fragment_shader = unsafe {
         vulkan_context
@@ -590,14 +594,6 @@ fn create_pipeline(
     println!(".. done!");
 
     pipelines.pop().ok_or(HothamError::EmptyListError.into())
-}
-
-fn read_spv_from_path(path: &std::path::Path) -> Result<Vec<u32>> {
-    let mut file = std::fs::File::open(path)
-        .with_context(|| format!("Failed to read SPV file at {:?}", path))?;
-    ash::util::read_spv(&mut file)
-        .with_context(|| format!("Unable to read SPV file at {:?}", path))
-        .map_err(|e| e.into())
 }
 
 fn create_pipeline_layout(

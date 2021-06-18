@@ -1,4 +1,5 @@
 ${env:RUST_BACKTRACE} = 1
+adb shell am force-stop rust.hotham_cubeworld
 
 # cargo build
 # if ($?) {
@@ -17,8 +18,12 @@ Set-Location hotham-cubeworld
 cargo apk run
 
 if ($?) {
-    adb logcat RustStdoutStderr:D *:S
-
+    Start-Sleep -Seconds 2
+    $processIdStr = (adb shell pidof rust.hotham_cubeworld) | Out-String
+    echo $processIdStr
+    $processId = $processIdStr -as [int]
+    echo $processId
+    adb logcat --pid=$processId
 }
 
 

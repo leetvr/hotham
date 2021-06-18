@@ -2,9 +2,11 @@ use crate::{
     renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program, BLEND_MODE,
     COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
-use anyhow::anyhow;
-use anyhow::Result;
-use ash::{version::InstanceV1_0, vk};
+use anyhow::{anyhow, Context, Result};
+use ash::{
+    version::InstanceV1_0,
+    vk::{self, Handle},
+};
 use openxr as xr;
 use std::{
     ffi::CStr,
@@ -17,12 +19,11 @@ use std::{
     thread::sleep,
     time::Duration,
 };
-use xr::VulkanLegacy;
 use xr::{
-    sys::{pfn::InitializeLoaderKHR, LoaderInitInfoAndroidKHR},
+    sys::{pfn::InitializeLoaderKHR, InstanceCreateInfoAndroidKHR, LoaderInitInfoAndroidKHR},
     vulkan_legacy::SessionCreateInfo,
-    EventDataBuffer, FrameStream, FrameWaiter, ReferenceSpaceType, Session, SessionState,
-    Swapchain, SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Vulkan,
+    EventDataBuffer, FrameStream, FrameWaiter, Posef, ReferenceSpaceType, Session, SessionState,
+    Swapchain, SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, VulkanLegacy,
 };
 
 pub struct App<P: Program> {
@@ -34,6 +35,9 @@ pub struct App<P: Program> {
     xr_state: SessionState,
     xr_swapchain: Swapchain<VulkanLegacy>,
     xr_space: xr::Space,
+    xr_action_set: xr::ActionSet,
+    xr_left_action: xr::Action<Posef>,
+    xr_right_action: xr::Action<Posef>,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
@@ -45,7 +49,7 @@ where
     P: Program,
 {
     pub fn new(mut program: P) -> HothamResult<Self> {
-        let params = program.init();
+        let params = program.init()?;
         println!("[HOTHAM_APP] Initialised program with {:?}", params);
 
         let (xr_instance, system) = create_xr_instance()?;
@@ -56,6 +60,40 @@ where
             xr_session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&xr_instance, system)?;
         let xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution)?;
+
+        // Create an action set to encapsulate our actions
+        let xr_action_set = xr_instance.create_action_set("input", "input pose information", 0)?;
+
+        let xr_right_action =
+            xr_action_set.create_action::<xr::Posef>("right_hand", "Right Hand Controller", &[])?;
+        let xr_left_action =
+            xr_action_set.create_action::<xr::Posef>("left_hand", "Left Hand Controller", &[])?;
+
+        // Bind our actions to input devices using the given profile
+        // If you want to access inputs specific to a particular device you may specify a different
+        // interaction profile
+        xr_instance.suggest_interaction_profile_bindings(
+            xr_instance
+                .string_to_path("/interaction_profiles/oculus/touch_controller")
+                .unwrap(),
+            &[
+                xr::Binding::new(
+                    &xr_right_action,
+                    xr_instance
+                        .string_to_path("/user/hand/right/input/grip/pose")
+                        .unwrap(),
+                ),
+                xr::Binding::new(
+                    &xr_left_action,
+                    xr_instance
+                        .string_to_path("/user/hand/left/input/grip/pose")
+                        .unwrap(),
+                ),
+            ],
+        )?;
+
+        // Attach the action set to the session
+        xr_session.attach_action_sets(&[&xr_action_set])?;
 
         let renderer = Renderer::new(vulkan_context, &xr_swapchain, swapchain_resolution, &params)?;
 
@@ -68,6 +106,9 @@ where
             xr_swapchain,
             xr_space,
             xr_state: SessionState::IDLE,
+            xr_action_set,
+            xr_left_action,
+            xr_right_action,
             swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,
@@ -77,6 +118,8 @@ where
 
     pub fn run(&mut self) -> HothamResult<()> {
         let should_quit = self.should_quit.clone();
+
+        #[cfg(not(target_os = "android"))]
         ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
             .map_err(anyhow::Error::new)?;
 
@@ -103,18 +146,15 @@ where
             // Wait for a frame to become available from the runtime
             let (frame_state, swapchain_image_index) = self.begin_frame()?;
 
-            let (_view_flags, views) = self.xr_session.locate_views(
+            let (_, views) = self.xr_session.locate_views(
                 VIEW_TYPE,
                 frame_state.predicted_display_time,
                 &self.xr_space,
             )?;
-            let rotations = [10.0, -10.0];
 
             if frame_state.should_render {
-                for r in &rotations {
-                    self.renderer.update_uniform_buffer(&views, *r)?;
-                    self.renderer.draw(swapchain_image_index)?;
-                }
+                self.renderer.update_uniform_buffer(&views, 10.0)?;
+                self.renderer.draw(swapchain_image_index)?;
             }
 
             // Release the image back to OpenXR
@@ -126,6 +166,7 @@ where
 
     fn begin_frame(&mut self) -> Result<(xr::FrameState, usize)> {
         let frame_state = self.frame_waiter.wait()?;
+        self.frame_stream.begin()?;
 
         let image_index = self.xr_swapchain.acquire_image()?;
         self.xr_swapchain.wait_image(openxr::Duration::INFINITE)?;
@@ -153,15 +194,26 @@ where
             BLEND_MODE,
             &[&xr::CompositionLayerProjection::new()
                 .space(&self.xr_space)
-                .views(&[xr::CompositionLayerProjectionView::new()
-                    .pose(views[0].pose)
-                    .fov(views[0].fov)
-                    .sub_image(
-                        xr::SwapchainSubImage::new()
-                            .swapchain(&self.xr_swapchain)
-                            .image_array_index(0)
-                            .image_rect(rect),
-                    )])],
+                .views(&[
+                    xr::CompositionLayerProjectionView::new()
+                        .pose(views[0].pose)
+                        .fov(views[0].fov)
+                        .sub_image(
+                            xr::SwapchainSubImage::new()
+                                .swapchain(&self.xr_swapchain)
+                                .image_array_index(0)
+                                .image_rect(rect),
+                        ),
+                    xr::CompositionLayerProjectionView::new()
+                        .pose(views[1].pose)
+                        .fov(views[1].fov)
+                        .sub_image(
+                            xr::SwapchainSubImage::new()
+                                .swapchain(&self.xr_swapchain)
+                                .image_array_index(1)
+                                .image_rect(rect),
+                        ),
+                ])],
         )
     }
 
@@ -211,6 +263,7 @@ fn get_swapchain_resolution(
     system: xr::SystemId,
 ) -> Result<vk::Extent2D> {
     let views = xr_instance.enumerate_view_configuration_views(system, VIEW_TYPE)?;
+    println!("[HOTHAM_VULKAN] Views: {:?}", views);
     let resolution = vk::Extent2D {
         width: views[0].recommended_image_rect_width,
         height: views[0].recommended_image_rect_height,
@@ -252,9 +305,9 @@ fn create_xr_session(
         xr_instance.create_session(
             system,
             &SessionCreateInfo {
-                instance: &vulkan_context.instance.handle() as *const _ as *const _,
-                physical_device: &vulkan_context.physical_device as *const _ as *const _,
-                device: &vulkan_context.device.handle() as *const _ as *const _,
+                instance: vulkan_context.instance.handle().as_raw() as *const _,
+                physical_device: vulkan_context.physical_device.as_raw() as *const _,
+                device: vulkan_context.device.handle().as_raw() as *const _,
                 queue_family_index: vulkan_context.queue_family_index,
                 queue_index: 0,
             },
@@ -283,6 +336,10 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
 #[cfg(target_os = "android")]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = xr::Entry::load()?;
+    let native_activity = ndk_glue::native_activity();
+    let vm_ptr = native_activity.vm();
+    let context = native_activity.activity();
+
     unsafe {
         let mut initialize_loader = None;
         let get_instance_proc_addr = xr_entry.fp().get_instance_proc_addr;
@@ -299,10 +356,6 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
         ))?;
         let initialize_loader: InitializeLoaderKHR = transmute(initialize_loader);
 
-        let native_activity = ndk_glue::native_activity();
-        let vm_ptr = native_activity.vm();
-        let context = native_activity.activity();
-
         let loader_init_info = LoaderInitInfoAndroidKHR {
             ty: LoaderInitInfoAndroidKHR::TYPE,
             next: null(),
@@ -317,6 +370,12 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
         initialize_loader(transmute(&loader_init_info));
         println!("[HOTHAM_ANDROID] Done! Loader initialized.");
     }
+
+    let extensions = xr_entry.enumerate_extensions();
+    println!("[HOTHAM_ANDROID] Available extensions: {:?}", extensions);
+    let layers = xr_entry.enumerate_layers();
+    println!("[HOTHAM_ANDROID] Available layers: {:?}", layers);
+
     let xr_app_info = openxr::ApplicationInfo {
         application_name: "Hotham Cubeworld",
         application_version: 1,
@@ -324,9 +383,56 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
         engine_version: 1,
     };
     let mut required_extensions = xr::ExtensionSet::default();
+    required_extensions.ext_debug_utils = true;
     required_extensions.khr_vulkan_enable = true;
+    required_extensions.khr_android_create_instance = true;
     print!("[HOTHAM_ANDROID] Creating instance..");
-    let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
+    let instance_create_info_android = InstanceCreateInfoAndroidKHR {
+        ty: InstanceCreateInfoAndroidKHR::TYPE,
+        next: null(),
+        application_vm: vm_ptr as _,
+        application_activity: context as _,
+    };
+
+    // let debug_messenger_create_info = DebugUtilsMessengerCreateInfoEXT {
+    //     ty: DebugUtilsMessengerCreateInfoEXT::TYPE,
+    //     next: null(),
+    //     message_severities: DebugUtilsMessageSeverityFlagsEXT::VERBOSE,
+    //     message_types: DebugUtilsMessageTypeFlagsEXT::VALIDATION
+    //         | DebugUtilsMessageTypeFlagsEXT::GENERAL,
+    //     user_callback: Some(messenger_callback),
+    //     user_data: null_mut(),
+    // };
+
+    let instance = xr_entry.create_instance_android(
+        &xr_app_info,
+        &required_extensions,
+        &[],
+        &instance_create_info_android,
+    )?;
+
+    // unsafe {
+    //     let mut create_debug_messenger = None;
+    //     (xr_entry.fp().get_instance_proc_addr)(
+    //         instance.as_raw(),
+    //         CStr::from_bytes_with_nul_unchecked(b"xrCreateDebugUtilsMessengerEXT\0").as_ptr(),
+    //         &mut create_debug_messenger,
+    //     );
+
+    //     let create_debug_messenger = create_debug_messenger.ok_or(anyhow!(
+    //         "Couldn't get function pointer for create_debug_messenger"
+    //     ))?;
+    //     let create_debug_messenger: CreateDebugUtilsMessengerEXT =
+    //         transmute(create_debug_messenger);
+
+    //     let messenger = null_mut();
+    //     let result =
+    //         create_debug_messenger(instance.as_raw(), &debug_messenger_create_info, messenger);
+    //     if result.into_raw() < 0 {
+    //         return Err(result.into());
+    //     }
+    // }
+
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
     println!(" ..done!");
     Ok((instance, system))

@@ -1,6 +1,6 @@
-use crate::Result;
+use anyhow::Result;
 use ash::vk::{self, Handle};
-use openxr::{Swapchain as SwapchainHandle, Vulkan, VulkanLegacy};
+use openxr::{Swapchain as SwapchainHandle, VulkanLegacy};
 
 pub struct Swapchain {
     pub resolution: vk::Extent2D,

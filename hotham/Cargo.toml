@@ -9,11 +9,12 @@ version = "0.1.0"
 [dependencies]
 anyhow = "1.0"
 ash = "0.32"
-cgmath = "0.18"
+cgmath = {version = "0.18", features = ["mint"]}
 console = "0.14"
 ctrlc = {version = "3", features = ["termination"]}
 memoffset = "0.5.1"
-openxr = {features = ["loaded"], path = "../../openxrs/openxr"}
+mint = "0.5.6"
+openxr = {features = ["loaded", "mint"], path = "../../openxrs/openxr"}
 rand = "0.8"
 thiserror = "1.0"
 winit = "0.24"
