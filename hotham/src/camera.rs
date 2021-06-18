@@ -4,23 +4,17 @@ use openxr::View;
 
 #[derive(Debug, Clone)]
 pub struct Camera {
-    pub position: Point3<f32>,
-    pub pitch: Rad<f32>,
-    pub roll: Rad<f32>,
-    pub yaw: Rad<f32>,
+    pub position: Vector3<f32>,
+    pub orientation: Quaternion<f32>,
     pub view_matrix: Matrix4<f32>,
-    pub direction: Vector3<f32>,
 }
 
 impl Default for Camera {
     fn default() -> Self {
         Self {
-            position: (0.0, 0.0, 1.0).into(),
-            pitch: Deg(0.0).into(),
-            roll: Deg(0.0).into(),
-            yaw: Deg(0.0).into(),
+            position: vec3(0.0, 0.0, 0.0),
+            orientation: Quaternion::zero(),
             view_matrix: Matrix4::identity(),
-            direction: vec3(0.0, 0.0, 0.0),
         }
     }
 }
@@ -32,10 +26,9 @@ impl Camera {
         _delta_time: f32,
     ) -> Result<Matrix4<f32>> {
         // Convert values from OpenXR format
-        let (camera_position, camera_rotation) = convert_view(&views[0]);
+        let (camera_position, camera_orientation) = convert_view(&views[0]);
         self.position = camera_position;
-        self.yaw = camera_rotation.y;
-        self.pitch = camera_rotation.x;
+        self.orientation = camera_orientation;
 
         self.view_matrix = self.build_matrix();
 
@@ -44,10 +37,8 @@ impl Camera {
     }
 
     pub fn build_matrix(&self) -> Matrix4<f32> {
-        let rotation = Euler::new(self.pitch * -1.0, self.yaw * -1.0, self.roll * -1.0);
-        let rotation = Matrix4::from(Matrix3::from(rotation));
-
-        let translation = Matrix4::from_translation(self.position.to_vec() * -1.0);
+        let rotation = Matrix4::from(Matrix3::from(Basis3::from_quaternion(&self.orientation)));
+        let translation = Matrix4::from_translation(self.position * -1.0);
 
         rotation * translation
     }
@@ -64,15 +55,14 @@ impl Camera {
     }
 }
 
-fn convert_view(view: &View) -> (Point3<f32>, Euler<Rad<f32>>) {
-    let orientation = view.pose.orientation;
-    let orientation = Quaternion::new(orientation.w, orientation.x, orientation.y, orientation.z);
-    let rotation = Euler::from(orientation);
+fn convert_view(view: &View) -> (Vector3<f32>, Quaternion<f32>) {
+    let orientation: mint::Quaternion<f32> = view.pose.orientation.into();
+    let orientation = Quaternion::from(orientation);
 
-    let position = view.pose.position;
-    let position = Point3::new(position.x, position.y, position.z);
+    let position: mint::Vector3<f32> = view.pose.position.into();
+    let position = Vector3::from(position);
 
-    return (position, rotation);
+    return (position, orientation);
 }
 
 fn _working_matrix() -> Matrix4<f32> {

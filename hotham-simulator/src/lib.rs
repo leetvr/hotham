@@ -14,10 +14,7 @@ use ash::{
     extensions::khr,
     util::read_spv,
     version::{DeviceV1_0, InstanceV1_0},
-    vk::{
-        self, DeviceCreateInfo, Handle, InstanceCreateInfo as VulkanInstanceCreateInfo,
-        SwapchainKHR,
-    },
+    vk::{self, DeviceCreateInfo, Handle},
     Device, Entry as AshEntry, Instance as AshInstance,
 };
 use lazy_static::lazy_static;

@@ -12,5 +12,7 @@ pub enum HothamError {
     #[error("The format provided is not supported for this operation")]
     InvalidFormatError,
     #[error(transparent)]
+    IO(#[from] std::io::Error),
+    #[error(transparent)]
     Other(#[from] anyhow::Error),
 }

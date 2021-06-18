@@ -27,5 +27,6 @@ libs = [
 ]
 target_sdk_version = 26
 
-[[package.metadata.android.application.activity.intent_filter]]
-actions = ["com.oculus.intent.category.VR", "android.intent.category.LAUNCHER"]
+[[package.metadata.android.application.intent_filter]]
+actions = ["android.intent.action.MAIN"]
+categories = ["com.oculus.intent.category.VR", "android.intent.category.LAUNCHER"]
