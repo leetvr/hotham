@@ -20,38 +20,30 @@ impl Default for Camera {
 }
 
 impl Camera {
-    pub fn update_view_matrix(
-        &mut self,
-        views: &Vec<View>,
-        _delta_time: f32,
-    ) -> Result<Matrix4<f32>> {
+    pub fn update_view_matrix(&mut self, view: &View, _delta_time: f32) -> Result<Matrix4<f32>> {
         // Convert values from OpenXR format
-        let (camera_position, camera_orientation) = convert_view(&views[0]);
+        let (camera_position, camera_orientation) = convert_view(view);
         self.position = camera_position;
         self.orientation = camera_orientation;
 
-        self.view_matrix = self.build_matrix();
-
-        self.sanity_check()?;
+        self.view_matrix = self.build_matrix()?;
         Ok(self.view_matrix)
     }
 
-    pub fn build_matrix(&self) -> Matrix4<f32> {
+    pub fn build_matrix(&self) -> Result<Matrix4<f32>> {
         let rotation = Matrix4::from(Matrix3::from(Basis3::from_quaternion(&self.orientation)));
-        let translation = Matrix4::from_translation(self.position * -1.0);
+        let translation = Matrix4::from_translation(self.position);
 
-        rotation * translation
-    }
-
-    pub fn sanity_check(&self) -> Result<()> {
-        let numbers: &[f32; 16] = self.view_matrix.as_ref();
+        let matrix = translation * rotation;
+        let matrix = matrix.invert().ok_or(anyhow!("Unable to invert matrix"))?;
+        let numbers: &[f32; 16] = matrix.as_ref();
         for n in numbers {
             if n.is_nan() {
                 return Err(anyhow!("View matrix is broken: {:?}", self));
             }
         }
 
-        Ok(())
+        Ok(matrix)
     }
 }
 

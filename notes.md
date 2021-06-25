@@ -10,3 +10,8 @@ This isn't a problem on the index when top-fov == -down-fov. but on quest, that 
 
 06-25 17:32:54.816  5083  5107 I RustStdoutStderr: [View 0]: (Vector3 [0.039701987, 0.76085263, -0.774329], Quaternion { v: Vector3 [-0.010506645, -0.58130753, 0.009680491], s: -0.81355846 })
 06-25 17:32:54.816  5083  5107 I RustStdoutStderr: [View 1]: (Vector3 [0.06206919, 0.7606085, -0.83964473], Quaternion { v: Vector3 [-0.010506645, -0.58130753, 0.009680491], s: -0.81355846 })
+
+angleLeft: -0.9075712, 
+angleRight: 0.7330383, 
+angleDown: 0.82030475, 
+angleUp: -0.92502
