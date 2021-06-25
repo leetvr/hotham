@@ -55,7 +55,7 @@ impl Camera {
     }
 }
 
-fn convert_view(view: &View) -> (Vector3<f32>, Quaternion<f32>) {
+pub fn convert_view(view: &View) -> (Vector3<f32>, Quaternion<f32>) {
     let orientation: mint::Quaternion<f32> = view.pose.orientation.into();
     let orientation = Quaternion::from(orientation);
 

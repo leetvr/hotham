@@ -1,13 +1,18 @@
 use std::{ffi::CStr, mem::size_of, time::Instant, u64};
 
 use crate::{
-    buffer::Buffer, camera::Camera, frame::Frame, hotham_error::HothamError, image::Image,
-    swapchain::Swapchain, vulkan_context::VulkanContext, ProgramInitialization,
-    UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    buffer::Buffer,
+    camera::{convert_view, Camera},
+    frame::Frame,
+    hotham_error::HothamError,
+    image::Image,
+    swapchain::Swapchain,
+    vulkan_context::VulkanContext,
+    ProgramInitialization, UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{perspective, vec3, Deg, Euler, Matrix4, Quaternion, Rad, Rotation, Rotation3};
+use cgmath::{perspective, vec3, Deg, Euler, Matrix4, Rad};
 use console::Term;
 use openxr as xr;
 
@@ -30,6 +35,7 @@ pub(crate) struct Renderer {
     render_start_time: Instant,
     camera: Camera,
     term: Term,
+    views: Vec<xr::View>,
     pub frame_index: usize,
 }
 
@@ -140,6 +146,7 @@ impl Renderer {
             render_start_time: Instant::now(),
             camera: Default::default(),
             term: Term::buffered_stdout(),
+            views: Vec::new(),
         })
     }
 
@@ -169,15 +176,17 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn update_uniform_buffer(&mut self, views: &Vec<xr::View>, rotation: f32) -> Result<()> {
+    pub fn update_uniform_buffer(&mut self, views: &Vec<xr::View>, _rotation: f32) -> Result<()> {
+        self.views = views.clone();
+
         let delta_time = Instant::now()
             .duration_since(self.render_start_time)
             .as_secs_f32();
 
-        let rotation = rotation + (0.1 * delta_time);
         let scale = Matrix4::from_scale(0.4);
-        let rotation_y = Matrix4::from_angle_y(Deg(10.0 * delta_time));
-        let rotation_x = Matrix4::from_angle_x(Deg(60.0));
+        // let rotation = rotation + (0.1 * delta_time);
+        // let rotation_y = Matrix4::from_angle_y(Deg(10.0 * delta_time));
+        // let rotation_x = Matrix4::from_angle_x(Deg(60.0));
         let position = vec3(0.0, 0.0, 0.0);
 
         // let position = Quaternion::from_angle_x(Deg(rotation)).rotate_vector(position);
@@ -304,6 +313,10 @@ impl Renderer {
             Deg::from(e.y),
             Deg::from(e.z)
         ))?;
+        self.term
+            .write_line(&format!("[View 0]: {:?}", convert_view(&self.views[0])))?;
+        self.term
+            .write_line(&format!("[View 1]: {:?}", convert_view(&self.views[1])))?;
         self.term
             .write_line(&format!("[View Matrix]: {:?}", self.camera.view_matrix))?;
         self.term.flush()?;

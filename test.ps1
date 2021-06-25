@@ -20,9 +20,9 @@ cargo apk run
 if ($?) {
     Start-Sleep -Seconds 2
     $processIdStr = (adb shell pidof rust.hotham_cubeworld) | Out-String
-    echo $processIdStr
+    Write-Output $processIdStr
     $processId = $processIdStr -as [int]
-    echo $processId
+    Write-Output $processId
     adb logcat --pid=$processId
 }
 
