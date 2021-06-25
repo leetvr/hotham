@@ -2,7 +2,7 @@ use crate::{
     renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program, BLEND_MODE,
     COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
@@ -35,9 +35,9 @@ pub struct App<P: Program> {
     xr_state: SessionState,
     xr_swapchain: Swapchain<VulkanLegacy>,
     xr_space: xr::Space,
-    xr_action_set: xr::ActionSet,
-    xr_left_action: xr::Action<Posef>,
-    xr_right_action: xr::Action<Posef>,
+    _xr_action_set: xr::ActionSet,
+    _xr_left_action: xr::Action<Posef>,
+    _xr_right_action: xr::Action<Posef>,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
@@ -106,9 +106,9 @@ where
             xr_swapchain,
             xr_space,
             xr_state: SessionState::IDLE,
-            xr_action_set,
-            xr_left_action,
-            xr_right_action,
+            _xr_action_set: xr_action_set,
+            _xr_left_action: xr_left_action,
+            _xr_right_action: xr_right_action,
             swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,
@@ -117,7 +117,7 @@ where
     }
 
     pub fn run(&mut self) -> HothamResult<()> {
-        let should_quit = self.should_quit.clone();
+        let _should_quit = self.should_quit.clone();
 
         #[cfg(not(target_os = "android"))]
         ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
