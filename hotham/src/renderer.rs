@@ -1,25 +1,20 @@
 use std::{ffi::CStr, mem::size_of, time::Instant, u64};
 
 use crate::{
-    buffer::Buffer,
-    camera::{convert_view, Camera},
-    frame::Frame,
-    hotham_error::HothamError,
-    image::Image,
-    swapchain::Swapchain,
-    vulkan_context::VulkanContext,
-    ProgramInitialization, UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    buffer::Buffer, camera::Camera, frame::Frame, hotham_error::HothamError, image::Image,
+    swapchain::Swapchain, vulkan_context::VulkanContext, ProgramInitialization,
+    UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{perspective, vec3, Deg, Euler, Matrix4, Rad};
+use cgmath::{vec3, Deg, Euler, Matrix4};
 use console::Term;
 use openxr as xr;
 
 use xr::VulkanLegacy;
 
 pub(crate) struct Renderer {
-    swapchain: Swapchain,
+    _swapchain: Swapchain,
     vulkan_context: VulkanContext,
     frames: Vec<Frame>,
     descriptor_set_layout: vk::DescriptorSetLayout,
@@ -33,7 +28,7 @@ pub(crate) struct Renderer {
     uniform_buffer: Buffer<UniformBufferObject>,
     uniform_buffer_descriptor_set: vk::DescriptorSet,
     render_start_time: Instant,
-    camera: Camera,
+    cameras: Vec<Camera>,
     term: Term,
     views: Vec<xr::View>,
     pub frame_index: usize,
@@ -129,7 +124,7 @@ impl Renderer {
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
         Ok(Self {
-            swapchain,
+            _swapchain: swapchain,
             vulkan_context,
             frames,
             descriptor_set_layout,
@@ -144,7 +139,7 @@ impl Renderer {
             uniform_buffer,
             uniform_buffer_descriptor_set,
             render_start_time: Instant::now(),
-            camera: Default::default(),
+            cameras: vec![Default::default(); 2],
             term: Term::buffered_stdout(),
             views: Vec::new(),
         })
@@ -196,25 +191,24 @@ impl Renderer {
         let model = translate * scale;
 
         // View (camera)
-        let view = self.camera.update_view_matrix(views, delta_time)?;
+        let view_matrices = &self
+            .cameras
+            .iter_mut()
+            .enumerate()
+            .map(|(n, c)| c.update_view_matrix(&views[n], delta_time))
+            .collect::<Result<Vec<_>>>()?;
 
-        let model_view = view * model;
+        // let model_view = view * model;
 
         // Projection
-        let fovy = Rad(views[0].fov.angle_up - views[0].fov.angle_down);
-        let aspect =
-            self.swapchain.resolution.width as f32 / self.swapchain.resolution.height as f32;
-        let near = 0.001;
-        let far = 1000.0;
+        let near = 0.05;
+        let far = 100.0;
+        let mvp = [
+            get_projection(views[0].fov, near, far) * view_matrices[0] * model,
+            get_projection(views[1].fov, near, far) * view_matrices[1] * model,
+        ];
 
-        let mut projection = perspective(fovy, aspect, near, far);
-        projection[1][1] *= -1.0;
-
-        let uniform_buffer = UniformBufferObject {
-            model_view,
-            projection,
-            delta_time,
-        };
+        let uniform_buffer = UniformBufferObject { mvp, delta_time };
 
         self.uniform_buffer
             .update(&self.vulkan_context, &uniform_buffer, 1)?;
@@ -299,30 +293,90 @@ impl Renderer {
         if self.frame_index % 72 != 0 {
             return Ok(());
         };
-        let e = Euler::from(self.camera.orientation);
+        let e1 = Euler::from(self.cameras[0].orientation);
+        let e2 = Euler::from(self.cameras[1].orientation);
 
         self.term.clear_screen()?;
         self.term.write_line("[RENDER_DEBUG]")?;
         self.term
             .write_line(&format!("[Frame]: {}", self.frame_index))?;
-        self.term
-            .write_line(&format!("[Camera Position]: {:?}", self.camera.position))?;
         self.term.write_line(&format!(
-            "[Camera Orientation]: Pitch {:?}, Yaw: {:?}, Roll: {:?}",
-            Deg::from(e.x),
-            Deg::from(e.y),
-            Deg::from(e.z)
+            "[Camera 0 Position]: {:?}",
+            self.cameras[0].position
         ))?;
-        self.term
-            .write_line(&format!("[View 0]: {:?}", convert_view(&self.views[0])))?;
-        self.term
-            .write_line(&format!("[View 1]: {:?}", convert_view(&self.views[1])))?;
-        self.term
-            .write_line(&format!("[View Matrix]: {:?}", self.camera.view_matrix))?;
+        self.term.write_line(&format!(
+            "[Camera 0 Orientation]: Pitch {:?}, Yaw: {:?}, Roll: {:?}",
+            Deg::from(e1.x),
+            Deg::from(e1.y),
+            Deg::from(e1.z)
+        ))?;
+        self.term.write_line(&format!(
+            "[Camera 0 Matrix]: {:?}",
+            self.cameras[0].view_matrix
+        ))?;
+        self.term.write_line(&format!(
+            "[Camera 1 Position]: {:?}",
+            self.cameras[1].position
+        ))?;
+        self.term.write_line(&format!(
+            "[Camera 1 Orientation]: Pitch {:?}, Yaw: {:?}, Roll: {:?}",
+            Deg::from(e2.x),
+            Deg::from(e2.y),
+            Deg::from(e2.z)
+        ))?;
+        self.term.write_line(&format!(
+            "[Camera 1 Matrix]: {:?}",
+            self.cameras[1].view_matrix
+        ))?;
+        let view = &self.views[0];
+        let camera_position: mint::Vector3<f32> = view.pose.position.into();
+        let angle_left = view.fov.angle_left;
+        let angle_right = view.fov.angle_right;
+        let angle_up = view.fov.angle_up;
+        let angle_down = view.fov.angle_down;
+        self.term.write_line(&format!(
+            "[View 0]: Position: {:?}, angleLeft: {}, angleRight: {}, angleDown: {}, angleUp: {}",
+            camera_position, angle_left, angle_right, angle_up, angle_down
+        ))?;
         self.term.flush()?;
 
         Ok(())
     }
+}
+
+fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
+    let tan_left = f32::tan(fov.angle_left);
+    let tan_right = f32::tan(fov.angle_right);
+
+    let tan_down = f32::tan(fov.angle_down);
+    let tan_up = f32::tan(fov.angle_up);
+    let tan_angle_width = tan_left - tan_right;
+    let tan_angle_height = tan_down - tan_up;
+
+    let c0r0 = 2.0 / tan_angle_width;
+    let c1r0 = 0.0;
+    let c2r0 = (tan_right + tan_left) / tan_angle_width;
+    let c3r0 = 0.0;
+
+    let c0r1 = 0.0;
+    let c1r1 = 2.0 / tan_angle_height;
+    let c2r1 = (tan_up + tan_down) / tan_angle_height;
+    let c3r1 = 0.0;
+
+    let c0r2 = 0.0;
+    let c1r2 = 0.0;
+    let c2r2 = -(far) / (far - near);
+    let c3r2 = -(far * near) / (far - near);
+
+    let c0r3 = 0.0;
+    let c1r3 = 0.0;
+    let c2r3 = -1.0;
+    let c3r3 = 0.0;
+
+    return Matrix4::new(
+        c0r0, c0r1, c0r2, c0r3, c1r0, c1r1, c1r2, c1r3, c2r0, c2r1, c2r2, c2r3, c3r0, c3r1, c3r2,
+        c3r3,
+    );
 }
 
 fn create_descriptor_set_layout(
