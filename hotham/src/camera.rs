@@ -31,11 +31,19 @@ impl Camera {
     }
 
     pub fn build_matrix(&self) -> Result<Matrix4<f32>> {
-        let rotation = Matrix4::from(Matrix3::from(Basis3::from_quaternion(&self.orientation)));
+        let scale = Matrix4::from_scale(1.0);
+        let euler = Euler::from(self.orientation);
+        let rotation_x = Matrix4::from_angle_x(euler.x);
+        let rotation_y = Matrix4::from_angle_y(-euler.y);
+        let rotation_z = Matrix4::from_angle_z(-euler.z);
+        let rotation = rotation_x * rotation_y * rotation_z;
+
         let translation = Matrix4::from_translation(self.position);
 
-        let matrix = translation * rotation;
-        let matrix = matrix.invert().ok_or(anyhow!("Unable to invert matrix"))?;
+        let matrix = translation * rotation * scale;
+        let matrix = matrix
+            .inverse_transform()
+            .ok_or(anyhow!("Unable to invert matrix"))?;
         let numbers: &[f32; 16] = matrix.as_ref();
         for n in numbers {
             if n.is_nan() {

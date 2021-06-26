@@ -178,17 +178,17 @@ impl Renderer {
             .duration_since(self.render_start_time)
             .as_secs_f32();
 
-        let scale = Matrix4::from_scale(0.4);
+        let scale = Matrix4::from_scale(0.2);
         // let rotation = rotation + (0.1 * delta_time);
-        // let rotation_y = Matrix4::from_angle_y(Deg(10.0 * delta_time));
+        let rotation_y = Matrix4::from_angle_y(Deg(10.0 * delta_time));
         // let rotation_x = Matrix4::from_angle_x(Deg(60.0));
-        let position = vec3(0.0, 0.0, 0.0);
+        let position = vec3(0.0, 0.5, 0.0);
 
         // let position = Quaternion::from_angle_x(Deg(rotation)).rotate_vector(position);
         // let position = Quaternion::from_angle_y(Deg(rotation)).rotate_vector(position);
 
         let translate = Matrix4::from_translation(position);
-        let model = translate * scale;
+        let model = translate * rotation_y * scale;
 
         // View (camera)
         let view_matrices = &self
@@ -203,9 +203,10 @@ impl Renderer {
         // Projection
         let near = 0.05;
         let far = 100.0;
+        // HACK - should check the imageArrayIndex
         let mvp = [
-            get_projection(views[0].fov, near, far) * view_matrices[0] * model,
             get_projection(views[1].fov, near, far) * view_matrices[1] * model,
+            get_projection(views[0].fov, near, far) * view_matrices[0] * model,
         ];
 
         let uniform_buffer = UniformBufferObject { mvp, delta_time };
@@ -584,7 +585,7 @@ fn create_pipeline(
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
         .cull_mode(vk::CullModeFlags::BACK)
-        .front_face(vk::FrontFace::CLOCKWISE)
+        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)
         .depth_bias_enable(false)
