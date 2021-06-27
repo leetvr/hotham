@@ -32,12 +32,7 @@ impl Camera {
 
     pub fn build_matrix(&self) -> Result<Matrix4<f32>> {
         let scale = Matrix4::from_scale(1.0);
-        let euler = Euler::from(self.orientation);
-        let rotation_x = Matrix4::from_angle_x(euler.x);
-        let rotation_y = Matrix4::from_angle_y(-euler.y);
-        let rotation_z = Matrix4::from_angle_z(-euler.z);
-        let rotation = rotation_x * rotation_y * rotation_z;
-
+        let rotation = Matrix4::from(self.orientation);
         let translation = Matrix4::from_translation(self.position);
 
         let matrix = translation * rotation * scale;
