@@ -11,6 +11,7 @@ crate-type = ["lib", "cdylib"]
 [dependencies]
 cgmath = "0.18"
 hotham = {path = "../hotham"}
+image = "0.23"
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.3.0"
@@ -20,6 +21,7 @@ shaderc = "0.7"
 
 [package.metadata.android]
 apk_label = "Hotham Cubeworld"
+assets = "assets"
 fullscreen = true
 libs = [
   "lib/libopenxr_loader.so",

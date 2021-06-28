@@ -370,6 +370,154 @@ impl VulkanContext {
 
         unsafe { self.device.allocate_memory(&allocate_info, None) }.map_err(Into::into)
     }
+
+    pub fn create_texture_image(
+        &self,
+        image_buf: &Vec<u8>,
+        width: u32,
+        height: u32,
+    ) -> Result<(Image, vk::Sampler)> {
+        let size = image_buf.len() * 8;
+        let image_extent = vk::Extent2D { width, height };
+
+        let format = vk::Format::R8G8B8A8_SRGB;
+
+        let image = self.create_image(format, &image_extent)?;
+
+        let old_layout = vk::ImageLayout::UNDEFINED;
+        let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+
+        self.update_buffer(&image_buf, size, image.device_memory)?;
+        self.transition_image_layout(image.handle, format, old_layout, final_layout);
+
+        let sampler = self.create_texture_sampler()?;
+
+        Ok((image, sampler))
+    }
+
+    pub fn transition_image_layout(
+        &self,
+        image: vk::Image,
+        _format: vk::Format,
+        old_layout: vk::ImageLayout,
+        new_layout: vk::ImageLayout,
+    ) {
+        let command_buffer = self.begin_single_time_commands();
+        let subresource_range = vk::ImageSubresourceRange::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .base_mip_level(0)
+            .level_count(1)
+            .base_array_layer(0)
+            .layer_count(1)
+            .build();
+
+        let (src_access_mask, dst_access_mask, src_stage, dst_stage) =
+            get_stage(old_layout, new_layout);
+
+        let barrier = vk::ImageMemoryBarrier::builder()
+            .old_layout(old_layout)
+            .new_layout(new_layout)
+            .src_access_mask(src_access_mask)
+            .dst_access_mask(dst_access_mask)
+            .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
+            .subresource_range(subresource_range)
+            .image(image)
+            .build();
+
+        let dependency_flags = vk::DependencyFlags::empty();
+        let image_memory_barriers = &[barrier];
+
+        unsafe {
+            self.device.cmd_pipeline_barrier(
+                command_buffer,
+                src_stage,
+                dst_stage,
+                dependency_flags,
+                &[],
+                &[],
+                image_memory_barriers,
+            )
+        };
+        self.end_single_time_commands(command_buffer);
+    }
+    pub fn begin_single_time_commands(&self) -> vk::CommandBuffer {
+        let alloc_info = vk::CommandBufferAllocateInfo::builder()
+            .command_buffer_count(1)
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_pool(self.command_pool);
+
+        let command_buffer = unsafe {
+            self.device
+                .allocate_command_buffers(&alloc_info)
+                .map(|mut b| b.pop().unwrap())
+                .expect("Unable to allocate command buffer")
+        };
+
+        let begin_info = vk::CommandBufferBeginInfo::builder()
+            .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+
+        unsafe {
+            self.device
+                .begin_command_buffer(command_buffer, &begin_info)
+                .expect("Unable to begin command buffer")
+        }
+
+        command_buffer
+    }
+
+    pub fn end_single_time_commands(&self, command_buffer: vk::CommandBuffer) {
+        unsafe {
+            self.device
+                .end_command_buffer(command_buffer)
+                .expect("Unable to end command buffer");
+        }
+
+        let command_buffers = &[command_buffer];
+
+        let submit_info = vk::SubmitInfo::builder()
+            .command_buffers(command_buffers)
+            .build();
+
+        let submit_info = &[submit_info];
+
+        unsafe {
+            self.device
+                .queue_submit(self.graphics_queue, submit_info, vk::Fence::null())
+                .expect("Unable to submit to queue");
+            self.device
+                .queue_wait_idle(self.graphics_queue)
+                .expect("Unable to wait idle");
+            self.device
+                .free_command_buffers(self.command_pool, command_buffers)
+        }
+    }
+
+    fn create_texture_sampler(&self) -> Result<vk::Sampler> {
+        let create_info = vk::SamplerCreateInfo::builder()
+            .mag_filter(vk::Filter::LINEAR)
+            .min_filter(vk::Filter::LINEAR)
+            .address_mode_u(vk::SamplerAddressMode::REPEAT)
+            .address_mode_v(vk::SamplerAddressMode::REPEAT)
+            .address_mode_w(vk::SamplerAddressMode::REPEAT)
+            .anisotropy_enable(true)
+            .max_anisotropy(16.0)
+            .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
+            .unnormalized_coordinates(false)
+            .compare_enable(false)
+            .compare_op(vk::CompareOp::ALWAYS)
+            .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
+            .mip_lod_bias(0.0)
+            .min_lod(0.0)
+            .max_lod(0.0)
+            .build();
+
+        unsafe {
+            self.device
+                .create_sampler(&create_info, None)
+                .map_err(Into::into)
+        }
+    }
 }
 
 fn get_usage(format: vk::Format) -> Result<vk::ImageUsageFlags> {
@@ -512,4 +660,36 @@ fn get_layer_names(entry: &Entry) -> Result<Vec<*const c_char>> {
         .iter()
         .map(|l| l.layer_name.as_ptr())
         .collect::<Vec<_>>())
+}
+
+fn get_stage(
+    old_layout: vk::ImageLayout,
+    new_layout: vk::ImageLayout,
+) -> (
+    vk::AccessFlags,
+    vk::AccessFlags,
+    vk::PipelineStageFlags,
+    vk::PipelineStageFlags,
+) {
+    if old_layout == vk::ImageLayout::UNDEFINED
+        && new_layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL
+    {
+        return (
+            vk::AccessFlags::empty(),
+            vk::AccessFlags::TRANSFER_WRITE,
+            vk::PipelineStageFlags::TOP_OF_PIPE,
+            vk::PipelineStageFlags::TRANSFER,
+        );
+    } else if old_layout == vk::ImageLayout::TRANSFER_DST_OPTIMAL
+        && new_layout == vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL
+    {
+        return (
+            vk::AccessFlags::TRANSFER_WRITE,
+            vk::AccessFlags::SHADER_READ,
+            vk::PipelineStageFlags::TRANSFER,
+            vk::PipelineStageFlags::FRAGMENT_SHADER,
+        );
+    }
+
+    panic!("Invalid layout transition!");
 }

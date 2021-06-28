@@ -41,6 +41,14 @@ impl Program for Cubeworld {
         // TODO: This should be somehow relative to hotham-cubeworld already
         let vertex_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.vert.spv")))?;
         let fragment_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.frag.spv")))?;
+        let img = image::io::Reader::open("./src/tutorials/images/viking_room.png")
+            .expect("Unable to read image")
+            .decode()
+            .expect("Unable to read image")
+            .to_rgba8();
+        let image_width = img.width();
+        let image_height = img.height();
+        let image_buf = img.into_raw();
 
         let (vertices, indices) = self.update();
 
@@ -49,6 +57,9 @@ impl Program for Cubeworld {
             indices,
             vertex_shader,
             fragment_shader,
+            image_width,
+            image_height,
+            image_buf
         })
     }
 
