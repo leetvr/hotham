@@ -38,6 +38,9 @@ pub struct ProgramInitialization<'a> {
     pub indices: &'a Vec<u32>,
     pub vertex_shader: Vec<u32>,
     pub fragment_shader: Vec<u32>,
+    pub image_buf: Vec<u8>,
+    pub image_height: u32,
+    pub image_width: u32,
 }
 
 pub fn read_spv_from_bytes<R: std::io::Read + Seek>(bytes: &mut R) -> std::io::Result<Vec<u32>> {

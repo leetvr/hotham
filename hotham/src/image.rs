@@ -1,4 +1,3 @@
-
 use ash::{version::DeviceV1_0, vk};
 
 use crate::vulkan_context::VulkanContext;

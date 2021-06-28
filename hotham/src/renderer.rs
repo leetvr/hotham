@@ -26,7 +26,7 @@ pub(crate) struct Renderer {
     vertex_buffer: Buffer<Vertex>,
     index_buffer: Buffer<u32>,
     uniform_buffer: Buffer<UniformBufferObject>,
-    uniform_buffer_descriptor_set: vk::DescriptorSet,
+    descriptor_sets: Vec<vk::DescriptorSet>,
     render_start_time: Instant,
     cameras: Vec<Camera>,
     term: Term,
@@ -112,14 +112,27 @@ impl Renderer {
             vk::BufferUsageFlags::INDEX_BUFFER,
         )?;
 
+        // Create texture images
+        let (texture_image, texture_sampler) = vulkan_context.create_texture_image(
+            &params.image_buf,
+            params.image_width,
+            params.image_height,
+        )?;
+
         let view_matrix = UniformBufferObject::default();
         let uniform_buffer = Buffer::new(
             &vulkan_context,
             &view_matrix,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
-        let uniform_buffer_descriptor_set =
-            uniform_buffer.create_descriptor_set(&vulkan_context, &[descriptor_set_layout])?;
+
+        let descriptor_sets = create_descriptor_sets(
+            &vulkan_context,
+            &[descriptor_set_layout],
+            uniform_buffer.handle,
+            texture_image.view,
+            texture_sampler,
+        )?;
 
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
@@ -137,7 +150,7 @@ impl Renderer {
             vertex_buffer,
             index_buffer,
             uniform_buffer,
-            uniform_buffer_descriptor_set,
+            descriptor_sets,
             render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
             term: Term::buffered_stdout(),
@@ -253,7 +266,7 @@ impl Renderer {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                &[self.uniform_buffer_descriptor_set],
+                &self.descriptor_sets,
                 &[],
             );
             device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.handle], &[0]);
@@ -376,13 +389,21 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
 fn create_descriptor_set_layout(
     vulkan_context: &VulkanContext,
 ) -> VkResult<vk::DescriptorSetLayout> {
-    let binding = vk::DescriptorSetLayoutBinding::builder()
+    let vertex_binding = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .build();
-    let bindings = [binding];
+
+    let sampler_binding = vk::DescriptorSetLayoutBinding::builder()
+        .binding(1)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+        .build();
+
+    let bindings = [vertex_binding, sampler_binding];
     let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
     unsafe {
@@ -668,4 +689,56 @@ fn create_pipeline_layout(
         )
     }
     .map_err(|e| e.into())
+}
+
+fn create_descriptor_sets(
+    vulkan_context: &VulkanContext,
+    set_layouts: &[vk::DescriptorSetLayout],
+    buffer_handle: vk::Buffer,
+    texture_image_view: vk::ImageView,
+    texture_sampler: vk::Sampler,
+) -> Result<Vec<vk::DescriptorSet>> {
+    let descriptor_sets = unsafe {
+        vulkan_context.device.allocate_descriptor_sets(
+            &vk::DescriptorSetAllocateInfo::builder()
+                .set_layouts(set_layouts)
+                .descriptor_pool(vulkan_context.descriptor_pool),
+        )
+    }?;
+
+    let buffer_info = vk::DescriptorBufferInfo::builder()
+        .buffer(buffer_handle)
+        .offset(0)
+        .range(size_of::<UniformBufferObject>() as _)
+        .build();
+
+    let ubo_descriptor_write = vk::WriteDescriptorSet::builder()
+        .dst_set(descriptor_sets[0])
+        .dst_binding(0)
+        .dst_array_element(0)
+        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+        .buffer_info(&[buffer_info])
+        .build();
+
+    let image_info = vk::DescriptorImageInfo::builder()
+        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+        .image_view(texture_image_view)
+        .sampler(texture_sampler)
+        .build();
+
+    let sampler_descriptor_write = vk::WriteDescriptorSet::builder()
+        .dst_set(descriptor_sets[0])
+        .dst_binding(1)
+        .dst_array_element(0)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .image_info(&[image_info])
+        .build();
+
+    unsafe {
+        vulkan_context
+            .device
+            .update_descriptor_sets(&[ubo_descriptor_write, sampler_descriptor_write], &[])
+    };
+
+    Ok(descriptor_sets)
 }
