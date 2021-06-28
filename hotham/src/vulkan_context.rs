@@ -1,6 +1,6 @@
 use crate::{
     hotham_error::HothamError, image::Image, util::parse_raw_strings, COLOR_FORMAT, DEPTH_FORMAT,
-    SWAPCHAIN_LENGTH,
+    SWAPCHAIN_LENGTH, TEXTURE_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -233,6 +233,11 @@ impl VulkanContext {
         image: &vk::Image,
         format: vk::Format,
     ) -> Result<vk::ImageView> {
+        let layer_count = if format == vk::Format::R8G8B8A8_SRGB {
+            1
+        } else {
+            2
+        };
         let aspect_mask = get_aspect_mask(format)?;
         let create_info = vk::ImageViewCreateInfo::builder()
             .view_type(vk::ImageViewType::TYPE_2D_ARRAY)
@@ -242,7 +247,7 @@ impl VulkanContext {
                 base_mip_level: 0,
                 level_count: 1,
                 base_array_layer: 0,
-                layer_count: 2,
+                layer_count,
             })
             .image(*image);
         unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
@@ -267,7 +272,9 @@ impl VulkanContext {
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let image = unsafe { self.device.create_image(&create_info, None) }?;
 
-        let device_memory = self.allocate_image_memory(image)?;
+        let properties = vk::MemoryPropertyFlags::DEVICE_LOCAL;
+
+        let device_memory = self.allocate_image_memory(image, properties)?;
 
         unsafe { self.device.bind_image_memory(image, device_memory, 0) }?;
 
@@ -349,9 +356,12 @@ impl VulkanContext {
         self.allocate_memory(memory_requirements, properties)
     }
 
-    fn allocate_image_memory(&self, image: vk::Image) -> Result<vk::DeviceMemory> {
+    fn allocate_image_memory(
+        &self,
+        image: vk::Image,
+        properties: vk::MemoryPropertyFlags,
+    ) -> Result<vk::DeviceMemory> {
         let memory_requirements = unsafe { self.device.get_image_memory_requirements(image) };
-        let properties = vk::MemoryPropertyFlags::DEVICE_LOCAL;
         self.allocate_memory(memory_requirements, properties)
     }
 
@@ -529,11 +539,15 @@ fn get_usage(format: vk::Format) -> Result<vk::ImageUsageFlags> {
         return Ok(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT);
     }
 
+    if format == TEXTURE_FORMAT {
+        return Ok(vk::ImageUsageFlags::SAMPLED);
+    }
+
     return Err(HothamError::InvalidFormatError.into());
 }
 
 fn get_aspect_mask(format: vk::Format) -> Result<vk::ImageAspectFlags> {
-    if format == COLOR_FORMAT {
+    if format == COLOR_FORMAT || format == TEXTURE_FORMAT {
         return Ok(vk::ImageAspectFlags::COLOR);
     }
 
