@@ -1,9 +1,9 @@
 use ash::vk;
-use hotham_error::HothamError;
 use openxr as xr;
 use std::io::Seek;
 
 pub use app::App;
+pub use hotham_error::HothamError;
 pub use uniform_buffer_object::UniformBufferObject;
 pub use vertex::Vertex;
 
@@ -23,6 +23,7 @@ mod vulkan_context;
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
+pub const TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB;
 pub const VIEW_COUNT: u32 = 2;
 pub const SWAPCHAIN_LENGTH: usize = 3;
 pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIMARY_STEREO;

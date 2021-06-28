@@ -1,7 +1,9 @@
 use std::{io::Cursor};
 
-use cgmath::{vec3};
+use cgmath::{vec2, vec3};
 use hotham::{Program, ProgramInitialization, Vertex, read_spv_from_bytes, HothamResult as Result};
+use image::{GenericImageView, ImageFormat::Tga};
+use tobj::LoadOptions;
 
 #[derive(Debug, Clone)]
 pub struct Cubeworld {
@@ -27,9 +29,10 @@ impl Cubeworld {
         self.vertices.clear();
         self.indices.clear();
 
-        let cube = Cube::default();
-        self.vertices = cube.vertices;
-        self.indices = cube.indices;
+        let (vertices, indices) = load_model();
+        self.vertices = vertices;
+        self.indices = indices;
+
 
         self.needs_update = false;
     }
@@ -41,14 +44,13 @@ impl Program for Cubeworld {
         // TODO: This should be somehow relative to hotham-cubeworld already
         let vertex_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.vert.spv")))?;
         let fragment_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.frag.spv")))?;
-        let img = image::io::Reader::open("./src/tutorials/images/viking_room.png")
-            .expect("Unable to read image")
-            .decode()
-            .expect("Unable to read image")
-            .to_rgba8();
+        let mut cursor = Cursor::new(include_bytes!("../assets/asteroid.tga"));
+        let mut reader = image::io::Reader::new(&mut cursor);
+        reader.set_format(Tga);
+        let img = reader.decode().unwrap();
         let image_width = img.width();
         let image_height = img.height();
-        let image_buf = img.into_raw();
+        let image_buf = img.into_bytes();
 
         let (vertices, indices) = self.update();
 
@@ -111,4 +113,39 @@ impl Default for Cube {
         Self { vertices, indices }
     }
 
+}
+
+fn load_model() -> (Vec<Vertex>, Vec<u32>) {
+    println!("Loading model..");
+    let obj_buf = &mut Cursor::new(include_bytes!("../assets/asteroid.obj"));
+    let (models, _) = tobj::load_obj_buf(obj_buf, &LoadOptions { single_index: true, triangulate: true, ..Default::default()}, |_| {
+        let mtl_buf = &mut Cursor::new(include_bytes!("../assets/asteroid.mtl"));
+        tobj::load_mtl_buf(mtl_buf)
+    }).unwrap();
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+
+    for model in models {
+        for index in model.mesh.indices {
+            indices.push(indices.len() as u32);
+            let i = index as usize;
+
+            let v1 = model.mesh.positions[i * 3];
+            let v2 = model.mesh.positions[i * 3 + 1];
+            let v3 = model.mesh.positions[i * 3 + 2];
+            let pos = vec3(v1, v2, v3);
+
+            let t1 = model.mesh.texcoords[i * 2];
+            let t2 = model.mesh.texcoords[i * 2 + 1];
+            let texture_coordinate = vec2(t1, 1.0 - t2);
+
+            let colour = vec3(1.0, 1.0, 1.0);
+            let vertex = Vertex::new(pos, colour, texture_coordinate);
+            vertices.push(vertex)
+        }
+    }
+
+    println!("..done!");
+
+    (vertices, indices)
 }
