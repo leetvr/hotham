@@ -209,7 +209,7 @@ impl Renderer {
         // Projection
         let near = 0.05;
         let far = 100.0;
-        // HACK - should check the imageArrayIndex
+
         let mvp = [
             get_projection(views[0].fov, near, far) * view_matrices[0] * model,
             get_projection(views[1].fov, near, far) * view_matrices[1] * model,

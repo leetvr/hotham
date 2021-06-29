@@ -272,9 +272,7 @@ impl VulkanContext {
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
         let image = unsafe { self.device.create_image(&create_info, None) }?;
 
-        let properties = vk::MemoryPropertyFlags::DEVICE_LOCAL;
-
-        let device_memory = self.allocate_image_memory(image, properties)?;
+        let device_memory = self.allocate_image_memory(image)?;
 
         unsafe { self.device.bind_image_memory(image, device_memory, 0) }?;
 
@@ -290,6 +288,7 @@ impl VulkanContext {
         item_count: usize,
     ) -> Result<(vk::Buffer, vk::DeviceMemory)> {
         let buffer_size = (size_of::<T>() * item_count) as _;
+        println!("Buffer size is {:?}", buffer_size);
         let device = &self.device;
         let buffer_create_info = vk::BufferCreateInfo::builder()
             .size(buffer_size)
@@ -311,14 +310,14 @@ impl VulkanContext {
         device_memory: vk::DeviceMemory,
     ) -> Result<()> {
         let buffer_size = (size_of::<T>() * item_count) as _;
-        let dst = unsafe {
-            self.device
-                .map_memory(device_memory, 0, buffer_size, vk::MemoryMapFlags::empty())
-        }?;
-
         unsafe {
+            let dst = self.device.map_memory(
+                device_memory,
+                0,
+                buffer_size,
+                vk::MemoryMapFlags::empty(),
+            )?;
             copy(data, dst as *mut _, item_count);
-            self.device.unmap_memory(device_memory);
         };
 
         Ok(())
@@ -356,11 +355,8 @@ impl VulkanContext {
         self.allocate_memory(memory_requirements, properties)
     }
 
-    fn allocate_image_memory(
-        &self,
-        image: vk::Image,
-        properties: vk::MemoryPropertyFlags,
-    ) -> Result<vk::DeviceMemory> {
+    fn allocate_image_memory(&self, image: vk::Image) -> Result<vk::DeviceMemory> {
+        let properties = vk::MemoryPropertyFlags::DEVICE_LOCAL;
         let memory_requirements = unsafe { self.device.get_image_memory_requirements(image) };
         self.allocate_memory(memory_requirements, properties)
     }
@@ -387,22 +383,38 @@ impl VulkanContext {
         width: u32,
         height: u32,
     ) -> Result<(Image, vk::Sampler)> {
-        let size = image_buf.len() * 8;
+        // Get the image's properties
         let image_extent = vk::Extent2D { width, height };
+        let format = TEXTURE_FORMAT;
 
-        let format = vk::Format::R8G8B8A8_SRGB;
+        // Create the destination image
+        let texture_image = self.create_image(format, &image_extent)?;
 
-        let image = self.create_image(format, &image_extent)?;
+        // Create a staging buffer.
+        println!("Creating a staging buffer..");
+        let usage = vk::BufferUsageFlags::TRANSFER_SRC;
+        let (staging_buffer, _) =
+            self.create_buffer_with_data(image_buf, usage, image_buf.len())?;
 
-        let old_layout = vk::ImageLayout::UNDEFINED;
+        // Copy the buffer into the image
+        let initial_layout = vk::ImageLayout::UNDEFINED;
+        let transfer_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+        self.transition_image_layout(
+            texture_image.handle,
+            format,
+            initial_layout,
+            transfer_layout,
+        );
+
+        self.copy_buffer_to_image(staging_buffer, &texture_image);
+
+        // Now transition the image
         let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
-
-        self.update_buffer(&image_buf, size, image.device_memory)?;
-        self.transition_image_layout(image.handle, format, old_layout, final_layout);
+        self.transition_image_layout(texture_image.handle, format, transfer_layout, final_layout);
 
         let sampler = self.create_texture_sampler()?;
 
-        Ok((image, sampler))
+        Ok((texture_image, sampler))
     }
 
     pub fn transition_image_layout(
@@ -528,6 +540,46 @@ impl VulkanContext {
                 .map_err(Into::into)
         }
     }
+
+    pub fn copy_buffer_to_image(&self, src_buffer: vk::Buffer, dst_image: &Image) {
+        let command_buffer = self.begin_single_time_commands();
+
+        let image_subresource = vk::ImageSubresourceLayers::builder()
+            .aspect_mask(vk::ImageAspectFlags::COLOR)
+            .mip_level(0)
+            .base_array_layer(0)
+            .layer_count(1)
+            .build();
+
+        let image_extent = vk::Extent3D {
+            width: dst_image.extent.width,
+            height: dst_image.extent.height,
+            depth: 1,
+        };
+
+        let region = vk::BufferImageCopy::builder()
+            .buffer_offset(0)
+            .buffer_row_length(0)
+            .buffer_image_height(0)
+            .image_subresource(image_subresource)
+            .image_extent(image_extent)
+            .build();
+
+        let regions = &[region];
+        let dst_image_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+
+        unsafe {
+            self.device.cmd_copy_buffer_to_image(
+                command_buffer,
+                src_buffer,
+                dst_image.handle,
+                dst_image_layout,
+                regions,
+            )
+        };
+
+        self.end_single_time_commands(command_buffer);
+    }
 }
 
 fn get_usage(format: vk::Format) -> Result<vk::ImageUsageFlags> {
@@ -540,7 +592,7 @@ fn get_usage(format: vk::Format) -> Result<vk::ImageUsageFlags> {
     }
 
     if format == TEXTURE_FORMAT {
-        return Ok(vk::ImageUsageFlags::SAMPLED);
+        return Ok(vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST);
     }
 
     return Err(HothamError::InvalidFormatError.into());
