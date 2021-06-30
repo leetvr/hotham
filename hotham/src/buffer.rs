@@ -6,6 +6,7 @@ use ash::{version::DeviceV1_0, vk};
 use crate::vulkan_context::VulkanContext;
 
 // TODO: Let Buffer<T> own the data
+#[derive(Debug, Clone)]
 pub(crate) struct Buffer<T> {
     pub handle: vk::Buffer,
     pub device_memory: vk::DeviceMemory,
