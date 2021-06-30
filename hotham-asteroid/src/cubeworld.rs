@@ -6,7 +6,7 @@ use image::{GenericImageView};
 use itertools::izip;
 
 #[derive(Debug, Clone)]
-pub struct Cubeworld {
+pub struct Asteroid {
     model_data: ModelData,
     needs_update: bool,
     cube_count: u32,
@@ -14,7 +14,7 @@ pub struct Cubeworld {
 
 // const CUBE_VERTICES: u32 = 8;
 
-impl Cubeworld {
+impl Asteroid {
     pub fn new() -> Self {
         Self {
             model_data: Default::default(),
@@ -35,7 +35,7 @@ struct ModelData {
 }
 
 
-impl Program for Cubeworld {
+impl Program for Asteroid {
     fn init(&mut self) -> Result<ProgramInitialization> {
         // TODO: This should be somehow relative to hotham-cubeworld already
         let vertex_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.vert.spv")))?;
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     pub fn test_program_init() {
         let tick = Instant::now();
-        let mut cubeworld = Cubeworld::new();
+        let mut cubeworld = Asteroid::new();
         let init = cubeworld.init().unwrap();
         let tock = Instant::now();
         let elapsed = (tock - tick).as_millis();

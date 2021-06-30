@@ -1,6 +1,6 @@
 mod cubeworld;
 
-use cubeworld::Cubeworld;
+use cubeworld::Asteroid;
 use hotham::{App, HothamResult};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -13,7 +13,7 @@ pub fn main() {
 }
 
 pub fn real_main() -> HothamResult<()> {
-    let program = Cubeworld::new();
+    let program = Asteroid::new();
     let mut app = App::new(program)?;
     app.run()?;
     Ok(())
