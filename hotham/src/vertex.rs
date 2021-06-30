@@ -8,14 +8,21 @@ pub struct Vertex {
     pub position: Vector3<f32>,
     pub color: Vector3<f32>,
     pub texture_coords: Vector2<f32>,
+    pub normal: Vector3<f32>,
 }
 
 impl Vertex {
-    pub fn new(position: Vector3<f32>, color: Vector3<f32>, texture_coords: Vector2<f32>) -> Self {
+    pub fn new(
+        position: Vector3<f32>,
+        color: Vector3<f32>,
+        texture_coords: Vector2<f32>,
+        normal: Vector3<f32>,
+    ) -> Self {
         Self {
             position,
             color,
             texture_coords,
+            normal,
         }
     }
 
@@ -25,7 +32,12 @@ impl Vertex {
             position,
             color,
             texture_coords: vec2(0.0, 0.0),
+            normal: vec3(0.0, 0.0, 0.0),
         }
+    }
+
+    pub fn from_zip(t: (Vector3<f32>, Vector3<f32>, Vector2<f32>, Vector3<f32>)) -> Self {
+        Vertex::new(t.0, t.1, t.2, t.3)
     }
 }
 

@@ -2,13 +2,12 @@ use std::{io::Cursor};
 
 use cgmath::{vec2, vec3};
 use hotham::{Program, ProgramInitialization, Vertex, read_spv_from_bytes, HothamResult as Result};
-use image::{GenericImageView, ImageFormat::Tga};
-use tobj::LoadOptions;
+use image::{GenericImageView};
+use itertools::izip;
 
 #[derive(Debug, Clone)]
 pub struct Cubeworld {
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
+    model_data: ModelData,
     needs_update: bool,
     cube_count: u32,
 }
@@ -18,24 +17,21 @@ pub struct Cubeworld {
 impl Cubeworld {
     pub fn new() -> Self {
         Self {
-            vertices: Vec::new(),
-            indices: Vec::new(),
+            model_data: Default::default(),
             needs_update: true,
             cube_count: 1,
         }
     }
 
-    fn update_vertices(&mut self) {
-        self.vertices.clear();
-        self.indices.clear();
+}
 
-        let (vertices, indices) = load_model();
-        self.vertices = vertices;
-        self.indices = indices;
-
-
-        self.needs_update = false;
-    }
+#[derive(Debug, Clone, Default)]
+struct ModelData {
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+    image_buf: Vec<u8>,
+    image_height: u32,
+    image_width: u32,
 }
 
 
@@ -44,33 +40,21 @@ impl Program for Cubeworld {
         // TODO: This should be somehow relative to hotham-cubeworld already
         let vertex_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.vert.spv")))?;
         let fragment_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!("shaders/cube.frag.spv")))?;
-        let mut cursor = Cursor::new(include_bytes!("../assets/asteroid.tga"));
-        let mut reader = image::io::Reader::new(&mut cursor);
-        reader.set_format(Tga);
-        let img = reader.decode().unwrap();
-        let image_width = img.width();
-        let image_height = img.height();
-        let image_buf = img.into_bytes();
-
-        let (vertices, indices) = self.update();
+        self.model_data = load_model();
 
         Ok(ProgramInitialization {
-            vertices,
-            indices,
+            vertices: &self.model_data.vertices,
+            indices: &self.model_data.indices,
             vertex_shader,
             fragment_shader,
-            image_width,
-            image_height,
-            image_buf
+            image_width: self.model_data.image_width,
+            image_height: self.model_data.image_height,
+            image_buf: self.model_data.image_buf.clone(),
         })
     }
 
     fn update(&mut self) -> (&Vec<Vertex>, &Vec<u32>) {
-        if self.needs_update {
-            self.update_vertices();
-        }
-
-        (&self.vertices, &self.indices)
+        (&self.model_data.vertices, &self.model_data.indices)
     }
 }
 
@@ -115,37 +99,91 @@ impl Default for Cube {
 
 }
 
-fn load_model() -> (Vec<Vertex>, Vec<u32>) {
+fn load_model() -> ModelData {
     println!("Loading model..");
-    let obj_buf = &mut Cursor::new(include_bytes!("../assets/asteroid.obj"));
-    let (models, _) = tobj::load_obj_buf(obj_buf, &LoadOptions { single_index: true, triangulate: true, ..Default::default()}, |_| {
-        let mtl_buf = &mut Cursor::new(include_bytes!("../assets/asteroid.mtl"));
-        tobj::load_mtl_buf(mtl_buf)
-    }).unwrap();
-    let mut vertices = Vec::new();
+    let gtlf_buf = Cursor::new(include_bytes!("../assets/asteroid.gltf"));
+    let buffers = include_bytes!("../assets/asteroid_data.bin");
+    let gltf = gltf::Gltf::from_reader(gtlf_buf).unwrap();
     let mut indices = Vec::new();
 
-    for model in models {
-        for index in model.mesh.indices {
-            indices.push(indices.len() as u32);
-            let i = index as usize;
+    let mut positions = Vec::new();
+    let mut tex_coords = Vec::new();
+    let mut colours = Vec::new();
+    let mut normals = Vec::new();
 
-            let v1 = model.mesh.positions[i * 3];
-            let v2 = model.mesh.positions[i * 3 + 1];
-            let v3 = model.mesh.positions[i * 3 + 2];
-            let pos = vec3(v1, v2, v3);
-
-            let t1 = model.mesh.texcoords[i * 2];
-            let t2 = model.mesh.texcoords[i * 2 + 1];
-            let texture_coordinate = vec2(t1, 1.0 - t2);
-
-            let colour = vec3(1.0, 1.0, 1.0);
-            let vertex = Vertex::new(pos, colour, texture_coordinate);
-            vertices.push(vertex)
+    for mesh in gltf.meshes() {
+        for primitive in mesh.primitives() {
+            let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()..buffer.index() + buffer.length()]));
+            if let Some(iter) = reader.read_positions() {
+                for v in iter {
+                    positions.push(vec3(v[0], -v[1], v[2]));
+                }
+            }
+            if let Some(iter) = reader.read_normals() {
+                for v in iter {
+                    normals.push(vec3(v[0], -v[1], v[2]));
+                }
+            }
+            if let Some(iter) = reader.read_tex_coords(0) {
+                for v in iter.into_f32() {
+                    tex_coords.push(vec2(v[0], v[1]));
+                }
+            }
+            if let Some(iter) = reader.read_colors(0) {
+                for v in iter.into_rgb_f32() {
+                    colours.push(vec3(v[0], v[1], v[2]));
+                }
+            }
+            if let Some(iter) = reader.read_indices() {
+                for i in iter.into_u32() {
+                    indices.push(i);
+                }
+            }
         }
     }
 
+    let vertices = izip!(positions, colours, tex_coords, normals).into_iter().map(Vertex::from_zip).collect();
+
+    let mut cursor = Cursor::new(include_bytes!("../assets/asteroid_img2.png"));
+    let mut reader = image::io::Reader::new(&mut cursor);
+    reader.set_format(image::ImageFormat::Png);
+    let img = reader.decode().unwrap();
+    let image_width = img.width();
+    let image_height = img.height();
+    let image_buf = img.into_rgba8().into_raw();
+
+    // let image_buf = Vec::new();
+    // let image_height = 0;
+    // let image_width = 0;
+
     println!("..done!");
 
-    (vertices, indices)
+    ModelData {
+        vertices,
+        indices,
+        image_buf,
+        image_height,
+        image_width,
+    }
+
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Instant;
+
+    use super::*;
+    #[test]
+    pub fn test_program_init() {
+        let tick = Instant::now();
+        let mut cubeworld = Cubeworld::new();
+        let init = cubeworld.init().unwrap();
+        let tock = Instant::now();
+        let elapsed = (tock - tick).as_millis();
+        println!("Took {}", elapsed);
+        assert_eq!(init.vertices.len(), 618);
+        assert_eq!(init.indices.len(), 1800);
+        assert_eq!(init.image_height, 2048);
+        assert_eq!(init.image_width, 2048);
+    }
 }

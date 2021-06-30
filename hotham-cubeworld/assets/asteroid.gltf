@@ -1,0 +1,167 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v1.6.16",
+    "version": "2.0"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "mesh": 0,
+      "name": "Asteroid"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "Asteroid_01",
+      "normalTexture": {
+        "index": 0
+      },
+      "occlusionTexture": {
+        "index": 1
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 2
+        },
+        "metallicFactor": 0.12366615980863571,
+        "roughnessFactor": 0.8275533318519592
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Asteroid Mob 01_Asteroid 01_0",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "COLOR_0": 3
+          },
+          "indices": 4,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    },
+    {
+      "sampler": 0,
+      "source": 2
+    }
+  ],
+  "images": [
+    {
+      "name": "Asteroid_01_normal",
+      "uri": "asteroid_img0.png"
+    },
+    {
+      "name": "Asteroid_01_metallicRoughness",
+      "uri": "asteroid_img1.png"
+    },
+    {
+      "name": "Asteroid_01_baseColor",
+      "uri": "asteroid_img2.png"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 618,
+      "max": [
+        2.023674964904785,
+        1.9481924772262573,
+        2.020200729370117
+      ],
+      "min": [
+        -1.8874317407608032,
+        -1.928831696510315,
+        -1.976090431213379
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 618,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 618,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 618,
+      "normalized": true,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 4,
+      "componentType": 5123,
+      "count": 1800,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 7416,
+      "byteOffset": 0
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7416,
+      "byteOffset": 7416
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4944,
+      "byteOffset": 14832
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4944,
+      "byteOffset": 19776
+    },
+    {
+      "buffer": 0,
+      "byteLength": 3600,
+      "byteOffset": 24720
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "asteroid_data.bin",
+      "byteLength": 28320
+    }
+  ]
+}
