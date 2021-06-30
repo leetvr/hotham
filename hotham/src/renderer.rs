@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{vec3, Deg, Euler, Matrix4};
+use cgmath::{vec3, vec4, Deg, Euler, Matrix4};
 use console::Term;
 use openxr as xr;
 
@@ -113,19 +113,24 @@ impl Renderer {
         )?;
 
         // Create texture images
+        println!("[HOTHAM_RENDERER] Creating texture image..");
         let (texture_image, texture_sampler) = vulkan_context.create_texture_image(
             &params.image_buf,
             params.image_width,
             params.image_height,
         )?;
+        println!("[HOTHAM_RENDERER] Done! {:?}", texture_image);
 
+        println!("[HOTHAM_RENDERER] Creating UBO..");
         let view_matrix = UniformBufferObject::default();
         let uniform_buffer = Buffer::new(
             &vulkan_context,
             &view_matrix,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
+        println!("[HOTHAM_RENDERER] ..done! {:?}", uniform_buffer);
 
+        println!("[HOTHAM_RENDERER] Creating descriptor sets..");
         let descriptor_sets = create_descriptor_sets(
             &vulkan_context,
             &[descriptor_set_layout],
@@ -133,6 +138,7 @@ impl Renderer {
             texture_image.view,
             texture_sampler,
         )?;
+        println!("[HOTHAM_RENDERER] ..done! {:?}", descriptor_sets);
 
         println!("[HOTHAM_INIT] Done! Renderer initialised!");
 
@@ -191,9 +197,9 @@ impl Renderer {
             .duration_since(self.render_start_time)
             .as_secs_f32();
 
-        let scale = Matrix4::from_scale(0.2);
+        let scale = Matrix4::from_scale(0.1);
         let rotation_y = Matrix4::from_angle_y(Deg(10.0));
-        let position = vec3(0.0, 0.0, 0.0);
+        let position = vec3(0.0, 1.0, 0.0);
 
         let translate = Matrix4::from_translation(position);
         let model = translate * rotation_y * scale;
@@ -210,12 +216,22 @@ impl Renderer {
         let near = 0.05;
         let far = 100.0;
 
-        let mvp = [
-            get_projection(views[0].fov, near, far) * view_matrices[0] * model,
-            get_projection(views[1].fov, near, far) * view_matrices[1] * model,
+        let view = [view_matrices[0], view_matrices[1]];
+
+        let projection = [
+            get_projection(views[0].fov, near, far),
+            get_projection(views[1].fov, near, far),
         ];
 
-        let uniform_buffer = UniformBufferObject { mvp, delta_time };
+        let light_pos = vec4(2.0, -2.0, -2.0, 1.0);
+
+        let uniform_buffer = UniformBufferObject {
+            model,
+            view,
+            projection,
+            delta_time,
+            light_pos,
+        };
 
         self.uniform_buffer
             .update(&self.vulkan_context, &uniform_buffer, 1)?;
@@ -598,8 +614,8 @@ fn create_pipeline(
     // Rasterization state
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
-        .cull_mode(vk::CullModeFlags::BACK)
-        .front_face(vk::FrontFace::CLOCKWISE)
+        .cull_mode(vk::CullModeFlags::NONE)
+        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)
         .depth_bias_enable(false)
@@ -697,7 +713,8 @@ fn create_descriptor_sets(
     buffer_handle: vk::Buffer,
     texture_image_view: vk::ImageView,
     texture_sampler: vk::Sampler,
-) -> Result<Vec<vk::DescriptorSet>> {
+) -> VkResult<Vec<vk::DescriptorSet>> {
+    println!("[HOTHAM_RENDERER] Allocating descriptor sets..");
     let descriptor_sets = unsafe {
         vulkan_context.device.allocate_descriptor_sets(
             &vk::DescriptorSetAllocateInfo::builder()
@@ -705,6 +722,7 @@ fn create_descriptor_sets(
                 .descriptor_pool(vulkan_context.descriptor_pool),
         )
     }?;
+    println!("[HOTHAM_RENDERER] ..done! {:?}", descriptor_sets);
 
     let buffer_info = vk::DescriptorBufferInfo::builder()
         .buffer(buffer_handle)

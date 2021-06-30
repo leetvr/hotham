@@ -19,12 +19,17 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+
 use xr::{
-    sys::{pfn::InitializeLoaderKHR, InstanceCreateInfoAndroidKHR, LoaderInitInfoAndroidKHR},
-    vulkan_legacy::SessionCreateInfo,
-    EventDataBuffer, FrameStream, FrameWaiter, Posef, ReferenceSpaceType, Session, SessionState,
-    Swapchain, SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, VulkanLegacy,
+    sys::pfn::InitializeLoaderKHR, vulkan_legacy::SessionCreateInfo, EventDataBuffer, FrameStream,
+    FrameWaiter, Posef, ReferenceSpaceType, Session, SessionState, Swapchain, SwapchainCreateFlags,
+    SwapchainCreateInfo, SwapchainUsageFlags, VulkanLegacy,
 };
+
+pub const ANDROID_LOOPER_ID_MAIN: u32 = 0;
+pub const ANDROID_LOOPER_ID_INPUT: u32 = 1;
+pub const ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(0);
+pub const ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
 
 pub struct App<P: Program> {
     program: P,
@@ -42,6 +47,7 @@ pub struct App<P: Program> {
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<VulkanLegacy>,
+    resumed: bool,
 }
 
 impl<P> App<P>
@@ -113,17 +119,22 @@ where
             event_buffer: Default::default(),
             frame_stream,
             frame_waiter,
+            resumed: true,
         })
     }
 
     pub fn run(&mut self) -> HothamResult<()> {
-        let _should_quit = self.should_quit.clone();
-
         #[cfg(not(target_os = "android"))]
-        ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
-            .map_err(anyhow::Error::new)?;
+        {
+            let should_quit = self.should_quit.clone();
+            ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
+                .map_err(anyhow::Error::new)?;
+        }
 
+        #[cfg(target_os = "android")]
         while !self.should_quit.load(Ordering::Relaxed) {
+            self.process_android_events();
+
             let current_state = self.poll_xr_event()?;
 
             if current_state == SessionState::IDLE {
@@ -224,18 +235,81 @@ where
                     let new_state = session_changed.state();
 
                     if self.xr_state == SessionState::IDLE && new_state == SessionState::READY {
+                        println!("[HOTHAM_POLL_EVENT] Beginning session!");
                         self.xr_session.begin(VIEW_TYPE)?;
+                    }
+
+                    if self.xr_state != SessionState::STOPPING
+                        && new_state == SessionState::STOPPING
+                    {
+                        println!("[HOTHAM_POLL_EVENT] Ending session!");
+                        self.xr_session.end()?;
                     }
 
                     println!("[HOTHAM_POLL_EVENT] State is now {:?}", new_state);
                     self.xr_state = new_state;
                 }
-                Some(_) => {}
+                Some(_) => {
+                    println!("[HOTHAM_POLL_EVENT] Received some other event");
+                }
                 None => break,
             }
         }
 
         Ok(self.xr_state)
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn process_android_events(&mut self) {
+        loop {
+            if let Some(event) = self.poll_android_events() {
+                println!("[HOTHAM_ANDROID] Received event {:?}", event);
+                match event {
+                    ndk_glue::Event::Resume => self.resumed = true,
+                    ndk_glue::Event::Destroy => self.should_quit.store(true, Ordering::Relaxed),
+                    ndk_glue::Event::Pause => self.resumed = false,
+                    _ => {}
+                }
+            }
+            break;
+        }
+    }
+
+    #[cfg(target_os = "android")]
+    pub fn poll_android_events(&mut self) -> Option<ndk_glue::Event> {
+        use ndk::looper::{Poll, ThreadLooper};
+
+        let looper = ThreadLooper::for_thread().unwrap();
+        let timeout = if self.resumed {
+            ANDROID_LOOPER_NONBLOCKING_TIMEOUT
+        } else {
+            ANDROID_LOOPER_BLOCKING_TIMEOUT
+        };
+        let result = looper.poll_all_timeout(timeout);
+
+        match result {
+            Ok(Poll::Event { ident, .. }) => {
+                let ident = ident as u32;
+                if ident == ANDROID_LOOPER_ID_MAIN {
+                    ndk_glue::poll_events()
+                } else if ident == ANDROID_LOOPER_ID_INPUT {
+                    if let Some(input_queue) = ndk_glue::input_queue().as_ref() {
+                        while let Some(event) = input_queue.get_event() {
+                            if let Some(event) = input_queue.pre_dispatch(event) {
+                                input_queue.finish_event(event, false);
+                            }
+                        }
+                    }
+                    None
+                } else {
+                    unreachable!(
+                        "Unrecognised looper identifier: {:?} but LOOPER_ID_INPUT is {:?}",
+                        ident, ANDROID_LOOPER_ID_INPUT
+                    );
+                }
+            }
+            _ => None,
+        }
     }
 }
 
@@ -319,7 +393,7 @@ fn create_xr_session(
 
 #[cfg(not(target_os = "android"))]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
-    let xr_entry = xr::Entry::linked();
+    let xr_entry = xr::Entry::load()?;
     let xr_app_info = openxr::ApplicationInfo {
         application_name: "Hotham Cubeworld",
         application_version: 1,
@@ -335,6 +409,8 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
 
 #[cfg(target_os = "android")]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
+    use openxr::sys::{InstanceCreateInfoAndroidKHR, LoaderInitInfoAndroidKHR};
+
     let xr_entry = xr::Entry::load()?;
     let native_activity = ndk_glue::native_activity();
     let vm_ptr = native_activity.vm();

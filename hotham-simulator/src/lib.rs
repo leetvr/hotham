@@ -128,7 +128,7 @@ unsafe extern "system" fn create_vulkan_instance(
     vulkan_instance: *mut VkInstance,
     vulkan_result: *mut VkResult,
 ) -> Result {
-    let vulkan_create_info: &VulkanInstanceCreateInfo =
+    let vulkan_create_info: &ash::vk::InstanceCreateInfo =
         transmute((*create_info).vulkan_create_info);
     let get_instance_proc_adddr = (*create_info).pfn_get_instance_proc_addr.unwrap();
     let vk_create_instance = CStr::from_bytes_with_nul_unchecked(b"vkCreateInstance\0").as_ptr();
@@ -979,7 +979,7 @@ fn create_multiview_image_views(
 }
 
 #[cfg(target_os = "windows")]
-unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> SwapchainKHR {
+unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
     let entry = state.vulkan_entry.as_ref().unwrap().clone();
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
     let device = state.device.as_ref().unwrap();

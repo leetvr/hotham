@@ -3,6 +3,7 @@ use ash::{version::DeviceV1_0, vk};
 use crate::vulkan_context::VulkanContext;
 
 /// Thin wrapper around a locally created Vulkan image.
+#[derive(Debug, Clone)]
 pub(crate) struct Image {
     pub handle: vk::Image,
     pub view: vk::ImageView,

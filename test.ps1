@@ -1,5 +1,8 @@
 ${env:RUST_BACKTRACE} = 1
 adb shell am force-stop rust.hotham_cubeworld
+if (!$?) {
+    Break
+}
 
 # cargo build
 # if ($?) {

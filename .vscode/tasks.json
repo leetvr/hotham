@@ -22,13 +22,27 @@
 				"kind": "test",
 				"isDefault": true
 			},
-			"label": "Run Cubeworld on hotham-simulator",
+			"label": "Run Cubeworld on Oculus Quest",
+			"problemMatcher": []
 		},
 		{
 			"type": "shell",
 			"label": "Run Renderdoc",
 			"command": ".\\cubeworld.cap",
 			"problemMatcher": []
+		},
+		{
+			"type": "cargo",
+			"command": "test",
+			"args": [
+				"-p",
+				"hotham-cubeworld"
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "test",
+			"label": "rust: cargo test"
 		}
 	]
 }

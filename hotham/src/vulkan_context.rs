@@ -206,11 +206,18 @@ impl VulkanContext {
         let descriptor_pool = unsafe {
             device.create_descriptor_pool(
                 &vk::DescriptorPoolCreateInfo::builder()
-                    .pool_sizes(&[vk::DescriptorPoolSize {
-                        ty: vk::DescriptorType::UNIFORM_BUFFER,
-                        descriptor_count: SWAPCHAIN_LENGTH as _,
-                        ..Default::default()
-                    }])
+                    .pool_sizes(&[
+                        vk::DescriptorPoolSize {
+                            ty: vk::DescriptorType::UNIFORM_BUFFER,
+                            descriptor_count: SWAPCHAIN_LENGTH as _,
+                            ..Default::default()
+                        },
+                        vk::DescriptorPoolSize {
+                            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                            descriptor_count: SWAPCHAIN_LENGTH as _,
+                            ..Default::default()
+                        },
+                    ])
                     .max_sets(SWAPCHAIN_LENGTH as _),
                 None,
             )
@@ -233,14 +240,10 @@ impl VulkanContext {
         image: &vk::Image,
         format: vk::Format,
     ) -> Result<vk::ImageView> {
-        let layer_count = if format == vk::Format::R8G8B8A8_SRGB {
-            1
-        } else {
-            2
-        };
+        let (view_type, layer_count) = get_image_info(format);
         let aspect_mask = get_aspect_mask(format)?;
         let create_info = vk::ImageViewCreateInfo::builder()
-            .view_type(vk::ImageViewType::TYPE_2D_ARRAY)
+            .view_type(view_type)
             .format(format)
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask,
@@ -249,22 +252,29 @@ impl VulkanContext {
                 base_array_layer: 0,
                 layer_count,
             })
+            .components(vk::ComponentMapping {
+                r: vk::ComponentSwizzle::R,
+                g: vk::ComponentSwizzle::G,
+                b: vk::ComponentSwizzle::B,
+                a: vk::ComponentSwizzle::A,
+            })
             .image(*image);
         unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
     }
 
     pub fn create_image(&self, format: vk::Format, extent: &vk::Extent2D) -> Result<Image> {
         let usage = get_usage(format)?;
+        let (_, array_layers) = get_image_info(format);
         let create_info = vk::ImageCreateInfo::builder()
             .format(format)
             .image_type(vk::ImageType::TYPE_2D)
             .extent(vk::Extent3D {
-                height: extent.height,
                 width: extent.width,
+                height: extent.height,
                 depth: 1,
             })
             .mip_levels(1)
-            .array_layers(2)
+            .array_layers(array_layers)
             .tiling(vk::ImageTiling::OPTIMAL)
             .initial_layout(vk::ImageLayout::UNDEFINED)
             .usage(usage)
@@ -281,6 +291,10 @@ impl VulkanContext {
         Ok(Image::new(image, image_view, device_memory, *extent))
     }
 
+    /// Create a Vukan buffer filled with the contents of `data`.
+    /// **NOTE**: If passing in a Vec, you MUST use vec.as_ptr(), passing in
+    /// a reference will result in A Very Bad Time.
+    // TODO: fix this
     pub fn create_buffer_with_data<T: Sized>(
         &self,
         data: *const T,
@@ -288,7 +302,6 @@ impl VulkanContext {
         item_count: usize,
     ) -> Result<(vk::Buffer, vk::DeviceMemory)> {
         let buffer_size = (size_of::<T>() * item_count) as _;
-        println!("Buffer size is {:?}", buffer_size);
         let device = &self.device;
         let buffer_create_info = vk::BufferCreateInfo::builder()
             .size(buffer_size)
@@ -297,6 +310,10 @@ impl VulkanContext {
 
         let buffer = unsafe { device.create_buffer(&buffer_create_info, None) }?;
         let device_memory = self.allocate_buffer_memory(buffer)?;
+        println!(
+            "[HOTHAM_VULKAN] Allocated buffer memory: {:?}",
+            device_memory
+        );
         unsafe { device.bind_buffer_memory(buffer, device_memory, 0) }?;
         self.update_buffer(data, item_count, device_memory)?;
 
@@ -309,16 +326,21 @@ impl VulkanContext {
         item_count: usize,
         device_memory: vk::DeviceMemory,
     ) -> Result<()> {
-        let buffer_size = (size_of::<T>() * item_count) as _;
+        // println!("[HOTHAM_VULKAN] Updating memory: {:?}", device_memory);
         unsafe {
             let dst = self.device.map_memory(
                 device_memory,
                 0,
-                buffer_size,
+                vk::WHOLE_SIZE,
                 vk::MemoryMapFlags::empty(),
             )?;
             copy(data, dst as *mut _, item_count);
+            self.device.unmap_memory(device_memory);
         };
+        // println!(
+        //     "[HOTHAM_VULKAN] Done! {:?} is updated, memory is unmapped",
+        //     device_memory
+        // );
 
         Ok(())
     }
@@ -391,10 +413,11 @@ impl VulkanContext {
         let texture_image = self.create_image(format, &image_extent)?;
 
         // Create a staging buffer.
-        println!("Creating a staging buffer..");
+        println!("[HOTHAM_VULKAN] Creating staging buffer..");
         let usage = vk::BufferUsageFlags::TRANSFER_SRC;
         let (staging_buffer, _) =
-            self.create_buffer_with_data(image_buf, usage, image_buf.len())?;
+            self.create_buffer_with_data(image_buf.as_ptr(), usage, image_buf.len())?;
+        println!("[HOTHAM_VULKAN] ..done!");
 
         // Copy the buffer into the image
         let initial_layout = vk::ImageLayout::UNDEFINED;
@@ -406,6 +429,7 @@ impl VulkanContext {
             transfer_layout,
         );
 
+        println!("[HOTHAM_VULKAN] Copying buffer to image..");
         self.copy_buffer_to_image(staging_buffer, &texture_image);
 
         // Now transition the image
@@ -522,7 +546,7 @@ impl VulkanContext {
             .address_mode_u(vk::SamplerAddressMode::REPEAT)
             .address_mode_v(vk::SamplerAddressMode::REPEAT)
             .address_mode_w(vk::SamplerAddressMode::REPEAT)
-            .anisotropy_enable(true)
+            .anisotropy_enable(false)
             .max_anisotropy(16.0)
             .border_color(vk::BorderColor::INT_OPAQUE_BLACK)
             .unnormalized_coordinates(false)
@@ -580,6 +604,14 @@ impl VulkanContext {
 
         self.end_single_time_commands(command_buffer);
     }
+}
+
+fn get_image_info(format: vk::Format) -> (vk::ImageViewType, u32) {
+    if format == TEXTURE_FORMAT {
+        return (vk::ImageViewType::TYPE_2D, 1);
+    }
+
+    return (vk::ImageViewType::TYPE_2D_ARRAY, 2);
 }
 
 fn get_usage(format: vk::Format) -> Result<vk::ImageUsageFlags> {
