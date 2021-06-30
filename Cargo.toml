@@ -1,2 +1,2 @@
 [workspace]
-members = ["hotham", "hotham-cubeworld", "hotham-simulator"]
+members = ["hotham", "hotham-asteroid", "hotham-simulator"]

@@ -2,7 +2,7 @@
 authors = ["Kane Rogers <kane.m.rogers@gmail.com>"]
 build = "build.rs"
 edition = "2018"
-name = "hotham-cubeworld"
+name = "hotham-asteroid"
 version = "0.1.0"
 
 [lib]
@@ -22,7 +22,7 @@ ndk-glue = "0.3.0"
 shaderc = "0.7"
 
 [package.metadata.android]
-apk_label = "Hotham Cubeworld"
+apk_label = "Hotham Asteroid"
 fullscreen = true
 libs = [
   "lib/libopenxr_loader.so",
