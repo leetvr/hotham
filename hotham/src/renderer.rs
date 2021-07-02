@@ -273,22 +273,6 @@ impl Renderer {
                 vk::SubpassContents::INLINE,
             );
 
-            // Draw the starfield
-            // device.cmd_bind_descriptor_sets(
-            //     command_buffer,
-            //     vk::PipelineBindPoint::GRAPHICS,
-            //     self.pipeline_layout,
-            //     0,
-            //     &self.descriptor_sets,
-            //     &[],
-            // );
-            // device.cmd_bind_pipeline(
-            //     command_buffer,
-            //     vk::PipelineBindPoint::GRAPHICS,
-            //     self.starfield_pipeline,
-            // );
-            // device.cmd_draw(command_buffer, 4, 1, 0, 0);
-
             device.cmd_bind_pipeline(
                 command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
