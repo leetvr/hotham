@@ -65,7 +65,8 @@ where
         let xr_space =
             xr_session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&xr_instance, system)?;
-        let xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution)?;
+        let xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, VIEW_COUNT)?;
+        let _starfield_xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, 1)?;
 
         // Create an action set to encapsulate our actions
         let xr_action_set = xr_instance.create_action_set("input", "input pose information", 0)?;
@@ -102,6 +103,7 @@ where
         xr_session.attach_action_sets(&[&xr_action_set])?;
 
         let renderer = Renderer::new(vulkan_context, &xr_swapchain, swapchain_resolution, &params)?;
+        // renderer.
 
         Ok(Self {
             program,
@@ -349,6 +351,7 @@ fn get_swapchain_resolution(
 fn create_xr_swapchain(
     xr_session: &Session<VulkanLegacy>,
     resolution: &vk::Extent2D,
+    array_size: u32,
 ) -> Result<Swapchain<VulkanLegacy>> {
     xr_session
         .create_swapchain(&SwapchainCreateInfo {
@@ -359,7 +362,7 @@ fn create_xr_swapchain(
             width: resolution.width,
             height: resolution.height,
             face_count: 1,
-            array_size: VIEW_COUNT,
+            array_size,
             mip_count: 1,
         })
         .map_err(Into::into)
