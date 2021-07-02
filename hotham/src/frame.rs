@@ -3,6 +3,7 @@ use ash::{version::DeviceV1_0, vk};
 use crate::{hotham_error::HothamError, vulkan_context::VulkanContext};
 use anyhow::Result;
 
+/// A container for all the resources necessary to render a single frame.
 #[derive(Debug, Clone)]
 pub(crate) struct Frame {
     pub fence: vk::Fence,
