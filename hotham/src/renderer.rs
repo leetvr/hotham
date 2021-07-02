@@ -2,8 +2,8 @@ use std::{ffi::CStr, mem::size_of, time::Instant, u64};
 
 use crate::{
     buffer::Buffer, camera::Camera, frame::Frame, image::Image, swapchain::Swapchain,
-    vulkan_context::VulkanContext, ProgramInitialization, UniformBufferObject, Vertex,
-    COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    texture::Texture, vulkan_context::VulkanContext, ProgramInitialization, UniformBufferObject,
+    Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
@@ -11,7 +11,7 @@ use cgmath::{vec3, vec4, Deg, Euler, Matrix4};
 use console::Term;
 use openxr as xr;
 
-use xr::VulkanLegacy;
+use xr::{vulkan, VulkanLegacy};
 
 pub(crate) struct Renderer {
     _swapchain: Swapchain,
@@ -113,13 +113,14 @@ impl Renderer {
         )?;
 
         // Create texture images
-        println!("[HOTHAM_RENDERER] Creating texture image..");
-        let (texture_image, texture_sampler) = vulkan_context.create_texture_image(
+        println!("[HOTHAM_RENDERER] Creating texture ..");
+        let texture = Texture::new(
+            &vulkan_context,
             &params.image_buf,
             params.image_width,
             params.image_height,
         )?;
-        println!("[HOTHAM_RENDERER] Done! {:?}", texture_image);
+        println!("[HOTHAM_RENDERER] Done! {:?}", texture);
 
         println!("[HOTHAM_RENDERER] Creating UBO..");
         let view_matrix = UniformBufferObject::default();
@@ -135,8 +136,7 @@ impl Renderer {
             &vulkan_context,
             &[descriptor_set_layout],
             uniform_buffer.handle,
-            texture_image.view,
-            texture_sampler,
+            &texture,
         )?;
         println!("[HOTHAM_RENDERER] ..done! {:?}", descriptor_sets);
 
@@ -716,8 +716,7 @@ fn create_descriptor_sets(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
     buffer_handle: vk::Buffer,
-    texture_image_view: vk::ImageView,
-    texture_sampler: vk::Sampler,
+    texture: &Texture,
 ) -> VkResult<Vec<vk::DescriptorSet>> {
     println!("[HOTHAM_RENDERER] Allocating descriptor sets..");
     let descriptor_sets = unsafe {
@@ -743,18 +742,12 @@ fn create_descriptor_sets(
         .buffer_info(&[buffer_info])
         .build();
 
-    let image_info = vk::DescriptorImageInfo::builder()
-        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        .image_view(texture_image_view)
-        .sampler(texture_sampler)
-        .build();
-
     let sampler_descriptor_write = vk::WriteDescriptorSet::builder()
         .dst_set(descriptor_sets[0])
         .dst_binding(1)
         .dst_array_element(0)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .image_info(&[image_info])
+        .image_info(&[texture.descriptor])
         .build();
 
     unsafe {
