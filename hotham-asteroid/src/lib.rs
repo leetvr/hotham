@@ -1,6 +1,6 @@
-mod cubeworld;
+mod asteroid;
 
-use cubeworld::Asteroid;
+use asteroid::Asteroid;
 use hotham::{App, HothamResult};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
