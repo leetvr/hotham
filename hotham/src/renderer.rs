@@ -1,9 +1,9 @@
 use std::{ffi::CStr, mem::size_of, time::Instant, u64};
 
 use crate::{
-    buffer::Buffer, camera::Camera, frame::Frame, hotham_error::HothamError, image::Image,
-    swapchain::Swapchain, vulkan_context::VulkanContext, ProgramInitialization,
-    UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    buffer::Buffer, camera::Camera, frame::Frame, image::Image, swapchain::Swapchain,
+    vulkan_context::VulkanContext, ProgramInitialization, UniformBufferObject, Vertex,
+    COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
@@ -272,6 +272,23 @@ impl Renderer {
                 &render_pass_begin_info,
                 vk::SubpassContents::INLINE,
             );
+
+            // Draw the starfield
+            // device.cmd_bind_descriptor_sets(
+            //     command_buffer,
+            //     vk::PipelineBindPoint::GRAPHICS,
+            //     self.pipeline_layout,
+            //     0,
+            //     &self.descriptor_sets,
+            //     &[],
+            // );
+            // device.cmd_bind_pipeline(
+            //     command_buffer,
+            //     vk::PipelineBindPoint::GRAPHICS,
+            //     self.starfield_pipeline,
+            // );
+            // device.cmd_draw(command_buffer, 4, 1, 0, 0);
+
             device.cmd_bind_pipeline(
                 command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
@@ -544,35 +561,18 @@ fn create_pipeline(
     // Build up the state of the pipeline
 
     // Vertex shader stage
-    let vertex_code = &params.vertex_shader;
-    let vertex_shader_create_info = vk::ShaderModuleCreateInfo::builder().code(&vertex_code);
-    let vertex_shader = unsafe {
-        vulkan_context
-            .device
-            .create_shader_module(&vertex_shader_create_info, None)
-    }?;
-
-    let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
-
-    let vertex_stage = vk::PipelineShaderStageCreateInfo::builder()
-        .stage(vk::ShaderStageFlags::VERTEX)
-        .name(main.clone())
-        .module(vertex_shader)
-        .build();
+    let (vertex_shader, vertex_stage) = create_shader(
+        &params.vertex_shader,
+        vk::ShaderStageFlags::VERTEX,
+        vulkan_context,
+    )?;
 
     // Fragment shader stage
-    let fragment_code = &params.fragment_shader;
-    let fragment_shader_create_info = vk::ShaderModuleCreateInfo::builder().code(&fragment_code);
-    let fragment_shader = unsafe {
-        vulkan_context
-            .device
-            .create_shader_module(&fragment_shader_create_info, None)
-    }?;
-    let fragment_stage = vk::PipelineShaderStageCreateInfo::builder()
-        .stage(vk::ShaderStageFlags::FRAGMENT)
-        .name(main)
-        .module(fragment_shader)
-        .build();
+    let (fragment_shader, fragment_stage) = create_shader(
+        &params.fragment_shader,
+        vk::ShaderStageFlags::FRAGMENT,
+        vulkan_context,
+    )?;
 
     let stages = [vertex_stage, fragment_stage];
 
@@ -671,7 +671,7 @@ fn create_pipeline(
 
     let create_infos = [create_info];
 
-    let mut pipelines = unsafe {
+    let pipelines = unsafe {
         vulkan_context.device.create_graphics_pipelines(
             vk::PipelineCache::null(),
             &create_infos,
@@ -689,9 +689,30 @@ fn create_pipeline(
             .destroy_shader_module(fragment_shader, None);
     }
 
-    println!(".. done!");
+    let primary_pipeline = pipelines[0];
 
-    pipelines.pop().ok_or(HothamError::EmptyListError.into())
+    Ok(primary_pipeline)
+}
+
+fn create_shader(
+    shader_code: &Vec<u32>,
+    stage: vk::ShaderStageFlags,
+    vulkan_context: &VulkanContext,
+) -> Result<(vk::ShaderModule, vk::PipelineShaderStageCreateInfo)> {
+    let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
+    let create_info = vk::ShaderModuleCreateInfo::builder().code(shader_code);
+    let shader_module = unsafe {
+        vulkan_context
+            .device
+            .create_shader_module(&create_info, None)
+    }?;
+    let shader_stage = vk::PipelineShaderStageCreateInfo::builder()
+        .stage(stage)
+        .name(main.clone())
+        .module(shader_module)
+        .build();
+
+    Ok((shader_module, shader_stage))
 }
 
 fn create_pipeline_layout(
