@@ -1,8 +1,5 @@
 ${env:RUST_BACKTRACE} = 1
-adb shell am force-stop rust.hotham_cubeworld
-if (!$?) {
-    Break
-}
+adb shell am force-stop rust.hotham_asteroid
 
 # cargo build
 # if ($?) {
@@ -17,12 +14,12 @@ if (!$?) {
 # else {
 #     Write-Warning "Hotham simulator failed to compile."
 # }
-Set-Location hotham-cubeworld
+Set-Location hotham-asteroid
 cargo apk run
 
 if ($?) {
     Start-Sleep -Seconds 2
-    $processIdStr = (adb shell pidof rust.hotham_cubeworld) | Out-String
+    $processIdStr = (adb shell pidof rust.hotham_asteroid) | Out-String
     Write-Output $processIdStr
     $processId = $processIdStr -as [int]
     Write-Output $processId
