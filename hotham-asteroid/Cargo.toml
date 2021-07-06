@@ -5,7 +5,7 @@ edition = "2018"
 name = "hotham-asteroid"
 version = "0.1.0"
 
-[lib]
+[target.'cfg(target_os = "android")'.lib]
 crate-type = ["lib", "cdylib"]
 
 [dependencies]
