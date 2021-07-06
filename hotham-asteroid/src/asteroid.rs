@@ -1,9 +1,13 @@
-use std::io::Cursor;
+use std::{
+    fs::OpenOptions,
+    io::Cursor,
+    sync::{Arc, Mutex},
+};
 
 use cgmath::{vec2, vec3};
 use hotham::{read_spv_from_bytes, HothamResult as Result, Program, ProgramInitialization, Vertex};
-use image::GenericImageView;
 use itertools::izip;
+use libktx_rs::{sources::StreamSource, RustKtxStream, TextureCreateFlags, TextureSource};
 
 #[derive(Debug, Clone)]
 pub struct Asteroid {
@@ -23,12 +27,12 @@ impl Asteroid {
 }
 
 #[derive(Debug, Clone, Default)]
-struct ModelData {
-    vertices: Vec<Vertex>,
-    indices: Vec<u32>,
-    image_buf: Vec<u8>,
-    image_height: u32,
-    image_width: u32,
+pub struct ModelData {
+    pub vertices: Vec<Vertex>,
+    pub indices: Vec<u32>,
+    pub image_buf: Vec<u8>,
+    pub image_height: u32,
+    pub image_width: u32,
 }
 
 impl Program for Asteroid {
@@ -39,7 +43,7 @@ impl Program for Asteroid {
         let fragment_shader = read_spv_from_bytes(&mut Cursor::new(include_bytes!(
             "shaders/asteroid.frag.spv"
         )))?;
-        self.model_data = load_model();
+        self.model_data = load_model_from_gltf_optimized();
 
         Ok(ProgramInitialization {
             vertices: &self.model_data.vertices,
@@ -57,8 +61,7 @@ impl Program for Asteroid {
     }
 }
 
-fn load_model() -> ModelData {
-    println!("Loading model..");
+pub fn load_model_from_gltf_optimized() -> ModelData {
     let gtlf_buf = Cursor::new(include_bytes!("../assets/asteroid.gltf"));
     let buffers = include_bytes!("../assets/asteroid_data.bin");
     let gltf = gltf::Gltf::from_reader(gtlf_buf).unwrap();
@@ -106,19 +109,15 @@ fn load_model() -> ModelData {
         .map(Vertex::from_zip)
         .collect();
 
-    let mut cursor = Cursor::new(include_bytes!("../assets/asteroid_img2.png"));
-    let mut reader = image::io::Reader::new(&mut cursor);
-    reader.set_format(image::ImageFormat::Png);
-    let img = reader.decode().unwrap();
-    let image_width = img.width();
-    let image_height = img.height();
-    let image_buf = img.into_rgba8().into_raw();
+    let mut images = vec![
+        parse_ktx("C:\\Users\\kanem\\Development\\hotham\\hotham-asteroid\\assets\\asteroid_optimized_img0.ktx2"),
+        parse_ktx("C:\\Users\\kanem\\Development\\hotham\\hotham-asteroid\\assets\\asteroid_optimized_img1.ktx2"),
+        parse_ktx("C:\\Users\\kanem\\Development\\hotham\\hotham-asteroid\\assets\\asteroid_optimized_img2.ktx2"),
+        parse_ktx("C:\\Users\\kanem\\Development\\hotham\\hotham-asteroid\\assets\\asteroid_optimized_img3.ktx2"),
+        parse_ktx("C:\\Users\\kanem\\Development\\hotham\\hotham-asteroid\\assets\\asteroid_optimized_img4.ktx2"),
+    ];
 
-    // let image_buf = Vec::new();
-    // let image_height = 0;
-    // let image_width = 0;
-
-    println!("..done!");
+    let (image_buf, image_height, image_width) = images.remove(2);
 
     ModelData {
         vertices,
@@ -127,6 +126,35 @@ fn load_model() -> ModelData {
         image_height,
         image_width,
     }
+}
+
+pub fn parse_ktx(path: &str) -> (Vec<u8>, u32, u32) {
+    let file = Box::new(
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .unwrap(),
+    );
+    let stream = RustKtxStream::new(file).unwrap();
+    let source = Arc::new(Mutex::new(stream));
+    let texture = StreamSource::new(source, TextureCreateFlags::LOAD_IMAGE_DATA)
+        .create_texture()
+        .unwrap();
+
+    let image_buf = texture.data().to_vec();
+    let (image_height, image_width, _size) = unsafe {
+        let ktx_texture = texture.handle();
+        (
+            (*ktx_texture).baseHeight,
+            (*ktx_texture).baseWidth,
+            (*ktx_texture).dataSize,
+        )
+    };
+
+    // assert_eq!(texture.get_image_size(0).unwrap(), size);
+
+    (image_buf, image_width, image_height)
 }
 
 #[cfg(test)]
@@ -143,7 +171,7 @@ mod tests {
         let elapsed = (tock - tick).as_millis();
         println!("Took {}", elapsed);
         assert_eq!(init.vertices.len(), 618);
-        assert_eq!(init.indices.len(), 1800);
+        assert_eq!(init.indices.len(), 25728);
         assert_eq!(init.image_height, 2048);
         assert_eq!(init.image_width, 2048);
     }

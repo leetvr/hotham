@@ -36,13 +36,29 @@
 			"command": "test",
 			"args": [
 				"-p",
-				"hotham-cubeworld"
+				"hotham-asteroid"
 			],
 			"problemMatcher": [
 				"$rustc"
 			],
 			"group": "test",
+			"env": {
+				"RUST_BACKTRACE": "1"
+			},
 			"label": "rust: cargo test"
+		},
+		{
+			"type": "cargo",
+			"command": "bench",
+			"args": [
+				"-p",
+				"hotham-asteroid"
+			],
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": "test",
+			"label": "rust: cargo bench"
 		}
 	]
 }

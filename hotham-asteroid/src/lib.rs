@@ -1,4 +1,4 @@
-mod asteroid;
+pub mod asteroid;
 
 use asteroid::Asteroid;
 use hotham::{App, HothamResult};
