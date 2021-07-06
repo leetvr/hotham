@@ -2,16 +2,14 @@ use crate::{
     renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program, BLEND_MODE,
     COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
 };
 use openxr as xr;
+
 use std::{
-    ffi::CStr,
-    mem::transmute,
-    ptr::null,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -20,15 +18,25 @@ use std::{
     time::Duration,
 };
 
+#[cfg(target_os = "android")]
+use std::{ffi::CStr, mem::transmute, ptr::null};
+
 use xr::{
-    sys::pfn::InitializeLoaderKHR, vulkan_legacy::SessionCreateInfo, EventDataBuffer, FrameStream,
-    FrameWaiter, Posef, ReferenceSpaceType, Session, SessionState, Swapchain, SwapchainCreateFlags,
+    vulkan_legacy::SessionCreateInfo, EventDataBuffer, FrameStream, FrameWaiter, Posef,
+    ReferenceSpaceType, Session, SessionState, Swapchain, SwapchainCreateFlags,
     SwapchainCreateInfo, SwapchainUsageFlags, VulkanLegacy,
 };
 
+#[cfg(target_os = "android")]
+use xr::sys::pfn::InitializeLoaderKHR;
+
+#[cfg(target_os = "android")]
 pub const ANDROID_LOOPER_ID_MAIN: u32 = 0;
+#[cfg(target_os = "android")]
 pub const ANDROID_LOOPER_ID_INPUT: u32 = 1;
+#[cfg(target_os = "android")]
 pub const ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(0);
+#[cfg(target_os = "android")]
 pub const ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
 
 pub struct App<P: Program> {
@@ -47,6 +55,7 @@ pub struct App<P: Program> {
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<VulkanLegacy>,
+    #[allow(dead_code)]
     resumed: bool,
 }
 
@@ -56,7 +65,7 @@ where
 {
     pub fn new(mut program: P) -> HothamResult<Self> {
         let params = program.init()?;
-        println!("[HOTHAM_APP] Initialised program with {:?}", params);
+        println!("[HOTHAM_APP] Initialised program!");
 
         let (xr_instance, system) = create_xr_instance()?;
         let vulkan_context = create_vulkan_context(&xr_instance, system)?;
@@ -66,7 +75,7 @@ where
             xr_session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&xr_instance, system)?;
         let xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, VIEW_COUNT)?;
-        let _starfield_xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, 1)?;
+        // let _starfield_xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, 1)?;
 
         // Create an action set to encapsulate our actions
         let xr_action_set = xr_instance.create_action_set("input", "input pose information", 0)?;
@@ -133,8 +142,8 @@ where
                 .map_err(anyhow::Error::new)?;
         }
 
-        #[cfg(target_os = "android")]
         while !self.should_quit.load(Ordering::Relaxed) {
+            #[cfg(target_os = "android")]
             self.process_android_events();
 
             let current_state = self.poll_xr_event()?;
@@ -315,12 +324,13 @@ where
     }
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(target_os = "windows")]
 fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
     let vulkan_context = VulkanContext::create_from_xr_instance(xr_instance, system)?;
+    println!("[HOTHAM_VULKAN] - Vulkan Context created successfully");
     Ok(vulkan_context)
 }
 
@@ -391,7 +401,6 @@ fn create_xr_session(
         )
     }
     .unwrap())
-    // .map_err(|e| e.into())
 }
 
 #[cfg(not(target_os = "android"))]
@@ -412,6 +421,7 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
 
 #[cfg(target_os = "android")]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
+    use anyhow::anyhow;
     use openxr::sys::{InstanceCreateInfoAndroidKHR, LoaderInitInfoAndroidKHR};
 
     let xr_entry = xr::Entry::load()?;
@@ -473,44 +483,12 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
         application_activity: context as _,
     };
 
-    // let debug_messenger_create_info = DebugUtilsMessengerCreateInfoEXT {
-    //     ty: DebugUtilsMessengerCreateInfoEXT::TYPE,
-    //     next: null(),
-    //     message_severities: DebugUtilsMessageSeverityFlagsEXT::VERBOSE,
-    //     message_types: DebugUtilsMessageTypeFlagsEXT::VALIDATION
-    //         | DebugUtilsMessageTypeFlagsEXT::GENERAL,
-    //     user_callback: Some(messenger_callback),
-    //     user_data: null_mut(),
-    // };
-
     let instance = xr_entry.create_instance_android(
         &xr_app_info,
         &required_extensions,
         &[],
         &instance_create_info_android,
     )?;
-
-    // unsafe {
-    //     let mut create_debug_messenger = None;
-    //     (xr_entry.fp().get_instance_proc_addr)(
-    //         instance.as_raw(),
-    //         CStr::from_bytes_with_nul_unchecked(b"xrCreateDebugUtilsMessengerEXT\0").as_ptr(),
-    //         &mut create_debug_messenger,
-    //     );
-
-    //     let create_debug_messenger = create_debug_messenger.ok_or(anyhow!(
-    //         "Couldn't get function pointer for create_debug_messenger"
-    //     ))?;
-    //     let create_debug_messenger: CreateDebugUtilsMessengerEXT =
-    //         transmute(create_debug_messenger);
-
-    //     let messenger = null_mut();
-    //     let result =
-    //         create_debug_messenger(instance.as_raw(), &debug_messenger_create_info, messenger);
-    //     if result.into_raw() < 0 {
-    //         return Err(result.into());
-    //     }
-    // }
 
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
     println!(" ..done!");

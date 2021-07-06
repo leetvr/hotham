@@ -11,7 +11,7 @@ use cgmath::{vec3, vec4, Deg, Euler, Matrix4};
 use console::Term;
 use openxr as xr;
 
-use xr::{vulkan, VulkanLegacy};
+use xr::VulkanLegacy;
 
 pub(crate) struct Renderer {
     _swapchain: Swapchain,

@@ -2,8 +2,10 @@ use std::{fs, path::Path, str};
 
 use shaderc::{Compiler, ShaderKind};
 
+#[cfg(target_os = "windows")]
 fn main() {
-    println!("cargo:rerun-if-changed=src/shaders/");
+    println!("cargo:rerun-if-changed=src/shaders/*.frag");
+    println!("cargo:rerun-if-changed=src/shaders/*.vert");
     println!("cargo:rerun-if-changed=wrapper.h");
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for
@@ -21,7 +23,7 @@ fn main() {
         .expect("Unable to generate bindings");
 
     bindings
-        .write_to_file("src/openxr_loader.rs")
+        .write_to_file("src/bindings.rs")
         .expect("Couldn't write bindings!");
 
     let mut compiler = Compiler::new().expect("Unable to instantiate compiler");
