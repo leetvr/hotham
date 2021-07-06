@@ -12,8 +12,16 @@ crate-type = ["lib", "cdylib"]
 cgmath = "0.18"
 gltf = "0.16"
 hotham = {path = "../hotham"}
-image = "0.23"
 itertools = "0.10.0"
+libktx-rs = "0.2"
+
+[dev-dependencies.criterion]
+features = ["html_reports"]
+version = "0.3"
+
+[[bench]]
+harness = false
+name = "model_loading"
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.3.0"

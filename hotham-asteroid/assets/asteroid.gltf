@@ -8,7 +8,8 @@
     {
       "name": "Scene",
       "nodes": [
-        0
+        0,
+        1
       ]
     }
   ],
@@ -16,6 +17,26 @@
     {
       "mesh": 0,
       "name": "Asteroid"
+    },
+    {
+      "mesh": 1,
+      "name": "Refinery",
+      "rotation": [
+        -0.09325116872787476,
+        0.6883626580238342,
+        0.006518156733363867,
+        0.719318151473999
+      ],
+      "scale": [
+        0.10000002384185791,
+        0.10000002384185791,
+        0.10000002384185791
+      ],
+      "translation": [
+        -0.06670808792114258,
+        2.140815496444702,
+        -0.46151405572891235
+      ]
     }
   ],
   "materials": [
@@ -35,11 +56,24 @@
         "metallicFactor": 0.12366615980863571,
         "roughnessFactor": 0.8275533318519592
       }
+    },
+    {
+      "doubleSided": true,
+      "name": "Structure",
+      "normalTexture": {
+        "index": 3
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 4
+        },
+        "roughnessFactor": 0.858578622341156
+      }
     }
   ],
   "meshes": [
     {
-      "name": "Asteroid Mob 01_Asteroid 01_0",
+      "name": "Asteroid",
       "primitives": [
         {
           "attributes": {
@@ -50,6 +84,20 @@
           },
           "indices": 4,
           "material": 0
+        }
+      ]
+    },
+    {
+      "name": "Refinery",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 5,
+            "NORMAL": 6,
+            "TEXCOORD_0": 7
+          },
+          "indices": 8,
+          "material": 1
         }
       ]
     }
@@ -66,6 +114,14 @@
     {
       "sampler": 0,
       "source": 2
+    },
+    {
+      "sampler": 0,
+      "source": 3
+    },
+    {
+      "sampler": 0,
+      "source": 4
     }
   ],
   "images": [
@@ -80,6 +136,14 @@
     {
       "name": "Asteroid_01_baseColor",
       "uri": "asteroid_img2.png"
+    },
+    {
+      "name": "Structure_v1_NM",
+      "uri": "asteroid_img3.png"
+    },
+    {
+      "name": "Structure_v1_blue",
+      "uri": "asteroid_img4.png"
     }
   ],
   "accessors": [
@@ -88,12 +152,12 @@
       "componentType": 5126,
       "count": 618,
       "max": [
-        2.023674964904785,
+        3.2066287994384766,
         1.9481924772262573,
         2.020200729370117
       ],
       "min": [
-        -1.8874317407608032,
+        -2.990743398666382,
         -1.928831696510315,
         -1.976090431213379
       ],
@@ -123,6 +187,40 @@
       "componentType": 5123,
       "count": 1800,
       "type": "SCALAR"
+    },
+    {
+      "bufferView": 5,
+      "componentType": 5126,
+      "count": 12514,
+      "max": [
+        2.680603265762329,
+        2.8176109790802,
+        4.457511901855469
+      ],
+      "min": [
+        -2.680603265762329,
+        -2.8176109790802,
+        -4.457512378692627
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 6,
+      "componentType": 5126,
+      "count": 12514,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 7,
+      "componentType": 5126,
+      "count": 12514,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 8,
+      "componentType": 5123,
+      "count": 23928,
+      "type": "SCALAR"
     }
   ],
   "bufferViews": [
@@ -150,6 +248,26 @@
       "buffer": 0,
       "byteLength": 3600,
       "byteOffset": 24720
+    },
+    {
+      "buffer": 0,
+      "byteLength": 150168,
+      "byteOffset": 28320
+    },
+    {
+      "buffer": 0,
+      "byteLength": 150168,
+      "byteOffset": 178488
+    },
+    {
+      "buffer": 0,
+      "byteLength": 100112,
+      "byteOffset": 328656
+    },
+    {
+      "buffer": 0,
+      "byteLength": 47856,
+      "byteOffset": 428768
     }
   ],
   "samplers": [
@@ -161,7 +279,7 @@
   "buffers": [
     {
       "uri": "asteroid_data.bin",
-      "byteLength": 28320
+      "byteLength": 476624
     }
   ]
 }

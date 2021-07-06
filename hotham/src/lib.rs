@@ -15,16 +15,16 @@ mod hotham_error;
 mod image;
 mod renderer;
 mod swapchain;
+mod texture;
 mod uniform_buffer_object;
 mod util;
 mod vertex;
 mod vulkan_context;
-mod texture;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
-pub const TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB;
+pub const TEXTURE_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 pub const VIEW_COUNT: u32 = 2;
 pub const SWAPCHAIN_LENGTH: usize = 3;
 pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIMARY_STEREO;
@@ -47,12 +47,4 @@ pub struct ProgramInitialization<'a> {
 
 pub fn read_spv_from_bytes<R: std::io::Read + Seek>(bytes: &mut R) -> std::io::Result<Vec<u32>> {
     ash::util::read_spv(bytes)
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
 }
