@@ -1,6 +1,6 @@
 use crate::{
-    hotham_error::HothamError, image::Image, util::parse_raw_strings, COLOR_FORMAT, DEPTH_FORMAT,
-    SWAPCHAIN_LENGTH, TEXTURE_FORMAT,
+    hotham_error::HothamError, image::Image, COLOR_FORMAT, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
+    TEXTURE_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -9,14 +9,19 @@ use ash::{
     Device, Entry, Instance as AshInstance,
 };
 use openxr as xr;
-use std::{ffi::CString, fmt::Debug, intrinsics::transmute, os::raw::c_char};
-use std::{mem::size_of, ptr::copy};
-use xr::SystemId;
+use std::{fmt::Debug, intrinsics::transmute, mem::size_of, ptr::copy};
+
+#[cfg(target_os = "windows")]
+type XrVulkan = xr::Vulkan;
+
+#[cfg(target_os = "android")]
+type XrVulkan = xr::VulkanLegacy;
 
 #[derive(Clone)]
 pub(crate) struct VulkanContext {
     pub entry: Entry,
     pub instance: AshInstance,
+
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub command_pool: vk::CommandPool,
@@ -45,7 +50,7 @@ impl VulkanContext {
         println!("[HOTHAM_VULKAN] Creating VulkanContext..");
         let vk_target_version_xr = xr::Version::new(1, 2, 0);
 
-        let requirements = xr_instance.graphics_requirements::<xr::VulkanLegacy>(system)?;
+        let requirements = xr_instance.graphics_requirements::<XrVulkan>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
             || vk_target_version_xr.major() > requirements.max_api_version_supported.major()
         {
@@ -169,6 +174,7 @@ impl VulkanContext {
         })
     }
 
+    #[cfg(target_os = "android")]
     pub fn create_from_xr_instance_legacy(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
@@ -651,7 +657,10 @@ impl Debug for VulkanContext {
     }
 }
 
+#[cfg(taget_os = "android")]
 fn vulkan_init_legacy(instance: &xr::Instance, system: SystemId) -> Result<(AshInstance, Entry)> {
+    use util::parse_raw_strings;
+
     println!("[HOTHAM_VULKAN] Initialising Vulkan..");
     let app_name = CString::new("Hotham Cubeworld")?;
     let entry = unsafe { Entry::new()? };
@@ -684,6 +693,7 @@ fn vulkan_init_legacy(instance: &xr::Instance, system: SystemId) -> Result<(AshI
     Ok((instance, entry))
 }
 
+#[cfg(target_os = "android")]
 pub fn create_vulkan_device_legacy(
     xr_instance: &xr::Instance,
     system: SystemId,
@@ -752,6 +762,7 @@ pub fn create_vulkan_device_legacy(
     Ok((device, graphics_queue, graphics_family_index))
 }
 
+#[cfg(target_os = "android")]
 fn get_layer_names(entry: &Entry) -> Result<Vec<*const c_char>> {
     Ok(entry
         .enumerate_instance_layer_properties()?

@@ -18,7 +18,11 @@ use std::{
     thread::JoinHandle,
 };
 
-use crate::{space_state::SpaceState, HothamInputEvent, NUM_VIEWS};
+use crate::{
+    simulator::{HothamInputEvent, NUM_VIEWS},
+    space_state::SpaceState,
+};
+// use crate::simulator::spa
 pub struct State {
     pub vulkan_entry: Option<AshEntry>,
     pub vulkan_instance: Option<AshInstance>,
