@@ -137,10 +137,19 @@ impl Debug for State {
 impl State {
     pub unsafe fn destroy(&mut self) {
         println!("[HOTHAM_SIMULATOR] Destroy called..");
-        let device = self.device.take().unwrap();
-        device.device_wait_idle().unwrap();
-        let instance = self.vulkan_instance.take().unwrap();
-        let entry = self.vulkan_entry.take().unwrap();
+        if let Some(device) = self.device.take() {
+            let instance = self.vulkan_instance.take().unwrap();
+            let entry = self.vulkan_entry.take().unwrap();
+            device.device_wait_idle().unwrap();
+            self.close_window.store(true, Relaxed);
+            self.window_thread_handle.take().unwrap().join().unwrap();
+
+            let swapchain_ext = khr::Swapchain::new(&instance, &device);
+            swapchain_ext.destroy_swapchain(self.internal_swapchain, None);
+
+            let surface_ext = khr::Surface::new(&entry, &instance);
+            surface_ext.destroy_surface(self.surface, None);
+        }
         // device.queue_wait_idle(self.present_queue).unwrap();
         // for image in self.multiview_images.drain(..) {
         //     device.destroy_image(image, None)
@@ -175,14 +184,6 @@ impl State {
         // for framebuffer in self.framebuffers.drain(..) {
         //     device.destroy_framebuffer(framebuffer, None)
         // }
-        self.close_window.store(true, Relaxed);
-        self.window_thread_handle.take().unwrap().join().unwrap();
-
-        let swapchain_ext = khr::Swapchain::new(&instance, &device);
-        swapchain_ext.destroy_swapchain(self.internal_swapchain, None);
-
-        let surface_ext = khr::Surface::new(&entry, &instance);
-        surface_ext.destroy_surface(self.surface, None);
 
         // device.destroy_device(None);
         // instance.destroy_instance(None);

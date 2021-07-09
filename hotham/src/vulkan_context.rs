@@ -1,9 +1,10 @@
 use crate::{
-    hotham_error::HothamError, image::Image, COLOR_FORMAT, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
-    TEXTURE_FORMAT,
+    hotham_error::HothamError, image::Image, texture::Texture, UniformBufferObject, COLOR_FORMAT,
+    DEPTH_FORMAT, SWAPCHAIN_LENGTH, TEXTURE_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
+    prelude::VkResult,
     version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk::{self, Handle},
     Device, Entry, Instance as AshInstance,
@@ -42,6 +43,58 @@ impl Drop for VulkanContext {
 }
 
 impl VulkanContext {
+    #[cfg(test)]
+    pub fn testing() -> Result<Self> {
+        let (instance, entry) = vulkan_init_test()?;
+        let physical_device = get_test_physical_device(&instance);
+        let extension_names = Vec::new();
+        let (device, graphics_queue, queue_family_index) =
+            create_vulkan_device(&extension_names, &instance, physical_device)?;
+
+        let command_pool = unsafe {
+            device.create_command_pool(
+                &vk::CommandPoolCreateInfo::builder()
+                    .queue_family_index(queue_family_index)
+                    .flags(
+                        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
+                            | vk::CommandPoolCreateFlags::TRANSIENT,
+                    ),
+                None,
+            )
+        }?;
+
+        let descriptor_pool = unsafe {
+            device.create_descriptor_pool(
+                &vk::DescriptorPoolCreateInfo::builder()
+                    .pool_sizes(&[
+                        vk::DescriptorPoolSize {
+                            ty: vk::DescriptorType::UNIFORM_BUFFER,
+                            descriptor_count: SWAPCHAIN_LENGTH as _,
+                            ..Default::default()
+                        },
+                        vk::DescriptorPoolSize {
+                            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                            descriptor_count: SWAPCHAIN_LENGTH as _,
+                            ..Default::default()
+                        },
+                    ])
+                    .max_sets(SWAPCHAIN_LENGTH as _),
+                None,
+            )
+        }?;
+
+        Ok(Self {
+            entry,
+            instance,
+            physical_device,
+            device,
+            graphics_queue,
+            queue_family_index,
+            command_pool,
+            descriptor_pool,
+        })
+    }
+
     #[cfg(not(target_os = "android"))]
     pub fn create_from_xr_instance(
         xr_instance: &xr::Instance,
@@ -181,7 +234,7 @@ impl VulkanContext {
     ) -> Result<Self> {
         let vk_target_version_xr = xr::Version::new(1, 2, 0);
 
-        let requirements = xr_instance.graphics_requirements::<xr::VulkanLegacy>(system)?;
+        let requirements = xr_instance.graphics_requirements::<XrVulkan>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
             || vk_target_version_xr.major() > requirements.max_api_version_supported.major()
         {
@@ -610,6 +663,61 @@ impl VulkanContext {
 
         self.end_single_time_commands(command_buffer);
     }
+
+    pub fn create_descriptor_sets(
+        &self,
+        set_layouts: &[vk::DescriptorSetLayout],
+        ubo_buffer: vk::Buffer,
+        base_color_texture: &Texture,
+        normal_texture: &Texture,
+    ) -> VkResult<Vec<vk::DescriptorSet>> {
+        println!("[HOTHAM_VULKAN] Allocating descriptor sets..");
+        let descriptor_sets = unsafe {
+            self.device.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::builder()
+                    .set_layouts(set_layouts)
+                    .descriptor_pool(self.descriptor_pool),
+            )
+        }?;
+        println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
+
+        let buffer_info = vk::DescriptorBufferInfo::builder()
+            .buffer(ubo_buffer)
+            .offset(0)
+            .range(size_of::<UniformBufferObject>() as _)
+            .build();
+
+        let ubo = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_sets[0])
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .buffer_info(&[buffer_info])
+            .build();
+
+        let base_color = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_sets[0])
+            .dst_binding(1)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&[base_color_texture.descriptor])
+            .build();
+
+        let normal = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_sets[0])
+            .dst_binding(2)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .image_info(&[normal_texture.descriptor])
+            .build();
+
+        unsafe {
+            self.device
+                .update_descriptor_sets(&[ubo, base_color, normal], &[])
+        };
+
+        Ok(descriptor_sets)
+    }
 }
 
 fn get_image_info(format: vk::Format) -> (vk::ImageViewType, u32) {
@@ -657,17 +765,19 @@ impl Debug for VulkanContext {
     }
 }
 
-#[cfg(taget_os = "android")]
-fn vulkan_init_legacy(instance: &xr::Instance, system: SystemId) -> Result<(AshInstance, Entry)> {
-    use util::parse_raw_strings;
+#[cfg(target_os = "android")]
+fn vulkan_init_legacy(
+    instance: &xr::Instance,
+    system: xr::SystemId,
+) -> Result<(AshInstance, Entry)> {
+    use crate::util::get_raw_strings;
+    use std::ffi::CString;
 
     println!("[HOTHAM_VULKAN] Initialising Vulkan..");
-    let app_name = CString::new("Hotham Cubeworld")?;
+    let app_name = CString::new("Hotham Asteroid")?;
     let entry = unsafe { Entry::new()? };
-    let layer_names = get_layer_names(&entry)?;
-    println!("[HOTHAM_VULKAN] Trying to use layers: {:?}", unsafe {
-        parse_raw_strings(&layer_names)
-    });
+    let layers = vec!["VK_LAYER_KHRONOS_validation\0"];
+    let layer_names = unsafe { get_raw_strings(layers) };
 
     let extension_names = unsafe { instance.get_vulkan_legacy_instance_extensions(system) }?;
     println!("[HOTHAM_VULKAN] Trying to use extensions: {:?}", {
@@ -693,19 +803,64 @@ fn vulkan_init_legacy(instance: &xr::Instance, system: SystemId) -> Result<(AshI
     Ok((instance, entry))
 }
 
+#[cfg(test)]
+fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
+    use std::ffi::CString;
+
+    use crate::util::{get_raw_strings, parse_raw_strings};
+
+    println!("[HOTHAM_VULKAN] Initialising Vulkan..");
+    let app_name = CString::new("Hotham Asteroid")?;
+    let entry = unsafe { Entry::new()? };
+    let layers = vec!["VK_LAYER_KHRONOS_validation\0"];
+    let layer_names = unsafe { get_raw_strings(layers) };
+    println!("[HOTHAM_VULKAN] Trying to use layers: {:?}", unsafe {
+        parse_raw_strings(&layer_names)
+    });
+    let mut extensions = Vec::new();
+    extensions.push(vk::ExtDebugUtilsFn::name().to_owned());
+
+    let extension_names = extensions.iter().map(|e| e.as_ptr()).collect::<Vec<_>>();
+
+    let app_info = vk::ApplicationInfo::builder()
+        .application_name(&app_name)
+        .api_version(vk::make_version(1, 2, 0));
+    let create_info = vk::InstanceCreateInfo::builder()
+        .application_info(&app_info)
+        .enabled_extension_names(&extension_names)
+        .enabled_layer_names(&layer_names);
+
+    let instance = unsafe { entry.create_instance(&create_info, None) }?;
+
+    println!("[HOTHAM_VULKAN] ..done");
+
+    Ok((instance, entry))
+}
+
 #[cfg(target_os = "android")]
 pub fn create_vulkan_device_legacy(
     xr_instance: &xr::Instance,
-    system: SystemId,
+    system: xr::SystemId,
     vulkan_instance: &AshInstance,
     physical_device: vk::PhysicalDevice,
 ) -> Result<(Device, vk::Queue, u32)> {
+    use std::ffi::CString;
+
     println!("[HOTHAM_VULKAN] Creating logical device.. ");
     let mut extension_names = unsafe { xr_instance.get_vulkan_legacy_device_extensions(system) }?;
     unsafe {
         extension_names.push(CString::from_vec_unchecked(b"VK_KHR_multiview".to_vec()));
     }
 
+    create_vulkan_device(&extension_names, vulkan_instance, physical_device)
+}
+
+#[cfg(any(target_os = "android", test))]
+fn create_vulkan_device(
+    extension_names: &Vec<std::ffi::CString>,
+    vulkan_instance: &AshInstance,
+    physical_device: vk::PhysicalDevice,
+) -> Result<(Device, vk::Queue, u32)> {
     println!(
         "[HOTHAM_VULKAN] Using device extensions: {:?}",
         extension_names
@@ -762,15 +917,6 @@ pub fn create_vulkan_device_legacy(
     Ok((device, graphics_queue, graphics_family_index))
 }
 
-#[cfg(target_os = "android")]
-fn get_layer_names(entry: &Entry) -> Result<Vec<*const c_char>> {
-    Ok(entry
-        .enumerate_instance_layer_properties()?
-        .iter()
-        .map(|l| l.layer_name.as_ptr())
-        .collect::<Vec<_>>())
-}
-
 fn get_stage(
     old_layout: vk::ImageLayout,
     new_layout: vk::ImageLayout,
@@ -801,4 +947,13 @@ fn get_stage(
     }
 
     panic!("Invalid layout transition!");
+}
+
+#[cfg(test)]
+pub fn get_test_physical_device(instance: &AshInstance) -> vk::PhysicalDevice {
+    unsafe {
+        println!("[HOTHAM_VULKAN] Getting physical device..");
+        let devices = instance.enumerate_physical_devices().unwrap();
+        devices[0]
+    }
 }

@@ -1,6 +1,6 @@
 use crate::{
-    renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program, BLEND_MODE,
-    COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
+    model::SceneObject, renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program,
+    BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
 use anyhow::Result;
 use ash::{
@@ -40,7 +40,7 @@ pub const ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(0
 pub const ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
 
 pub struct App<P: Program> {
-    program: P,
+    _program: P,
     should_quit: Arc<AtomicBool>,
     renderer: Renderer,
     xr_instance: openxr::Instance,
@@ -55,6 +55,7 @@ pub struct App<P: Program> {
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<VulkanLegacy>,
+    scene_objects: Vec<SceneObject>,
     #[allow(dead_code)]
     resumed: bool,
 }
@@ -63,10 +64,7 @@ impl<P> App<P>
 where
     P: Program,
 {
-    pub fn new(mut program: P) -> HothamResult<Self> {
-        let params = program.init()?;
-        println!("[HOTHAM_APP] Initialised program!");
-
+    pub fn new(mut _program: P) -> HothamResult<Self> {
         let (xr_instance, system) = create_xr_instance()?;
         let vulkan_context = create_vulkan_context(&xr_instance, system)?;
         let (xr_session, frame_waiter, frame_stream) =
@@ -111,11 +109,23 @@ where
         // Attach the action set to the session
         xr_session.attach_action_sets(&[&xr_action_set])?;
 
-        let renderer = Renderer::new(vulkan_context, &xr_swapchain, swapchain_resolution, &params)?;
-        // renderer.
+        let renderer = Renderer::new(vulkan_context, &xr_swapchain, swapchain_resolution)?;
+        println!("[HOTHAM_INIT] Loading models..");
+        let models = renderer.load_models(_program.get_model_data())?;
+        println!(
+            "[HOTHAM_INIT] done! Loaded {} models. Getting scene objects..",
+            models.len()
+        );
+        let scene_objects = _program.init(models)?;
+        println!(
+            "[HOTHAM_INIT] done! Loaded {} scene objects.",
+            scene_objects.len()
+        );
+
+        println!("[HOTHAM_INIT] INIT COMPLETE!");
 
         Ok(Self {
-            program,
+            _program,
             renderer,
             should_quit: Arc::new(AtomicBool::from(false)),
             xr_instance,
@@ -131,6 +141,7 @@ where
             frame_stream,
             frame_waiter,
             resumed: true,
+            scene_objects,
         })
     }
 
@@ -157,12 +168,6 @@ where
                 break;
             }
 
-            // Tell the program to update its geometry
-            let (vertices, indices) = self.program.update();
-
-            // Push the updated geometry back into Vulkan
-            self.renderer.update(vertices, indices);
-
             self.xr_session.sync_actions(&[])?;
 
             // Wait for a frame to become available from the runtime
@@ -175,8 +180,9 @@ where
             )?;
 
             if frame_state.should_render {
-                self.renderer.update_uniform_buffer(&views, 10.0)?;
-                self.renderer.draw(swapchain_image_index)?;
+                self.renderer.update_uniform_buffer(&views)?;
+                self.renderer
+                    .draw(swapchain_image_index, &self.scene_objects)?;
             }
 
             // Release the image back to OpenXR
@@ -404,16 +410,17 @@ fn create_xr_session(
 }
 
 #[cfg(not(target_os = "android"))]
-fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
+pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = xr::Entry::load()?;
     let xr_app_info = openxr::ApplicationInfo {
-        application_name: "Hotham Cubeworld",
+        application_name: "Hotham Asteroid",
         application_version: 1,
         engine_name: "Hotham",
         engine_version: 1,
     };
     let mut required_extensions = xr::ExtensionSet::default();
     required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
+    required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
     let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
     Ok((instance, system))
@@ -466,7 +473,7 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     println!("[HOTHAM_ANDROID] Available layers: {:?}", layers);
 
     let xr_app_info = openxr::ApplicationInfo {
-        application_name: "Hotham Cubeworld",
+        application_name: "Hotham Asteroid",
         application_version: 1,
         engine_name: "Hotham",
         engine_version: 1,

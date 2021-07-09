@@ -1,36 +1,26 @@
 [package]
 authors = ["Kane Rogers <kane.m.rogers@gmail.com>"]
-build = "build.rs"
 edition = "2018"
 name = "hotham-asteroid"
 version = "0.1.0"
 
-[target.'cfg(target_os = "android")'.lib]
+[lib]
 crate-type = ["lib", "cdylib"]
+
+[[bin]]
+name = "hotham-asteroid"
+path = "src/main.rs"
 
 [dependencies]
 cgmath = "0.18"
-gltf = "0.16"
 hotham = {path = "../hotham"}
-itertools = "0.10.0"
-libktx-rs = "0.2"
-
-[dev-dependencies.criterion]
-features = ["html_reports"]
-version = "0.3"
-
-[[bench]]
-harness = false
-name = "model_loading"
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.3.0"
 
-[build-dependencies]
-shaderc = "0.7"
-
 [package.metadata.android]
 apk_label = "Hotham Asteroid"
+assets = "assets"
 fullscreen = true
 libs = [
   "lib/libopenxr_loader.so",

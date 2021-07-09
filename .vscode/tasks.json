@@ -16,13 +16,22 @@
 		{
 			"type": "shell",
 			"windows": {
-				"command": ".\\test.ps1"
+				"command": ".\\run_on_simulator.ps1"
+			},
+			"group": "test",
+			"label": "Run Asteroid on Simulator",
+			"problemMatcher": []
+		},
+		{
+			"type": "shell",
+			"windows": {
+				"command": ".\\run_on_device.ps1"
 			},
 			"group": {
 				"kind": "test",
 				"isDefault": true
 			},
-			"label": "Run Cubeworld on Oculus Quest",
+			"label": "Run Asteroid on Headset",
 			"problemMatcher": []
 		},
 		{
@@ -36,15 +45,12 @@
 			"command": "test",
 			"args": [
 				"-p",
-				"hotham-asteroid"
+				"hotham"
 			],
 			"problemMatcher": [
 				"$rustc"
 			],
 			"group": "test",
-			"env": {
-				"RUST_BACKTRACE": "1"
-			},
 			"label": "rust: cargo test"
 		},
 		{

@@ -87,18 +87,26 @@ pub unsafe extern "C" fn enumerate_instance_extension_properties(
     properties: *mut XrExtensionProperties,
 ) -> XrResult {
     if propertyCapacityInput == 0 {
-        *propertyCountOutput = 1;
+        *propertyCountOutput = 2;
         return Result::SUCCESS.into_raw();
     }
 
     let extension = "XR_KHR_vulkan_enable2";
     let name = str_to_fixed_bytes(extension);
-    let extensions = std::ptr::slice_from_raw_parts_mut(properties, 1);
+    let extensions = std::ptr::slice_from_raw_parts_mut(properties, 2);
     (*extensions)[0] = openxr_loader::XrExtensionProperties {
         type_: StructureType::EXTENSION_PROPERTIES.into_raw(),
         next: ptr::null_mut(),
         extensionName: name,
         extensionVersion: 2,
+    };
+    let extension = "XR_KHR_vulkan_enable";
+    let name = str_to_fixed_bytes(extension);
+    (*extensions)[1] = openxr_loader::XrExtensionProperties {
+        type_: StructureType::EXTENSION_PROPERTIES.into_raw(),
+        next: ptr::null_mut(),
+        extensionName: name,
+        extensionVersion: 1,
     };
     Result::SUCCESS.into_raw()
 }
@@ -1490,10 +1498,10 @@ pub unsafe extern "system" fn locate_views(
             next: null_mut(),
             pose,
             fov: Fovf {
-                angle_down: -0.8,
-                angle_up: 0.8,
-                angle_left: -0.55,
-                angle_right: 0.55,
+                angle_down: -0.785398,
+                angle_up: 0.785398,
+                angle_left: -0.785398,
+                angle_right: 0.785398,
             },
         };
     }

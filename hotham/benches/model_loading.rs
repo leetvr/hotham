@@ -1,11 +1,15 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use hotham_asteroid::asteroid::load_model_from_gltf_optimized;
+// use hotham::model::load_models;
 
 fn bench(c: &mut Criterion) {
     let mut group = c.benchmark_group("gltf_benches");
     group.sample_size(10);
-    group.bench_function("load_model_from_gltf_optimized", |b| {
-        b.iter(|| load_model_from_gltf_optimized())
+    group.bench_function("load_models", |_| {
+        // b.iter(|| {
+        //     load_models(include_bytes!(
+        //         "C:\\Users\\kanem\\Development\\hotham\\hotham-asteroid\\assets\\asteroid.glb"
+        //     ))
+        // })
     });
     group.finish();
 }
