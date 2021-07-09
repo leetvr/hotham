@@ -1,8 +1,12 @@
 [package]
 authors = ["Kane Rogers <kane.m.rogers@gmail.com>"]
+build = "build.rs"
 edition = "2018"
 name = "hotham"
 version = "0.1.0"
+
+[build-dependencies]
+shaderc = "0.7"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,6 +16,9 @@ ash = "0.32"
 cgmath = {version = "0.18", features = ["mint"]}
 console = "0.14"
 ctrlc = {version = "3", features = ["termination"]}
+gltf = "0.16"
+itertools = "0.10.0"
+libktx-rs = "0.2"
 memoffset = "0.5.1"
 mint = "0.5.6"
 openxr = {features = ["loaded", "mint"], path = "../../openxrs/openxr"}
@@ -23,3 +30,11 @@ winit = "0.24"
 jni = "0.18.0"
 ndk = "0.3.0"
 ndk-glue = "0.3"
+
+[dev-dependencies.criterion]
+features = ["html_reports"]
+version = "0.3"
+
+[[bench]]
+harness = false
+name = "model_loading"

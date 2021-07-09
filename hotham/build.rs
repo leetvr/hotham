@@ -3,9 +3,9 @@ use std::fs;
 use shaderc::{Compiler, ShaderKind};
 
 fn main() {
-    println!("cargo:rerun-if-changed=src/shaders");
+    println!("cargo:rerun-if-changed=./shaders");
 
-    for path in fs::read_dir("./src/shaders").unwrap() {
+    for path in fs::read_dir("./shaders").unwrap() {
         let path = path.unwrap().path();
         let ext = path.extension().unwrap();
         let mut compiler = shaderc::Compiler::new().unwrap();

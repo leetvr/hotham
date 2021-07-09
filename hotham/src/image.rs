@@ -12,7 +12,7 @@ pub(crate) struct Image {
 }
 
 impl Image {
-    pub(crate) fn new(
+    pub fn new(
         handle: vk::Image,
         view: vk::ImageView,
         device_memory: vk::DeviceMemory,
@@ -26,7 +26,7 @@ impl Image {
         }
     }
 
-    pub fn destroy(&self, vulkan_context: &VulkanContext) {
+    pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) {
         let device = &vulkan_context.device;
         unsafe {
             device.free_memory(self.device_memory, None);

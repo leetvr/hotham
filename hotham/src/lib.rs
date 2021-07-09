@@ -1,6 +1,7 @@
 use ash::vk;
+use model::{Model, SceneObject};
 use openxr as xr;
-use std::io::Seek;
+use std::{collections::HashMap, io::Seek};
 
 pub use app::App;
 pub use hotham_error::HothamError;
@@ -13,6 +14,7 @@ mod camera;
 mod frame;
 mod hotham_error;
 mod image;
+pub mod model;
 mod renderer;
 mod swapchain;
 mod texture;
@@ -24,14 +26,20 @@ mod vulkan_context;
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
-pub const TEXTURE_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 pub const VIEW_COUNT: u32 = 2;
 pub const SWAPCHAIN_LENGTH: usize = 3;
 pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIMARY_STEREO;
 pub const BLEND_MODE: xr::EnvironmentBlendMode = xr::EnvironmentBlendMode::OPAQUE;
+
+#[cfg(target_os = "windows")]
+pub const TEXTURE_FORMAT: vk::Format = vk::Format::BC7_SRGB_BLOCK;
+
+#[cfg(target_os = "android")]
+pub const TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
+
 pub trait Program {
-    fn update(&mut self) -> (&Vec<Vertex>, &Vec<u32>);
-    fn init(&mut self) -> HothamResult<ProgramInitialization>;
+    fn get_model_data(&self) -> (&[u8], &[u8]);
+    fn init(&mut self, models: HashMap<String, Model>) -> HothamResult<Vec<SceneObject>>;
 }
 
 #[derive(Debug, Clone)]

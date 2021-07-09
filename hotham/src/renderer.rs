@@ -1,13 +1,18 @@
-use std::{ffi::CStr, mem::size_of, time::Instant, u64};
+use std::{collections::HashMap, ffi::CStr, io::Cursor, mem::size_of, time::Instant, u64};
 
 use crate::{
-    buffer::Buffer, camera::Camera, frame::Frame, image::Image, swapchain::Swapchain,
-    texture::Texture, vulkan_context::VulkanContext, ProgramInitialization, UniformBufferObject,
-    Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    buffer::Buffer,
+    camera::Camera,
+    frame::Frame,
+    image::Image,
+    model::{load_models, Model, SceneObject},
+    swapchain::Swapchain,
+    vulkan_context::VulkanContext,
+    UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{vec3, vec4, Deg, Euler, Matrix4};
+use cgmath::{vec4, Deg, Euler, Matrix4};
 use console::Term;
 use openxr as xr;
 
@@ -23,10 +28,7 @@ pub(crate) struct Renderer {
     render_pass: vk::RenderPass,
     depth_image: Image,
     render_area: vk::Rect2D,
-    vertex_buffer: Buffer<Vertex>,
-    index_buffer: Buffer<u32>,
     uniform_buffer: Buffer<UniformBufferObject>,
-    descriptor_sets: Vec<vk::DescriptorSet>,
     render_start_time: Instant,
     cameras: Vec<Camera>,
     term: Term,
@@ -46,9 +48,7 @@ impl Drop for Renderer {
                 .device
                 .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
             self.depth_image.destroy(&self.vulkan_context);
-            self.vertex_buffer.destroy(&self.vulkan_context);
             self.uniform_buffer.destroy(&self.vulkan_context);
-            self.index_buffer.destroy(&self.vulkan_context); // possible to get child resources to drop on their own??
             for frame in self.frames.drain(..) {
                 frame.destroy(&self.vulkan_context);
             }
@@ -70,9 +70,8 @@ impl Renderer {
         vulkan_context: VulkanContext,
         xr_swapchain: &xr::Swapchain<VulkanLegacy>,
         swapchain_resolution: vk::Extent2D,
-        params: &ProgramInitialization,
     ) -> Result<Self> {
-        println!("[HOTHAM_INIT] Creating renderer..");
+        println!("[HOTHAM_RENDERER] Creating renderer..");
 
         // Build swapchain
         let swapchain = Swapchain::new(xr_swapchain, swapchain_resolution)?;
@@ -86,41 +85,14 @@ impl Renderer {
         // Pipeline, render pass
         let render_pass = create_render_pass(&vulkan_context)?;
         let pipeline_layout = create_pipeline_layout(&vulkan_context, &[descriptor_set_layout])?;
-        let pipeline = create_pipeline(
-            &vulkan_context,
-            pipeline_layout,
-            params,
-            &render_area,
-            render_pass,
-        )?;
+        let pipeline =
+            create_pipeline(&vulkan_context, pipeline_layout, &render_area, render_pass)?;
 
         // Depth image, shared between frames
         let depth_image = vulkan_context.create_image(DEPTH_FORMAT, &swapchain.resolution)?;
 
         // Create all the per-frame resources we need
         let frames = create_frames(&vulkan_context, &render_pass, &swapchain, &depth_image)?;
-
-        // Create buffers
-        let vertex_buffer = Buffer::new_from_vec(
-            &vulkan_context,
-            &params.vertices,
-            vk::BufferUsageFlags::VERTEX_BUFFER,
-        )?;
-        let index_buffer = Buffer::new_from_vec(
-            &vulkan_context,
-            &params.indices,
-            vk::BufferUsageFlags::INDEX_BUFFER,
-        )?;
-
-        // Create texture images
-        println!("[HOTHAM_RENDERER] Creating texture ..");
-        let texture = Texture::new(
-            &vulkan_context,
-            &params.image_buf,
-            params.image_width,
-            params.image_height,
-        )?;
-        println!("[HOTHAM_RENDERER] Done! {:?}", texture);
 
         println!("[HOTHAM_RENDERER] Creating UBO..");
         let view_matrix = UniformBufferObject::default();
@@ -131,16 +103,7 @@ impl Renderer {
         )?;
         println!("[HOTHAM_RENDERER] ..done! {:?}", uniform_buffer);
 
-        println!("[HOTHAM_RENDERER] Creating descriptor sets..");
-        let descriptor_sets = create_descriptor_sets(
-            &vulkan_context,
-            &[descriptor_set_layout],
-            uniform_buffer.handle,
-            &texture,
-        )?;
-        println!("[HOTHAM_RENDERER] ..done! {:?}", descriptor_sets);
-
-        println!("[HOTHAM_INIT] Done! Renderer initialised!");
+        println!("[HOTHAM_RENDERER] Done! Renderer initialised!");
 
         Ok(Self {
             _swapchain: swapchain,
@@ -153,10 +116,7 @@ impl Renderer {
             frame_index: 0,
             depth_image,
             render_area,
-            vertex_buffer,
-            index_buffer,
             uniform_buffer,
-            descriptor_sets,
             render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
             term: Term::buffered_stdout(),
@@ -164,7 +124,7 @@ impl Renderer {
         })
     }
 
-    pub fn draw(&mut self, frame_index: usize) -> Result<()> {
+    pub fn draw(&mut self, frame_index: usize, scene_objects: &Vec<SceneObject>) -> Result<()> {
         self.frame_index += 1;
 
         self.show_debug_info()?;
@@ -172,7 +132,7 @@ impl Renderer {
         let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
 
-        self.prepare_frame(frame)?;
+        self.prepare_frame(frame, scene_objects)?;
 
         let command_buffer = frame.command_buffer;
         let submit_info = vk::SubmitInfo::builder()
@@ -190,19 +150,11 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn update_uniform_buffer(&mut self, views: &Vec<xr::View>, _rotation: f32) -> Result<()> {
+    pub fn update_uniform_buffer(&mut self, views: &Vec<xr::View>) -> Result<()> {
         self.views = views.clone();
-
         let delta_time = Instant::now()
             .duration_since(self.render_start_time)
             .as_secs_f32();
-
-        let scale = Matrix4::from_scale(0.1);
-        let rotation_y = Matrix4::from_angle_y(Deg(10.0));
-        let position = vec3(0.0, 1.0, 0.0);
-
-        let translate = Matrix4::from_translation(position);
-        let model = translate * rotation_y * scale;
 
         // View (camera)
         let view_matrices = &self
@@ -223,10 +175,10 @@ impl Renderer {
             get_projection(views[1].fov, near, far),
         ];
 
-        let light_pos = vec4(2.0, -2.0, -2.0, 1.0);
+        // let light_pos = vec4(2.0, 20.0 + delta_time, 10.0, 0.0);
+        let light_pos = vec4(0.0, 2.0, 2.0, 1.0);
 
         let uniform_buffer = UniformBufferObject {
-            model,
             view,
             projection,
             delta_time,
@@ -239,7 +191,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn prepare_frame(&self, frame: &Frame) -> Result<()> {
+    pub fn prepare_frame(&self, frame: &Frame, scene_objects: &Vec<SceneObject>) -> Result<()> {
         let device = &self.vulkan_context.device;
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
@@ -278,39 +230,40 @@ impl Renderer {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline,
             );
-            device.cmd_bind_descriptor_sets(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout,
-                0,
-                &self.descriptor_sets,
-                &[],
-            );
-            device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.handle], &[0]);
-            device.cmd_bind_index_buffer(
-                command_buffer,
-                self.index_buffer.handle,
-                0,
-                vk::IndexType::UINT32,
-            );
-            device.cmd_draw_indexed(
-                command_buffer,
-                self.index_buffer.item_count as _,
-                1,
-                0,
-                0,
-                1,
-            );
+
+            for scene_object in scene_objects.iter() {
+                let model = &scene_object.model;
+                let transform_constant = to_push_constant(&scene_object.transform);
+                device.cmd_bind_descriptor_sets(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline_layout,
+                    0,
+                    &model.descriptor_sets,
+                    &[],
+                );
+                device.cmd_bind_vertex_buffers(command_buffer, 0, &[model.vertex_buffer], &[0]);
+                device.cmd_bind_index_buffer(
+                    command_buffer,
+                    model.index_buffer,
+                    0,
+                    vk::IndexType::UINT32,
+                );
+                device.cmd_push_constants(
+                    command_buffer,
+                    self.pipeline_layout,
+                    vk::ShaderStageFlags::VERTEX,
+                    0,
+                    transform_constant,
+                );
+                device.cmd_draw_indexed(command_buffer, model.num_indices, 1, 0, 0, 1);
+            }
+
             device.cmd_end_render_pass(command_buffer);
             device.end_command_buffer(command_buffer)?;
         };
 
         Ok(())
-    }
-
-    pub fn update(&self, _vertices: &Vec<Vertex>, _indices: &Vec<u32>) -> () {
-        // println!("[HOTHAM_TEST] Vertices are now: {:?}", vertices);
-        // println!("[HOTHAM_TEST] Indices are now: {:?}", indices);
     }
 
     fn show_debug_info(&self) -> Result<()> {
@@ -366,6 +319,20 @@ impl Renderer {
 
         Ok(())
     }
+
+    pub(crate) fn load_models(&self, model_data: (&[u8], &[u8])) -> Result<HashMap<String, Model>> {
+        load_models(
+            model_data.0,
+            model_data.1,
+            &self.vulkan_context,
+            &[self.descriptor_set_layout],
+            self.uniform_buffer.handle,
+        )
+    }
+}
+
+fn to_push_constant<T: Sized>(p: &T) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(std::mem::transmute(p), size_of::<T>()) }
 }
 
 fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
@@ -403,24 +370,31 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     );
 }
 
-fn create_descriptor_set_layout(
+pub(crate) fn create_descriptor_set_layout(
     vulkan_context: &VulkanContext,
 ) -> VkResult<vk::DescriptorSetLayout> {
-    let vertex_binding = vk::DescriptorSetLayoutBinding::builder()
+    let vertex = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .build();
 
-    let sampler_binding = vk::DescriptorSetLayoutBinding::builder()
+    let base_color = vk::DescriptorSetLayoutBinding::builder()
         .binding(1)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .build();
 
-    let bindings = [vertex_binding, sampler_binding];
+    let normal = vk::DescriptorSetLayoutBinding::builder()
+        .binding(2)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
+        .build();
+
+    let bindings = [vertex, base_color, normal];
     let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
     unsafe {
@@ -537,7 +511,6 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
 fn create_pipeline(
     vulkan_context: &VulkanContext,
     pipeline_layout: vk::PipelineLayout,
-    params: &ProgramInitialization,
     render_area: &vk::Rect2D,
     render_pass: vk::RenderPass,
 ) -> Result<vk::Pipeline> {
@@ -546,14 +519,14 @@ fn create_pipeline(
 
     // Vertex shader stage
     let (vertex_shader, vertex_stage) = create_shader(
-        &params.vertex_shader,
+        include_bytes!("../shaders/model.vert.spv"),
         vk::ShaderStageFlags::VERTEX,
         vulkan_context,
     )?;
 
     // Fragment shader stage
     let (fragment_shader, fragment_stage) = create_shader(
-        &params.fragment_shader,
+        include_bytes!("../shaders/model.frag.spv"),
         vk::ShaderStageFlags::FRAGMENT,
         vulkan_context,
     )?;
@@ -679,12 +652,14 @@ fn create_pipeline(
 }
 
 fn create_shader(
-    shader_code: &Vec<u32>,
+    shader_code: &[u8],
     stage: vk::ShaderStageFlags,
     vulkan_context: &VulkanContext,
 ) -> Result<(vk::ShaderModule, vk::PipelineShaderStageCreateInfo)> {
+    let mut cursor = Cursor::new(shader_code);
+    let shader_code = ash::util::read_spv(&mut cursor)?;
     let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
-    let create_info = vk::ShaderModuleCreateInfo::builder().code(shader_code);
+    let create_info = vk::ShaderModuleCreateInfo::builder().code(&shader_code);
     let shader_module = unsafe {
         vulkan_context
             .device
@@ -703,58 +678,18 @@ fn create_pipeline_layout(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout> {
-    unsafe {
-        vulkan_context.device.create_pipeline_layout(
-            &vk::PipelineLayoutCreateInfo::builder().set_layouts(set_layouts),
-            None,
-        )
-    }
-    .map_err(|e| e.into())
-}
-
-fn create_descriptor_sets(
-    vulkan_context: &VulkanContext,
-    set_layouts: &[vk::DescriptorSetLayout],
-    buffer_handle: vk::Buffer,
-    texture: &Texture,
-) -> VkResult<Vec<vk::DescriptorSet>> {
-    println!("[HOTHAM_RENDERER] Allocating descriptor sets..");
-    let descriptor_sets = unsafe {
-        vulkan_context.device.allocate_descriptor_sets(
-            &vk::DescriptorSetAllocateInfo::builder()
-                .set_layouts(set_layouts)
-                .descriptor_pool(vulkan_context.descriptor_pool),
-        )
-    }?;
-    println!("[HOTHAM_RENDERER] ..done! {:?}", descriptor_sets);
-
-    let buffer_info = vk::DescriptorBufferInfo::builder()
-        .buffer(buffer_handle)
-        .offset(0)
-        .range(size_of::<UniformBufferObject>() as _)
-        .build();
-
-    let ubo_descriptor_write = vk::WriteDescriptorSet::builder()
-        .dst_set(descriptor_sets[0])
-        .dst_binding(0)
-        .dst_array_element(0)
-        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .buffer_info(&[buffer_info])
-        .build();
-
-    let sampler_descriptor_write = vk::WriteDescriptorSet::builder()
-        .dst_set(descriptor_sets[0])
-        .dst_binding(1)
-        .dst_array_element(0)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .image_info(&[texture.descriptor])
-        .build();
-
+    let push_constant_ranges = [vk::PushConstantRange {
+        stage_flags: vk::ShaderStageFlags::VERTEX,
+        offset: 0,
+        size: size_of::<Matrix4<f32>>() as _,
+    }];
+    let create_info = &vk::PipelineLayoutCreateInfo::builder()
+        .set_layouts(set_layouts)
+        .push_constant_ranges(&push_constant_ranges);
     unsafe {
         vulkan_context
             .device
-            .update_descriptor_sets(&[ubo_descriptor_write, sampler_descriptor_write], &[])
-    };
-
-    Ok(descriptor_sets)
+            .create_pipeline_layout(&create_info, None)
+    }
+    .map_err(|e| e.into())
 }

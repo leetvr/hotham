@@ -7,6 +7,7 @@ pub mod space_state;
 #[cfg(target_os = "windows")]
 pub mod state;
 
+#[cfg(target_os = "windows")]
 use crate::openxr_loader::{
     PFN_xrEnumerateInstanceExtensionProperties, PFN_xrGetInstanceProcAddr, PFN_xrVoidFunction,
     XrInstance_T, XrResult,
@@ -17,6 +18,7 @@ use crate::simulator::*;
 #[cfg(target_os = "windows")]
 use openxr_sys::{pfn, Result};
 
+#[cfg(target_os = "windows")]
 type DummyFn = unsafe extern "system" fn() -> Result;
 
 #[no_mangle]
@@ -135,7 +137,6 @@ pub unsafe extern "C" fn get_instance_proc_addr(
         *function = transmute::<pfn::EndSession, _>(end_session);
     } else {
         let _name = String::from_utf8_unchecked(name.to_vec());
-        // eprintln!("[HOTHAM_SIMULATOR] {} is unimplemented", name);
         unsafe extern "system" fn bang() -> Result {
             panic!("BAD BADB ADB ADB BAD");
         }
@@ -145,10 +146,12 @@ pub unsafe extern "C" fn get_instance_proc_addr(
     Result::SUCCESS.into_raw()
 }
 
+#[cfg(target_os = "windows")]
 static GET_INSTANCE_PROC_ADDR: PFN_xrGetInstanceProcAddr = Some(get_instance_proc_addr);
 
 #[allow(non_snake_case)]
 #[no_mangle]
+#[cfg(target_os = "windows")]
 pub unsafe extern "system" fn xrNegotiateLoaderRuntimeInterface(
     _loader_info: *const openxr_loader::XrNegotiateLoaderInfo,
     runtime_request: *mut openxr_loader::XrNegotiateRuntimeRequest,
