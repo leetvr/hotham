@@ -27,10 +27,7 @@
 			"windows": {
 				"command": ".\\run_on_device.ps1"
 			},
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			},
+			"group": "test",
 			"label": "Run Asteroid on Headset",
 			"problemMatcher": []
 		},
@@ -50,7 +47,10 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"group": "test",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
 			"label": "rust: cargo test"
 		},
 		{
