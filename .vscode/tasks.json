@@ -47,10 +47,7 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			},
+			"group": "test",
 			"label": "rust: cargo test"
 		},
 		{
@@ -65,6 +62,18 @@
 			],
 			"group": "test",
 			"label": "rust: cargo bench"
+		},
+		{
+			"type": "cargo",
+			"command": "test",
+			"problemMatcher": [
+				"$rustc"
+			],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"label": "rust: cargo test"
 		}
 	]
 }

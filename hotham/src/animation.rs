@@ -120,8 +120,8 @@ mod tests {
         assert_eq!(animations.len(), 1);
         let mut animation = animations.pop().unwrap();
         let delta_time = 0.5;
-        let mut nodes = Vec::new();
-        animation.update(delta_time, &mut nodes);
+        let mut nodes = todo!();
+        // animation.update(delta_time, &mut nodes);
 
         // Load test animation from glTF
         // Get interpolated value
