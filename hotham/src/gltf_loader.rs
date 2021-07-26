@@ -1,7 +1,11 @@
 use crate::{node::Node, vulkan_context::VulkanContext};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ash::vk;
-use std::{collections::HashMap, io::Cursor};
+use std::{
+    collections::HashMap,
+    io::Cursor,
+    rc::{Rc, Weak},
+};
 
 pub(crate) fn load_gltf_nodes(
     gltf_bytes: &[u8],
@@ -9,7 +13,7 @@ pub(crate) fn load_gltf_nodes(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
     ubo_buffer: vk::Buffer,
-) -> Result<HashMap<String, Node>> {
+) -> Result<HashMap<String, Rc<Node>>> {
     let gtlf_buf = Cursor::new(gltf_bytes);
     let gltf = gltf::Gltf::from_reader(gtlf_buf)?;
     let document = gltf.document;
@@ -19,7 +23,14 @@ pub(crate) fn load_gltf_nodes(
     let root_scene = document.scenes().next().unwrap(); // safe as there is always one scene
 
     for node_data in root_scene.nodes() {
-        let (name, node) = Node::load(&node_data, blob, vulkan_context, set_layouts, ubo_buffer)?;
+        let (name, node) = Node::load(
+            &node_data,
+            blob,
+            vulkan_context,
+            set_layouts,
+            ubo_buffer,
+            Weak::new(),
+        )?;
         nodes.insert(name, node);
     }
 
@@ -52,8 +63,11 @@ mod tests {
         let nodes = load_gltf_nodes(&gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
         assert!(nodes.len() == 1);
         let hand = nodes.get("Hand").unwrap();
-        let palm = hand.children.get(0).unwrap();
-        assert!(palm.borrow().children.len() == 5);
-        assert_eq!(palm.borrow().parent.upgrade().unwrap().index, hand.index);
+        println!("Hand: {:?}", hand);
+        assert!(hand.children.borrow().len() == 1);
+        let children = hand.children.borrow();
+        let palm = children.get(0).unwrap();
+        assert!(palm.children.borrow().len() == 5);
+        assert_eq!(palm.parent.upgrade().unwrap().index, hand.index);
     }
 }
