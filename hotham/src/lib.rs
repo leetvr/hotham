@@ -1,7 +1,7 @@
 use crate::node::Node;
 use ash::vk;
 use openxr as xr;
-use std::{collections::HashMap, io::Seek, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, io::Seek, rc::Rc};
 
 pub use app::App;
 pub use hotham_error::HothamError;
@@ -19,6 +19,7 @@ mod image;
 pub mod mesh;
 pub mod node;
 mod renderer;
+mod skin;
 mod swapchain;
 mod texture;
 mod uniform_buffer_object;
@@ -42,7 +43,7 @@ pub const TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
 
 pub trait Program {
     fn get_gltf_data(&self) -> (&[u8], &[u8]);
-    fn init(&mut self, nodes: HashMap<String, Rc<Node>>) -> HothamResult<Vec<Node>>;
+    fn init(&mut self, nodes: HashMap<String, Rc<RefCell<Node>>>) -> HothamResult<Vec<Node>>;
 }
 
 #[derive(Debug, Clone)]

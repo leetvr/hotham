@@ -2,6 +2,7 @@ use crate::{node::Node, vulkan_context::VulkanContext};
 use anyhow::Result;
 use ash::vk;
 use std::{
+    cell::RefCell,
     collections::HashMap,
     io::Cursor,
     rc::{Rc, Weak},
@@ -13,7 +14,7 @@ pub(crate) fn load_gltf_nodes(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
     ubo_buffer: vk::Buffer,
-) -> Result<HashMap<String, Rc<Node>>> {
+) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
     let gtlf_buf = Cursor::new(gltf_bytes);
     let gltf = gltf::Gltf::from_reader(gtlf_buf)?;
     let document = gltf.document;
@@ -62,12 +63,18 @@ mod tests {
         let buffer = vk::Buffer::null();
         let nodes = load_gltf_nodes(&gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
         assert!(nodes.len() == 1);
+
         let hand = nodes.get("Hand").unwrap();
-        println!("Hand: {:?}", hand);
-        assert!(hand.children.borrow().len() == 1);
-        let children = hand.children.borrow();
-        let palm = children.get(0).unwrap();
-        assert!(palm.children.borrow().len() == 5);
-        assert_eq!(palm.parent.upgrade().unwrap().index, hand.index);
+
+        let children = &hand.borrow().children;
+        assert!(children.len() == 2);
+
+        let palm = children.get(1).unwrap();
+        assert!(palm.borrow().children.len() == 5);
+        assert!(Rc::ptr_eq(&palm.borrow().parent.upgrade().unwrap(), hand));
+
+        let hand_base = children.get(0).unwrap().borrow();
+        assert!(Rc::ptr_eq(&hand_base.parent.upgrade().unwrap(), hand));
+        assert!(hand_base.skin.is_some());
     }
 }

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, ffi::CStr, io::Cursor, mem::size_of, rc::Rc, time::Instant, u64};
+use std::{
+    cell::RefCell, collections::HashMap, ffi::CStr, io::Cursor, mem::size_of, rc::Rc,
+    time::Instant, u64,
+};
 
 use crate::{
     buffer::Buffer, camera::Camera, frame::Frame, gltf_loader::load_gltf_nodes, image::Image,
@@ -318,7 +321,7 @@ impl Renderer {
     pub(crate) fn load_gltf_nodes(
         &self,
         gltf_data: (&[u8], &[u8]),
-    ) -> Result<HashMap<String, Rc<Node>>> {
+    ) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
         load_gltf_nodes(
             gltf_data.0,
             gltf_data.1,
