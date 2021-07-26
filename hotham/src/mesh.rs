@@ -3,11 +3,9 @@ use ash::vk;
 use libktx_rs::{sources::StreamSource, RustKtxStream, TextureCreateFlags, TextureSource};
 
 use crate::{buffer::Buffer, texture::Texture, vulkan_context::VulkanContext, Vertex};
-use cgmath::{vec2, vec3, vec4, Matrix4, Quaternion};
+use cgmath::{vec2, vec3, vec4};
 use itertools::izip;
 use std::{
-    collections::HashMap,
-    io::Cursor,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
