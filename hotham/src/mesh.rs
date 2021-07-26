@@ -32,6 +32,9 @@ impl Mesh {
         let mut tex_coords = Vec::new();
         let mut normals = Vec::new();
         let mut tangents = Vec::new();
+        let mut joint_indices = Vec::new();
+        let mut joint_weights = Vec::new();
+
         let mut normal_texture = None;
         let mut base_color_texture = None;
 
@@ -70,6 +73,18 @@ impl Mesh {
                 .ok_or(anyhow!("Mesh {} has no tangents!"))?
             {
                 tangents.push(vec4(t[0], t[1], t[2], t[3]));
+            }
+
+            if let Some(iter) = reader.read_joints(0) {
+                for t in iter.into_u16() {
+                    joint_indices.push(vec4(t[0] as f32, t[1] as f32, t[2] as f32, t[3] as f32));
+                }
+            }
+
+            if let Some(iter) = reader.read_weights(0) {
+                for t in iter.into_u16() {
+                    joint_weights.push(vec4(t[0] as f32, t[1] as f32, t[2] as f32, t[3] as f32));
+                }
             }
 
             let material = primitive.material();
@@ -117,10 +132,29 @@ impl Mesh {
             return Err(anyhow!("No normal texture found for {}", name));
         }
 
-        let vertices: Vec<Vertex> = izip!(positions, tex_coords, normals, tangents)
-            .into_iter()
-            .map(Vertex::from_zip)
-            .collect();
+        if joint_indices.is_empty() {
+            for _ in 0..positions.len() {
+                joint_indices.push(vec4(0.0, 0.0, 0.0, 0.0));
+            }
+        }
+
+        if joint_weights.is_empty() {
+            for _ in 0..positions.len() {
+                joint_weights.push(vec4(0.0, 0.0, 0.0, 0.0));
+            }
+        }
+
+        let vertices: Vec<Vertex> = izip!(
+            positions,
+            tex_coords,
+            normals,
+            tangents,
+            joint_indices,
+            joint_weights
+        )
+        .into_iter()
+        .map(Vertex::from_zip)
+        .collect();
 
         println!("[HOTHAM_MODEL] {} parsed! Creating vertex buffers..", name);
         // Create buffers

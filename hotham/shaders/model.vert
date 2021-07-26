@@ -17,6 +17,8 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTextureCoordinates;
 layout(location = 2) in vec3 inNormal;
 layout(location = 3) in vec4 inTangent;
+layout(location = 4) in vec4 inJointIndices;
+layout(location = 5) in vec4 inJointWeights;
 
 layout(location = 0) out vec2 outTextureCoordinates;
 layout(location = 1) out vec3 outNormal;
