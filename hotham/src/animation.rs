@@ -1,6 +1,5 @@
-use anyhow::{anyhow, Result};
-use cgmath::{vec3, Quaternion, Vector3, Vector4};
-use gltf::{animation::util::ReadOutputs, Animation as GltfAnimation, Document};
+use cgmath::{vec3, Quaternion, Vector3};
+use gltf::{animation::util::ReadOutputs, Document};
 
 use crate::node::Node;
 
@@ -120,7 +119,7 @@ mod tests {
         assert_eq!(animations.len(), 1);
         let mut animation = animations.pop().unwrap();
         let delta_time = 0.5;
-        let mut nodes = todo!();
+        // let mut nodes = todo!();
         // animation.update(delta_time, &mut nodes);
 
         // Load test animation from glTF

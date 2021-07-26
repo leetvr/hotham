@@ -2,8 +2,8 @@ use std::{collections::HashMap, ffi::CStr, io::Cursor, mem::size_of, time::Insta
 
 use crate::{
     buffer::Buffer, camera::Camera, frame::Frame, gltf_loader::load_gltf_nodes, image::Image,
-    mesh::Mesh, node::Node, swapchain::Swapchain, vulkan_context::VulkanContext,
-    UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    node::Node, swapchain::Swapchain, vulkan_context::VulkanContext, UniformBufferObject, Vertex,
+    COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};

@@ -1,5 +1,5 @@
 use ash::vk;
-use cgmath::{vec2, vec3, vec4, Matrix4};
+use cgmath::Matrix4;
 
 #[derive(Debug, Clone)]
 pub struct Mesh {

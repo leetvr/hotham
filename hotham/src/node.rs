@@ -14,7 +14,7 @@ pub struct Node {
     pub translation: Vector3<f32>,
     pub scale: Vector3<f32>,
     pub rotation: Quaternion<f32>,
-    pub skin_index: usize,
+    pub skin_index: Option<usize>,
     pub matrix: Matrix4<f32>,
     pub mesh: Option<Mesh>,
 }

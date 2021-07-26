@@ -6,7 +6,7 @@ use std::{
 };
 
 use ash::vk;
-use cgmath::{vec2, vec3, vec4, Matrix4};
+use cgmath::{vec2, vec3, vec4, Matrix4, Quaternion};
 use itertools::izip;
 use libktx_rs::{sources::StreamSource, RustKtxStream, TextureCreateFlags, TextureSource};
 
@@ -39,6 +39,7 @@ pub(crate) fn load_gltf_nodes(
         let mut normal_texture = None;
         let mut base_color_texture = None;
 
+        // TODO: Push mesh loading into mesh struct
         if let Some(mesh) = node_data.mesh() {
             for primitive in mesh.primitives() {
                 let reader = primitive
@@ -163,7 +164,21 @@ pub(crate) fn load_gltf_nodes(
             transform,
         };
 
-        // nodes.insert(name.to_string(), mesh);
+        let transform = node_data.transform();
+        let (translation, rotation, scale) = transform.clone().decomposed();
+
+        let node = Node {
+            parent: None,
+            children: Default::default(),
+            translation: vec3(translation[0], translation[1], translation[2]),
+            scale: vec3(scale[0], scale[1], scale[2]),
+            rotation: Quaternion::new(rotation[0], rotation[1], rotation[2], rotation[3]),
+            skin_index: node_data.skin().map(|s| s.index()),
+            matrix: Matrix4::from(transform.matrix()),
+            mesh: Some(mesh),
+        };
+
+        nodes.insert(name.to_string(), node);
     }
 
     Ok(nodes)
@@ -233,17 +248,28 @@ mod tests {
     use super::*;
     use crate::{renderer::create_descriptor_set_layout, vulkan_context::VulkanContext};
     #[test]
-    pub fn test_load_models() {
+    pub fn test_asteroid() {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let gltf = include_bytes!(
-            "C:\\Users\\kanem\\Development\\hotham\\hotham-asteroid\\assets\\asteroid.gltf"
-        );
-        let data = include_bytes!(
-            "C:\\Users\\kanem\\Development\\hotham\\hotham-asteroid\\assets\\asteroid_data.bin"
-        );
+        let gltf = include_bytes!("../../hotham-asteroid/assets/asteroid.gltf");
+        let data = include_bytes!("../../hotham-asteroid/assets/asteroid_data.bin");
         let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
         let buffer = vk::Buffer::null();
-        let models = load_gltf_nodes(gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
-        assert!(models.len() != 0);
+        let nodes = load_gltf_nodes(gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
+        assert!(nodes.len() != 0);
+    }
+
+    #[test]
+    pub fn test_hand() {
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
+        let gltf = document.into_json().to_vec().unwrap();
+        let data = &buffers[0];
+        let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
+        let buffer = vk::Buffer::null();
+        let nodes = load_gltf_nodes(&gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
+        assert!(nodes.len() == 1);
+        assert!(nodes.get("hand").is_some());
+        let hand = nodes.get("hand").unwrap();
+        assert!(hand.children.len() > 1);
     }
 }

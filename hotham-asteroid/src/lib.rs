@@ -1,7 +1,5 @@
 pub mod asteroid;
 
-use std::{thread, time::Duration};
-
 use asteroid::Asteroid;
 use hotham::{App, HothamResult};
 
