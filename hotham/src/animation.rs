@@ -85,7 +85,7 @@ impl Animation {
         }
     }
 
-    pub fn update(delta_time: f32, nodes: &mut Vec<Node>) {}
+    pub fn update(delta_time: f32, root_node: &mut Node) {}
 }
 
 #[derive(Debug, Clone, PartialEq)]
