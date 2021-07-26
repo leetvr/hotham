@@ -1,5 +1,5 @@
 use crate::{
-    model::SceneObject, renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program,
+    node::Node, renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program,
     BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
 use anyhow::Result;
@@ -55,7 +55,7 @@ pub struct App<P: Program> {
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<VulkanLegacy>,
-    scene_objects: Vec<SceneObject>,
+    nodes: Vec<Node>,
     #[allow(dead_code)]
     resumed: bool,
 }
@@ -64,7 +64,7 @@ impl<P> App<P>
 where
     P: Program,
 {
-    pub fn new(mut _program: P) -> HothamResult<Self> {
+    pub fn new(mut program: P) -> HothamResult<Self> {
         let (xr_instance, system) = create_xr_instance()?;
         let vulkan_context = create_vulkan_context(&xr_instance, system)?;
         let (xr_session, frame_waiter, frame_stream) =
@@ -111,21 +111,18 @@ where
 
         let renderer = Renderer::new(vulkan_context, &xr_swapchain, swapchain_resolution)?;
         println!("[HOTHAM_INIT] Loading models..");
-        let models = renderer.load_models(_program.get_model_data())?;
+        let nodes = renderer.load_gltf_nodes(program.get_gltf_data())?;
         println!(
             "[HOTHAM_INIT] done! Loaded {} models. Getting scene objects..",
-            models.len()
+            nodes.len()
         );
-        let scene_objects = _program.init(models)?;
-        println!(
-            "[HOTHAM_INIT] done! Loaded {} scene objects.",
-            scene_objects.len()
-        );
+        let nodes = program.init(nodes)?;
+        println!("[HOTHAM_INIT] done! Loaded {} scene objects.", nodes.len());
 
         println!("[HOTHAM_INIT] INIT COMPLETE!");
 
         Ok(Self {
-            _program,
+            _program: program,
             renderer,
             should_quit: Arc::new(AtomicBool::from(false)),
             xr_instance,
@@ -141,7 +138,7 @@ where
             frame_stream,
             frame_waiter,
             resumed: true,
-            scene_objects,
+            nodes,
         })
     }
 
@@ -181,8 +178,7 @@ where
 
             if frame_state.should_render {
                 self.renderer.update_uniform_buffer(&views)?;
-                self.renderer
-                    .draw(swapchain_image_index, &self.scene_objects)?;
+                self.renderer.draw(swapchain_image_index, &self.nodes)?;
             }
 
             // Release the image back to OpenXR

@@ -1,13 +1,8 @@
 use std::{collections::HashMap, ffi::CStr, io::Cursor, mem::size_of, time::Instant, u64};
 
 use crate::{
-    buffer::Buffer,
-    camera::Camera,
-    frame::Frame,
-    image::Image,
-    model::{load_models, Model, SceneObject},
-    swapchain::Swapchain,
-    vulkan_context::VulkanContext,
+    buffer::Buffer, camera::Camera, frame::Frame, gltf_loader::load_gltf_nodes, image::Image,
+    mesh::Mesh, node::Node, swapchain::Swapchain, vulkan_context::VulkanContext,
     UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
@@ -124,7 +119,7 @@ impl Renderer {
         })
     }
 
-    pub fn draw(&mut self, frame_index: usize, scene_objects: &Vec<SceneObject>) -> Result<()> {
+    pub fn draw(&mut self, frame_index: usize, nodes: &Vec<Node>) -> Result<()> {
         self.frame_index += 1;
 
         self.show_debug_info()?;
@@ -132,7 +127,7 @@ impl Renderer {
         let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
 
-        self.prepare_frame(frame, scene_objects)?;
+        self.prepare_frame(frame, nodes)?;
 
         let command_buffer = frame.command_buffer;
         let submit_info = vk::SubmitInfo::builder()
@@ -191,7 +186,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn prepare_frame(&self, frame: &Frame, scene_objects: &Vec<SceneObject>) -> Result<()> {
+    pub fn prepare_frame(&self, frame: &Frame, nodes: &Vec<Node>) -> Result<()> {
         let device = &self.vulkan_context.device;
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
@@ -231,21 +226,21 @@ impl Renderer {
                 self.pipeline,
             );
 
-            for scene_object in scene_objects.iter() {
-                let model = &scene_object.model;
-                let transform_constant = to_push_constant(&scene_object.transform);
+            for node in nodes.iter().filter(|n| n.mesh.is_some()) {
+                let mesh = node.mesh.as_ref().unwrap();
+                let transform_constant = to_push_constant(&node.matrix);
                 device.cmd_bind_descriptor_sets(
                     command_buffer,
                     vk::PipelineBindPoint::GRAPHICS,
                     self.pipeline_layout,
                     0,
-                    &model.descriptor_sets,
+                    &mesh.descriptor_sets,
                     &[],
                 );
-                device.cmd_bind_vertex_buffers(command_buffer, 0, &[model.vertex_buffer], &[0]);
+                device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer], &[0]);
                 device.cmd_bind_index_buffer(
                     command_buffer,
-                    model.index_buffer,
+                    mesh.index_buffer,
                     0,
                     vk::IndexType::UINT32,
                 );
@@ -256,7 +251,7 @@ impl Renderer {
                     0,
                     transform_constant,
                 );
-                device.cmd_draw_indexed(command_buffer, model.num_indices, 1, 0, 0, 1);
+                device.cmd_draw_indexed(command_buffer, mesh.num_indices, 1, 0, 0, 1);
             }
 
             device.cmd_end_render_pass(command_buffer);
@@ -320,10 +315,13 @@ impl Renderer {
         Ok(())
     }
 
-    pub(crate) fn load_models(&self, model_data: (&[u8], &[u8])) -> Result<HashMap<String, Model>> {
-        load_models(
-            model_data.0,
-            model_data.1,
+    pub(crate) fn load_gltf_nodes(
+        &self,
+        gltf_data: (&[u8], &[u8]),
+    ) -> Result<HashMap<String, Node>> {
+        load_gltf_nodes(
+            gltf_data.0,
+            gltf_data.1,
             &self.vulkan_context,
             &[self.descriptor_set_layout],
             self.uniform_buffer.handle,

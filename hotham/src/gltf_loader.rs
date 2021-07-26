@@ -10,46 +10,27 @@ use cgmath::{vec2, vec3, vec4, Matrix4};
 use itertools::izip;
 use libktx_rs::{sources::StreamSource, RustKtxStream, TextureCreateFlags, TextureSource};
 
-use crate::{buffer::Buffer, texture::Texture, vulkan_context::VulkanContext, Vertex};
+use crate::{
+    buffer::Buffer, mesh::Mesh, node::Node, texture::Texture, vulkan_context::VulkanContext, Vertex,
+};
 use anyhow::{anyhow, Result};
 
-#[derive(Debug, Clone)]
-pub struct Model {
-    pub descriptor_sets: Vec<vk::DescriptorSet>,
-    pub index_buffer: vk::Buffer,
-    pub vertex_buffer: vk::Buffer,
-    pub num_indices: u32,
-    pub transform: Matrix4<f32>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SceneObject {
-    pub model: Model,
-    pub transform: Matrix4<f32>,
-}
-
-impl SceneObject {
-    pub fn new(model: Model, transform: Matrix4<f32>) -> Self {
-        Self { model, transform }
-    }
-}
-
-pub(crate) fn load_models(
+pub(crate) fn load_gltf_nodes(
     gltf_bytes: &[u8],
     data_bytes: &[u8],
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
     ubo_buffer: vk::Buffer,
-) -> Result<HashMap<String, Model>> {
+) -> Result<HashMap<String, Node>> {
     let gtlf_buf = Cursor::new(gltf_bytes);
     let gltf = gltf::Gltf::from_reader(gtlf_buf)?;
     let document = gltf.document;
     let blob = data_bytes;
 
-    let mut models = HashMap::new();
+    let mut nodes = HashMap::new();
 
-    for node in document.nodes() {
-        let name = node.name().unwrap();
+    for node_data in document.nodes() {
+        let name = node_data.name().unwrap();
         let mut indices = Vec::new();
         let mut positions = Vec::new();
         let mut tex_coords = Vec::new();
@@ -58,7 +39,7 @@ pub(crate) fn load_models(
         let mut normal_texture = None;
         let mut base_color_texture = None;
 
-        if let Some(mesh) = node.mesh() {
+        if let Some(mesh) = node_data.mesh() {
             for primitive in mesh.primitives() {
                 let reader = primitive
                     .reader(|buffer| Some(&blob[buffer.index()..buffer.index() + buffer.length()]));
@@ -172,9 +153,9 @@ pub(crate) fn load_models(
         )?;
         println!("[HOTHAM_MODEL] ..done!");
 
-        let transform = Matrix4::from(node.transform().matrix());
+        let transform = Matrix4::from(node_data.transform().matrix());
 
-        let model = Model {
+        let mesh = Mesh {
             vertex_buffer: vertex_buffer.handle,
             index_buffer: index_buffer.handle,
             descriptor_sets,
@@ -182,10 +163,10 @@ pub(crate) fn load_models(
             transform,
         };
 
-        models.insert(name.to_string(), model);
+        // nodes.insert(name.to_string(), mesh);
     }
 
-    Ok(models)
+    Ok(nodes)
 }
 
 pub fn parse_ktx(path: &PathBuf) -> Result<(Vec<u8>, u32, u32)> {
@@ -262,7 +243,7 @@ mod tests {
         );
         let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
         let buffer = vk::Buffer::null();
-        let models = load_models(gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
+        let models = load_gltf_nodes(gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
         assert!(models.len() != 0);
     }
 }
