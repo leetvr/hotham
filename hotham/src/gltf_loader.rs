@@ -75,6 +75,8 @@ mod tests {
 
         let hand_base = children.get(0).unwrap().borrow();
         assert!(Rc::ptr_eq(&hand_base.parent.upgrade().unwrap(), hand));
-        assert!(hand_base.skin.is_some());
+
+        let skin = hand_base.skin.as_ref().unwrap();
+        assert_eq!(skin.inverse_bind_matrices.len(), 16);
     }
 }

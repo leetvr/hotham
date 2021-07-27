@@ -7,7 +7,7 @@ use cgmath::{vec3, Matrix4, Quaternion, Vector3};
 
 use crate::skin::Skin;
 use crate::{mesh::Mesh, vulkan_context::VulkanContext};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ash::vk;
 
 #[derive(Debug, Clone)]
@@ -33,6 +33,8 @@ impl Node {
         parent: Weak<RefCell<Node>>,
     ) -> Result<(String, Rc<RefCell<Node>>)> {
         let name = node_data.name().unwrap().to_string();
+        println!("Loading node {} - {}", node_data.index(), name);
+
         let mesh = node_data
             .mesh()
             .map(|m| {
@@ -41,6 +43,7 @@ impl Node {
                     .ok()
             })
             .flatten();
+
         let transform = node_data.transform();
         let (translation, rotation, scale) = transform.clone().decomposed();
 
@@ -57,11 +60,6 @@ impl Node {
         };
 
         let node = Rc::new(RefCell::new(node));
-
-        if let Some(s) = node_data.skin() {
-            let skin = Skin::load(&s, blob, vulkan_context, set_layouts, node.clone())?;
-            node.borrow_mut().skin.replace(skin);
-        }
 
         node_data
             .children()
@@ -81,6 +79,67 @@ impl Node {
             })
             .collect::<Result<_>>()?;
 
+        // If our children need skins, create them.
+        for child in node_data.children() {
+            if let Some(skin_data) = child.skin() {
+                let index = child.index();
+                println!(
+                    "{} - {} needs a skin, loading..",
+                    index,
+                    child.name().unwrap()
+                );
+                let child_node = node
+                    .borrow()
+                    .find(index)
+                    .ok_or_else(|| anyhow!("Child not found"))?;
+                Skin::load(&skin_data, blob, vulkan_context, set_layouts, child_node)?;
+            }
+        }
         Ok((name, node))
+    }
+
+    pub fn find(&self, index: usize) -> Option<Rc<RefCell<Node>>> {
+        // Go up to the top of the tree
+        if let Some(parent) = self.parent.upgrade() {
+            // Check that this isn't the node we're after.
+            if parent.borrow().index == index {
+                return Some(parent);
+            }
+
+            println!(
+                "Going to {}'s parent - {}",
+                self.index,
+                parent.borrow().index
+            );
+            return parent.borrow().find(index);
+        }
+
+        // We are at the top of the tree.
+        self.find_node_in_child(index)
+    }
+
+    pub fn find_node_in_child(&self, index: usize) -> Option<Rc<RefCell<Node>>> {
+        println!("Searching {}", self.index);
+        if self.children.is_empty() {
+            println!("{} has no children", self.index);
+            return None;
+        }
+
+        let mut node = None;
+
+        for child in &self.children {
+            println!("Searching child {}", child.borrow().index);
+            if child.borrow().index == index {
+                return Some(child.clone());
+            } else {
+                node = child.borrow().find_node_in_child(index);
+            }
+
+            if node.is_some() {
+                break;
+            }
+        }
+
+        node
     }
 }
