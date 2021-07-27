@@ -1,8 +1,4 @@
-use crate::{
-    animation::Animation,
-    node::{self, Node},
-    vulkan_context::VulkanContext,
-};
+use crate::{animation::Animation, node::Node, vulkan_context::VulkanContext};
 use anyhow::Result;
 use ash::vk;
 use std::{
@@ -36,14 +32,14 @@ pub(crate) fn load_gltf_nodes(
             ubo_buffer,
             Weak::new(),
         )?;
-        node.borrow_mut().update_joints(vulkan_context)?;
+        // node.borrow_mut().update_joints(vulkan_context)?;
         nodes.insert(name, node);
     }
 
     let nodes_vec = nodes.values().collect::<Vec<_>>();
 
     for animation in document.animations() {
-        Animation::load(&animation, blob, &nodes_vec);
+        Animation::load(&animation, blob, &nodes_vec)?;
     }
 
     Ok(nodes)

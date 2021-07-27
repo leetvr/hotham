@@ -134,7 +134,9 @@ impl Node {
                 .iter()
                 .zip(inverse_bind_matrices)
                 .map(|(joint, inverse_bind_matrix)| {
-                    let joint_matrix = joint.borrow().get_node_matrix() * inverse_bind_matrix;
+                    let joint = joint.borrow();
+                    println!("Borrowing joint {}", joint.index);
+                    let joint_matrix = joint.get_node_matrix() * inverse_bind_matrix;
                     inverse_transform * joint_matrix
                 })
                 .collect::<Vec<_>>();
@@ -146,6 +148,12 @@ impl Node {
             )?;
         }
 
+        for child in &self.children {
+            let mut child = child.borrow_mut();
+            println!("Borrowing child {}", child.index);
+            // child.update_joints(vulkan_context)?;
+        }
+
         Ok(())
     }
 
@@ -154,6 +162,7 @@ impl Node {
         let mut parent = self.parent.clone();
 
         while let Some(p) = parent.upgrade() {
+            println!("Borrowing parent {}", self.index);
             let p = p.borrow();
             node_matrix = p.get_local_matrix() * node_matrix;
             parent = p.parent.clone();

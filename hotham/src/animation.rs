@@ -1,10 +1,11 @@
-use std::{borrow::Borrow, cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
 use anyhow::{anyhow, Result};
-use cgmath::{vec3, Quaternion, Vector3};
+use cgmath::{vec3, InnerSpace, Quaternion, Vector3, VectorSpace};
 use gltf::animation::util::ReadOutputs;
 
-use crate::node::Node;
+use crate::{node::Node, vulkan_context::VulkanContext};
+use itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub struct Animation {
@@ -107,8 +108,60 @@ impl Animation {
         Ok(())
     }
 
-    pub fn update(&mut self, delta_time: f32) -> Result<()> {
-        todo!()
+    pub(crate) fn update(&mut self, delta_time: f32, vulkan_context: &VulkanContext) -> Result<()> {
+        self.current_time += delta_time;
+        if self.current_time >= self.end_time {
+            self.current_time -= self.end_time;
+        }
+        let current_time = &self.current_time;
+
+        for channel in &self.channels {
+            let sampler = &channel.sampler;
+            for mut chunk in &sampler.inputs.iter().enumerate().chunks(2) {
+                let lower = chunk.next();
+                let higher = chunk.next();
+
+                if lower.is_none() || higher.is_none() {
+                    continue;
+                }
+
+                let (lower_index, lower) = lower.unwrap();
+                let (higher_index, higher) = higher.unwrap();
+                if current_time >= lower && current_time <= higher {
+                    let mut target_node = channel.target_node.borrow_mut();
+                    let interpolation = (current_time - lower) / (higher - lower);
+                    match &sampler.outputs {
+                        AnimationOutputs::Translations(t) => {
+                            let lower = t.get(lower_index).unwrap();
+                            let higher = t.get(higher_index).unwrap();
+                            let interpolated = lower.lerp(*higher, interpolation);
+                            target_node.translation = interpolated;
+                            println!(
+                                "{} translation is now {:?}",
+                                target_node.index, interpolated
+                            );
+                        }
+                        AnimationOutputs::Rotations(r) => {
+                            let lower = r.get(lower_index).unwrap();
+                            let higher = r.get(higher_index).unwrap();
+                            let interpolated = lower.slerp(*higher, interpolation).normalize();
+                            target_node.rotation = interpolated;
+                            println!("{} rotation is now {:?}", target_node.index, interpolated);
+                        }
+                        AnimationOutputs::Scales(s) => {
+                            let lower = s.get(lower_index).unwrap();
+                            let higher = s.get(higher_index).unwrap();
+                            let interpolated = lower.lerp(*higher, interpolation);
+                            target_node.scale = interpolated;
+                            println!("{} scale is now {:?}", target_node.index, interpolated);
+                        }
+                    }
+                    target_node.update_joints(vulkan_context)?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -195,15 +248,18 @@ mod tests {
         let hand = nodes.get("Hand").unwrap().borrow();
         let hand_root = hand.children.first().unwrap();
         let hand_root = hand_root.borrow();
-        let before = hand.find(15).unwrap().borrow().get_node_matrix();
+        let before = hand.find(2).unwrap().borrow().get_node_matrix();
 
         {
             let animation = hand_root.animations.first().unwrap();
             let delta_time = 0.5;
-            animation.borrow_mut().update(delta_time).unwrap();
+            animation
+                .borrow_mut()
+                .update(delta_time, &vulkan_context)
+                .unwrap();
         }
 
-        let after = hand.find(15).unwrap().borrow().get_node_matrix();
+        let after = hand.find(2).unwrap().borrow().get_node_matrix();
         assert_ne!(before, after);
     }
 }
