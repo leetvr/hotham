@@ -20,7 +20,7 @@ pub struct Node {
     pub matrix: Matrix4<f32>,
     pub mesh: Option<Mesh>,
     pub skin: Option<Skin>,
-    pub animations: Vec<Animation>,
+    pub animations: Vec<Rc<RefCell<Animation>>>,
     pub active_animation_index: Option<usize>,
 }
 

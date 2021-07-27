@@ -101,12 +101,13 @@ impl Animation {
             (*parent_node).borrow().index,
             first_node_index
         );
+        let animation = Rc::new(RefCell::new(animation));
         (*parent_node).borrow_mut().animations.push(animation);
 
         Ok(())
     }
 
-    pub fn update(&mut self, delta_time: f32, root_node: &mut Node) -> Result<()> {
+    pub fn update(&mut self, delta_time: f32) -> Result<()> {
         todo!()
     }
 }
@@ -194,13 +195,15 @@ mod tests {
         let hand = nodes.get("Hand").unwrap().borrow();
         let hand_root = hand.children.first().unwrap();
         let hand_root = hand_root.borrow();
-        let animation = hand_root.animations.first().unwrap();
+        let before = hand.find(15).unwrap().borrow().get_node_matrix();
 
-        let delta_time = 0.5;
-        // animation.update(delta_time, &mut nodes);
+        {
+            let animation = hand_root.animations.first().unwrap();
+            let delta_time = 0.5;
+            animation.borrow_mut().update(delta_time).unwrap();
+        }
 
-        // Load test animation from glTF
-        // Get interpolated value
-        // Test
+        let after = hand.find(15).unwrap().borrow().get_node_matrix();
+        assert_ne!(before, after);
     }
 }
