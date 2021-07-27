@@ -5,8 +5,7 @@ use std::{
 
 use cgmath::{vec3, Matrix4, Quaternion, Vector3};
 
-use crate::skin::Skin;
-use crate::{mesh::Mesh, vulkan_context::VulkanContext};
+use crate::{animation::Animation, mesh::Mesh, skin::Skin, vulkan_context::VulkanContext};
 use anyhow::{anyhow, Result};
 use ash::vk;
 
@@ -21,6 +20,8 @@ pub struct Node {
     pub matrix: Matrix4<f32>,
     pub mesh: Option<Mesh>,
     pub skin: Option<Skin>,
+    pub animations: Vec<Animation>,
+    pub active_animation_index: Option<usize>,
 }
 
 impl Node {
@@ -35,14 +36,17 @@ impl Node {
         let name = node_data.name().unwrap().to_string();
         println!("Loading node {} - {}", node_data.index(), name);
 
-        let mesh = node_data
-            .mesh()
-            .map(|m| {
-                Mesh::load(&m, blob, vulkan_context, set_layouts, ubo_buffer)
-                    .map_err(|e| eprintln!("Error loading mesh {:?}", e))
-                    .ok()
-            })
-            .flatten();
+        let mesh = if let Some(mesh_data) = node_data.mesh() {
+            Some(Mesh::load(
+                &mesh_data,
+                blob,
+                vulkan_context,
+                set_layouts,
+                ubo_buffer,
+            )?)
+        } else {
+            None
+        };
 
         let transform = node_data.transform();
         let (translation, rotation, scale) = transform.clone().decomposed();
@@ -57,6 +61,8 @@ impl Node {
             matrix: Matrix4::from(transform.matrix()),
             mesh,
             skin: None,
+            animations: Default::default(),
+            active_animation_index: None,
         };
 
         let node = Rc::new(RefCell::new(node));
@@ -88,11 +94,6 @@ impl Node {
                 return Some(parent);
             }
 
-            println!(
-                "Going to {}'s parent - {}",
-                self.index,
-                parent.borrow().index
-            );
             return parent.borrow().find(index);
         }
 
@@ -101,16 +102,13 @@ impl Node {
     }
 
     pub fn find_node_in_child(&self, index: usize) -> Option<Rc<RefCell<Node>>> {
-        println!("Searching {}", self.index);
         if self.children.is_empty() {
-            println!("{} has no children", self.index);
             return None;
         }
 
         let mut node = None;
 
         for child in &self.children {
-            println!("Searching child {}", child.borrow().index);
             if child.borrow().index == index {
                 return Some(child.clone());
             } else {

@@ -1,10 +1,13 @@
+use std::{borrow::Borrow, cell::RefCell, rc::Rc};
+
+use anyhow::{anyhow, Result};
 use cgmath::{vec3, Quaternion, Vector3};
-use gltf::{animation::util::ReadOutputs, Document};
+use gltf::animation::util::ReadOutputs;
 
 use crate::node::Node;
 
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Animation {
+#[derive(Debug, Clone)]
+pub struct Animation {
     channels: Vec<AnimationChannel>,
     start_time: f32,
     end_time: f32,
@@ -12,20 +15,17 @@ pub(crate) struct Animation {
 }
 
 impl Animation {
-    pub(crate) fn load(document: &Document, blob: &[u8]) -> Vec<Self> {
-        document
-            .animations()
-            .map(|a| Animation::new(&a, &blob))
-            .collect()
-    }
-
-    fn new(animation: &gltf::Animation, blob: &[u8]) -> Animation {
+    pub(crate) fn load(
+        animation: &gltf::Animation,
+        blob: &[u8],
+        nodes: &[&Rc<RefCell<Node>>],
+    ) -> Result<()> {
         let mut channels = Vec::new();
         let mut start_time = 0.0;
         let mut end_time = 0.0;
+        let mut first_node_index = None;
 
         for channel in animation.channels() {
-            assert_eq!(blob.len(), 100);
             let reader = channel.reader(|_| Some(&blob));
 
             let mut inputs = Vec::new();
@@ -69,37 +69,95 @@ impl Animation {
             }
 
             let sampler = AnimationSampler { inputs, outputs };
+            let target_node_index = channel.target().node().index();
+            let target_node = find_node(nodes, target_node_index)?;
+
+            if first_node_index.is_none() {
+                first_node_index = Some(target_node_index);
+            }
 
             channels.push(AnimationChannel {
                 sampler,
-                target_node_index: channel.target().node().index(),
+                target_node,
             })
         }
 
-        Animation {
+        let animation = Animation {
             channels,
             start_time,
             end_time,
             current_time: 0.0,
-        }
+        };
+
+        let first_node_index = first_node_index.unwrap();
+        let parent_node = find_parent_node(nodes, first_node_index).ok_or_else(|| {
+            anyhow!(
+                "Unable to find parent node with first index: {}",
+                first_node_index
+            )
+        })?;
+        println!(
+            "Found parent node {} for first_node_index {}",
+            (*parent_node).borrow().index,
+            first_node_index
+        );
+        (*parent_node).borrow_mut().animations.push(animation);
+
+        Ok(())
     }
 
     pub fn update(delta_time: f32, root_node: &mut Node) {}
 }
 
-#[derive(Debug, Clone, PartialEq)]
+fn find_node(nodes: &[&Rc<RefCell<Node>>], index: usize) -> Result<Rc<RefCell<Node>>> {
+    for n in nodes {
+        if let Some(found) = (***n).borrow().find(index) {
+            return Ok(found);
+        }
+    }
+
+    Err(anyhow!("Unable to find node with index: {}", index))
+}
+
+fn find_parent_node(nodes: &[&Rc<RefCell<Node>>], first_index: usize) -> Option<Rc<RefCell<Node>>> {
+    // What we want to do is find the node that has a skin whose skeleton root is the parent node
+    // This is all based on the fact that the skeleton root is the first node in the hierarchy
+    for node in nodes {
+        let n = (***node).borrow();
+        let skin = n.skin.as_ref();
+        if let Some(skin) = skin {
+            if skin.skeleton_root_index == first_index {
+                return Some(Rc::clone(node));
+            }
+        }
+
+        let children = &n.children;
+        if children.len() == 0 {
+            return None;
+        }
+
+        let children = children.iter().collect::<Vec<_>>();
+        if let Some(found) = find_parent_node(&children, first_index) {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct AnimationSampler {
     inputs: Vec<f32>,
     outputs: AnimationOutputs,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub(crate) struct AnimationChannel {
     sampler: AnimationSampler,
-    target_node_index: usize,
+    target_node: Rc<RefCell<Node>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub(crate) enum AnimationOutputs {
     Translations(Vec<Vector3<f32>>),
     Rotations(Vec<Quaternion<f32>>),
@@ -108,18 +166,34 @@ pub(crate) enum AnimationOutputs {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::{
+        gltf_loader, renderer::create_descriptor_set_layout, vulkan_context::VulkanContext,
+    };
+    use ash::vk;
 
     #[test]
     pub fn animation_test() {
-        let (document, buffers, _) = gltf::import("../test_assets/animation_test.gltf").unwrap();
-        let data = &buffers[1];
-        assert_eq!(data.len(), 100);
-        let mut animations = Animation::load(&document, data);
-        assert_eq!(animations.len(), 1);
-        let mut animation = animations.pop().unwrap();
-        let delta_time = 0.5;
-        // let mut nodes = todo!();
+        let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
+        let ubo_buffer = vk::Buffer::null();
+
+        let gltf_bytes = document.into_json().to_vec().unwrap();
+        let data_bytes = &buffers[0];
+        let nodes = gltf_loader::load_gltf_nodes(
+            &gltf_bytes,
+            data_bytes,
+            &vulkan_context,
+            &[set_layout],
+            ubo_buffer,
+        )
+        .unwrap();
+
+        let hand = nodes.get("Hand").unwrap().borrow();
+        let hand_root = hand.children.first().unwrap();
+        let hand_root = hand_root.borrow();
+        assert_eq!(hand_root.animations.len(), 1);
+
         // animation.update(delta_time, &mut nodes);
 
         // Load test animation from glTF

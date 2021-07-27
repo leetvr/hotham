@@ -1,4 +1,8 @@
-use crate::{node::Node, vulkan_context::VulkanContext};
+use crate::{
+    animation::Animation,
+    node::{self, Node},
+    vulkan_context::VulkanContext,
+};
 use anyhow::Result;
 use ash::vk;
 use std::{
@@ -35,6 +39,12 @@ pub(crate) fn load_gltf_nodes(
         nodes.insert(name, node);
     }
 
+    let nodes_vec = nodes.values().collect::<Vec<_>>();
+
+    for animation in document.animations() {
+        Animation::load(&animation, blob, &nodes_vec);
+    }
+
     Ok(nodes)
 }
 
@@ -45,9 +55,10 @@ mod tests {
     #[test]
     pub fn test_asteroid() {
         let vulkan_context = VulkanContext::testing().unwrap();
+        let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
+
         let gltf = include_bytes!("../../hotham-asteroid/assets/asteroid.gltf");
         let data = include_bytes!("../../hotham-asteroid/assets/asteroid_data.bin");
-        let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
         let buffer = vk::Buffer::null();
         let nodes = load_gltf_nodes(gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
         assert!(nodes.len() != 0);
@@ -56,10 +67,11 @@ mod tests {
     #[test]
     pub fn test_hand() {
         let vulkan_context = VulkanContext::testing().unwrap();
+        let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
+
         let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
         let gltf = document.into_json().to_vec().unwrap();
         let data = &buffers[0];
-        let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
         let buffer = vk::Buffer::null();
         let nodes = load_gltf_nodes(&gltf, data, &vulkan_context, &[set_layout], buffer).unwrap();
         assert!(nodes.len() == 1);
