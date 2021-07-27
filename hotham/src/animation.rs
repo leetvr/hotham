@@ -106,7 +106,9 @@ impl Animation {
         Ok(())
     }
 
-    pub fn update(delta_time: f32, root_node: &mut Node) {}
+    pub fn update(&mut self, delta_time: f32, root_node: &mut Node) -> Result<()> {
+        todo!()
+    }
 }
 
 fn find_node(nodes: &[&Rc<RefCell<Node>>], index: usize) -> Result<Rc<RefCell<Node>>> {
@@ -192,8 +194,9 @@ mod tests {
         let hand = nodes.get("Hand").unwrap().borrow();
         let hand_root = hand.children.first().unwrap();
         let hand_root = hand_root.borrow();
-        assert_eq!(hand_root.animations.len(), 1);
+        let animation = hand_root.animations.first().unwrap();
 
+        let delta_time = 0.5;
         // animation.update(delta_time, &mut nodes);
 
         // Load test animation from glTF
