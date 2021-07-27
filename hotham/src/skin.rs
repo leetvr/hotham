@@ -13,17 +13,14 @@ pub struct Skin {
     pub name: String,
     pub inverse_bind_matrices: Vec<Matrix4<f32>>,
     pub joints: Joints,
-    // pub ssbo: Buffer,
-    // vks::Buffer            ssbo;
-    // VkDescriptorSet        descriptorSet;
+    pub(crate) ssbo: Buffer<Matrix4<f32>>,
 }
 
 impl Skin {
     pub(crate) fn load(
         skin_data: &gltf::Skin,
         blob: &[u8],
-        _vulkan_context: &VulkanContext,
-        _set_layouts: &[vk::DescriptorSetLayout],
+        vulkan_context: &VulkanContext,
         skeleton_root: Rc<RefCell<Node>>,
     ) -> Result<()> {
         let name = skin_data.name().unwrap_or("Skin").to_string();
@@ -35,12 +32,18 @@ impl Skin {
             .collect::<Vec<_>>();
 
         let joints = load_joints(skin_data, &skeleton_root)?;
+        let ssbo = Buffer::new_from_vec(
+            vulkan_context,
+            &inverse_bind_matrices,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+        )?;
 
         let skin = Skin {
             inverse_bind_matrices,
             skeleton_root: skeleton_root.clone(),
             name,
             joints,
+            ssbo,
         };
 
         skeleton_root.borrow_mut().skin.replace(skin);

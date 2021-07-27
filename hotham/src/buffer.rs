@@ -52,6 +52,8 @@ where
         })
     }
 
+    /// **NOTE**: If passing in a Vec, you MUST use vec.as_ptr(), passing in
+    /// a reference will result in A Very Bad Time.
     pub fn update(
         &mut self,
         vulkan_context: &VulkanContext,

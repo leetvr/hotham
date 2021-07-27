@@ -431,6 +431,7 @@ impl VulkanContext {
 
     fn allocate_buffer_memory(&self, buffer: vk::Buffer) -> Result<vk::DeviceMemory> {
         let memory_requirements = unsafe { self.device.get_buffer_memory_requirements(buffer) };
+        // PERF: This is slow.
         let properties =
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
         self.allocate_memory(memory_requirements, properties)

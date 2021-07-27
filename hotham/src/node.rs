@@ -1,5 +1,4 @@
 use std::{
-    borrow::BorrowMut,
     cell::RefCell,
     rc::{Rc, Weak},
 };
@@ -75,11 +74,12 @@ impl Node {
         // NOTE: This *must* be done after load_children as skins will refer to children that may not be loaded yet.
         (*node)
             .borrow()
-            .load_skins(blob, vulkan_context, set_layouts, node_data, node.clone())?;
+            .load_skins(blob, vulkan_context, node_data, node.clone())?;
 
         Ok((name, node))
     }
 
+    // PERF: This algorithm is terrible.
     pub fn find(&self, index: usize) -> Option<Rc<RefCell<Node>>> {
         // Go up to the top of the tree
         if let Some(parent) = self.parent.upgrade() {
@@ -156,7 +156,6 @@ impl Node {
         &self,
         blob: &[u8],
         vulkan_context: &VulkanContext,
-        set_layouts: &[vk::DescriptorSetLayout],
         node_data: &gltf::Node,
         skeleton_root: Rc<RefCell<Node>>,
     ) -> Result<()> {
@@ -173,7 +172,7 @@ impl Node {
                     .borrow()
                     .find(index)
                     .ok_or_else(|| anyhow!("Child not found"))?;
-                Skin::load(&skin_data, blob, vulkan_context, set_layouts, child_node)?;
+                Skin::load(&skin_data, blob, vulkan_context, child_node)?;
             }
         }
 
