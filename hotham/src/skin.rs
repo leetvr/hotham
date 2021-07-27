@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{node::Node, vulkan_context::VulkanContext};
+use crate::{buffer::Buffer, node::Node, vulkan_context::VulkanContext};
 use anyhow::{anyhow, Result};
 use ash::vk;
 use cgmath::Matrix4;
@@ -13,6 +13,7 @@ pub struct Skin {
     pub name: String,
     pub inverse_bind_matrices: Vec<Matrix4<f32>>,
     pub joints: Joints,
+    // pub ssbo: Buffer,
     // vks::Buffer            ssbo;
     // VkDescriptorSet        descriptorSet;
 }

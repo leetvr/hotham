@@ -78,5 +78,6 @@ mod tests {
 
         let skin = hand_base.skin.as_ref().unwrap();
         assert_eq!(skin.inverse_bind_matrices.len(), 16);
+        assert_eq!(skin.joints.len(), 16);
     }
 }

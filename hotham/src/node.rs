@@ -1,4 +1,5 @@
 use std::{
+    borrow::BorrowMut,
     cell::RefCell,
     rc::{Rc, Weak},
 };
@@ -60,41 +61,22 @@ impl Node {
         };
 
         let node = Rc::new(RefCell::new(node));
+        let parent_node = Rc::downgrade(&node);
 
-        node_data
-            .children()
-            .map(|n| {
-                let parent_node = Rc::downgrade(&node);
-                let (_, child_node) = Node::load(
-                    &n,
-                    blob,
-                    vulkan_context,
-                    set_layouts,
-                    ubo_buffer,
-                    parent_node,
-                )?;
-                node.borrow_mut().children.push(child_node);
+        (*node).borrow_mut().load_children(
+            blob,
+            vulkan_context,
+            set_layouts,
+            ubo_buffer,
+            node_data,
+            parent_node,
+        )?;
 
-                Ok(())
-            })
-            .collect::<Result<_>>()?;
+        // NOTE: This *must* be done after load_children as skins will refer to children that may not be loaded yet.
+        (*node)
+            .borrow()
+            .load_skins(blob, vulkan_context, set_layouts, node_data, node.clone())?;
 
-        // If our children need skins, create them.
-        for child in node_data.children() {
-            if let Some(skin_data) = child.skin() {
-                let index = child.index();
-                println!(
-                    "{} - {} needs a skin, loading..",
-                    index,
-                    child.name().unwrap()
-                );
-                let child_node = node
-                    .borrow()
-                    .find(index)
-                    .ok_or_else(|| anyhow!("Child not found"))?;
-                Skin::load(&skin_data, blob, vulkan_context, set_layouts, child_node)?;
-            }
-        }
         Ok((name, node))
     }
 
@@ -141,5 +123,60 @@ impl Node {
         }
 
         node
+    }
+
+    fn load_children(
+        &mut self,
+        blob: &[u8],
+        vulkan_context: &VulkanContext,
+        set_layouts: &[vk::DescriptorSetLayout],
+        ubo_buffer: vk::Buffer,
+        node_data: &gltf::Node,
+        parent_node: Weak<RefCell<Node>>,
+    ) -> Result<()> {
+        self.children = node_data
+            .children()
+            .map(|n| {
+                let (_, node) = Node::load(
+                    &n,
+                    blob,
+                    vulkan_context,
+                    set_layouts,
+                    ubo_buffer,
+                    parent_node.clone(),
+                )?;
+                Ok(node)
+            })
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(())
+    }
+
+    fn load_skins(
+        &self,
+        blob: &[u8],
+        vulkan_context: &VulkanContext,
+        set_layouts: &[vk::DescriptorSetLayout],
+        node_data: &gltf::Node,
+        skeleton_root: Rc<RefCell<Node>>,
+    ) -> Result<()> {
+        // If our children need skins, create them.
+        for child in node_data.children() {
+            if let Some(skin_data) = child.skin() {
+                let index = child.index();
+                println!(
+                    "{} - {} needs a skin, loading..",
+                    index,
+                    child.name().unwrap()
+                );
+                let child_node = skeleton_root
+                    .borrow()
+                    .find(index)
+                    .ok_or_else(|| anyhow!("Child not found"))?;
+                Skin::load(&skin_data, blob, vulkan_context, set_layouts, child_node)?;
+            }
+        }
+
+        Ok(())
     }
 }
