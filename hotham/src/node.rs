@@ -3,7 +3,7 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use cgmath::{vec3, Matrix4, Quaternion, Vector3};
+use cgmath::{vec3, Matrix4, Quaternion, Transform, Vector3};
 
 use crate::{animation::Animation, mesh::Mesh, skin::Skin, vulkan_context::VulkanContext};
 use anyhow::{anyhow, Result};
@@ -121,6 +121,53 @@ impl Node {
         }
 
         node
+    }
+
+    pub(crate) fn update_joints(&mut self, vulkan_context: &VulkanContext) -> Result<()> {
+        let node_matrix = self.get_node_matrix();
+        if let Some(skin) = self.skin.as_mut() {
+            let inverse_transform = node_matrix.inverse_transform().unwrap();
+            let joints = &skin.joints;
+            let inverse_bind_matrices = &skin.inverse_bind_matrices;
+
+            let joint_matrices = joints
+                .iter()
+                .zip(inverse_bind_matrices)
+                .map(|(joint, inverse_bind_matrix)| {
+                    let joint_matrix = joint.borrow().get_node_matrix() * inverse_bind_matrix;
+                    inverse_transform * joint_matrix
+                })
+                .collect::<Vec<_>>();
+
+            skin.ssbo.update(
+                vulkan_context,
+                joint_matrices.as_ptr(),
+                joint_matrices.len(),
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn get_node_matrix(&self) -> Matrix4<f32> {
+        let mut node_matrix = self.get_local_matrix();
+        let mut parent = self.parent.clone();
+
+        while let Some(p) = parent.upgrade() {
+            let p = p.borrow();
+            node_matrix = p.get_local_matrix() * node_matrix;
+            parent = p.parent.clone();
+        }
+
+        node_matrix
+    }
+
+    pub fn get_local_matrix(&self) -> Matrix4<f32> {
+        let translation = Matrix4::from_translation(self.translation);
+        let rotation = Matrix4::from(self.rotation);
+        let scale = Matrix4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);
+
+        return translation * rotation * scale * self.matrix;
     }
 
     fn load_children(

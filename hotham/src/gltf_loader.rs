@@ -36,6 +36,7 @@ pub(crate) fn load_gltf_nodes(
             ubo_buffer,
             Weak::new(),
         )?;
+        node.borrow_mut().update_joints(vulkan_context)?;
         nodes.insert(name, node);
     }
 

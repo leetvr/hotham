@@ -57,7 +57,7 @@ where
     pub fn update(
         &mut self,
         vulkan_context: &VulkanContext,
-        data: &T,
+        data: *const T,
         item_count: usize,
     ) -> Result<()> {
         self.item_count = item_count;
