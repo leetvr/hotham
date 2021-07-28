@@ -7,10 +7,7 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
+			"group": "build",
 			"label": "rust: cargo build"
 		},
 		{
@@ -18,7 +15,10 @@
 			"windows": {
 				"command": ".\\run_on_simulator.ps1"
 			},
-			"group": "test",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
 			"label": "Run Asteroid on Simulator",
 			"problemMatcher": []
 		},
@@ -68,6 +68,6 @@
 			],
 			"group": "test",
 			"label": "rust: cargo bench"
-		},
+		}
 	]
 }
