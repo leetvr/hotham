@@ -235,7 +235,7 @@ impl Renderer {
                 self.pipeline,
             );
 
-            for node in nodes.iter().filter(|n| n.mesh.is_some()) {
+            for node in nodes {
                 self.draw_node(node, device, command_buffer)?;
             }
 
@@ -252,52 +252,62 @@ impl Renderer {
         device: &ash::Device,
         command_buffer: vk::CommandBuffer,
     ) -> Result<()> {
-        let mesh = node.mesh.as_ref().unwrap();
-
-        // Bind mesh descriptor sets
-        device.cmd_bind_descriptor_sets(
-            command_buffer,
-            vk::PipelineBindPoint::GRAPHICS,
-            self.pipeline_layout,
-            0,
-            &mesh.descriptor_sets,
-            &[],
-        );
-
-        // Bind vertex and index buffers
-        device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer], &[0]);
-        device.cmd_bind_index_buffer(command_buffer, mesh.index_buffer, 0, vk::IndexType::UINT32);
-
-        // Bind skin descriptor sets, if present.
-        if let Some(skin) = node.skin.as_ref() {
+        if let Some(mesh) = node.mesh.as_ref() {
+            // Bind mesh descriptor sets
             device.cmd_bind_descriptor_sets(
                 command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
-                1,
-                &skin.descriptor_sets,
+                0,
+                &mesh.descriptor_sets,
                 &[],
-            )
+            );
+
+            // Bind vertex and index buffers
+            device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer], &[0]);
+            device.cmd_bind_index_buffer(
+                command_buffer,
+                mesh.index_buffer,
+                0,
+                vk::IndexType::UINT32,
+            );
+
+            // Bind skin descriptor sets, if present.
+            if let Some(skin) = node.skin.as_ref() {
+                device.cmd_bind_descriptor_sets(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline_layout,
+                    1,
+                    &skin.descriptor_sets,
+                    &[],
+                )
+            }
+
+            // Update any animations
+            node.update_animation(
+                self.last_frame_time.elapsed().as_secs_f32(),
+                &self.vulkan_context,
+            )?;
+
+            // Push constants
+            let node_matrix = node.get_node_matrix();
+            let node_matrix = create_push_constant(&node_matrix);
+
+            device.cmd_push_constants(
+                command_buffer,
+                self.pipeline_layout,
+                vk::ShaderStageFlags::VERTEX,
+                0,
+                node_matrix,
+            );
+            device.cmd_draw_indexed(command_buffer, mesh.num_indices, 1, 0, 0, 1);
         }
 
-        // Update any animations
-        node.update_animation(
-            self.last_frame_time.elapsed().as_secs_f32(),
-            &self.vulkan_context,
-        )?;
-
-        // Push constants
-        let node_matrix = node.get_node_matrix();
-        let node_matrix = create_push_constant(&node_matrix);
-
-        device.cmd_push_constants(
-            command_buffer,
-            self.pipeline_layout,
-            vk::ShaderStageFlags::VERTEX,
-            0,
-            node_matrix,
-        );
-        device.cmd_draw_indexed(command_buffer, mesh.num_indices, 1, 0, 0, 1);
+        for child in &node.children {
+            let child = (*child).borrow();
+            self.draw_node(&child, device, command_buffer)?;
+        }
 
         Ok(())
     }
