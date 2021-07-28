@@ -13,6 +13,10 @@ layout(push_constant) uniform PushConsts {
 	mat4 model;
 } pushConsts;
 
+layout(std430, set = 1, binding = 0) readonly buffer JointMatrices {
+    mat4 jointMatrices[];
+};
+
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTextureCoordinates;
 layout(location = 2) in vec3 inNormal;
@@ -27,12 +31,20 @@ layout(location = 3) out vec3 outLightVec;
 layout(location = 4) out vec4 outTangent;
 
 void main() {
-    gl_Position = ubo.projection[gl_ViewIndex] * ubo.view[gl_ViewIndex] * pushConsts.model * vec4(inPosition, 1.0);
-    outNormal = mat3(ubo.view[gl_ViewIndex]) * inNormal;
+    mat4 skinMat = 
+        inJointWeights.x * jointMatrices[int(inJointIndices.x)] +
+        inJointWeights.y * jointMatrices[int(inJointIndices.y)] +
+        inJointWeights.z * jointMatrices[int(inJointIndices.z)] +
+        inJointWeights.w * jointMatrices[int(inJointIndices.w)];
+
+    gl_Position = ubo.projection[gl_ViewIndex] * ubo.view[gl_ViewIndex] * pushConsts.model * skinMat * vec4(inPosition, 1.0);
+
+    outNormal = normalize(transpose(inverse(mat3(ubo.view[gl_ViewIndex] * pushConsts.model * skinMat))) * inNormal);
     outTextureCoordinates = inTextureCoordinates;
 
     vec4 pos = ubo.view[gl_ViewIndex] * vec4(inPosition, 1.0);
-    outLightVec = ubo.lightPos.xyz - pos.xyz;
+    vec3 lightPos = mat3(ubo.view[gl_ViewIndex]) * ubo.lightPos.xyz;
+    outLightVec = lightPos- pos.xyz;
     outViewVec = -pos.xyz;
     outTangent = inTangent;
 }
