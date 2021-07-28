@@ -10,7 +10,6 @@ use crate::vulkan_context::VulkanContext;
 pub(crate) struct Buffer<T> {
     pub handle: vk::Buffer,
     pub device_memory: vk::DeviceMemory,
-    pub item_count: usize,
     pub _phantom: PhantomData<T>,
 }
 
@@ -30,7 +29,6 @@ where
         Ok(Self {
             handle,
             device_memory,
-            item_count,
             _phantom: PhantomData,
         })
     }
@@ -47,7 +45,6 @@ where
         Ok(Self {
             handle,
             device_memory,
-            item_count,
             _phantom: PhantomData,
         })
     }
@@ -55,12 +52,11 @@ where
     /// **NOTE**: If passing in a Vec, you MUST use vec.as_ptr(), passing in
     /// a reference will result in A Very Bad Time.
     pub fn update(
-        &mut self,
+        &self,
         vulkan_context: &VulkanContext,
         data: *const T,
         item_count: usize,
     ) -> Result<()> {
-        self.item_count = item_count;
         vulkan_context.update_buffer(data, item_count, self.device_memory)
     }
 }

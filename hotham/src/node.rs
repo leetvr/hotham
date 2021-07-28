@@ -123,9 +123,9 @@ impl Node {
         node
     }
 
-    pub(crate) fn update_joints(&mut self, vulkan_context: &VulkanContext) -> Result<()> {
+    pub(crate) fn update_joints(&self, vulkan_context: &VulkanContext) -> Result<()> {
         let node_matrix = self.get_node_matrix();
-        if let Some(skin) = self.skin.as_mut() {
+        if let Some(skin) = self.skin.as_ref() {
             let inverse_transform = node_matrix.inverse_transform().unwrap();
             let joints = &skin.joints;
             let inverse_bind_matrices = &skin.inverse_bind_matrices;
@@ -149,9 +149,9 @@ impl Node {
         }
 
         for child in &self.children {
-            let mut child = child.borrow_mut();
+            let child = child.borrow();
             println!("Borrowing child {}", child.index);
-            // child.update_joints(vulkan_context)?;
+            child.update_joints(vulkan_context)?;
         }
 
         Ok(())
