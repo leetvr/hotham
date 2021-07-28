@@ -337,7 +337,7 @@ impl Renderer {
             gltf_data.0,
             gltf_data.1,
             &self.vulkan_context,
-            self.descriptor_set_layouts[0],
+            &self.descriptor_set_layouts,
             self.uniform_buffer.handle,
         )
     }

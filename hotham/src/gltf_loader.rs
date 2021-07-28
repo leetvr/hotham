@@ -12,7 +12,7 @@ pub(crate) fn load_gltf_nodes(
     gltf_bytes: &[u8],
     data_bytes: &[u8],
     vulkan_context: &VulkanContext,
-    mesh_descriptor_set_layout: vk::DescriptorSetLayout,
+    descriptor_set_layouts: &[vk::DescriptorSetLayout],
     ubo_buffer: vk::Buffer,
 ) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
     let gtlf_buf = Cursor::new(gltf_bytes);
@@ -28,7 +28,7 @@ pub(crate) fn load_gltf_nodes(
             &node_data,
             blob,
             vulkan_context,
-            &[mesh_descriptor_set_layout],
+            descriptor_set_layouts,
             ubo_buffer,
             Weak::new(),
         )?;
@@ -57,7 +57,7 @@ mod tests {
         let gltf = include_bytes!("../../hotham-asteroid/assets/asteroid.gltf");
         let data = include_bytes!("../../hotham-asteroid/assets/asteroid_data.bin");
         let buffer = vk::Buffer::null();
-        let nodes = load_gltf_nodes(gltf, data, &vulkan_context, set_layouts[0], buffer).unwrap();
+        let nodes = load_gltf_nodes(gltf, data, &vulkan_context, &set_layouts, buffer).unwrap();
         assert!(nodes.len() != 0);
     }
 
@@ -70,7 +70,7 @@ mod tests {
         let gltf = document.into_json().to_vec().unwrap();
         let data = &buffers[0];
         let buffer = vk::Buffer::null();
-        let nodes = load_gltf_nodes(&gltf, data, &vulkan_context, set_layouts[0], buffer).unwrap();
+        let nodes = load_gltf_nodes(&gltf, data, &vulkan_context, &set_layouts, buffer).unwrap();
         assert!(nodes.len() == 1);
 
         let hand = nodes.get("Hand").unwrap();

@@ -240,7 +240,7 @@ mod tests {
             &gltf_bytes,
             data_bytes,
             &vulkan_context,
-            set_layouts[0],
+            &set_layouts,
             ubo_buffer,
         )
         .unwrap();

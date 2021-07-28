@@ -41,7 +41,7 @@ impl Node {
                 &mesh_data,
                 blob,
                 vulkan_context,
-                set_layouts,
+                set_layouts[0],
                 ubo_buffer,
             )?)
         } else {
@@ -78,9 +78,13 @@ impl Node {
         )?;
 
         // NOTE: This *must* be done after load_children as skins will refer to children that may not be loaded yet.
-        (*node)
-            .borrow()
-            .load_skins(blob, vulkan_context, node_data, node.clone())?;
+        (*node).borrow().load_skins(
+            blob,
+            vulkan_context,
+            node_data,
+            node.clone(),
+            set_layouts[1],
+        )?;
 
         Ok((name, node))
     }
@@ -210,6 +214,7 @@ impl Node {
         vulkan_context: &VulkanContext,
         node_data: &gltf::Node,
         skeleton_root: Rc<RefCell<Node>>,
+        skin_descriptor_set_layout: vk::DescriptorSetLayout,
     ) -> Result<()> {
         // If our children need skins, create them.
         for child in node_data.children() {
@@ -224,7 +229,13 @@ impl Node {
                     .borrow()
                     .find(index)
                     .ok_or_else(|| anyhow!("Child not found"))?;
-                Skin::load(&skin_data, blob, vulkan_context, child_node)?;
+                Skin::load(
+                    &skin_data,
+                    blob,
+                    vulkan_context,
+                    child_node,
+                    skin_descriptor_set_layout,
+                )?;
             }
         }
 

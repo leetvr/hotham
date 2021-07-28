@@ -673,7 +673,7 @@ impl VulkanContext {
 
     pub fn create_mesh_descriptor_set(
         &self,
-        set_layouts: &[vk::DescriptorSetLayout],
+        set_layout: vk::DescriptorSetLayout,
         ubo_buffer: vk::Buffer,
         base_color_texture: &Texture,
         normal_texture: &Texture,
@@ -682,13 +682,13 @@ impl VulkanContext {
         let descriptor_sets = unsafe {
             self.device.allocate_descriptor_sets(
                 &vk::DescriptorSetAllocateInfo::builder()
-                    .set_layouts(set_layouts)
+                    .set_layouts(&[set_layout])
                     .descriptor_pool(self.descriptor_pool),
             )
         }?;
         println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
 
-        let buffer_info = vk::DescriptorBufferInfo::builder()
+        let ubo_info = vk::DescriptorBufferInfo::builder()
             .buffer(ubo_buffer)
             .offset(0)
             .range(size_of::<UniformBufferObject>() as _)
@@ -699,10 +699,10 @@ impl VulkanContext {
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-            .buffer_info(&[buffer_info])
+            .buffer_info(&[ubo_info])
             .build();
 
-        let base_color = vk::WriteDescriptorSet::builder()
+        let base_color_texture_sampler = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_sets[0])
             .dst_binding(1)
             .dst_array_element(0)
@@ -710,7 +710,7 @@ impl VulkanContext {
             .image_info(&[base_color_texture.descriptor])
             .build();
 
-        let normal = vk::WriteDescriptorSet::builder()
+        let normal_texture_sampler = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_sets[0])
             .dst_binding(2)
             .dst_array_element(0)
@@ -719,9 +719,46 @@ impl VulkanContext {
             .build();
 
         unsafe {
-            self.device
-                .update_descriptor_sets(&[ubo, base_color, normal], &[])
+            self.device.update_descriptor_sets(
+                &[ubo, base_color_texture_sampler, normal_texture_sampler],
+                &[],
+            )
         };
+
+        Ok(descriptor_sets)
+    }
+
+    pub fn create_skin_descriptor_set(
+        &self,
+        set_layout: vk::DescriptorSetLayout,
+        skin_ssbo: vk::Buffer,
+        buffer_size: usize,
+    ) -> VkResult<Vec<vk::DescriptorSet>> {
+        println!("[HOTHAM_VULKAN] Allocating skin descriptor sets..");
+        let descriptor_sets = unsafe {
+            self.device.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::builder()
+                    .set_layouts(&[set_layout])
+                    .descriptor_pool(self.descriptor_pool),
+            )
+        }?;
+        println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
+
+        let ssbo_info = vk::DescriptorBufferInfo::builder()
+            .buffer(skin_ssbo)
+            .offset(0)
+            .range(buffer_size as _)
+            .build();
+
+        let ssbo = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_sets[0])
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .buffer_info(&[ssbo_info])
+            .build();
+
+        unsafe { self.device.update_descriptor_sets(&[ssbo], &[]) };
 
         Ok(descriptor_sets)
     }

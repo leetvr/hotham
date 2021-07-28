@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, mem::size_of, rc::Rc};
 
 use crate::{buffer::Buffer, node::Node, vulkan_context::VulkanContext};
 use anyhow::{anyhow, Result};
@@ -13,6 +13,7 @@ pub struct Skin {
     pub name: String,
     pub inverse_bind_matrices: Vec<Matrix4<f32>>,
     pub joints: Joints,
+    pub descriptor_sets: Vec<vk::DescriptorSet>,
     pub(crate) ssbo: Buffer<Matrix4<f32>>,
 }
 
@@ -22,6 +23,7 @@ impl Skin {
         blob: &[u8],
         vulkan_context: &VulkanContext,
         parent_node: Rc<RefCell<Node>>,
+        skin_descriptor_set_layout: vk::DescriptorSetLayout,
     ) -> Result<()> {
         let name = skin_data.name().unwrap_or("Skin").to_string();
         let inverse_bind_matrices = skin_data
@@ -37,6 +39,12 @@ impl Skin {
             &inverse_bind_matrices,
             vk::BufferUsageFlags::STORAGE_BUFFER,
         )?;
+        let size = size_of::<Matrix4<f32>>() * inverse_bind_matrices.len();
+        let descriptor_sets = vulkan_context.create_skin_descriptor_set(
+            skin_descriptor_set_layout,
+            ssbo.handle,
+            size,
+        )?;
 
         let skeleton_root_index = skin_data.joints().next().unwrap().index();
 
@@ -46,6 +54,7 @@ impl Skin {
             name,
             joints,
             ssbo,
+            descriptor_sets,
         };
 
         parent_node.borrow_mut().skin.replace(skin);

@@ -23,7 +23,7 @@ impl Mesh {
         mesh_data: &gltf::Mesh,
         blob: &[u8],
         vulkan_context: &VulkanContext,
-        set_layouts: &[vk::DescriptorSetLayout],
+        mesh_descriptor_set_layout: vk::DescriptorSetLayout,
         ubo_buffer: vk::Buffer,
     ) -> Result<Mesh> {
         let name = mesh_data.name().unwrap_or("");
@@ -173,7 +173,7 @@ impl Mesh {
         // Create descriptor sets
         println!("[HOTHAM_MODEL] Creating descriptor sets for {}", name);
         let descriptor_sets = vulkan_context.create_mesh_descriptor_set(
-            set_layouts,
+            mesh_descriptor_set_layout,
             ubo_buffer,
             &base_color_texture.unwrap(),
             &normal_texture.unwrap(),
