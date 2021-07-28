@@ -128,34 +128,34 @@ impl Animation {
                 let (lower_index, lower) = lower.unwrap();
                 let (higher_index, higher) = higher.unwrap();
                 if current_time >= lower && current_time <= higher {
-                    let mut target_node = channel.target_node.borrow_mut();
-                    let interpolation = (current_time - lower) / (higher - lower);
-                    match &sampler.outputs {
-                        AnimationOutputs::Translations(t) => {
-                            let lower = t.get(lower_index).unwrap();
-                            let higher = t.get(higher_index).unwrap();
-                            let interpolated = lower.lerp(*higher, interpolation);
-                            target_node.translation = interpolated;
-                            println!(
-                                "{} translation is now {:?}",
-                                target_node.index, interpolated
-                            );
-                        }
-                        AnimationOutputs::Rotations(r) => {
-                            let lower = r.get(lower_index).unwrap();
-                            let higher = r.get(higher_index).unwrap();
-                            let interpolated = lower.slerp(*higher, interpolation).normalize();
-                            target_node.rotation = interpolated;
-                            println!("{} rotation is now {:?}", target_node.index, interpolated);
-                        }
-                        AnimationOutputs::Scales(s) => {
-                            let lower = s.get(lower_index).unwrap();
-                            let higher = s.get(higher_index).unwrap();
-                            let interpolated = lower.lerp(*higher, interpolation);
-                            target_node.scale = interpolated;
-                            println!("{} scale is now {:?}", target_node.index, interpolated);
+                    // Do this in a block so that we drop the mutable reference to target_node
+                    {
+                        let mut target_node = channel.target_node.borrow_mut();
+                        let interpolation = (current_time - lower) / (higher - lower);
+                        match &sampler.outputs {
+                            AnimationOutputs::Translations(t) => {
+                                let lower = t.get(lower_index).unwrap();
+                                let higher = t.get(higher_index).unwrap();
+                                let interpolated = lower.lerp(*higher, interpolation);
+                                target_node.translation = interpolated;
+                            }
+                            AnimationOutputs::Rotations(r) => {
+                                let lower = r.get(lower_index).unwrap();
+                                let higher = r.get(higher_index).unwrap();
+                                let interpolated = lower.slerp(*higher, interpolation).normalize();
+                                target_node.rotation = interpolated;
+                            }
+                            AnimationOutputs::Scales(s) => {
+                                let lower = s.get(lower_index).unwrap();
+                                let higher = s.get(higher_index).unwrap();
+                                let interpolated = lower.lerp(*higher, interpolation);
+                                target_node.scale = interpolated;
+                            }
                         }
                     }
+
+                    // Now update the target_node's joints
+                    let target_node = channel.target_node.borrow();
                     target_node.update_joints(vulkan_context)?;
                 }
             }

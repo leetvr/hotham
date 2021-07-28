@@ -135,7 +135,6 @@ impl Node {
                 .zip(inverse_bind_matrices)
                 .map(|(joint, inverse_bind_matrix)| {
                     let joint = joint.borrow();
-                    println!("Borrowing joint {}", joint.index);
                     let joint_matrix = joint.get_node_matrix() * inverse_bind_matrix;
                     inverse_transform * joint_matrix
                 })
@@ -150,7 +149,6 @@ impl Node {
 
         for child in &self.children {
             let child = child.borrow();
-            println!("Borrowing child {}", child.index);
             child.update_joints(vulkan_context)?;
         }
 
@@ -161,8 +159,8 @@ impl Node {
         let mut node_matrix = self.get_local_matrix();
         let mut parent = self.parent.clone();
 
+        // Walk up the tree to the root
         while let Some(p) = parent.upgrade() {
-            println!("Borrowing parent {}", self.index);
             let p = p.borrow();
             node_matrix = p.get_local_matrix() * node_matrix;
             parent = p.parent.clone();
