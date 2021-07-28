@@ -94,11 +94,11 @@ impl Node {
         // Go up to the top of the tree
         if let Some(parent) = self.parent.upgrade() {
             // Check that this isn't the node we're after.
-            if parent.borrow().index == index {
+            if (*parent).borrow().index == index {
                 return Some(parent);
             }
 
-            return parent.borrow().find(index);
+            return (*parent).borrow().find(index);
         }
 
         // We are at the top of the tree.
@@ -113,10 +113,10 @@ impl Node {
         let mut node = None;
 
         for child in &self.children {
-            if child.borrow().index == index {
+            if (**child).borrow().index == index {
                 return Some(child.clone());
             } else {
-                node = child.borrow().find_node_in_child(index);
+                node = (**child).borrow().find_node_in_child(index);
             }
 
             if node.is_some() {
@@ -138,7 +138,7 @@ impl Node {
                 .iter()
                 .zip(inverse_bind_matrices)
                 .map(|(joint, inverse_bind_matrix)| {
-                    let joint = joint.borrow();
+                    let joint = (**joint).borrow();
                     let joint_matrix = joint.get_node_matrix() * inverse_bind_matrix;
                     inverse_transform * joint_matrix
                 })
@@ -152,7 +152,7 @@ impl Node {
         }
 
         for child in &self.children {
-            let child = child.borrow();
+            let child = (**child).borrow();
             child.update_joints(vulkan_context)?;
         }
 
@@ -165,7 +165,7 @@ impl Node {
 
         // Walk up the tree to the root
         while let Some(p) = parent.upgrade() {
-            let p = p.borrow();
+            let p = (*p).borrow();
             node_matrix = p.get_local_matrix() * node_matrix;
             parent = p.parent.clone();
         }
@@ -179,6 +179,26 @@ impl Node {
         let scale = Matrix4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);
 
         return translation * rotation * scale * self.matrix;
+    }
+
+    pub(crate) fn update_animation(
+        &self,
+        delta_time: f32,
+        vulkan_context: &VulkanContext,
+    ) -> Result<()> {
+        if let Some(index) = self.active_animation_index {
+            let animation = self.animations.get(index).ok_or_else(|| {
+                anyhow!(
+                    "Unable to find animation with index {} on node {}",
+                    index,
+                    self.index
+                )
+            })?;
+            (**animation)
+                .borrow_mut()
+                .update(delta_time, vulkan_context)?;
+        }
+        Ok(())
     }
 
     fn load_children(
@@ -225,7 +245,7 @@ impl Node {
                     index,
                     child.name().unwrap()
                 );
-                let child_node = skeleton_root
+                let child_node = (*skeleton_root)
                     .borrow()
                     .find(index)
                     .ok_or_else(|| anyhow!("Child not found"))?;

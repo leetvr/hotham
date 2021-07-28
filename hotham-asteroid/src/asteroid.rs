@@ -24,13 +24,13 @@ impl Program for Asteroid {
         let translation = vec3(0.0, 1.0, 0.0);
         let rotation = vec3(0.0, 0.0, 0.0);
         let scale = vec3(0.1, 0.1, 0.1);
+        asteroid.active_animation_index.replace(0);
 
         asteroid.scale = scale;
         let rotation = Euler::new(Rad(rotation.x), Rad(rotation.y), Rad(rotation.z));
         asteroid.rotation = Quaternion::from(rotation);
         asteroid.translation = translation;
 
-        // TODO: asteroid.update_local_matrix();
         let refinery = nodes
             .get("Refinery")
             .ok_or(HothamError::EmptyListError)?

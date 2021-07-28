@@ -247,17 +247,17 @@ mod tests {
 
         let hand = nodes.get("Hand").unwrap().borrow();
         let hand_root = hand.children.first().unwrap();
-        let hand_root = hand_root.borrow();
         let before = hand.find(2).unwrap().borrow().get_node_matrix();
-
+        let delta_time = 0.5;
         {
-            let animation = hand_root.animations.first().unwrap();
-            let delta_time = 0.5;
-            animation
-                .borrow_mut()
-                .update(delta_time, &vulkan_context)
-                .unwrap();
+            let mut hand_root = hand_root.borrow_mut();
+            hand_root.active_animation_index.replace(0);
         }
+
+        let hand_root = hand_root.borrow();
+        hand_root
+            .update_animation(delta_time, &vulkan_context)
+            .unwrap();
 
         let after = hand.find(2).unwrap().borrow().get_node_matrix();
         assert_ne!(before, after);
