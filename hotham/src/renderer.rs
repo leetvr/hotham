@@ -374,28 +374,40 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
 pub(crate) fn create_descriptor_set_layout(
     vulkan_context: &VulkanContext,
 ) -> VkResult<vk::DescriptorSetLayout> {
-    let vertex = vk::DescriptorSetLayoutBinding::builder()
+    let uniform_buffer = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .build();
 
-    let base_color = vk::DescriptorSetLayoutBinding::builder()
+    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
+        .binding(1)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .build();
+
+    let base_color_image_sampler = vk::DescriptorSetLayoutBinding::builder()
         .binding(1)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .build();
 
-    let normal = vk::DescriptorSetLayoutBinding::builder()
+    let normal_image_sampler = vk::DescriptorSetLayoutBinding::builder()
         .binding(2)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .build();
 
-    let bindings = [vertex, base_color, normal];
+    let bindings = [
+        uniform_buffer,
+        skin_joint_buffer,
+        base_color_image_sampler,
+        normal_image_sampler,
+    ];
     let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
 
     unsafe {

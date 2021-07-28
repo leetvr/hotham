@@ -63,12 +63,18 @@ impl VulkanContext {
             )
         }?;
 
+        // HACK: This needs to be updated based on the actual data in the system.
         let descriptor_pool = unsafe {
             device.create_descriptor_pool(
                 &vk::DescriptorPoolCreateInfo::builder()
                     .pool_sizes(&[
                         vk::DescriptorPoolSize {
                             ty: vk::DescriptorType::UNIFORM_BUFFER,
+                            descriptor_count: SWAPCHAIN_LENGTH as _,
+                            ..Default::default()
+                        },
+                        vk::DescriptorPoolSize {
+                            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
                             descriptor_count: SWAPCHAIN_LENGTH as _,
                             ..Default::default()
                         },
