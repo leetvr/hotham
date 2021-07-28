@@ -230,31 +230,7 @@ impl Renderer {
             );
 
             for node in nodes.iter().filter(|n| n.mesh.is_some()) {
-                let mesh = node.mesh.as_ref().unwrap();
-                let transform_constant = to_push_constant(&node.matrix);
-                device.cmd_bind_descriptor_sets(
-                    command_buffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    self.pipeline_layout,
-                    0,
-                    &mesh.descriptor_sets,
-                    &[],
-                );
-                device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer], &[0]);
-                device.cmd_bind_index_buffer(
-                    command_buffer,
-                    mesh.index_buffer,
-                    0,
-                    vk::IndexType::UINT32,
-                );
-                device.cmd_push_constants(
-                    command_buffer,
-                    self.pipeline_layout,
-                    vk::ShaderStageFlags::VERTEX,
-                    0,
-                    transform_constant,
-                );
-                device.cmd_draw_indexed(command_buffer, mesh.num_indices, 1, 0, 0, 1);
+                self.draw_node(node, device, command_buffer);
             }
 
             device.cmd_end_render_pass(command_buffer);
@@ -262,6 +238,39 @@ impl Renderer {
         };
 
         Ok(())
+    }
+
+    unsafe fn draw_node(
+        &self,
+        node: &Node,
+        device: &ash::Device,
+        command_buffer: vk::CommandBuffer,
+    ) {
+        let mesh = node.mesh.as_ref().unwrap();
+        let node_matrix = node.get_node_matrix();
+        let node_matrix = create_push_constant(&node_matrix);
+
+        // Bind mesh descriptor sets
+        device.cmd_bind_descriptor_sets(
+            command_buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.pipeline_layout,
+            0,
+            &mesh.descriptor_sets,
+            &[],
+        );
+        device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer], &[0]);
+        device.cmd_bind_index_buffer(command_buffer, mesh.index_buffer, 0, vk::IndexType::UINT32);
+        device.cmd_push_constants(
+            command_buffer,
+            self.pipeline_layout,
+            vk::ShaderStageFlags::VERTEX,
+            0,
+            node_matrix,
+        );
+        device.cmd_draw_indexed(command_buffer, mesh.num_indices, 1, 0, 0, 1);
+
+        // TODO: Draw child nodes
     }
 
     fn show_debug_info(&self) -> Result<()> {
@@ -332,7 +341,7 @@ impl Renderer {
     }
 }
 
-fn to_push_constant<T: Sized>(p: &T) -> &[u8] {
+fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(std::mem::transmute(p), size_of::<T>()) }
 }
 

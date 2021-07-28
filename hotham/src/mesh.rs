@@ -172,7 +172,7 @@ impl Mesh {
 
         // Create descriptor sets
         println!("[HOTHAM_MODEL] Creating descriptor sets for {}", name);
-        let descriptor_sets = vulkan_context.create_descriptor_sets(
+        let descriptor_sets = vulkan_context.create_mesh_descriptor_set(
             set_layouts,
             ubo_buffer,
             &base_color_texture.unwrap(),

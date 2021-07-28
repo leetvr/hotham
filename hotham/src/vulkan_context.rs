@@ -671,7 +671,7 @@ impl VulkanContext {
         self.end_single_time_commands(command_buffer);
     }
 
-    pub fn create_descriptor_sets(
+    pub fn create_mesh_descriptor_set(
         &self,
         set_layouts: &[vk::DescriptorSetLayout],
         ubo_buffer: vk::Buffer,
