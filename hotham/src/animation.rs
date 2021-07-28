@@ -223,7 +223,7 @@ pub(crate) enum AnimationOutputs {
 #[cfg(test)]
 mod tests {
     use crate::{
-        gltf_loader, renderer::create_descriptor_set_layout, vulkan_context::VulkanContext,
+        gltf_loader, renderer::create_descriptor_set_layouts, vulkan_context::VulkanContext,
     };
     use ash::vk;
 
@@ -231,7 +231,7 @@ mod tests {
     pub fn animation_test() {
         let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
         let vulkan_context = VulkanContext::testing().unwrap();
-        let set_layout = create_descriptor_set_layout(&vulkan_context).unwrap();
+        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
         let ubo_buffer = vk::Buffer::null();
 
         let gltf_bytes = document.into_json().to_vec().unwrap();
@@ -240,7 +240,7 @@ mod tests {
             &gltf_bytes,
             data_bytes,
             &vulkan_context,
-            &[set_layout],
+            set_layouts[0],
             ubo_buffer,
         )
         .unwrap();

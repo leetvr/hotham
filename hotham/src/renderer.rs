@@ -20,7 +20,7 @@ pub(crate) struct Renderer {
     _swapchain: Swapchain,
     vulkan_context: VulkanContext,
     frames: Vec<Frame>,
-    descriptor_set_layout: vk::DescriptorSetLayout,
+    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     render_pass: vk::RenderPass,
@@ -42,9 +42,11 @@ impl Drop for Renderer {
                 .queue_wait_idle(self.vulkan_context.graphics_queue)
                 .expect("Unable to wait for queue to become idle!");
 
-            self.vulkan_context
-                .device
-                .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
+            for layout in &self.descriptor_set_layouts {
+                self.vulkan_context
+                    .device
+                    .destroy_descriptor_set_layout(*layout, None);
+            }
             self.depth_image.destroy(&self.vulkan_context);
             self.uniform_buffer.destroy(&self.vulkan_context);
             for frame in self.frames.drain(..) {
@@ -78,11 +80,11 @@ impl Renderer {
             offset: vk::Offset2D::default(),
         };
 
-        let descriptor_set_layout = create_descriptor_set_layout(&vulkan_context)?;
+        let descriptor_set_layouts = create_descriptor_set_layouts(&vulkan_context)?;
 
         // Pipeline, render pass
         let render_pass = create_render_pass(&vulkan_context)?;
-        let pipeline_layout = create_pipeline_layout(&vulkan_context, &[descriptor_set_layout])?;
+        let pipeline_layout = create_pipeline_layout(&vulkan_context, &descriptor_set_layouts)?;
         let pipeline =
             create_pipeline(&vulkan_context, pipeline_layout, &render_area, render_pass)?;
 
@@ -107,7 +109,7 @@ impl Renderer {
             _swapchain: swapchain,
             vulkan_context,
             frames,
-            descriptor_set_layout,
+            descriptor_set_layouts,
             pipeline,
             pipeline_layout,
             render_pass,
@@ -335,7 +337,7 @@ impl Renderer {
             gltf_data.0,
             gltf_data.1,
             &self.vulkan_context,
-            &[self.descriptor_set_layout],
+            self.descriptor_set_layouts[0],
             self.uniform_buffer.handle,
         )
     }
@@ -380,20 +382,13 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     );
 }
 
-pub(crate) fn create_descriptor_set_layout(
+pub(crate) fn create_descriptor_set_layouts(
     vulkan_context: &VulkanContext,
-) -> VkResult<vk::DescriptorSetLayout> {
+) -> VkResult<Vec<vk::DescriptorSetLayout>> {
     let uniform_buffer = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX)
-        .build();
-
-    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
-        .binding(1)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .build();
 
@@ -411,19 +406,36 @@ pub(crate) fn create_descriptor_set_layout(
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .build();
 
-    let bindings = [
+    let mesh_bindings = [
         uniform_buffer,
-        skin_joint_buffer,
         base_color_image_sampler,
         normal_image_sampler,
     ];
-    let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
+    let mesh_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&mesh_bindings);
 
-    unsafe {
+    let mesh_layout = unsafe {
         vulkan_context
             .device
-            .create_descriptor_set_layout(&create_info, None)
-    }
+            .create_descriptor_set_layout(&mesh_create_info, None)
+    }?;
+
+    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .build();
+
+    let skin_bindings = [skin_joint_buffer];
+    let skin_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&skin_bindings);
+
+    let skin_layout = unsafe {
+        vulkan_context
+            .device
+            .create_descriptor_set_layout(&skin_create_info, None)
+    }?;
+
+    Ok(vec![mesh_layout, skin_layout])
 }
 
 fn create_frames(
