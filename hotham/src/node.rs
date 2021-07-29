@@ -275,3 +275,83 @@ impl Node {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use cgmath::SquareMatrix;
+
+    use super::*;
+    #[test]
+    pub fn test_node_matrix() {
+        let parent = Node {
+            index: 0,
+            parent: Weak::new(),
+            children: Vec::new(),
+            translation: vec3(0.0, 0.0, 0.0),
+            scale: vec3(1.0, 1.0, 1.0),
+            rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0),
+            matrix: Matrix4::identity(),
+            mesh: None,
+            skin: None,
+            animations: Vec::new(),
+            active_animation_index: None,
+        };
+
+        let parent_ref = Rc::new(RefCell::new(parent));
+
+        let child = Node {
+            index: 1,
+            parent: Rc::downgrade(&parent_ref),
+            children: Vec::new(),
+            translation: vec3(0.0, 0.0, 0.0),
+            scale: vec3(1.0, 1.0, 1.0),
+            rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0),
+            matrix: Matrix4::identity(),
+            mesh: None,
+            skin: None,
+            animations: Vec::new(),
+            active_animation_index: None,
+        };
+
+        let child_ref = Rc::new(RefCell::new(child));
+        (*parent_ref).borrow_mut().children.push(child_ref.clone());
+
+        let grandchild = Node {
+            index: 2,
+            parent: Rc::downgrade(&child_ref),
+            children: Vec::new(),
+            translation: vec3(0.0, 0.0, 0.0),
+            scale: vec3(1.0, 1.0, 1.0),
+            rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0),
+            matrix: Matrix4::identity(),
+            mesh: None,
+            skin: None,
+            animations: Vec::new(),
+            active_animation_index: None,
+        };
+
+        let grandchild_ref = Rc::new(RefCell::new(grandchild));
+        (*child_ref)
+            .borrow_mut()
+            .children
+            .push(grandchild_ref.clone());
+
+        let grandchild = parent_ref.borrow().find(2).unwrap();
+        assert_eq!(grandchild.borrow().get_node_matrix(), Matrix4::identity());
+
+        (*parent_ref).borrow_mut().translation = vec3(1.0, 2.0, 3.0);
+        let expected_translation = Matrix4::from_translation(vec3(1.0, 2.0, 3.0));
+        assert_eq!(grandchild.borrow().get_node_matrix(), expected_translation);
+
+        (*child_ref).borrow_mut().translation = vec3(-1.0, 0.0, 0.0);
+        let expected_translation = Matrix4::from_translation(vec3(1.0, 2.0, 3.0))
+            * Matrix4::from_translation(vec3(-1.0, 0.0, 0.0));
+        assert_eq!(grandchild.borrow().get_node_matrix(), expected_translation);
+
+        (*grandchild_ref).borrow_mut().translation = vec3(1.0, 0.0, 0.0);
+        let expected_translation = Matrix4::from_translation(vec3(1.0, 2.0, 3.0))
+            * Matrix4::from_translation(vec3(-1.0, 0.0, 0.0))
+            * Matrix4::from_translation(vec3(1.0, 0.0, 0.0));
+        assert_eq!(grandchild.borrow().get_node_matrix(), expected_translation);
+    }
+}

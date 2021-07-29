@@ -129,6 +129,24 @@ impl Mesh {
             return Err(anyhow!("No normal texture found for {}", name));
         }
 
+        if tex_coords.is_empty() {
+            for _ in 0..positions.len() {
+                tex_coords.push(vec2(0.0, 0.0));
+            }
+        }
+
+        if normals.is_empty() {
+            for _ in 0..positions.len() {
+                normals.push(vec3(0.0, 0.0, 0.0));
+            }
+        }
+
+        if tangents.is_empty() {
+            for _ in 0..positions.len() {
+                tangents.push(vec4(0.0, 0.0, 0.0, 0.0));
+            }
+        }
+
         if joint_indices.is_empty() {
             for _ in 0..positions.len() {
                 joint_indices.push(vec4(0.0, 0.0, 0.0, 0.0));

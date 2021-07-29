@@ -13,10 +13,12 @@
       "children": [1]
     },
     {
+      "name": "Test Child",
       "children": [2],
       "translation": [0.0, 1.0, 0.0]
     },
     {
+      "name": "Test Grandchild",
       "rotation": [0.0, 0.0, 0.0, 1.0]
     }
   ],
