@@ -37,8 +37,8 @@ void main() {
         inJointWeights.z * jointMatrices[int(inJointIndices.z)] +
         inJointWeights.w * jointMatrices[int(inJointIndices.w)];
 
-    gl_Position = ubo.projection[gl_ViewIndex] * ubo.view[gl_ViewIndex] * pushConsts.model * skinMat * vec4(inPosition, 1.0);
-    // gl_Position = ubo.projection[gl_ViewIndex] * ubo.view[gl_ViewIndex] * pushConsts.model * vec4(inPosition, 1.0);
+    // gl_Position = ubo.projection[gl_ViewIndex] * ubo.view[gl_ViewIndex] * pushConsts.model * skinMat * vec4(inPosition, 1.0);
+    gl_Position = ubo.projection[gl_ViewIndex] * ubo.view[gl_ViewIndex] * pushConsts.model * vec4(inPosition, 1.0);
 
     outNormal = normalize(transpose(inverse(mat3(ubo.view[gl_ViewIndex] * pushConsts.model * skinMat))) * inNormal);
     outTextureCoordinates = inTextureCoordinates;

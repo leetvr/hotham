@@ -45,6 +45,8 @@ impl Program for Asteroid {
 
         let test = nodes.get("Test").unwrap().borrow();
         let mut test = Node::clone(&test);
+        test.translation = vec3(0.0, 1.0, -2.0);
+        test.scale = vec3(3.0, 3.0, 3.0);
         test.active_animation_index.replace(0);
 
         Ok(vec![test])
