@@ -24,7 +24,7 @@ impl Animation {
         let mut channels = Vec::new();
         let mut start_time = 0.0;
         let mut end_time = 0.0;
-        let mut first_node_index = None;
+        let mut first_target_node = None;
 
         for channel in animation.channels() {
             let reader = channel.reader(|_| Some(&blob));
@@ -73,8 +73,8 @@ impl Animation {
             let target_node_index = channel.target().node().index();
             let target_node = find_node(nodes, target_node_index)?;
 
-            if first_node_index.is_none() {
-                first_node_index = Some(target_node_index);
+            if first_target_node.is_none() {
+                first_target_node.replace(target_node.clone());
             }
 
             channels.push(AnimationChannel {
@@ -90,17 +90,15 @@ impl Animation {
             current_time: 0.0,
         };
 
-        let first_node_index = first_node_index.unwrap();
-        let parent_node = find_parent_node(nodes, first_node_index).ok_or_else(|| {
-            anyhow!(
-                "Unable to find parent node with first index: {}",
-                first_node_index
-            )
-        })?;
+        let parent_node = first_target_node
+            .unwrap()
+            .borrow()
+            .get_root_node()
+            .ok_or_else(|| anyhow!("Unable to find parent node"))?;
+
         println!(
-            "Found parent node {} for first_node_index {}",
+            "Found parent node {} for animation!",
             (*parent_node).borrow().index,
-            first_node_index
         );
         let animation = Rc::new(RefCell::new(animation));
         (*parent_node).borrow_mut().animations.push(animation);
@@ -108,7 +106,7 @@ impl Animation {
         Ok(())
     }
 
-    pub(crate) fn update(&mut self, delta_time: f32, vulkan_context: &VulkanContext) -> Result<()> {
+    pub(crate) fn update(&mut self, delta_time: f32) -> Result<()> {
         self.current_time += delta_time;
         if self.current_time >= self.end_time {
             self.current_time -= self.end_time;
@@ -153,14 +151,9 @@ impl Animation {
                             }
                         }
                     }
-
-                    // Now update the target_node's joints
-                    let target_node = channel.target_node.borrow();
-                    target_node.update_joints(vulkan_context)?;
                 }
             }
         }
-
         Ok(())
     }
 }
@@ -173,32 +166,6 @@ fn find_node(nodes: &[&Rc<RefCell<Node>>], index: usize) -> Result<Rc<RefCell<No
     }
 
     Err(anyhow!("Unable to find node with index: {}", index))
-}
-
-fn find_parent_node(nodes: &[&Rc<RefCell<Node>>], first_index: usize) -> Option<Rc<RefCell<Node>>> {
-    // What we want to do is find the node that has a skin whose skeleton root is the parent node
-    // This is all based on the fact that the skeleton root is the first node in the hierarchy
-    for node in nodes {
-        let n = (***node).borrow();
-        let skin = n.skin.as_ref();
-        if let Some(skin) = skin {
-            if skin.skeleton_root_index == first_index {
-                return Some(Rc::clone(node));
-            }
-        }
-
-        let children = &n.children;
-        if children.len() == 0 {
-            return None;
-        }
-
-        let children = children.iter().collect::<Vec<_>>();
-        if let Some(found) = find_parent_node(&children, first_index) {
-            return Some(found);
-        }
-    }
-
-    None
 }
 
 #[derive(Debug, Clone)]
@@ -245,19 +212,17 @@ mod tests {
         )
         .unwrap();
 
-        let hand = nodes.get("Hand").unwrap().borrow();
-        let hand_root = hand.children.first().unwrap();
-        let before = hand.find(2).unwrap().borrow().get_node_matrix();
-        let delta_time = 0.5;
+        let hand = nodes.get("Hand").unwrap();
         {
-            let mut hand_root = hand_root.borrow_mut();
-            hand_root.active_animation_index.replace(0);
+            let mut hand = hand.borrow_mut();
+            hand.active_animation_index.replace(0);
         }
 
-        let hand_root = hand_root.borrow();
-        hand_root
-            .update_animation(delta_time, &vulkan_context)
-            .unwrap();
+        let hand = hand.borrow();
+        let before = hand.find(2).unwrap().borrow().get_node_matrix();
+
+        let delta_time = 0.5;
+        hand.update_animation(delta_time, &vulkan_context).unwrap();
 
         let after = hand.find(2).unwrap().borrow().get_node_matrix();
         assert_ne!(before, after);

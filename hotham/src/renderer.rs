@@ -129,7 +129,7 @@ impl Renderer {
     pub fn draw(&mut self, frame_index: usize, nodes: &Vec<Node>) -> Result<()> {
         self.frame_index += 1;
 
-        self.show_debug_info()?;
+        // self.show_debug_info()?;
 
         let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
@@ -252,6 +252,12 @@ impl Renderer {
         device: &ash::Device,
         command_buffer: vk::CommandBuffer,
     ) -> Result<()> {
+        // Update any animations
+        node.update_animation(
+            self.last_frame_time.elapsed().as_secs_f32(),
+            &self.vulkan_context,
+        )?;
+
         if let Some(mesh) = node.mesh.as_ref() {
             // Bind mesh descriptor sets
             device.cmd_bind_descriptor_sets(
@@ -283,12 +289,6 @@ impl Renderer {
                     &[],
                 )
             }
-
-            // Update any animations
-            node.update_animation(
-                self.last_frame_time.elapsed().as_secs_f32(),
-                &self.vulkan_context,
-            )?;
 
             // Push constants
             let node_matrix = node.get_node_matrix();

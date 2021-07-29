@@ -181,6 +181,20 @@ impl Node {
         return translation * rotation * scale * self.matrix;
     }
 
+    pub fn get_root_node(&self) -> Option<Rc<RefCell<Node>>> {
+        let mut last_parent = None;
+        let mut parent = self.parent.clone();
+
+        // Walk up the tree to the root
+        while let Some(p) = parent.upgrade() {
+            last_parent = Some(p.clone());
+            let p = (*p).borrow();
+            parent = p.parent.clone();
+        }
+
+        last_parent
+    }
+
     pub(crate) fn update_animation(
         &self,
         delta_time: f32,
@@ -194,9 +208,8 @@ impl Node {
                     self.index
                 )
             })?;
-            (**animation)
-                .borrow_mut()
-                .update(delta_time, vulkan_context)?;
+            (**animation).borrow_mut().update(delta_time)?;
+            self.update_joints(vulkan_context)?;
         }
         Ok(())
     }
