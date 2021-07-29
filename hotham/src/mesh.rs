@@ -21,7 +21,7 @@ pub struct Mesh {
 impl Mesh {
     pub(crate) fn load(
         mesh_data: &gltf::Mesh,
-        blob: &[u8],
+        buffers: &Vec<&[u8]>,
         vulkan_context: &VulkanContext,
         mesh_descriptor_set_layout: vk::DescriptorSetLayout,
         ubo_buffer: vk::Buffer,
@@ -39,8 +39,7 @@ impl Mesh {
         let mut base_color_texture = None;
 
         for primitive in mesh_data.primitives() {
-            let reader = primitive
-                .reader(|buffer| Some(&blob[buffer.index()..buffer.index() + buffer.length()]));
+            let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
 
             for v in reader
                 .read_positions()
@@ -49,11 +48,10 @@ impl Mesh {
                 positions.push(vec3(v[0], v[1], v[2]));
             }
 
-            for v in reader
-                .read_normals()
-                .ok_or(anyhow!("Mesh {} has no normals!"))?
-            {
-                normals.push(vec3(v[0], v[1], v[2]));
+            if let Some(iter) = reader.read_normals() {
+                for v in iter {
+                    normals.push(vec3(v[0], v[1], v[2]));
+                }
             }
 
             if let Some(iter) = reader.read_tex_coords(0) {
@@ -68,11 +66,10 @@ impl Mesh {
                 }
             }
 
-            for t in reader
-                .read_tangents()
-                .ok_or(anyhow!("Mesh {} has no tangents!"))?
-            {
-                tangents.push(vec4(t[0], t[1], t[2], t[3]));
+            if let Some(iter) = reader.read_tangents() {
+                for t in iter {
+                    tangents.push(vec4(t[0], t[1], t[2], t[3]));
+                }
             }
 
             if let Some(iter) = reader.read_joints(0) {

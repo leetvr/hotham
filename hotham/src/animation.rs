@@ -18,7 +18,7 @@ pub struct Animation {
 impl Animation {
     pub(crate) fn load(
         animation: &gltf::Animation,
-        blob: &[u8],
+        buffers: &Vec<&[u8]>,
         nodes: &[&Rc<RefCell<Node>>],
     ) -> Result<()> {
         let mut channels = Vec::new();
@@ -27,7 +27,7 @@ impl Animation {
         let mut first_target_node = None;
 
         for channel in animation.channels() {
-            let reader = channel.reader(|_| Some(&blob));
+            let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]));
 
             let mut inputs = Vec::new();
             let outputs;
@@ -195,17 +195,17 @@ mod tests {
     use ash::vk;
 
     #[test]
-    pub fn animation_test() {
+    pub fn animation_test_hand() {
         let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
         let vulkan_context = VulkanContext::testing().unwrap();
         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
         let ubo_buffer = vk::Buffer::null();
+        let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
 
         let gltf_bytes = document.into_json().to_vec().unwrap();
-        let data_bytes = &buffers[0];
         let nodes = gltf_loader::load_gltf_nodes(
             &gltf_bytes,
-            data_bytes,
+            &buffers,
             &vulkan_context,
             &set_layouts,
             ubo_buffer,
@@ -225,6 +225,40 @@ mod tests {
         hand.update_animation(delta_time, &vulkan_context).unwrap();
 
         let after = hand.find(2).unwrap().borrow().get_node_matrix();
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    pub fn animation_test_simple() {
+        let (document, buffers, _) = gltf::import("../test_assets/animation_test.gltf").unwrap();
+        let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
+        let ubo_buffer = vk::Buffer::null();
+
+        let gltf_bytes = document.into_json().to_vec().unwrap();
+        let nodes = gltf_loader::load_gltf_nodes(
+            &gltf_bytes,
+            &buffers,
+            &vulkan_context,
+            &set_layouts,
+            ubo_buffer,
+        )
+        .unwrap();
+
+        let test = nodes.get("Test").unwrap();
+        {
+            let mut hand = test.borrow_mut();
+            hand.active_animation_index.replace(0);
+        }
+
+        let test = test.borrow();
+        let before = test.find(2).unwrap().borrow().get_node_matrix();
+
+        let delta_time = 0.1;
+        test.update_animation(delta_time, &vulkan_context).unwrap();
+
+        let after = test.find(2).unwrap().borrow().get_node_matrix();
         assert_ne!(before, after);
     }
 }

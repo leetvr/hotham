@@ -113,11 +113,11 @@ where
         println!("[HOTHAM_INIT] Loading models..");
         let nodes = renderer.load_gltf_nodes(program.get_gltf_data())?;
         println!(
-            "[HOTHAM_INIT] done! Loaded {} models. Getting scene objects..",
+            "[HOTHAM_INIT] done! Loaded {} models. Getting scene nodes..",
             nodes.len()
         );
         let nodes = program.init(nodes)?;
-        println!("[HOTHAM_INIT] done! Loaded {} scene objects.", nodes.len());
+        println!("[HOTHAM_INIT] done! Loaded {} scene nodes.", nodes.len());
 
         println!("[HOTHAM_INIT] INIT COMPLETE!");
 

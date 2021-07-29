@@ -20,14 +20,14 @@ pub struct Skin {
 impl Skin {
     pub(crate) fn load(
         skin_data: &gltf::Skin,
-        blob: &[u8],
+        buffers: &Vec<&[u8]>,
         vulkan_context: &VulkanContext,
         parent_node: Rc<RefCell<Node>>,
         skin_descriptor_set_layout: vk::DescriptorSetLayout,
     ) -> Result<()> {
         let name = skin_data.name().unwrap_or("Skin").to_string();
         let inverse_bind_matrices = skin_data
-            .reader(|buffer| Some(&blob[buffer.index()..buffer.index() + buffer.length()]))
+            .reader(|buffer| Some(&buffers[buffer.index()]))
             .read_inverse_bind_matrices()
             .ok_or_else(|| anyhow!("No inverse bind matrices"))?
             .map(|matrix| matrix.into())

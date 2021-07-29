@@ -27,7 +27,7 @@ pub struct Node {
 impl Node {
     pub(crate) fn load(
         node_data: &gltf::Node,
-        blob: &[u8],
+        buffers: &Vec<&[u8]>,
         vulkan_context: &VulkanContext,
         set_layouts: &[vk::DescriptorSetLayout],
         ubo_buffer: vk::Buffer,
@@ -39,7 +39,7 @@ impl Node {
         let mesh = if let Some(mesh_data) = node_data.mesh() {
             Some(Mesh::load(
                 &mesh_data,
-                blob,
+                buffers,
                 vulkan_context,
                 set_layouts[0],
                 ubo_buffer,
@@ -69,7 +69,7 @@ impl Node {
         let parent_node = Rc::downgrade(&node);
 
         (*node).borrow_mut().load_children(
-            blob,
+            buffers,
             vulkan_context,
             set_layouts,
             ubo_buffer,
@@ -79,7 +79,7 @@ impl Node {
 
         // NOTE: This *must* be done after load_children as skins will refer to children that may not be loaded yet.
         (*node).borrow().load_skins(
-            blob,
+            buffers,
             vulkan_context,
             node_data,
             node.clone(),
@@ -216,7 +216,7 @@ impl Node {
 
     fn load_children(
         &mut self,
-        blob: &[u8],
+        buffers: &Vec<&[u8]>,
         vulkan_context: &VulkanContext,
         set_layouts: &[vk::DescriptorSetLayout],
         ubo_buffer: vk::Buffer,
@@ -228,7 +228,7 @@ impl Node {
             .map(|n| {
                 let (_, node) = Node::load(
                     &n,
-                    blob,
+                    buffers,
                     vulkan_context,
                     set_layouts,
                     ubo_buffer,
@@ -243,7 +243,7 @@ impl Node {
 
     fn load_skins(
         &self,
-        blob: &[u8],
+        buffers: &Vec<&[u8]>,
         vulkan_context: &VulkanContext,
         node_data: &gltf::Node,
         skeleton_root: Rc<RefCell<Node>>,
@@ -264,7 +264,7 @@ impl Node {
                     .ok_or_else(|| anyhow!("Child not found"))?;
                 Skin::load(
                     &skin_data,
-                    blob,
+                    buffers,
                     vulkan_context,
                     child_node,
                     skin_descriptor_set_layout,

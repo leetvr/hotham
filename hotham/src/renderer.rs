@@ -370,9 +370,10 @@ impl Renderer {
         &self,
         gltf_data: (&[u8], &[u8]),
     ) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
+        let buffers = vec![gltf_data.1];
         load_gltf_nodes(
             gltf_data.0,
-            gltf_data.1,
+            &buffers,
             &self.vulkan_context,
             &self.descriptor_set_layouts,
             self.uniform_buffer.handle,

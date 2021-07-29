@@ -10,7 +10,7 @@ use std::{
 
 pub(crate) fn load_gltf_nodes(
     gltf_bytes: &[u8],
-    data_bytes: &[u8],
+    buffers: &Vec<&[u8]>,
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &[vk::DescriptorSetLayout],
     ubo_buffer: vk::Buffer,
@@ -18,7 +18,7 @@ pub(crate) fn load_gltf_nodes(
     let gtlf_buf = Cursor::new(gltf_bytes);
     let gltf = gltf::Gltf::from_reader(gtlf_buf)?;
     let document = gltf.document;
-    let blob = data_bytes;
+    let blob = buffers;
 
     let mut nodes = HashMap::new();
     let root_scene = document.scenes().next().unwrap(); // safe as there is always one scene
@@ -26,7 +26,7 @@ pub(crate) fn load_gltf_nodes(
     for node_data in root_scene.nodes() {
         let (name, node) = Node::load(
             &node_data,
-            blob,
+            buffers,
             vulkan_context,
             descriptor_set_layouts,
             ubo_buffer,
@@ -55,9 +55,10 @@ mod tests {
         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
         let gltf = include_bytes!("../../hotham-asteroid/assets/asteroid.gltf");
-        let data = include_bytes!("../../hotham-asteroid/assets/asteroid_data.bin");
+        let data = include_bytes!("../../hotham-asteroid/assets/asteroid_data.bin").to_vec();
         let buffer = vk::Buffer::null();
-        let nodes = load_gltf_nodes(gltf, data, &vulkan_context, &set_layouts, buffer).unwrap();
+        let buffers = vec![data.as_slice()];
+        let nodes = load_gltf_nodes(gltf, &buffers, &vulkan_context, &set_layouts, buffer).unwrap();
         assert!(nodes.len() != 0);
     }
 
@@ -68,9 +69,10 @@ mod tests {
 
         let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
         let gltf = document.into_json().to_vec().unwrap();
-        let data = &buffers[0];
+        let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
         let buffer = vk::Buffer::null();
-        let nodes = load_gltf_nodes(&gltf, data, &vulkan_context, &set_layouts, buffer).unwrap();
+        let nodes =
+            load_gltf_nodes(&gltf, &buffers, &vulkan_context, &set_layouts, buffer).unwrap();
         assert!(nodes.len() == 1);
 
         let hand = nodes.get("Hand").unwrap();
