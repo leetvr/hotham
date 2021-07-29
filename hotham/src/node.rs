@@ -34,6 +34,7 @@ impl Node {
         parent: Weak<RefCell<Node>>,
     ) -> Result<(String, Rc<RefCell<Node>>)> {
         let name = node_data.name().unwrap().to_string();
+        let is_root = parent.upgrade().is_none();
         println!("Loading node {} - {}", node_data.index(), name);
 
         let mesh = if let Some(mesh_data) = node_data.mesh() {
@@ -77,8 +78,21 @@ impl Node {
             parent_node,
         )?;
 
+        // Special case: the root node has no parent, so it must apply its own skin.
+        if is_root {
+            if let Some(skin_data) = node_data.skin() {
+                Skin::load(
+                    &skin_data,
+                    buffers,
+                    vulkan_context,
+                    node.clone(),
+                    set_layouts[1],
+                )?;
+            }
+        }
+
         // NOTE: This *must* be done after load_children as skins will refer to children that may not be loaded yet.
-        (*node).borrow().load_skins(
+        (*node).borrow().load_child_skins(
             buffers,
             vulkan_context,
             node_data,
@@ -241,7 +255,7 @@ impl Node {
         Ok(())
     }
 
-    fn load_skins(
+    fn load_child_skins(
         &self,
         buffers: &Vec<&[u8]>,
         vulkan_context: &VulkanContext,

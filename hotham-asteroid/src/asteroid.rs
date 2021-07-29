@@ -36,14 +36,18 @@ impl Program for Asteroid {
         // let refinery = Node::clone(&refinery.borrow());
 
         // Ok(vec![asteroid, refinery])
-        let hand = nodes
-            .get("Hand")
-            .ok_or(HothamError::EmptyListError)?
-            .clone();
-        let mut hand = Node::clone(&hand.borrow());
-        hand.active_animation_index.replace(0);
+        // let hand = nodes
+        //     .get("Hand")
+        //     .ok_or(HothamError::EmptyListError)?
+        //     .clone();
+        // let mut hand = Node::clone(&hand.borrow());
+        // hand.active_animation_index.replace(0);
 
-        Ok(vec![hand])
+        let test = nodes.get("Test").unwrap().borrow();
+        let mut test = Node::clone(&test);
+        test.active_animation_index.replace(0);
+
+        Ok(vec![test])
     }
 
     fn get_gltf_data(&self) -> (&[u8], &[u8]) {
@@ -52,8 +56,8 @@ impl Program for Asteroid {
         //     include_bytes!("../assets/asteroid_data.bin"),
         // )
         (
-            include_bytes!("../assets/hand.gltf"),
-            include_bytes!("../assets/hand.bin"),
+            include_bytes!("../assets/animation_test.gltf"),
+            include_bytes!("../assets/animation_test_data.bin"),
         )
     }
 }
