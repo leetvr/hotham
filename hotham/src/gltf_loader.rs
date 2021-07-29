@@ -48,7 +48,7 @@ pub(crate) fn load_gltf_nodes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{renderer::create_descriptor_set_layouts, vulkan_context::VulkanContext};
+    use crate::{renderer::create_descriptor_set_layouts, vulkan_context::VulkanContext, Vertex};
     #[test]
     pub fn test_asteroid() {
         let vulkan_context = VulkanContext::testing().unwrap();
@@ -90,5 +90,7 @@ mod tests {
         let skin = hand_base.skin.as_ref().unwrap();
         assert_eq!(skin.inverse_bind_matrices.len(), 16);
         assert_eq!(skin.joints.len(), 16);
+
+        let mesh = hand_base.mesh.as_ref().unwrap();
     }
 }

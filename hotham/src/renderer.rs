@@ -270,10 +270,10 @@ impl Renderer {
             );
 
             // Bind vertex and index buffers
-            device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer], &[0]);
+            device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer.handle], &[0]);
             device.cmd_bind_index_buffer(
                 command_buffer,
-                mesh.index_buffer,
+                mesh.index_buffer.handle,
                 0,
                 vk::IndexType::UINT32,
             );

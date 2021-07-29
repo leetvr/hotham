@@ -13,8 +13,8 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct Mesh {
     pub descriptor_sets: Vec<vk::DescriptorSet>,
-    pub index_buffer: vk::Buffer,
-    pub vertex_buffer: vk::Buffer,
+    pub(crate) index_buffer: Buffer<u32>,
+    pub(crate) vertex_buffer: Buffer<Vertex>,
     pub num_indices: u32,
 }
 
@@ -196,8 +196,8 @@ impl Mesh {
         println!("[HOTHAM_MODEL] ..done!");
 
         Ok(Mesh {
-            vertex_buffer: vertex_buffer.handle,
-            index_buffer: index_buffer.handle,
+            vertex_buffer,
+            index_buffer,
             descriptor_sets,
             num_indices: indices.len() as u32,
         })
