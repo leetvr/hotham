@@ -62,7 +62,7 @@ impl Animation {
                 Some(ReadOutputs::Rotations(rotations)) => {
                     let mut values = Vec::new();
                     for t in rotations.into_f32() {
-                        values.push(Quaternion::new(t[0], t[1], t[2], t[3]));
+                        values.push(Quaternion::new(t[3], t[0], t[1], t[2])); // gltf gives us a quaternion in [x, y, z, w] but we need [w, x, y, z]
                     }
                     outputs = AnimationOutputs::Rotations(values);
                 }
@@ -115,16 +115,19 @@ impl Animation {
 
         for channel in &self.channels {
             let sampler = &channel.sampler;
-            for mut chunk in &sampler.inputs.iter().enumerate().chunks(2) {
-                let lower = chunk.next();
-                let higher = chunk.next();
+            for i in 0..sampler.inputs.len() {
+                let lower_index = i;
+                let higher_index = i + 1;
+
+                let lower = sampler.inputs.get(lower_index);
+                let higher = sampler.inputs.get(higher_index);
 
                 if lower.is_none() || higher.is_none() {
                     continue;
                 }
 
-                let (lower_index, lower) = lower.unwrap();
-                let (higher_index, higher) = higher.unwrap();
+                let lower = lower.unwrap();
+                let higher = higher.unwrap();
                 if current_time >= lower && current_time <= higher {
                     // Do this in a block so that we drop the mutable reference to target_node
                     {

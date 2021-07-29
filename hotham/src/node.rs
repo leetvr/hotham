@@ -58,7 +58,7 @@ impl Node {
             children: Default::default(),
             translation: vec3(translation[0], translation[1], translation[2]),
             scale: vec3(scale[0], scale[1], scale[2]),
-            rotation: Quaternion::new(rotation[0], rotation[1], rotation[2], rotation[3]),
+            rotation: Quaternion::new(rotation[3], rotation[0], rotation[1], rotation[2]), // gltf gives a quaternion in [x, y, z, w], but we need [w, x, y, z]
             matrix: Matrix4::from(transform.matrix()),
             mesh,
             skin: None,
@@ -153,8 +153,8 @@ impl Node {
                 .zip(inverse_bind_matrices)
                 .map(|(joint, inverse_bind_matrix)| {
                     let joint = (**joint).borrow();
-                    let joint_matrix = joint.get_node_matrix() * inverse_bind_matrix;
-                    inverse_transform * joint_matrix
+                    let result = inverse_transform * joint.get_node_matrix() * inverse_bind_matrix;
+                    result
                 })
                 .collect::<Vec<_>>();
 

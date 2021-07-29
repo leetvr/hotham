@@ -79,7 +79,7 @@ impl Mesh {
             }
 
             if let Some(iter) = reader.read_weights(0) {
-                for t in iter.into_u16() {
+                for t in iter.into_f32() {
                     joint_weights.push(vec4(t[0] as f32, t[1] as f32, t[2] as f32, t[3] as f32));
                 }
             }

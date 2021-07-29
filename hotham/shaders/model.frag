@@ -28,6 +28,5 @@ void main() {
 	vec3 R = reflect(-L, N);
 	vec3 diffuse = max(dot(N, L), ambient).rrr;
 	float specular = pow(max(dot(R, V), 0.0), 32.0);
-	// outFragColor = vec4(diffuse * color.rgb + specular, color.a);
-	outFragColor = vec4(1.0);
+	outFragColor = vec4(diffuse * color.rgb + specular, color.a);
 }

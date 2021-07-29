@@ -47,6 +47,9 @@ pub(crate) fn load_gltf_nodes(
 
 #[cfg(test)]
 mod tests {
+    use ash::version::DeviceV1_0;
+    use cgmath::{vec3, vec4, Matrix4, Quaternion};
+
     use super::*;
     use crate::{renderer::create_descriptor_set_layouts, vulkan_context::VulkanContext, Vertex};
     #[test]
@@ -92,5 +95,59 @@ mod tests {
         assert_eq!(skin.joints.len(), 16);
 
         let mesh = hand_base.mesh.as_ref().unwrap();
+        let vertex_buffer = &mesh.vertex_buffer;
+
+        unsafe {
+            let memory = vulkan_context
+                .device
+                .map_memory(
+                    vertex_buffer.device_memory,
+                    0,
+                    vk::WHOLE_SIZE,
+                    vk::MemoryMapFlags::empty(),
+                )
+                .unwrap();
+            let vertices: &[Vertex] =
+                std::slice::from_raw_parts_mut(std::mem::transmute(memory), 2376);
+            assert_eq!(vertices.len(), 2376);
+            let first = &vertices[0];
+            assert_eq!(
+                first.joint_weights,
+                vec4(0.67059284, 0.19407976, 0.115477115, 0.019850286)
+            );
+        }
+    }
+
+    #[test]
+    pub fn test_simple() {
+        let (document, buffers, _) = gltf::import("test_assets/animation_test.gltf").unwrap();
+        let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
+        let ubo_buffer = vk::Buffer::null();
+
+        let gltf_bytes = document.into_json().to_vec().unwrap();
+        let nodes = load_gltf_nodes(
+            &gltf_bytes,
+            &buffers,
+            &vulkan_context,
+            &set_layouts,
+            ubo_buffer,
+        )
+        .unwrap();
+
+        let test = nodes.get("Test").unwrap();
+        {
+            let mut hand = test.borrow_mut();
+            hand.active_animation_index.replace(0);
+        }
+
+        let test = test.borrow();
+        assert_eq!(test.translation, vec3(0.0, 0.0, 0.0));
+        assert_eq!(test.scale, vec3(1.0, 1.0, 1.0));
+        assert_eq!(test.rotation, Quaternion::new(1.0, 0.0, 0.0, 0.0));
+        let expected_matrix = Matrix4::from_scale(1.0);
+        let node_matrix = test.get_node_matrix();
+        assert_eq!(node_matrix, expected_matrix);
     }
 }
