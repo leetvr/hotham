@@ -51,43 +51,10 @@ impl VulkanContext {
         let (device, graphics_queue, queue_family_index) =
             create_vulkan_device(&extension_names, &instance, physical_device)?;
 
-        let command_pool = unsafe {
-            device.create_command_pool(
-                &vk::CommandPoolCreateInfo::builder()
-                    .queue_family_index(queue_family_index)
-                    .flags(
-                        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
-                            | vk::CommandPoolCreateFlags::TRANSIENT,
-                    ),
-                None,
-            )
-        }?;
+        let command_pool = create_command_pool(&device, queue_family_index)?;
 
         // HACK: This needs to be updated based on the actual data in the system.
-        let descriptor_pool = unsafe {
-            device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::builder()
-                    .pool_sizes(&[
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::UNIFORM_BUFFER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                    ])
-                    .max_sets(SWAPCHAIN_LENGTH as _),
-                None,
-            )
-        }?;
+        let descriptor_pool = create_descriptor_pool(&device)?;
 
         Ok(Self {
             entry,
@@ -194,30 +161,9 @@ impl VulkanContext {
 
         let graphics_queue = unsafe { device.get_device_queue(queue_family_index, 0) };
 
-        let command_pool = unsafe {
-            device.create_command_pool(
-                &vk::CommandPoolCreateInfo::builder()
-                    .queue_family_index(queue_family_index)
-                    .flags(
-                        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
-                            | vk::CommandPoolCreateFlags::TRANSIENT,
-                    ),
-                None,
-            )
-        }?;
+        let command_pool = create_command_pool(&device, queue_family_index)?;
 
-        let descriptor_pool = unsafe {
-            device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::builder()
-                    .pool_sizes(&[vk::DescriptorPoolSize {
-                        ty: vk::DescriptorType::UNIFORM_BUFFER,
-                        descriptor_count: SWAPCHAIN_LENGTH as _,
-                        ..Default::default()
-                    }])
-                    .max_sets(SWAPCHAIN_LENGTH as _),
-                None,
-            )
-        }?;
+        let descriptor_pool = create_descriptor_pool(&device)?;
 
         println!(" ..done!");
 
@@ -256,37 +202,9 @@ impl VulkanContext {
         let (device, graphics_queue, queue_family_index) =
             create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device)?;
 
-        let command_pool = unsafe {
-            device.create_command_pool(
-                &vk::CommandPoolCreateInfo::builder()
-                    .queue_family_index(queue_family_index)
-                    .flags(
-                        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
-                            | vk::CommandPoolCreateFlags::TRANSIENT,
-                    ),
-                None,
-            )
-        }?;
+        let command_pool = create_command_pool(&device, queue_family_index)?;
 
-        let descriptor_pool = unsafe {
-            device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::builder()
-                    .pool_sizes(&[
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::UNIFORM_BUFFER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                    ])
-                    .max_sets(SWAPCHAIN_LENGTH as _),
-                None,
-            )
-        }?;
+        let descriptor_pool = create_descriptor_pool(&device)?;
 
         Ok(Self {
             entry: vulkan_entry,
@@ -762,6 +680,49 @@ impl VulkanContext {
 
         Ok(descriptor_sets)
     }
+}
+
+fn create_command_pool(
+    device: &Device,
+    queue_family_index: u32,
+) -> Result<vk::CommandPool, anyhow::Error> {
+    let command_pool = unsafe {
+        device.create_command_pool(
+            &vk::CommandPoolCreateInfo::builder()
+                .queue_family_index(queue_family_index)
+                .flags(
+                    vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
+                        | vk::CommandPoolCreateFlags::TRANSIENT,
+                ),
+            None,
+        )
+    }?;
+    Ok(command_pool)
+}
+
+fn create_descriptor_pool(device: &Device) -> Result<vk::DescriptorPool, anyhow::Error> {
+    let descriptor_pool = unsafe {
+        device.create_descriptor_pool(
+            &vk::DescriptorPoolCreateInfo::builder()
+                .pool_sizes(&[
+                    vk::DescriptorPoolSize {
+                        ty: vk::DescriptorType::UNIFORM_BUFFER,
+                        descriptor_count: SWAPCHAIN_LENGTH as _,
+                    },
+                    vk::DescriptorPoolSize {
+                        ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                        descriptor_count: SWAPCHAIN_LENGTH as _,
+                    },
+                    vk::DescriptorPoolSize {
+                        ty: vk::DescriptorType::STORAGE_BUFFER,
+                        descriptor_count: 200 as _,
+                    },
+                ])
+                .max_sets(100 as _),
+            None,
+        )
+    }?;
+    Ok(descriptor_pool)
 }
 
 fn get_image_info(format: vk::Format) -> (vk::ImageViewType, u32) {
