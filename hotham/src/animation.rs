@@ -4,8 +4,7 @@ use anyhow::{anyhow, Result};
 use cgmath::{vec3, InnerSpace, Quaternion, Vector3, VectorSpace};
 use gltf::animation::util::ReadOutputs;
 
-use crate::{node::Node, vulkan_context::VulkanContext};
-use itertools::Itertools;
+use crate::node::Node;
 
 #[derive(Debug, Clone)]
 pub struct Animation {

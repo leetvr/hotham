@@ -7,9 +7,11 @@ use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
 };
+use cgmath::{Quaternion, Vector3};
 use openxr as xr;
 
 use std::{
+    borrow::BorrowMut,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -22,8 +24,8 @@ use std::{
 use std::{ffi::CStr, mem::transmute, ptr::null};
 
 use xr::{
-    vulkan_legacy::SessionCreateInfo, EventDataBuffer, FrameStream, FrameWaiter, Posef,
-    ReferenceSpaceType, Session, SessionState, Swapchain, SwapchainCreateFlags,
+    vulkan_legacy::SessionCreateInfo, ActiveActionSet, EventDataBuffer, FrameStream, FrameWaiter,
+    Posef, ReferenceSpaceType, Session, SessionState, Swapchain, SwapchainCreateFlags,
     SwapchainCreateInfo, SwapchainUsageFlags, VulkanLegacy,
 };
 
@@ -47,10 +49,11 @@ pub struct App<P: Program> {
     xr_session: Session<VulkanLegacy>,
     xr_state: SessionState,
     xr_swapchain: Swapchain<VulkanLegacy>,
-    xr_space: xr::Space,
-    _xr_action_set: xr::ActionSet,
-    _xr_left_action: xr::Action<Posef>,
-    _xr_right_action: xr::Action<Posef>,
+    reference_space: xr::Space,
+    xr_action_set: xr::ActionSet,
+    pose_action: xr::Action<Posef>,
+    left_hand_space: xr::Space,
+    right_hand_space: xr::Space,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
@@ -78,32 +81,41 @@ where
         // Create an action set to encapsulate our actions
         let xr_action_set = xr_instance.create_action_set("input", "input pose information", 0)?;
 
-        let xr_right_action =
-            xr_action_set.create_action::<xr::Posef>("right_hand", "Right Hand Controller", &[])?;
-        let xr_left_action =
-            xr_action_set.create_action::<xr::Posef>("left_hand", "Left Hand Controller", &[])?;
+        let left_hand_subaction_path = xr_instance.string_to_path("/user/hand/left").unwrap();
+        let right_hand_subaction_path = xr_instance.string_to_path("/user/hand/right").unwrap();
+        let left_hand_pose_path = xr_instance
+            .string_to_path("/user/hand/left/input/grip/pose")
+            .unwrap();
+        let right_hand_pose_path = xr_instance
+            .string_to_path("/user/hand/right/input/grip/pose")
+            .unwrap();
+
+        let pose_action = xr_action_set.create_action::<xr::Posef>(
+            "hand_pose",
+            "Hand Pose",
+            &[left_hand_subaction_path, right_hand_subaction_path],
+        )?;
 
         // Bind our actions to input devices using the given profile
-        // If you want to access inputs specific to a particular device you may specify a different
-        // interaction profile
         xr_instance.suggest_interaction_profile_bindings(
             xr_instance
                 .string_to_path("/interaction_profiles/oculus/touch_controller")
                 .unwrap(),
             &[
-                xr::Binding::new(
-                    &xr_right_action,
-                    xr_instance
-                        .string_to_path("/user/hand/right/input/grip/pose")
-                        .unwrap(),
-                ),
-                xr::Binding::new(
-                    &xr_left_action,
-                    xr_instance
-                        .string_to_path("/user/hand/left/input/grip/pose")
-                        .unwrap(),
-                ),
+                xr::Binding::new(&pose_action, left_hand_pose_path),
+                xr::Binding::new(&pose_action, right_hand_pose_path),
             ],
+        )?;
+
+        let left_hand_space = pose_action.create_space(
+            xr_session.clone(),
+            left_hand_subaction_path,
+            Posef::IDENTITY,
+        )?;
+        let right_hand_space = pose_action.create_space(
+            xr_session.clone(),
+            left_hand_subaction_path,
+            Posef::IDENTITY,
         )?;
 
         // Attach the action set to the session
@@ -128,11 +140,12 @@ where
             xr_instance,
             xr_session,
             xr_swapchain,
-            xr_space,
+            reference_space: xr_space,
             xr_state: SessionState::IDLE,
-            _xr_action_set: xr_action_set,
-            _xr_left_action: xr_left_action,
-            _xr_right_action: xr_right_action,
+            xr_action_set,
+            pose_action,
+            left_hand_space,
+            right_hand_space,
             swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,
@@ -165,7 +178,8 @@ where
                 break;
             }
 
-            self.xr_session.sync_actions(&[])?;
+            let active_action_set = ActiveActionSet::new(&self.xr_action_set);
+            self.xr_session.sync_actions(&[active_action_set])?;
 
             // Wait for a frame to become available from the runtime
             let (frame_state, swapchain_image_index) = self.begin_frame()?;
@@ -173,8 +187,18 @@ where
             let (_, views) = self.xr_session.locate_views(
                 VIEW_TYPE,
                 frame_state.predicted_display_time,
-                &self.xr_space,
+                &self.reference_space,
             )?;
+
+            let left_hand_pose = self
+                .left_hand_space
+                .locate(&self.reference_space, frame_state.predicted_display_time)?;
+
+            // HACK
+            let mut hand = self.nodes.get_mut(0).unwrap();
+            (*hand).translation = Vector3::from(mint::Vector3::from(left_hand_pose.pose.position));
+            (*hand).rotation =
+                Quaternion::from(mint::Quaternion::from(left_hand_pose.pose.orientation));
 
             if frame_state.should_render {
                 self.renderer.update_uniform_buffer(&views)?;
@@ -217,7 +241,7 @@ where
             frame_state.predicted_display_time,
             BLEND_MODE,
             &[&xr::CompositionLayerProjection::new()
-                .space(&self.xr_space)
+                .space(&self.reference_space)
                 .views(&[
                     xr::CompositionLayerProjectionView::new()
                         .pose(views[0].pose)

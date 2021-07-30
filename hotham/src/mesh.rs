@@ -10,6 +10,9 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+#[cfg(target_os = "android")]
+use std::io::Cursor;
+
 #[derive(Debug, Clone)]
 pub struct Mesh {
     pub descriptor_sets: Vec<vk::DescriptorSet>,

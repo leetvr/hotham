@@ -17,7 +17,6 @@ pub struct Node {
     pub translation: Vector3<f32>,
     pub scale: Vector3<f32>,
     pub rotation: Quaternion<f32>,
-    pub matrix: Matrix4<f32>,
     pub mesh: Option<Mesh>,
     pub skin: Option<Skin>,
     pub animations: Vec<Rc<RefCell<Animation>>>,
@@ -59,7 +58,6 @@ impl Node {
             translation: vec3(translation[0], translation[1], translation[2]),
             scale: vec3(scale[0], scale[1], scale[2]),
             rotation: Quaternion::new(rotation[3], rotation[0], rotation[1], rotation[2]), // gltf gives a quaternion in [x, y, z, w], but we need [w, x, y, z]
-            matrix: Matrix4::from(transform.matrix()),
             mesh,
             skin: None,
             animations: Default::default(),
@@ -192,7 +190,7 @@ impl Node {
         let rotation = Matrix4::from(self.rotation);
         let scale = Matrix4::from_nonuniform_scale(self.scale.x, self.scale.y, self.scale.z);
 
-        return translation * rotation * scale * self.matrix;
+        return translation * rotation * scale;
     }
 
     pub fn get_root_node(&self) -> Option<Rc<RefCell<Node>>> {
@@ -304,7 +302,6 @@ mod tests {
             translation: vec3(0.0, 0.0, 0.0),
             scale: vec3(1.0, 1.0, 1.0),
             rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0),
-            matrix: Matrix4::identity(),
             mesh: None,
             skin: None,
             animations: Vec::new(),
@@ -320,7 +317,6 @@ mod tests {
             translation: vec3(0.0, 0.0, 0.0),
             scale: vec3(1.0, 1.0, 1.0),
             rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0),
-            matrix: Matrix4::identity(),
             mesh: None,
             skin: None,
             animations: Vec::new(),
@@ -337,7 +333,6 @@ mod tests {
             translation: vec3(0.0, 0.0, 0.0),
             scale: vec3(1.0, 1.0, 1.0),
             rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0),
-            matrix: Matrix4::identity(),
             mesh: None,
             skin: None,
             animations: Vec::new(),

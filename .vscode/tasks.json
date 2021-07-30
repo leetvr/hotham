@@ -15,10 +15,7 @@
 			"windows": {
 				"command": ".\\run_on_simulator.ps1"
 			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
+			"group": "build",
 			"label": "Run Asteroid on Simulator",
 			"problemMatcher": []
 		},
@@ -27,7 +24,10 @@
 			"windows": {
 				"command": ".\\run_on_device.ps1"
 			},
-			"group": "test",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
 			"label": "Run Asteroid on Headset",
 			"problemMatcher": []
 		},

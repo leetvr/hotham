@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use cgmath::{vec3, Euler, Quaternion, Rad};
+// use cgmath::{vec3, Euler, Quaternion, Rad};
 use hotham::{node::Node, HothamError, HothamResult as Result, Program};
 
 #[derive(Debug, Clone)]
@@ -41,7 +41,7 @@ impl Program for Asteroid {
             .ok_or(HothamError::EmptyListError)?
             .clone();
         let mut hand = Node::clone(&hand.borrow());
-        // hand.active_animation_index.replace(0);
+        hand.active_animation_index.replace(0);
 
         // let test = nodes.get("Test").unwrap().borrow();
         // let mut test = Node::clone(&test);
