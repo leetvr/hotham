@@ -362,5 +362,24 @@ mod tests {
             * Matrix4::from_translation(vec3(-1.0, 0.0, 0.0))
             * Matrix4::from_translation(vec3(1.0, 0.0, 0.0));
         assert_eq!(grandchild.borrow().get_node_matrix(), expected_translation);
+
+        // Persist upon cloning
+        let cloned_parent = Node::clone(&parent_ref.borrow());
+        drop(parent_ref);
+
+        let parent_ref = Rc::new(RefCell::new(cloned_parent));
+        (*parent_ref).borrow_mut().translation = vec3(5.0, 4.0, 3.0);
+
+        let child_ref = Rc::clone(
+            (*parent_ref)
+                .borrow()
+                .children
+                .iter()
+                .next()
+                .as_ref()
+                .unwrap(),
+        );
+        let expected_translation = Matrix4::from_translation(vec3(5.0, 4.0, 3.0));
+        assert_eq!(child_ref.borrow().get_node_matrix(), expected_translation);
     }
 }

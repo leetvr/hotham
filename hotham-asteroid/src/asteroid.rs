@@ -1,5 +1,6 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use cgmath::vec3;
 // use cgmath::{vec3, Euler, Quaternion, Rad};
 use hotham::{node::Node, HothamError, HothamResult as Result, Program};
 
@@ -14,7 +15,10 @@ impl Asteroid {
 
 impl Program for Asteroid {
     // TODO: Make more ergonomic
-    fn init(&mut self, nodes: HashMap<String, Rc<RefCell<Node>>>) -> Result<Vec<Node>> {
+    fn init(
+        &mut self,
+        nodes: HashMap<String, Rc<RefCell<Node>>>,
+    ) -> Result<Vec<Rc<RefCell<Node>>>> {
         // let asteroid = nodes
         //     .get("Asteroid")
         //     .ok_or(HothamError::EmptyListError)?
@@ -41,7 +45,13 @@ impl Program for Asteroid {
             .ok_or(HothamError::EmptyListError)?
             .clone();
         let mut hand = Node::clone(&hand.borrow());
+        hand.scale = vec3(0.05, 0.05, 0.05);
         hand.active_animation_index.replace(0);
+
+        let hand = Rc::new(RefCell::new(hand));
+        (*hand).borrow_mut().children.iter_mut().for_each(|c| {
+            (*c).borrow_mut().parent = Rc::downgrade(&hand);
+        });
 
         // let test = nodes.get("Test").unwrap().borrow();
         // let mut test = Node::clone(&test);

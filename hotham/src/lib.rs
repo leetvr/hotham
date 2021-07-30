@@ -43,7 +43,10 @@ pub const TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
 
 pub trait Program {
     fn get_gltf_data(&self) -> (&[u8], &[u8]);
-    fn init(&mut self, nodes: HashMap<String, Rc<RefCell<Node>>>) -> HothamResult<Vec<Node>>;
+    fn init(
+        &mut self,
+        nodes: HashMap<String, Rc<RefCell<Node>>>,
+    ) -> HothamResult<Vec<Rc<RefCell<Node>>>>;
 }
 
 #[derive(Debug, Clone)]

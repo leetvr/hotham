@@ -18,7 +18,7 @@ use xr::VulkanLegacy;
 
 pub(crate) struct Renderer {
     _swapchain: Swapchain,
-    vulkan_context: VulkanContext,
+    pub vulkan_context: VulkanContext,
     frames: Vec<Frame>,
     descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     pipeline_layout: vk::PipelineLayout,
@@ -126,10 +126,10 @@ impl Renderer {
         })
     }
 
-    pub fn draw(&mut self, frame_index: usize, nodes: &Vec<Node>) -> Result<()> {
+    pub fn draw(&mut self, frame_index: usize, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
         self.frame_index += 1;
 
-        // self.show_debug_info()?;
+        self.show_debug_info(nodes)?;
 
         let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
@@ -195,7 +195,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn prepare_frame(&self, frame: &Frame, nodes: &Vec<Node>) -> Result<()> {
+    pub fn prepare_frame(&self, frame: &Frame, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
         let device = &self.vulkan_context.device;
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
@@ -236,7 +236,7 @@ impl Renderer {
             );
 
             for node in nodes {
-                self.draw_node(node, device, command_buffer)?;
+                self.draw_node(&(**node).borrow(), device, command_buffer)?;
             }
 
             device.cmd_end_render_pass(command_buffer);
@@ -253,10 +253,10 @@ impl Renderer {
         command_buffer: vk::CommandBuffer,
     ) -> Result<()> {
         // Update any animations
-        node.update_animation(
-            self.last_frame_time.elapsed().as_secs_f32(),
-            &self.vulkan_context,
-        )?;
+        // node.update_animation(
+        //     self.last_frame_time.elapsed().as_secs_f32(),
+        //     &self.vulkan_context,
+        // )?;
 
         if let Some(mesh) = node.mesh.as_ref() {
             // Bind mesh descriptor sets
@@ -312,7 +312,7 @@ impl Renderer {
         Ok(())
     }
 
-    fn show_debug_info(&self) -> Result<()> {
+    fn show_debug_info(&self, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
         if self.frame_index % 72 != 0 {
             return Ok(());
         };
@@ -360,6 +360,16 @@ impl Renderer {
         self.term.write_line(&format!(
             "[View 0]: Position: {:?}, angleLeft: {}, angleRight: {}, angleDown: {}, angleUp: {}",
             camera_position, angle_left, angle_right, angle_up, angle_down
+        ))?;
+
+        let left_hand = nodes.get(0).unwrap().borrow();
+        let left_hand = left_hand.children.first().as_ref().unwrap().borrow();
+        let left_hand_position = left_hand.translation;
+        let left_hand_rotation = left_hand.rotation;
+        let left_hand_matrix = left_hand.get_node_matrix();
+        self.term.write_line(&format!(
+            "[Left Hand]: Position: {:?}, rotation: {:?}, matrix: {:?}",
+            left_hand_position, left_hand_rotation, left_hand_matrix
         ))?;
         self.term.flush()?;
 

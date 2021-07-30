@@ -11,7 +11,8 @@ use cgmath::{Quaternion, Vector3};
 use openxr as xr;
 
 use std::{
-    borrow::BorrowMut,
+    cell::RefCell,
+    rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -53,12 +54,13 @@ pub struct App<P: Program> {
     xr_action_set: xr::ActionSet,
     pose_action: xr::Action<Posef>,
     left_hand_space: xr::Space,
+    grab_action: xr::Action<f32>,
     right_hand_space: xr::Space,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<VulkanLegacy>,
-    nodes: Vec<Node>,
+    nodes: Vec<Rc<RefCell<Node>>>,
     #[allow(dead_code)]
     resumed: bool,
 }
@@ -90,9 +92,22 @@ where
             .string_to_path("/user/hand/right/input/grip/pose")
             .unwrap();
 
+        let left_hand_grip_squeeze_path = xr_instance
+            .string_to_path("/user/hand/left/input/squeeze/value")
+            .unwrap();
+        let right_hand_grip_squeeze_path = xr_instance
+            .string_to_path("/user/hand/right/input/squeeze/value")
+            .unwrap();
+
         let pose_action = xr_action_set.create_action::<xr::Posef>(
             "hand_pose",
             "Hand Pose",
+            &[left_hand_subaction_path, right_hand_subaction_path],
+        )?;
+
+        let grab_action = xr_action_set.create_action::<f32>(
+            "grab_object",
+            "Grab Object",
             &[left_hand_subaction_path, right_hand_subaction_path],
         )?;
 
@@ -104,6 +119,8 @@ where
             &[
                 xr::Binding::new(&pose_action, left_hand_pose_path),
                 xr::Binding::new(&pose_action, right_hand_pose_path),
+                xr::Binding::new(&grab_action, left_hand_grip_squeeze_path),
+                xr::Binding::new(&grab_action, right_hand_grip_squeeze_path),
             ],
         )?;
 
@@ -114,7 +131,7 @@ where
         )?;
         let right_hand_space = pose_action.create_space(
             xr_session.clone(),
-            left_hand_subaction_path,
+            right_hand_subaction_path,
             Posef::IDENTITY,
         )?;
 
@@ -144,6 +161,7 @@ where
             xr_state: SessionState::IDLE,
             xr_action_set,
             pose_action,
+            grab_action,
             left_hand_space,
             right_hand_space,
             swapchain_resolution,
@@ -162,6 +180,9 @@ where
             ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
                 .map_err(anyhow::Error::new)?;
         }
+
+        let right_hand_subaction_path =
+            self.xr_instance.string_to_path("/user/hand/right").unwrap();
 
         while !self.should_quit.load(Ordering::Relaxed) {
             #[cfg(target_os = "android")]
@@ -190,15 +211,27 @@ where
                 &self.reference_space,
             )?;
 
-            let left_hand_pose = self
-                .left_hand_space
+            let right_hand_pose = self
+                .right_hand_space
                 .locate(&self.reference_space, frame_state.predicted_display_time)?;
 
+            let right_hand_grabbed = xr::ActionInput::get(
+                &self.grab_action,
+                &self.xr_session,
+                right_hand_subaction_path,
+            )?
+            .current_state;
+
             // HACK
-            let mut hand = self.nodes.get_mut(0).unwrap();
-            (*hand).translation = Vector3::from(mint::Vector3::from(left_hand_pose.pose.position));
-            (*hand).rotation =
-                Quaternion::from(mint::Quaternion::from(left_hand_pose.pose.orientation));
+            let hand = self.nodes.get(0).unwrap();
+            (**hand).borrow_mut().translation =
+                Vector3::from(mint::Vector3::from(right_hand_pose.pose.position));
+            // (**hand).borrow_mut().translation = Vector3::new(2.0, 5.0, 0.0);
+            (**hand).borrow_mut().rotation =
+                Quaternion::from(mint::Quaternion::from(right_hand_pose.pose.orientation));
+            (**hand)
+                .borrow()
+                .update_animation(right_hand_grabbed, &self.renderer.vulkan_context)?;
 
             if frame_state.should_render {
                 self.renderer.update_uniform_buffer(&views)?;
