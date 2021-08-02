@@ -105,13 +105,22 @@ impl Animation {
         Ok(())
     }
 
-    pub(crate) fn update(&mut self, delta_time: f32) -> Result<()> {
+    pub(crate) fn update_to_percentage(&mut self, percentage: f32) -> () {
+        self.current_time = self.end_time * percentage;
+        self.update_channels()
+    }
+
+    pub(crate) fn update(&mut self, delta_time: f32) -> () {
         self.current_time += delta_time;
         if self.current_time >= self.end_time {
             self.current_time -= self.end_time;
         }
-        let current_time = &self.current_time;
 
+        self.update_channels()
+    }
+
+    fn update_channels(&self) -> () {
+        let current_time = &self.current_time;
         for channel in &self.channels {
             let sampler = &channel.sampler;
             for i in 0..sampler.inputs.len() {
@@ -156,7 +165,6 @@ impl Animation {
                 }
             }
         }
-        Ok(())
     }
 }
 

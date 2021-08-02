@@ -207,6 +207,25 @@ impl Node {
         last_parent
     }
 
+    pub(crate) fn update_animation_to_percentage(
+        &self,
+        percentage: f32,
+        vulkan_context: &VulkanContext,
+    ) -> Result<()> {
+        if let Some(index) = self.active_animation_index {
+            let animation = self.animations.get(index).ok_or_else(|| {
+                anyhow!(
+                    "Unable to find animation with index {} on node {}",
+                    index,
+                    self.index
+                )
+            })?;
+            (**animation).borrow_mut().update_to_percentage(percentage);
+            self.update_joints(vulkan_context)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn update_animation(
         &self,
         delta_time: f32,
@@ -220,7 +239,7 @@ impl Node {
                     self.index
                 )
             })?;
-            (**animation).borrow_mut().update(delta_time)?;
+            (**animation).borrow_mut().update(delta_time);
             self.update_joints(vulkan_context)?;
         }
         Ok(())

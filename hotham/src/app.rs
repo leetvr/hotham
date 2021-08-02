@@ -229,9 +229,10 @@ where
             // (**hand).borrow_mut().translation = Vector3::new(2.0, 5.0, 0.0);
             (**hand).borrow_mut().rotation =
                 Quaternion::from(mint::Quaternion::from(right_hand_pose.pose.orientation));
-            (**hand)
-                .borrow()
-                .update_animation(right_hand_grabbed, &self.renderer.vulkan_context)?;
+            (**hand).borrow().update_animation_to_percentage(
+                right_hand_grabbed,
+                &self.renderer.vulkan_context,
+            )?;
 
             if frame_state.should_render {
                 self.renderer.update_uniform_buffer(&views)?;

@@ -26,6 +26,7 @@ mod uniform_buffer_object;
 mod util;
 mod vertex;
 mod vulkan_context;
+mod hand;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
