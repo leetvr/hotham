@@ -44,7 +44,7 @@ mod tests {
     use crate::{
         gltf_loader, renderer::create_descriptor_set_layouts, vulkan_context::VulkanContext,
     };
-    use ash::vk;
+    use ash::{version::DeviceV1_0, vk};
 
     use super::*;
 
@@ -53,14 +53,34 @@ mod tests {
         let vulkan_context = VulkanContext::testing().unwrap();
         let hand_node = get_hand_node(&vulkan_context);
         let hand = Hand::new(hand_node);
-        let before = get_joint_matrices(&hand);
+        let before = get_joint_matrices(&hand, &vulkan_context);
         hand.grip(0.5, &vulkan_context).unwrap();
-        let after = get_joint_matrices(&hand);
+        let after = get_joint_matrices(&hand, &vulkan_context);
         assert_ne!(before, after);
     }
 
-    fn get_joint_matrices(hand: &Hand) -> Vec<Matrix4<f32>> {
-        Default::default()
+    fn get_joint_matrices(hand: &Hand, vulkan_context: &VulkanContext) -> Vec<Matrix4<f32>> {
+        let hand = (*hand).node.borrow().find(2).unwrap();
+        let hand = (*hand).borrow();
+        let skin = hand.skin.as_ref().unwrap();
+        let vertex_buffer = &skin.ssbo;
+        let matrices: &[Matrix4<f32>];
+
+        unsafe {
+            let memory = vulkan_context
+                .device
+                .map_memory(
+                    vertex_buffer.device_memory,
+                    0,
+                    vk::WHOLE_SIZE,
+                    vk::MemoryMapFlags::empty(),
+                )
+                .unwrap();
+            matrices = std::slice::from_raw_parts_mut(std::mem::transmute(memory), 25);
+            assert_eq!(matrices.len(), 25);
+        }
+
+        matrices.to_vec()
     }
 
     fn get_hand_node(vulkan_context: &VulkanContext) -> Rc<RefCell<Node>> {

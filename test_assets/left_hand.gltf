@@ -1669,27 +1669,6 @@
     {
       "channels": [
         {
-          "sampler": 0,
-          "target": {
-            "node": 4,
-            "path": "translation"
-          }
-        },
-        {
-          "sampler": 1,
-          "target": {
-            "node": 4,
-            "path": "rotation"
-          }
-        },
-        {
-          "sampler": 2,
-          "target": {
-            "node": 4,
-            "path": "scale"
-          }
-        },
-        {
           "sampler": 3,
           "target": {
             "node": 24,
@@ -2270,27 +2249,6 @@
     {
       "channels": [
         {
-          "sampler": 0,
-          "target": {
-            "node": 6,
-            "path": "translation"
-          }
-        },
-        {
-          "sampler": 1,
-          "target": {
-            "node": 6,
-            "path": "rotation"
-          }
-        },
-        {
-          "sampler": 2,
-          "target": {
-            "node": 6,
-            "path": "scale"
-          }
-        },
-        {
           "sampler": 3,
           "target": {
             "node": 24,
@@ -2350,27 +2308,6 @@
           "sampler": 11,
           "target": {
             "node": 26,
-            "path": "scale"
-          }
-        },
-        {
-          "sampler": 12,
-          "target": {
-            "node": 27,
-            "path": "translation"
-          }
-        },
-        {
-          "sampler": 13,
-          "target": {
-            "node": 27,
-            "path": "rotation"
-          }
-        },
-        {
-          "sampler": 14,
-          "target": {
-            "node": 27,
             "path": "scale"
           }
         },
@@ -2438,27 +2375,6 @@
           }
         },
         {
-          "sampler": 24,
-          "target": {
-            "node": 10,
-            "path": "translation"
-          }
-        },
-        {
-          "sampler": 25,
-          "target": {
-            "node": 10,
-            "path": "rotation"
-          }
-        },
-        {
-          "sampler": 26,
-          "target": {
-            "node": 10,
-            "path": "scale"
-          }
-        },
-        {
           "sampler": 27,
           "target": {
             "node": 11,
@@ -2522,27 +2438,6 @@
           }
         },
         {
-          "sampler": 36,
-          "target": {
-            "node": 14,
-            "path": "translation"
-          }
-        },
-        {
-          "sampler": 37,
-          "target": {
-            "node": 14,
-            "path": "rotation"
-          }
-        },
-        {
-          "sampler": 38,
-          "target": {
-            "node": 14,
-            "path": "scale"
-          }
-        },
-        {
           "sampler": 39,
           "target": {
             "node": 20,
@@ -2602,27 +2497,6 @@
           "sampler": 47,
           "target": {
             "node": 22,
-            "path": "scale"
-          }
-        },
-        {
-          "sampler": 48,
-          "target": {
-            "node": 23,
-            "path": "translation"
-          }
-        },
-        {
-          "sampler": 49,
-          "target": {
-            "node": 23,
-            "path": "rotation"
-          }
-        },
-        {
-          "sampler": 50,
-          "target": {
-            "node": 23,
             "path": "scale"
           }
         },
@@ -2707,27 +2581,6 @@
           "sampler": 62,
           "target": {
             "node": 18,
-            "path": "scale"
-          }
-        },
-        {
-          "sampler": 63,
-          "target": {
-            "node": 19,
-            "path": "translation"
-          }
-        },
-        {
-          "sampler": 64,
-          "target": {
-            "node": 19,
-            "path": "rotation"
-          }
-        },
-        {
-          "sampler": 65,
-          "target": {
-            "node": 19,
             "path": "scale"
           }
         },
