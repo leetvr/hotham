@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     pub fn test_simple() {
-        let (document, buffers, _) = gltf::import("test_assets/animation_test.gltf").unwrap();
+        let (document, buffers, _) = gltf::import("../test_assets/animation_test.gltf").unwrap();
         let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
         let vulkan_context = VulkanContext::testing().unwrap();
         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
