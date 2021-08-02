@@ -2265,7 +2265,7 @@
           "output": 76
         }
       ],
-      "name": "Left Hand Model"
+      "name": "Default"
     },
     {
       "channels": [
@@ -3031,7 +3031,7 @@
           "output": 168
         }
       ],
-      "name": "Left Hand Model"
+      "name": "Grip"
     }
   ],
   "asset": {

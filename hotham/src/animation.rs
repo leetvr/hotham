@@ -119,6 +119,57 @@ impl Animation {
         self.update_channels()
     }
 
+    pub(crate) fn blend(&self, target: &Animation, percentage: f32) -> Result<()> {
+        assert_eq!(
+            self.channels.len(),
+            target.channels.len(),
+            "This animation and the blend animation don't have the same number of channels"
+        );
+
+        for (n, channel) in self.channels.iter().enumerate() {
+            let mut target_node = channel.target_node.borrow_mut();
+            let sampler = &channel.sampler;
+            let other_sampler = &target.channels[n].sampler;
+            match &sampler.outputs {
+                AnimationOutputs::Translations(t) => {
+                    let this = t.get(0).unwrap();
+                    match &other_sampler.outputs {
+                        AnimationOutputs::Translations(t) => {
+                            let other = t.get(0).unwrap();
+                            let interpolated = this.lerp(*other, percentage);
+                            target_node.translation = interpolated;
+                        }
+                        _ => panic!("Invalid animation output"),
+                    }
+                }
+                AnimationOutputs::Rotations(r) => {
+                    let this = r.get(0).unwrap();
+                    match &other_sampler.outputs {
+                        AnimationOutputs::Rotations(r) => {
+                            let other = r.get(0).unwrap();
+                            let interpolated = this.slerp(*other, percentage);
+                            target_node.rotation = interpolated;
+                        }
+                        _ => panic!("Invalid animation output"),
+                    }
+                }
+                AnimationOutputs::Scales(s) => {
+                    let this = s.get(0).unwrap();
+                    match &other_sampler.outputs {
+                        AnimationOutputs::Scales(s) => {
+                            let other = s.get(0).unwrap();
+                            let interpolated = this.lerp(*other, percentage);
+                            target_node.scale = interpolated;
+                        }
+                        _ => panic!("Invalid animation output"),
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     fn update_channels(&self) -> () {
         let current_time = &self.current_time;
         for channel in &self.channels {
