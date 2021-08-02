@@ -1,11 +1,16 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    rc::Rc,
+};
 
 use anyhow::Result;
+use cgmath::{Quaternion, Vector3};
 
 use crate::{animation::Animation, node::Node, vulkan_context::VulkanContext};
 
+#[derive(Clone, Debug)]
 pub(crate) struct Hand {
-    node: Rc<RefCell<Node>>,
+    node_inner: Rc<RefCell<Node>>,
     default_animation: Rc<RefCell<Animation>>,
     grip_animation: Rc<RefCell<Animation>>,
 }
@@ -19,7 +24,7 @@ impl Hand {
         drop(n);
 
         Self {
-            node,
+            node_inner: node,
             default_animation,
             grip_animation,
         }
@@ -33,13 +38,31 @@ impl Hand {
                 .blend(&grip_animation, percentage)?;
         }
 
-        (*self.node).borrow().update_joints(vulkan_context)
+        (&self.node()).update_joints(vulkan_context)
+    }
+
+    pub(crate) fn update_position(
+        &self,
+        translation: Vector3<f32>,
+        rotation: Quaternion<f32>,
+    ) -> () {
+        let mut node = self.node_mut();
+        node.translation = translation;
+        node.rotation = rotation;
+    }
+
+    pub(crate) fn node<'a>(&'a self) -> Ref<'a, Node> {
+        (*self.node_inner).borrow()
+    }
+
+    pub(crate) fn node_mut<'a>(&'a self) -> RefMut<'a, Node> {
+        (*self.node_inner).borrow_mut()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use cgmath::Matrix4;
+    use cgmath::{vec3, Matrix4, Quaternion};
 
     use crate::{
         gltf_loader, renderer::create_descriptor_set_layouts, vulkan_context::VulkanContext,
@@ -59,8 +82,21 @@ mod tests {
         assert_ne!(before, after);
     }
 
+    #[test]
+    pub fn move_test() {
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let hand_node = get_hand_node(&vulkan_context);
+        let hand = Hand::new(hand_node);
+        let new_position = vec3(1.0, 0.0, 0.0);
+        let new_rotation = Quaternion::new(1.0, 0.0, 0.0, 0.0);
+        hand.update_position(new_position, new_rotation);
+        let hand_node = (*hand.node_inner).borrow();
+        assert_eq!(hand_node.translation, new_position);
+        assert_eq!(hand_node.rotation, new_rotation);
+    }
+
     fn get_joint_matrices(hand: &Hand, vulkan_context: &VulkanContext) -> Vec<Matrix4<f32>> {
-        let hand = (*hand).node.borrow().find(2).unwrap();
+        let hand = (*hand).node_inner.borrow().find(2).unwrap();
         let hand = (*hand).borrow();
         let skin = hand.skin.as_ref().unwrap();
         let vertex_buffer = &skin.ssbo;

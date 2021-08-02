@@ -1,8 +1,8 @@
 use crate::{
-    node::Node, renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program,
-    BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
+    hand::Hand, node::Node, renderer::Renderer, vulkan_context::VulkanContext, HothamResult,
+    Program, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
@@ -54,6 +54,8 @@ pub struct App<P: Program> {
     xr_action_set: xr::ActionSet,
     pose_action: xr::Action<Posef>,
     left_hand_space: xr::Space,
+    left_hand: Hand,
+    right_hand: Hand,
     grab_action: xr::Action<f32>,
     right_hand_space: xr::Space,
     swapchain_resolution: vk::Extent2D,
@@ -145,8 +147,11 @@ where
             "[HOTHAM_INIT] done! Loaded {} models. Getting scene nodes..",
             nodes.len()
         );
-        let nodes = program.init(nodes)?;
+        let mut nodes = program.init(nodes)?;
         println!("[HOTHAM_INIT] done! Loaded {} scene nodes.", nodes.len());
+
+        println!("[HOTHAM_INIT] Loading hands..");
+        let (left_hand, right_hand) = load_hands(&renderer, &mut nodes)?;
 
         println!("[HOTHAM_INIT] INIT COMPLETE!");
 
@@ -164,6 +169,8 @@ where
             grab_action,
             left_hand_space,
             right_hand_space,
+            left_hand,
+            right_hand,
             swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,
@@ -461,6 +468,24 @@ fn create_xr_session(
         )
     }
     .unwrap())
+}
+
+fn load_hands(renderer: &Renderer, app_nodes: &mut Vec<Rc<RefCell<Node>>>) -> Result<(Hand, Hand)> {
+    let gltf = include_bytes!("../assets/left_hand.gltf");
+    let data = include_bytes!("../assets/left_hand.bin");
+    let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
+    let (_, left_hand) = nodes
+        .drain()
+        .next()
+        .ok_or_else(|| anyhow!("Couldn't find left hand in gltf file"))?;
+
+    let left_hand_node = Rc::clone(&left_hand);
+    let left_hand = Hand::new(left_hand);
+    let right_hand = left_hand.clone(); // todo
+
+    app_nodes.push(left_hand_node);
+
+    Ok((left_hand, right_hand))
 }
 
 #[cfg(not(target_os = "android"))]
