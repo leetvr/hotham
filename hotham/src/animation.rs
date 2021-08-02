@@ -105,18 +105,18 @@ impl Animation {
         Ok(())
     }
 
-    pub(crate) fn update_to_percentage(&mut self, percentage: f32) -> () {
+    pub(crate) fn _update_to_percentage(&mut self, percentage: f32) -> () {
         self.current_time = self.end_time * percentage;
-        self.update_channels()
+        self._update_channels()
     }
 
-    pub(crate) fn update(&mut self, delta_time: f32) -> () {
+    pub(crate) fn _update(&mut self, delta_time: f32) -> () {
         self.current_time += delta_time;
         if self.current_time >= self.end_time {
             self.current_time -= self.end_time;
         }
 
-        self.update_channels()
+        self._update_channels()
     }
 
     pub(crate) fn blend(&self, target: &Animation, percentage: f32) -> Result<()> {
@@ -170,7 +170,7 @@ impl Animation {
         Ok(())
     }
 
-    fn update_channels(&self) -> () {
+    fn _update_channels(&self) -> () {
         let current_time = &self.current_time;
         for channel in &self.channels {
             let sampler = &channel.sampler;
@@ -283,7 +283,7 @@ mod tests {
         let before = hand.find(2).unwrap().borrow().get_node_matrix();
 
         let delta_time = 0.5;
-        hand.update_animation(delta_time, &vulkan_context).unwrap();
+        hand._update_animation(delta_time, &vulkan_context).unwrap();
 
         let after = hand.find(2).unwrap().borrow().get_node_matrix();
         assert_ne!(before, after);
@@ -317,7 +317,7 @@ mod tests {
         let before = test.find(2).unwrap().borrow().get_node_matrix();
 
         let delta_time = 0.1;
-        test.update_animation(delta_time, &vulkan_context).unwrap();
+        test._update_animation(delta_time, &vulkan_context).unwrap();
 
         let after = test.find(2).unwrap().borrow().get_node_matrix();
         assert_ne!(before, after);

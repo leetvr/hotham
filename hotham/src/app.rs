@@ -7,7 +7,6 @@ use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
 };
-use cgmath::{Quaternion, Vector3};
 use openxr as xr;
 
 use std::{
@@ -52,14 +51,14 @@ pub struct App<P: Program> {
     xr_swapchain: Swapchain<VulkanLegacy>,
     reference_space: xr::Space,
     xr_action_set: xr::ActionSet,
-    pose_action: xr::Action<Posef>,
+    _pose_action: xr::Action<Posef>,
     grab_action: xr::Action<f32>,
     left_hand: Hand,
     left_hand_space: xr::Space,
     left_hand_subaction_path: xr::Path,
-    right_hand: Hand,
-    right_hand_space: xr::Space,
-    right_hand_subaction_path: xr::Path,
+    _right_hand: Hand,
+    _right_hand_space: xr::Space,
+    _right_hand_subaction_path: xr::Path,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
@@ -82,7 +81,6 @@ where
             xr_session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&xr_instance, system)?;
         let xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, VIEW_COUNT)?;
-        // let _starfield_xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, 1)?;
 
         // Create an action set to encapsulate our actions
         let xr_action_set = xr_instance.create_action_set("input", "input pose information", 0)?;
@@ -167,14 +165,14 @@ where
             reference_space: xr_space,
             xr_state: SessionState::IDLE,
             xr_action_set,
-            pose_action,
+            _pose_action: pose_action,
             grab_action,
             left_hand_space,
-            right_hand_space,
+            _right_hand_space: right_hand_space,
             left_hand_subaction_path,
-            right_hand_subaction_path,
+            _right_hand_subaction_path: right_hand_subaction_path,
             left_hand,
-            right_hand,
+            _right_hand: right_hand,
             swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,

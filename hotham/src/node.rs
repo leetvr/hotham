@@ -208,7 +208,7 @@ impl Node {
         last_parent
     }
 
-    pub(crate) fn update_animation_to_percentage(
+    pub(crate) fn _update_animation_to_percentage(
         &self,
         percentage: f32,
         vulkan_context: &VulkanContext,
@@ -221,13 +221,13 @@ impl Node {
                     self.index
                 )
             })?;
-            (**animation).borrow_mut().update_to_percentage(percentage);
+            (**animation).borrow_mut()._update_to_percentage(percentage);
             self.update_joints(vulkan_context)?;
         }
         Ok(())
     }
 
-    pub(crate) fn update_animation(
+    pub(crate) fn _update_animation(
         &self,
         delta_time: f32,
         vulkan_context: &VulkanContext,
@@ -240,7 +240,7 @@ impl Node {
                     self.index
                 )
             })?;
-            (**animation).borrow_mut().update(delta_time);
+            (**animation).borrow_mut()._update(delta_time);
             self.update_joints(vulkan_context)?;
         }
         Ok(())
