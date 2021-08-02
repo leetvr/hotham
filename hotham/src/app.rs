@@ -53,11 +53,13 @@ pub struct App<P: Program> {
     reference_space: xr::Space,
     xr_action_set: xr::ActionSet,
     pose_action: xr::Action<Posef>,
-    left_hand_space: xr::Space,
-    left_hand: Hand,
-    right_hand: Hand,
     grab_action: xr::Action<f32>,
+    left_hand: Hand,
+    left_hand_space: xr::Space,
+    left_hand_subaction_path: xr::Path,
+    right_hand: Hand,
     right_hand_space: xr::Space,
+    right_hand_subaction_path: xr::Path,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
@@ -169,6 +171,8 @@ where
             grab_action,
             left_hand_space,
             right_hand_space,
+            left_hand_subaction_path,
+            right_hand_subaction_path,
             left_hand,
             right_hand,
             swapchain_resolution,
@@ -187,9 +191,6 @@ where
             ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
                 .map_err(anyhow::Error::new)?;
         }
-
-        let right_hand_subaction_path =
-            self.xr_instance.string_to_path("/user/hand/right").unwrap();
 
         while !self.should_quit.load(Ordering::Relaxed) {
             #[cfg(target_os = "android")]
@@ -218,28 +219,7 @@ where
                 &self.reference_space,
             )?;
 
-            let right_hand_pose = self
-                .right_hand_space
-                .locate(&self.reference_space, frame_state.predicted_display_time)?;
-
-            let right_hand_grabbed = xr::ActionInput::get(
-                &self.grab_action,
-                &self.xr_session,
-                right_hand_subaction_path,
-            )?
-            .current_state;
-
-            // HACK
-            let hand = self.nodes.get(0).unwrap();
-            (**hand).borrow_mut().translation =
-                Vector3::from(mint::Vector3::from(right_hand_pose.pose.position));
-            // (**hand).borrow_mut().translation = Vector3::new(2.0, 5.0, 0.0);
-            (**hand).borrow_mut().rotation =
-                Quaternion::from(mint::Quaternion::from(right_hand_pose.pose.orientation));
-            (**hand).borrow().update_animation_to_percentage(
-                right_hand_grabbed,
-                &self.renderer.vulkan_context,
-            )?;
+            self.update_hands(frame_state.predicted_display_time)?;
 
             if frame_state.should_render {
                 self.renderer.update_uniform_buffer(&views)?;
@@ -335,6 +315,28 @@ where
         }
 
         Ok(self.xr_state)
+    }
+
+    fn update_hands(&self, predicted_display_time: xr::Time) -> Result<()> {
+        let left_hand_pose = self
+            .left_hand_space
+            .locate(&self.reference_space, predicted_display_time)?
+            .pose;
+
+        let left_hand_grabbed = xr::ActionInput::get(
+            &self.grab_action,
+            &self.xr_session,
+            self.left_hand_subaction_path,
+        )?
+        .current_state;
+
+        self.left_hand.update_position(
+            mint::Vector3::from(left_hand_pose.position).into(),
+            mint::Quaternion::from(left_hand_pose.orientation).into(),
+        );
+
+        self.left_hand
+            .grip(left_hand_grabbed, &self.renderer.vulkan_context)
     }
 
     #[cfg(target_os = "android")]
