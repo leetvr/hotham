@@ -48,7 +48,8 @@ impl Program for Asteroid {
             (*c).borrow_mut().parent = Rc::downgrade(&refinery);
         });
 
-        Ok(vec![asteroid, refinery])
+        // Ok(vec![asteroid, refinery])
+        Ok(Vec::new())
     }
 
     fn get_gltf_data(&self) -> (&[u8], &[u8]) {
