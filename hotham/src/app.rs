@@ -1,12 +1,14 @@
 use crate::{
-    hand::Hand, node::Node, renderer::Renderer, vulkan_context::VulkanContext, HothamResult,
-    Program, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
+    hand::Hand, node::Node, renderer::Renderer, util::to_euler_degrees,
+    vulkan_context::VulkanContext, HothamResult, Program, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT,
+    VIEW_TYPE,
 };
 use anyhow::{anyhow, Result};
 use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
 };
+use cgmath::Euler;
 use openxr as xr;
 
 use std::{
@@ -64,6 +66,8 @@ pub struct App<P: Program> {
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<VulkanLegacy>,
     nodes: Vec<Rc<RefCell<Node>>>,
+    term: console::Term,
+    debug_messages: Vec<(String, String)>,
     #[allow(dead_code)]
     resumed: bool,
 }
@@ -178,7 +182,9 @@ where
             frame_stream,
             frame_waiter,
             resumed: true,
+            term: console::Term::buffered_stdout(),
             nodes,
+            debug_messages: Default::default(),
         })
     }
 
@@ -226,6 +232,10 @@ where
 
             // Release the image back to OpenXR
             self.end_frame(frame_state, &views)?;
+
+            // Clear out any debug messages
+            self.show_debug_info()?;
+            self.debug_messages.clear();
         }
 
         Ok(())
@@ -315,7 +325,36 @@ where
         Ok(self.xr_state)
     }
 
-    fn update_hands(&self, predicted_display_time: xr::Time) -> Result<()> {
+    fn show_debug_info(&self) -> Result<()> {
+        let frame_index = self.renderer.frame_index;
+        if self.renderer.frame_index % 72 != 0 {
+            return Ok(());
+        };
+
+        let nodes = &self.nodes;
+        self.term.clear_screen()?;
+        self.term.write_line("[APP_DEBUG]")?;
+        self.term.write_line(&format!("[Frame]: {}", frame_index))?;
+
+        let left_hand = nodes.get(0).unwrap().borrow();
+        let left_hand = left_hand.find(4);
+        let left_hand = left_hand.as_ref().unwrap().borrow();
+        let left_hand_position = left_hand.translation;
+        let left_hand_rotation = left_hand.rotation;
+        let left_hand_matrix = left_hand.get_node_matrix();
+        self.term.write_line(&format!(
+            "[Left Hand]: Position: {:?}, rotation: {:?}, matrix: {:?}",
+            left_hand_position, left_hand_rotation, left_hand_matrix
+        ))?;
+        for (tag, message) in &self.debug_messages {
+            self.term.write_line(&format!("[{}]: {}", tag, message))?;
+        }
+        self.term.flush()?;
+
+        Ok(())
+    }
+
+    fn update_hands(&mut self, predicted_display_time: xr::Time) -> Result<()> {
         let left_hand_pose = self
             .left_hand_space
             .locate(&self.reference_space, predicted_display_time)?
@@ -327,11 +366,14 @@ where
             self.left_hand_subaction_path,
         )?
         .current_state;
+        let position = mint::Vector3::from(left_hand_pose.position).into();
+        let orientation = mint::Quaternion::from(left_hand_pose.orientation).into();
 
-        self.left_hand.update_position(
-            mint::Vector3::from(left_hand_pose.position).into(),
-            mint::Quaternion::from(left_hand_pose.orientation).into(),
-        );
+        let tag = "HANDS".to_string();
+        let message = format!("Incoming orientation: {:?}", to_euler_degrees(orientation));
+        self.debug_messages.push((tag, message));
+
+        self.left_hand.update_position(position, orientation);
 
         self.left_hand
             .grip(left_hand_grabbed, &self.renderer.vulkan_context)
@@ -396,7 +438,7 @@ fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
-    let vulkan_context = VulkanContext::create_from_xr_instance(xr_instance, system)?;
+    let vulkan_context = VulkanContext::create_from_xr_instance_legacy(xr_instance, system)?;
     println!("[HOTHAM_VULKAN] - Vulkan Context created successfully");
     Ok(vulkan_context)
 }
@@ -497,8 +539,12 @@ pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId
         engine_name: "Hotham",
         engine_version: 1,
     };
+    println!(
+        "Available extensions: {:?}",
+        xr_entry.enumerate_extensions()?
+    );
     let mut required_extensions = xr::ExtensionSet::default();
-    required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
+    // required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
     required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
     let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;

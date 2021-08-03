@@ -4,9 +4,11 @@ use std::{
 };
 
 use anyhow::Result;
-use cgmath::{vec3, Deg, Euler, Quaternion, Vector3};
+use cgmath::{vec3, Deg, Euler, Quaternion, Rotation, Rotation3, Vector3};
 
-use crate::{animation::Animation, node::Node, vulkan_context::VulkanContext};
+use crate::{
+    animation::Animation, node::Node, util::to_euler_degrees, vulkan_context::VulkanContext,
+};
 
 #[derive(Clone, Debug)]
 pub(crate) struct Hand {
@@ -14,6 +16,7 @@ pub(crate) struct Hand {
     root_bone_node_inner: Rc<RefCell<Node>>,
     default_animation: Rc<RefCell<Animation>>,
     grip_animation: Rc<RefCell<Animation>>,
+    grip_offset: (Vector3<f32>, Quaternion<f32>),
 }
 
 impl Hand {
@@ -23,13 +26,41 @@ impl Hand {
         let default_animation = n.animations[0].clone();
         let grip_animation = n.animations[1].clone();
         let root_bone_node_inner = n.find(3).expect("Unable to find root bone node");
+        let hand_node_inner = n.find(4).expect("Unable to find hand node");
+        let hand_node = hand_node_inner.borrow();
+        let grip_node = n.find(5).expect("Unable to find grip node");
+        let grip_node = grip_node.borrow();
+        let root_bone_node = root_bone_node_inner.borrow();
+
+        let root_rotation = to_euler_degrees(root_bone_node.rotation);
+        let grip_rotation = to_euler_degrees(grip_node.rotation);
+        let hand_rotation = to_euler_degrees(hand_node.rotation);
+
+        let mut offset_rotation = Euler {
+            x: Deg(00.0),
+            y: Deg(00.0),
+            z: Deg(0.0),
+        };
+        // offset_rotation.y = offset_rotation.y - Deg(24.0);
+
+        let grip_offset = (
+            hand_node.translation + grip_node.translation,
+            offset_rotation.into(),
+        );
+        println!(
+            "Root: {:?} - Grip: {:?} - Hand: {:?}",
+            root_rotation, grip_rotation, hand_rotation
+        );
+        println!("Offset: {:?}", to_euler_degrees(grip_offset.1));
         drop(n);
+        drop(root_bone_node);
 
         Self {
             parent_node_inner: node,
             root_bone_node_inner,
             default_animation,
             grip_animation,
+            grip_offset,
         }
     }
 
@@ -50,10 +81,11 @@ impl Hand {
         rotation: Quaternion<f32>,
     ) -> () {
         let mut root_bone_node = (*self.root_bone_node_inner).borrow_mut();
-        root_bone_node.translation = translation + vec3(0.0075, -0.005, -0.0525);
-        let mut rotation = Euler::from(rotation);
-        rotation.x += Deg(40.0).into();
-        root_bone_node.rotation = Quaternion::from(rotation);
+        let (translation_offset, rotation_offset) = &self.grip_offset;
+        // let (translation_offset, rotation_offset) =
+        //     (vec3(0.0, 0.0, 0.0), Quaternion::new(0.0, 0.0, 0.0, 0.0));
+        root_bone_node.translation = translation - translation_offset;
+        root_bone_node.rotation = rotation * rotation_offset;
     }
 
     pub(crate) fn node<'a>(&'a self) -> Ref<'a, Node> {
@@ -67,7 +99,7 @@ impl Hand {
 
 #[cfg(test)]
 mod tests {
-    use cgmath::{vec3, Deg, Euler, Matrix4, Quaternion, Rad, Rotation3};
+    use cgmath::{assert_relative_eq, vec3, Deg, Euler, Matrix4, Quaternion, Rad, Rotation3};
 
     use crate::{
         gltf_loader, renderer::create_descriptor_set_layouts, vulkan_context::VulkanContext,
@@ -93,14 +125,17 @@ mod tests {
         let hand_node = get_hand_node(&vulkan_context);
         let hand = Hand::new(hand_node);
         let new_position = vec3(1.0, 0.0, 0.0);
-        let new_rotation = Quaternion::from_angle_x(Deg(90.0));
+        let new_rotation = Quaternion::from_angle_y(Deg(90.0));
         println!("{:?}", new_rotation);
         hand.update_position(new_position, new_rotation);
 
         let root_bone_node = (*hand.root_bone_node_inner).borrow();
-        let expected_rotation = Rad(3.1415925);
-        assert_eq!(root_bone_node.translation, new_position);
-        assert_eq!(Euler::from(root_bone_node.rotation).x, expected_rotation);
+        let expected_rotation = Quaternion::from_angle_y(Deg(150.0));
+        // assert_relative_eq!(root_bone_node.translation, expected_translation);
+        assert_relative_eq!(
+            Euler::from(root_bone_node.rotation),
+            expected_rotation.into()
+        );
     }
 
     fn get_joint_matrices(hand: &Hand, vulkan_context: &VulkanContext) -> Vec<Matrix4<f32>> {

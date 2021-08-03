@@ -1,6 +1,6 @@
 ${env:RUST_BACKTRACE} = 1
 
-cargo build
+# cargo build
 if ($?) {
     cargo run -p hotham-asteroid
 

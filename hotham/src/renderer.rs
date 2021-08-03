@@ -11,7 +11,6 @@ use crate::{
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
 use cgmath::{vec4, Deg, Euler, Matrix4};
-use console::Term;
 use openxr as xr;
 
 use xr::VulkanLegacy;
@@ -29,7 +28,6 @@ pub(crate) struct Renderer {
     uniform_buffer: Buffer<UniformBufferObject>,
     render_start_time: Instant,
     cameras: Vec<Camera>,
-    term: Term,
     views: Vec<xr::View>,
     last_frame_time: Instant,
     pub frame_index: usize,
@@ -120,7 +118,6 @@ impl Renderer {
             uniform_buffer,
             render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
-            term: Term::buffered_stdout(),
             views: Vec::new(),
             last_frame_time: Instant::now(),
         })
@@ -129,7 +126,7 @@ impl Renderer {
     pub fn draw(&mut self, frame_index: usize, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
         self.frame_index += 1;
 
-        self.show_debug_info(nodes)?;
+        // self.show_debug_info(nodes)?;
 
         let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
@@ -308,70 +305,6 @@ impl Renderer {
             let child = (*child).borrow();
             self.draw_node(&child, device, command_buffer)?;
         }
-
-        Ok(())
-    }
-
-    fn show_debug_info(&self, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
-        if self.frame_index % 72 != 0 {
-            return Ok(());
-        };
-        let e1 = Euler::from(self.cameras[0].orientation);
-        let e2 = Euler::from(self.cameras[1].orientation);
-
-        self.term.clear_screen()?;
-        self.term.write_line("[RENDER_DEBUG]")?;
-        self.term
-            .write_line(&format!("[Frame]: {}", self.frame_index))?;
-        self.term.write_line(&format!(
-            "[Camera 0 Position]: {:?}",
-            self.cameras[0].position
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 0 Orientation]: Pitch {:?}, Yaw: {:?}, Roll: {:?}",
-            Deg::from(e1.x),
-            Deg::from(e1.y),
-            Deg::from(e1.z)
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 0 Matrix]: {:?}",
-            self.cameras[0].view_matrix
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 1 Position]: {:?}",
-            self.cameras[1].position
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 1 Orientation]: Pitch {:?}, Yaw: {:?}, Roll: {:?}",
-            Deg::from(e2.x),
-            Deg::from(e2.y),
-            Deg::from(e2.z)
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 1 Matrix]: {:?}",
-            self.cameras[1].view_matrix
-        ))?;
-        let view = &self.views[0];
-        let camera_position: mint::Vector3<f32> = view.pose.position.into();
-        let angle_left = view.fov.angle_left;
-        let angle_right = view.fov.angle_right;
-        let angle_up = view.fov.angle_up;
-        let angle_down = view.fov.angle_down;
-        self.term.write_line(&format!(
-            "[View 0]: Position: {:?}, angleLeft: {}, angleRight: {}, angleDown: {}, angleUp: {}",
-            camera_position, angle_left, angle_right, angle_up, angle_down
-        ))?;
-
-        let left_hand = nodes.get(0).unwrap().borrow();
-        let left_hand = left_hand.children.first().as_ref().unwrap().borrow();
-        let left_hand_position = left_hand.translation;
-        let left_hand_rotation = left_hand.rotation;
-        let left_hand_matrix = left_hand.get_node_matrix();
-        self.term.write_line(&format!(
-            "[Left Hand]: Position: {:?}, rotation: {:?}, matrix: {:?}",
-            left_hand_position, left_hand_rotation, left_hand_matrix
-        ))?;
-        self.term.flush()?;
 
         Ok(())
     }

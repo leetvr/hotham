@@ -12,10 +12,10 @@ use ash::{
 use openxr as xr;
 use std::{fmt::Debug, intrinsics::transmute, mem::size_of, ptr::copy};
 
-#[cfg(target_os = "windows")]
-type XrVulkan = xr::Vulkan;
+// #[cfg(target_os = "windows")]
+// type XrVulkan = xr::Vulkan;
 
-#[cfg(target_os = "android")]
+// #[cfg(target_os = "android")]
 type XrVulkan = xr::VulkanLegacy;
 
 #[derive(Clone)]
@@ -69,6 +69,7 @@ impl VulkanContext {
     }
 
     #[cfg(not(target_os = "android"))]
+    #[allow(unused)]
     pub fn create_from_xr_instance(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
@@ -179,7 +180,6 @@ impl VulkanContext {
         })
     }
 
-    #[cfg(target_os = "android")]
     pub fn create_from_xr_instance_legacy(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
@@ -770,7 +770,6 @@ impl Debug for VulkanContext {
     }
 }
 
-#[cfg(target_os = "android")]
 fn vulkan_init_legacy(
     instance: &xr::Instance,
     system: xr::SystemId,
@@ -842,7 +841,6 @@ fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
     Ok((instance, entry))
 }
 
-#[cfg(target_os = "android")]
 pub fn create_vulkan_device_legacy(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
@@ -860,7 +858,6 @@ pub fn create_vulkan_device_legacy(
     create_vulkan_device(&extension_names, vulkan_instance, physical_device)
 }
 
-#[cfg(any(target_os = "android", test))]
 fn create_vulkan_device(
     extension_names: &Vec<std::ffi::CString>,
     vulkan_instance: &AshInstance,
