@@ -1,27 +1,32 @@
+use crate::node::Node;
 use ash::vk;
-use model::{Model, SceneObject};
 use openxr as xr;
-use std::{collections::HashMap, io::Seek};
+use std::{cell::RefCell, collections::HashMap, io::Seek, rc::Rc};
 
 pub use app::App;
 pub use hotham_error::HothamError;
 pub use uniform_buffer_object::UniformBufferObject;
 pub use vertex::Vertex;
 
+mod animation;
 mod app;
 mod buffer;
 mod camera;
 mod frame;
+mod gltf_loader;
 mod hotham_error;
 mod image;
-pub mod model;
+pub mod mesh;
+pub mod node;
 mod renderer;
+mod skin;
 mod swapchain;
 mod texture;
 mod uniform_buffer_object;
 mod util;
 mod vertex;
 mod vulkan_context;
+mod hand;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
@@ -38,8 +43,11 @@ pub const TEXTURE_FORMAT: vk::Format = vk::Format::BC7_SRGB_BLOCK;
 pub const TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
 
 pub trait Program {
-    fn get_model_data(&self) -> (&[u8], &[u8]);
-    fn init(&mut self, models: HashMap<String, Model>) -> HothamResult<Vec<SceneObject>>;
+    fn get_gltf_data(&self) -> (&[u8], &[u8]);
+    fn init(
+        &mut self,
+        nodes: HashMap<String, Rc<RefCell<Node>>>,
+    ) -> HothamResult<Vec<Rc<RefCell<Node>>>>;
 }
 
 #[derive(Debug, Clone)]

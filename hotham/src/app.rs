@@ -1,15 +1,19 @@
 use crate::{
-    model::SceneObject, renderer::Renderer, vulkan_context::VulkanContext, HothamResult, Program,
-    BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
+    hand::Hand, node::Node, renderer::Renderer, util::to_euler_degrees,
+    vulkan_context::VulkanContext, HothamResult, Program, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT,
+    VIEW_TYPE,
 };
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
 };
+use cgmath::Euler;
 use openxr as xr;
 
 use std::{
+    cell::RefCell,
+    rc::Rc,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -22,8 +26,8 @@ use std::{
 use std::{ffi::CStr, mem::transmute, ptr::null};
 
 use xr::{
-    vulkan_legacy::SessionCreateInfo, EventDataBuffer, FrameStream, FrameWaiter, Posef,
-    ReferenceSpaceType, Session, SessionState, Swapchain, SwapchainCreateFlags,
+    vulkan_legacy::SessionCreateInfo, ActiveActionSet, EventDataBuffer, FrameStream, FrameWaiter,
+    Posef, ReferenceSpaceType, Session, SessionState, Swapchain, SwapchainCreateFlags,
     SwapchainCreateInfo, SwapchainUsageFlags, VulkanLegacy,
 };
 
@@ -47,15 +51,23 @@ pub struct App<P: Program> {
     xr_session: Session<VulkanLegacy>,
     xr_state: SessionState,
     xr_swapchain: Swapchain<VulkanLegacy>,
-    xr_space: xr::Space,
-    _xr_action_set: xr::ActionSet,
-    _xr_left_action: xr::Action<Posef>,
-    _xr_right_action: xr::Action<Posef>,
+    reference_space: xr::Space,
+    xr_action_set: xr::ActionSet,
+    _pose_action: xr::Action<Posef>,
+    grab_action: xr::Action<f32>,
+    left_hand: Hand,
+    left_hand_space: xr::Space,
+    left_hand_subaction_path: xr::Path,
+    right_hand: Hand,
+    right_hand_space: xr::Space,
+    right_hand_subaction_path: xr::Path,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<VulkanLegacy>,
-    scene_objects: Vec<SceneObject>,
+    nodes: Vec<Rc<RefCell<Node>>>,
+    term: console::Term,
+    debug_messages: Vec<(String, String)>,
     #[allow(dead_code)]
     resumed: bool,
 }
@@ -64,7 +76,7 @@ impl<P> App<P>
 where
     P: Program,
 {
-    pub fn new(mut _program: P) -> HothamResult<Self> {
+    pub fn new(mut program: P) -> HothamResult<Self> {
         let (xr_instance, system) = create_xr_instance()?;
         let vulkan_context = create_vulkan_context(&xr_instance, system)?;
         let (xr_session, frame_waiter, frame_stream) =
@@ -73,37 +85,60 @@ where
             xr_session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&xr_instance, system)?;
         let xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, VIEW_COUNT)?;
-        // let _starfield_xr_swapchain = create_xr_swapchain(&xr_session, &swapchain_resolution, 1)?;
 
         // Create an action set to encapsulate our actions
         let xr_action_set = xr_instance.create_action_set("input", "input pose information", 0)?;
 
-        let xr_right_action =
-            xr_action_set.create_action::<xr::Posef>("right_hand", "Right Hand Controller", &[])?;
-        let xr_left_action =
-            xr_action_set.create_action::<xr::Posef>("left_hand", "Left Hand Controller", &[])?;
+        let left_hand_subaction_path = xr_instance.string_to_path("/user/hand/left").unwrap();
+        let right_hand_subaction_path = xr_instance.string_to_path("/user/hand/right").unwrap();
+        let left_hand_pose_path = xr_instance
+            .string_to_path("/user/hand/left/input/grip/pose")
+            .unwrap();
+        let right_hand_pose_path = xr_instance
+            .string_to_path("/user/hand/right/input/grip/pose")
+            .unwrap();
+
+        let left_hand_grip_squeeze_path = xr_instance
+            .string_to_path("/user/hand/left/input/squeeze/value")
+            .unwrap();
+        let right_hand_grip_squeeze_path = xr_instance
+            .string_to_path("/user/hand/right/input/squeeze/value")
+            .unwrap();
+
+        let pose_action = xr_action_set.create_action::<xr::Posef>(
+            "hand_pose",
+            "Hand Pose",
+            &[left_hand_subaction_path, right_hand_subaction_path],
+        )?;
+
+        let grab_action = xr_action_set.create_action::<f32>(
+            "grab_object",
+            "Grab Object",
+            &[left_hand_subaction_path, right_hand_subaction_path],
+        )?;
 
         // Bind our actions to input devices using the given profile
-        // If you want to access inputs specific to a particular device you may specify a different
-        // interaction profile
         xr_instance.suggest_interaction_profile_bindings(
             xr_instance
                 .string_to_path("/interaction_profiles/oculus/touch_controller")
                 .unwrap(),
             &[
-                xr::Binding::new(
-                    &xr_right_action,
-                    xr_instance
-                        .string_to_path("/user/hand/right/input/grip/pose")
-                        .unwrap(),
-                ),
-                xr::Binding::new(
-                    &xr_left_action,
-                    xr_instance
-                        .string_to_path("/user/hand/left/input/grip/pose")
-                        .unwrap(),
-                ),
+                xr::Binding::new(&pose_action, left_hand_pose_path),
+                xr::Binding::new(&pose_action, right_hand_pose_path),
+                xr::Binding::new(&grab_action, left_hand_grip_squeeze_path),
+                xr::Binding::new(&grab_action, right_hand_grip_squeeze_path),
             ],
+        )?;
+
+        let left_hand_space = pose_action.create_space(
+            xr_session.clone(),
+            left_hand_subaction_path,
+            Posef::IDENTITY,
+        )?;
+        let right_hand_space = pose_action.create_space(
+            xr_session.clone(),
+            right_hand_subaction_path,
+            Posef::IDENTITY,
         )?;
 
         // Attach the action set to the session
@@ -111,37 +146,45 @@ where
 
         let renderer = Renderer::new(vulkan_context, &xr_swapchain, swapchain_resolution)?;
         println!("[HOTHAM_INIT] Loading models..");
-        let models = renderer.load_models(_program.get_model_data())?;
+        let nodes = renderer.load_gltf_nodes(program.get_gltf_data())?;
         println!(
-            "[HOTHAM_INIT] done! Loaded {} models. Getting scene objects..",
-            models.len()
+            "[HOTHAM_INIT] done! Loaded {} models. Getting scene nodes..",
+            nodes.len()
         );
-        let scene_objects = _program.init(models)?;
-        println!(
-            "[HOTHAM_INIT] done! Loaded {} scene objects.",
-            scene_objects.len()
-        );
+        let mut nodes = program.init(nodes)?;
+        println!("[HOTHAM_INIT] done! Loaded {} scene nodes.", nodes.len());
+
+        println!("[HOTHAM_INIT] Loading hands..");
+        let (left_hand, right_hand) = load_hands(&renderer, &mut nodes)?;
 
         println!("[HOTHAM_INIT] INIT COMPLETE!");
 
         Ok(Self {
-            _program,
+            _program: program,
             renderer,
             should_quit: Arc::new(AtomicBool::from(false)),
             xr_instance,
             xr_session,
             xr_swapchain,
-            xr_space,
+            reference_space: xr_space,
             xr_state: SessionState::IDLE,
-            _xr_action_set: xr_action_set,
-            _xr_left_action: xr_left_action,
-            _xr_right_action: xr_right_action,
+            xr_action_set,
+            _pose_action: pose_action,
+            grab_action,
+            left_hand_space,
+            right_hand_space,
+            left_hand_subaction_path,
+            right_hand_subaction_path,
+            left_hand,
+            right_hand,
             swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,
             frame_waiter,
             resumed: true,
-            scene_objects,
+            term: console::Term::buffered_stdout(),
+            nodes,
+            debug_messages: Default::default(),
         })
     }
 
@@ -168,7 +211,8 @@ where
                 break;
             }
 
-            self.xr_session.sync_actions(&[])?;
+            let active_action_set = ActiveActionSet::new(&self.xr_action_set);
+            self.xr_session.sync_actions(&[active_action_set])?;
 
             // Wait for a frame to become available from the runtime
             let (frame_state, swapchain_image_index) = self.begin_frame()?;
@@ -176,17 +220,22 @@ where
             let (_, views) = self.xr_session.locate_views(
                 VIEW_TYPE,
                 frame_state.predicted_display_time,
-                &self.xr_space,
+                &self.reference_space,
             )?;
+
+            self.update_hands(frame_state.predicted_display_time)?;
 
             if frame_state.should_render {
                 self.renderer.update_uniform_buffer(&views)?;
-                self.renderer
-                    .draw(swapchain_image_index, &self.scene_objects)?;
+                self.renderer.draw(swapchain_image_index, &self.nodes)?;
             }
 
             // Release the image back to OpenXR
             self.end_frame(frame_state, &views)?;
+
+            // Clear out any debug messages
+            self.show_debug_info()?;
+            self.debug_messages.clear();
         }
 
         Ok(())
@@ -221,7 +270,7 @@ where
             frame_state.predicted_display_time,
             BLEND_MODE,
             &[&xr::CompositionLayerProjection::new()
-                .space(&self.xr_space)
+                .space(&self.reference_space)
                 .views(&[
                     xr::CompositionLayerProjectionView::new()
                         .pose(views[0].pose)
@@ -274,6 +323,79 @@ where
         }
 
         Ok(self.xr_state)
+    }
+
+    fn show_debug_info(&self) -> Result<()> {
+        let frame_index = self.renderer.frame_index;
+        if self.renderer.frame_index % 72 != 0 {
+            return Ok(());
+        };
+
+        self.term.clear_screen()?;
+        self.term.write_line("[APP_DEBUG]")?;
+        self.term.write_line(&format!("[Frame]: {}", frame_index))?;
+
+        for (tag, message) in &self.debug_messages {
+            self.term.write_line(&format!("[{}]: {}", tag, message))?;
+        }
+        self.term.flush()?;
+
+        Ok(())
+    }
+
+    fn update_hands(&mut self, predicted_display_time: xr::Time) -> Result<()> {
+        let left_hand_pose = self
+            .left_hand_space
+            .locate(&self.reference_space, predicted_display_time)?
+            .pose;
+        let left_hand_grabbed = xr::ActionInput::get(
+            &self.grab_action,
+            &self.xr_session,
+            self.left_hand_subaction_path,
+        )?
+        .current_state;
+        let position = mint::Vector3::from(left_hand_pose.position).into();
+        let orientation = mint::Quaternion::from(left_hand_pose.orientation).into();
+        self.left_hand.update_position(position, orientation);
+        self.left_hand
+            .grip(left_hand_grabbed, &self.renderer.vulkan_context)?;
+
+        {
+            let tag = "HANDS".to_string();
+            let message = format!("Incoming orientation: {:?}", to_euler_degrees(orientation));
+            self.debug_messages.push((tag.clone(), message));
+
+            let message = format!(
+                "Offset orientation: {:?}",
+                to_euler_degrees(self.left_hand.grip_offset.1)
+            );
+            self.debug_messages.push((tag.clone(), message));
+
+            let updated_orientation = (*self.left_hand.root_bone_node()).rotation;
+            let message = format!(
+                "Updated orientation: {:?}",
+                to_euler_degrees(updated_orientation)
+            );
+            self.debug_messages.push((tag, message));
+        }
+
+        let right_hand_pose = self
+            .right_hand_space
+            .locate(&self.reference_space, predicted_display_time)?
+            .pose;
+        let right_hand_grabbed = xr::ActionInput::get(
+            &self.grab_action,
+            &self.xr_session,
+            self.right_hand_subaction_path,
+        )?
+        .current_state;
+        let position = mint::Vector3::from(right_hand_pose.position).into();
+        let orientation = mint::Quaternion::from(right_hand_pose.orientation).into();
+        self.right_hand.update_position(position, orientation);
+        self.right_hand
+            .grip(right_hand_grabbed, &self.renderer.vulkan_context)?;
+
+        Ok(())
     }
 
     #[cfg(target_os = "android")]
@@ -335,7 +457,7 @@ fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
-    let vulkan_context = VulkanContext::create_from_xr_instance(xr_instance, system)?;
+    let vulkan_context = VulkanContext::create_from_xr_instance_legacy(xr_instance, system)?;
     println!("[HOTHAM_VULKAN] - Vulkan Context created successfully");
     Ok(vulkan_context)
 }
@@ -409,6 +531,35 @@ fn create_xr_session(
     .unwrap())
 }
 
+fn load_hands(renderer: &Renderer, app_nodes: &mut Vec<Rc<RefCell<Node>>>) -> Result<(Hand, Hand)> {
+    let gltf = include_bytes!("../assets/left_hand.gltf");
+    let data = include_bytes!("../assets/left_hand.bin");
+    let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
+    let (_, left_hand) = nodes
+        .drain()
+        .next()
+        .ok_or_else(|| anyhow!("Couldn't find left hand in gltf file"))?;
+
+    let left_hand_node = Rc::clone(&left_hand);
+    let left_hand = Hand::new(left_hand);
+
+    let gltf = include_bytes!("../assets/right_hand.gltf");
+    let data = include_bytes!("../assets/right_hand.bin");
+    let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
+    let (_, right_hand) = nodes
+        .drain()
+        .next()
+        .ok_or_else(|| anyhow!("Couldn't find right hand in gltf file"))?;
+
+    let right_hand_node = Rc::clone(&right_hand);
+    let right_hand = Hand::new(right_hand);
+
+    app_nodes.push(left_hand_node);
+    app_nodes.push(right_hand_node);
+
+    Ok((left_hand, right_hand))
+}
+
 #[cfg(not(target_os = "android"))]
 pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = xr::Entry::load()?;
@@ -418,8 +569,12 @@ pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId
         engine_name: "Hotham",
         engine_version: 1,
     };
+    println!(
+        "Available extensions: {:?}",
+        xr_entry.enumerate_extensions()?
+    );
     let mut required_extensions = xr::ExtensionSet::default();
-    required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
+    // required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
     required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
     let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;

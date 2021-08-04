@@ -7,10 +7,7 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
+			"group": "build",
 			"label": "rust: cargo build"
 		},
 		{
@@ -18,7 +15,10 @@
 			"windows": {
 				"command": ".\\run_on_simulator.ps1"
 			},
-			"group": "test",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
 			"label": "Run Asteroid on Simulator",
 			"problemMatcher": []
 		},
@@ -27,10 +27,7 @@
 			"windows": {
 				"command": ".\\run_on_device.ps1"
 			},
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			},
+			"group": "build",
 			"label": "Run Asteroid on Headset",
 			"problemMatcher": []
 		},
@@ -47,10 +44,16 @@
 				"-p",
 				"hotham"
 			],
+			"env": {
+				"RUST_BACKTRACE": "1"
+			},
 			"problemMatcher": [
 				"$rustc"
 			],
-			"group": "test",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
 			"label": "rust: cargo test"
 		},
 		{
