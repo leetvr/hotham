@@ -52,6 +52,16 @@ pub unsafe extern "C" fn get_instance_proc_addr(
         *function = transmute::<pfn::GetVulkanGraphicsRequirements2KHR, _>(
             get_vulkan_graphics_requirements,
         );
+    } else if name == b"xrGetVulkanGraphicsDeviceKHR" {
+        *function = transmute::<pfn::GetVulkanGraphicsDeviceKHR, _>(get_vulkan_physical_device);
+    } else if name == b"xrGetVulkanGraphicsRequirementsKHR" {
+        *function =
+            transmute::<pfn::GetVulkanGraphicsRequirementsKHR, _>(get_vulkan_graphics_requirements);
+    } else if name == b"xrGetVulkanInstanceExtensionsKHR" {
+        *function =
+            transmute::<pfn::GetVulkanInstanceExtensionsKHR, _>(get_vulkan_instance_extensions);
+    } else if name == b"xrGetVulkanDeviceExtensionsKHR" {
+        *function = transmute::<pfn::GetVulkanDeviceExtensionsKHR, _>(get_vulkan_device_extensions);
     } else if name == b"xrEnumerateEnvironmentBlendModes" {
         *function =
             transmute::<pfn::EnumerateEnvironmentBlendModes, _>(enumerate_environment_blend_modes);

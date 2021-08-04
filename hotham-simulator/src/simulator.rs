@@ -8,6 +8,7 @@ use crate::openxr_loader::{self, XrExtensionProperties, XrResult};
 use crate::space_state::SpaceState;
 use crate::state::State;
 
+use ash::version::EntryV1_0;
 use ash::{
     extensions::khr,
     util::read_spv,
@@ -16,6 +17,7 @@ use ash::{
     Device, Entry as AshEntry, Instance as AshInstance,
 };
 use lazy_static::lazy_static;
+use openxr_sys::GraphicsBindingVulkanKHR;
 use openxr_sys::{
     platform::{VkDevice, VkInstance, VkPhysicalDevice, VkResult},
     Action, ActionCreateInfo, ActionSet, ActionSetCreateInfo, ActionSpaceCreateInfo,
@@ -288,6 +290,40 @@ pub unsafe extern "system" fn create_vulkan_physical_device(
     Result::SUCCESS
 }
 
+pub unsafe extern "system" fn get_vulkan_physical_device(
+    _instance: Instance,
+    _system_id: SystemId,
+    vk_instance: VkInstance,
+    vk_physical_device: *mut VkPhysicalDevice,
+) -> Result {
+    // Create an entry
+    let entry = AshEntry::new().unwrap();
+
+    // Create an instance wrapping the instance we were passed
+    let ash_instance = AshInstance::load(entry.static_fn(), transmute(vk_instance));
+
+    // Create the device and asign it
+    let physical_device = ash_instance
+        .enumerate_physical_devices()
+        .unwrap()
+        .pop()
+        .unwrap();
+
+    println!(
+        "[HOTHAM_SIMULATOR] Created physical device: {:?}",
+        physical_device
+    );
+    *vk_physical_device = transmute(physical_device);
+
+    // Store everything in state.
+    let mut state = STATE.lock().unwrap();
+    state.vulkan_entry = Some(entry);
+    state.vulkan_instance = Some(ash_instance);
+    state.physical_device = physical_device;
+
+    Result::SUCCESS
+}
+
 pub unsafe extern "system" fn get_vulkan_graphics_requirements(
     _instance: Instance,
     _system_id: SystemId,
@@ -345,10 +381,19 @@ pub unsafe extern "system" fn get_system(
 
 pub unsafe extern "system" fn create_session(
     _instance: Instance,
-    _create_info: *const SessionCreateInfo,
+    create_info: *const SessionCreateInfo,
     session: *mut Session,
 ) -> Result {
     *session = Session::from_raw(42);
+    let mut state = STATE.lock().unwrap();
+    if state.device.is_none() {
+        let graphics_binding: &GraphicsBindingVulkanKHR = transmute((*create_info).next);
+        let vk_device = graphics_binding.device;
+        let instance = state.vulkan_instance.as_ref().unwrap();
+        let device = ash::Device::load(instance.fp_v1_0(), transmute(vk_device));
+        state.device = Some(device);
+    }
+
     Result::SUCCESS
 }
 
@@ -1700,6 +1745,28 @@ pub unsafe extern "system" fn get_action_state_boolean(
         last_change_time: openxr_sys::Time::from_nanos(0),
         is_active: TRUE,
     };
+    Result::SUCCESS
+}
+
+pub unsafe extern "system" fn get_vulkan_instance_extensions(
+    _instance: Instance,
+    _system_id: SystemId,
+    _buffer_capacity_input: u32,
+    buffer_count_output: *mut u32,
+    _buffer: *mut c_char,
+) -> Result {
+    (*buffer_count_output) = 0;
+    Result::SUCCESS
+}
+
+pub unsafe extern "system" fn get_vulkan_device_extensions(
+    _instance: Instance,
+    _system_id: SystemId,
+    _buffer_capacity_input: u32,
+    buffer_count_output: *mut u32,
+    _buffer: *mut c_char,
+) -> Result {
+    (*buffer_count_output) = 0;
     Result::SUCCESS
 }
 
