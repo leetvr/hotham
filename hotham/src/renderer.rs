@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{vec4, Deg, Euler, Matrix4};
+use cgmath::{vec4, Matrix4, SquareMatrix};
 use openxr as xr;
 
 use xr::VulkanLegacy;
@@ -30,6 +30,7 @@ pub(crate) struct Renderer {
     cameras: Vec<Camera>,
     views: Vec<xr::View>,
     last_frame_time: Instant,
+    empty_skin_descriptor_sets: Vec<vk::DescriptorSet>,
     pub frame_index: usize,
 }
 
@@ -104,6 +105,18 @@ impl Renderer {
 
         println!("[HOTHAM_RENDERER] Done! Renderer initialised!");
 
+        let empty_matrix: Matrix4<f32> = Matrix4::identity();
+        let empty_skin_buffer = Buffer::new(
+            &vulkan_context,
+            &empty_matrix,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+        )?;
+        let empty_skin_descriptor_sets = vulkan_context.create_skin_descriptor_set(
+            descriptor_set_layouts[1],
+            empty_skin_buffer.handle,
+            std::mem::size_of::<Matrix4<f32>>(),
+        )?;
+
         Ok(Self {
             _swapchain: swapchain,
             vulkan_context,
@@ -120,6 +133,7 @@ impl Renderer {
             cameras: vec![Default::default(); 2],
             views: Vec::new(),
             last_frame_time: Instant::now(),
+            empty_skin_descriptor_sets,
         })
     }
 
@@ -176,7 +190,6 @@ impl Renderer {
             get_projection(views[1].fov, near, far),
         ];
 
-        // let light_pos = vec4(2.0, 20.0 + delta_time, 10.0, 0.0);
         let light_pos = vec4(0.0, 2.0, 2.0, 1.0);
 
         let uniform_buffer = UniformBufferObject {
@@ -275,17 +288,21 @@ impl Renderer {
                 vk::IndexType::UINT32,
             );
 
-            // Bind skin descriptor sets, if present.
-            if let Some(skin) = node.skin.as_ref() {
-                device.cmd_bind_descriptor_sets(
-                    command_buffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    self.pipeline_layout,
-                    1,
-                    &skin.descriptor_sets,
-                    &[],
-                )
-            }
+            // Bind skin descriptor sets. If this node has no skin, use an empty one.
+            let skin_descriptor_sets = if let Some(skin) = node.skin.as_ref() {
+                &skin.descriptor_sets
+            } else {
+                &self.empty_skin_descriptor_sets
+            };
+
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout,
+                1,
+                skin_descriptor_sets,
+                &[],
+            );
 
             // Push constants
             let node_matrix = node.get_node_matrix();

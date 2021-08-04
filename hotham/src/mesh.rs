@@ -158,7 +158,7 @@ impl Mesh {
 
         if joint_weights.is_empty() {
             for _ in 0..positions.len() {
-                joint_weights.push(vec4(0.0, 0.0, 0.0, 0.0));
+                joint_weights.push(vec4(1.0, 0.0, 0.0, 0.0));
             }
         }
 
