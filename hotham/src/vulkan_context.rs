@@ -12,10 +12,10 @@ use ash::{
 use openxr as xr;
 use std::{fmt::Debug, intrinsics::transmute, mem::size_of, ptr::copy};
 
-#[cfg(target_os = "windows")]
-type XrVulkan = xr::Vulkan;
+// #[cfg(target_os = "windows")]
+// type XrVulkan = xr::Vulkan;
 
-#[cfg(target_os = "android")]
+// #[cfg(target_os = "android")]
 type XrVulkan = xr::VulkanLegacy;
 
 #[derive(Clone)]
@@ -51,37 +51,10 @@ impl VulkanContext {
         let (device, graphics_queue, queue_family_index) =
             create_vulkan_device(&extension_names, &instance, physical_device)?;
 
-        let command_pool = unsafe {
-            device.create_command_pool(
-                &vk::CommandPoolCreateInfo::builder()
-                    .queue_family_index(queue_family_index)
-                    .flags(
-                        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
-                            | vk::CommandPoolCreateFlags::TRANSIENT,
-                    ),
-                None,
-            )
-        }?;
+        let command_pool = create_command_pool(&device, queue_family_index)?;
 
-        let descriptor_pool = unsafe {
-            device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::builder()
-                    .pool_sizes(&[
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::UNIFORM_BUFFER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                    ])
-                    .max_sets(SWAPCHAIN_LENGTH as _),
-                None,
-            )
-        }?;
+        // HACK: This needs to be updated based on the actual data in the system.
+        let descriptor_pool = create_descriptor_pool(&device)?;
 
         Ok(Self {
             entry,
@@ -96,6 +69,7 @@ impl VulkanContext {
     }
 
     #[cfg(not(target_os = "android"))]
+    #[allow(unused)]
     pub fn create_from_xr_instance(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
@@ -188,30 +162,9 @@ impl VulkanContext {
 
         let graphics_queue = unsafe { device.get_device_queue(queue_family_index, 0) };
 
-        let command_pool = unsafe {
-            device.create_command_pool(
-                &vk::CommandPoolCreateInfo::builder()
-                    .queue_family_index(queue_family_index)
-                    .flags(
-                        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
-                            | vk::CommandPoolCreateFlags::TRANSIENT,
-                    ),
-                None,
-            )
-        }?;
+        let command_pool = create_command_pool(&device, queue_family_index)?;
 
-        let descriptor_pool = unsafe {
-            device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::builder()
-                    .pool_sizes(&[vk::DescriptorPoolSize {
-                        ty: vk::DescriptorType::UNIFORM_BUFFER,
-                        descriptor_count: SWAPCHAIN_LENGTH as _,
-                        ..Default::default()
-                    }])
-                    .max_sets(SWAPCHAIN_LENGTH as _),
-                None,
-            )
-        }?;
+        let descriptor_pool = create_descriptor_pool(&device)?;
 
         println!(" ..done!");
 
@@ -227,7 +180,6 @@ impl VulkanContext {
         })
     }
 
-    #[cfg(target_os = "android")]
     pub fn create_from_xr_instance_legacy(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
@@ -250,37 +202,9 @@ impl VulkanContext {
         let (device, graphics_queue, queue_family_index) =
             create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device)?;
 
-        let command_pool = unsafe {
-            device.create_command_pool(
-                &vk::CommandPoolCreateInfo::builder()
-                    .queue_family_index(queue_family_index)
-                    .flags(
-                        vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
-                            | vk::CommandPoolCreateFlags::TRANSIENT,
-                    ),
-                None,
-            )
-        }?;
+        let command_pool = create_command_pool(&device, queue_family_index)?;
 
-        let descriptor_pool = unsafe {
-            device.create_descriptor_pool(
-                &vk::DescriptorPoolCreateInfo::builder()
-                    .pool_sizes(&[
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::UNIFORM_BUFFER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                        vk::DescriptorPoolSize {
-                            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-                            descriptor_count: SWAPCHAIN_LENGTH as _,
-                            ..Default::default()
-                        },
-                    ])
-                    .max_sets(SWAPCHAIN_LENGTH as _),
-                None,
-            )
-        }?;
+        let descriptor_pool = create_descriptor_pool(&device)?;
 
         Ok(Self {
             entry: vulkan_entry,
@@ -431,6 +355,7 @@ impl VulkanContext {
 
     fn allocate_buffer_memory(&self, buffer: vk::Buffer) -> Result<vk::DeviceMemory> {
         let memory_requirements = unsafe { self.device.get_buffer_memory_requirements(buffer) };
+        // PERF: This is slow.
         let properties =
             vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
         self.allocate_memory(memory_requirements, properties)
@@ -664,9 +589,9 @@ impl VulkanContext {
         self.end_single_time_commands(command_buffer);
     }
 
-    pub fn create_descriptor_sets(
+    pub fn create_mesh_descriptor_set(
         &self,
-        set_layouts: &[vk::DescriptorSetLayout],
+        set_layout: vk::DescriptorSetLayout,
         ubo_buffer: vk::Buffer,
         base_color_texture: &Texture,
         normal_texture: &Texture,
@@ -675,13 +600,13 @@ impl VulkanContext {
         let descriptor_sets = unsafe {
             self.device.allocate_descriptor_sets(
                 &vk::DescriptorSetAllocateInfo::builder()
-                    .set_layouts(set_layouts)
+                    .set_layouts(&[set_layout])
                     .descriptor_pool(self.descriptor_pool),
             )
         }?;
         println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
 
-        let buffer_info = vk::DescriptorBufferInfo::builder()
+        let ubo_info = vk::DescriptorBufferInfo::builder()
             .buffer(ubo_buffer)
             .offset(0)
             .range(size_of::<UniformBufferObject>() as _)
@@ -692,10 +617,10 @@ impl VulkanContext {
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-            .buffer_info(&[buffer_info])
+            .buffer_info(&[ubo_info])
             .build();
 
-        let base_color = vk::WriteDescriptorSet::builder()
+        let base_color_texture_sampler = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_sets[0])
             .dst_binding(1)
             .dst_array_element(0)
@@ -703,7 +628,7 @@ impl VulkanContext {
             .image_info(&[base_color_texture.descriptor])
             .build();
 
-        let normal = vk::WriteDescriptorSet::builder()
+        let normal_texture_sampler = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_sets[0])
             .dst_binding(2)
             .dst_array_element(0)
@@ -712,12 +637,92 @@ impl VulkanContext {
             .build();
 
         unsafe {
-            self.device
-                .update_descriptor_sets(&[ubo, base_color, normal], &[])
+            self.device.update_descriptor_sets(
+                &[ubo, base_color_texture_sampler, normal_texture_sampler],
+                &[],
+            )
         };
 
         Ok(descriptor_sets)
     }
+
+    pub fn create_skin_descriptor_set(
+        &self,
+        set_layout: vk::DescriptorSetLayout,
+        skin_ssbo: vk::Buffer,
+        buffer_size: usize,
+    ) -> VkResult<Vec<vk::DescriptorSet>> {
+        println!("[HOTHAM_VULKAN] Allocating skin descriptor sets..");
+        let descriptor_sets = unsafe {
+            self.device.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::builder()
+                    .set_layouts(&[set_layout])
+                    .descriptor_pool(self.descriptor_pool),
+            )
+        }?;
+        println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
+
+        let ssbo_info = vk::DescriptorBufferInfo::builder()
+            .buffer(skin_ssbo)
+            .offset(0)
+            .range(buffer_size as _)
+            .build();
+
+        let ssbo = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_sets[0])
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .buffer_info(&[ssbo_info])
+            .build();
+
+        unsafe { self.device.update_descriptor_sets(&[ssbo], &[]) };
+
+        Ok(descriptor_sets)
+    }
+}
+
+fn create_command_pool(
+    device: &Device,
+    queue_family_index: u32,
+) -> Result<vk::CommandPool, anyhow::Error> {
+    let command_pool = unsafe {
+        device.create_command_pool(
+            &vk::CommandPoolCreateInfo::builder()
+                .queue_family_index(queue_family_index)
+                .flags(
+                    vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
+                        | vk::CommandPoolCreateFlags::TRANSIENT,
+                ),
+            None,
+        )
+    }?;
+    Ok(command_pool)
+}
+
+fn create_descriptor_pool(device: &Device) -> Result<vk::DescriptorPool, anyhow::Error> {
+    let descriptor_pool = unsafe {
+        device.create_descriptor_pool(
+            &vk::DescriptorPoolCreateInfo::builder()
+                .pool_sizes(&[
+                    vk::DescriptorPoolSize {
+                        ty: vk::DescriptorType::UNIFORM_BUFFER,
+                        descriptor_count: SWAPCHAIN_LENGTH as _,
+                    },
+                    vk::DescriptorPoolSize {
+                        ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+                        descriptor_count: SWAPCHAIN_LENGTH as _,
+                    },
+                    vk::DescriptorPoolSize {
+                        ty: vk::DescriptorType::STORAGE_BUFFER,
+                        descriptor_count: 200 as _,
+                    },
+                ])
+                .max_sets(100 as _),
+            None,
+        )
+    }?;
+    Ok(descriptor_pool)
 }
 
 fn get_image_info(format: vk::Format) -> (vk::ImageViewType, u32) {
@@ -765,7 +770,6 @@ impl Debug for VulkanContext {
     }
 }
 
-#[cfg(target_os = "android")]
 fn vulkan_init_legacy(
     instance: &xr::Instance,
     system: xr::SystemId,
@@ -837,7 +841,6 @@ fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
     Ok((instance, entry))
 }
 
-#[cfg(target_os = "android")]
 pub fn create_vulkan_device_legacy(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
@@ -855,7 +858,6 @@ pub fn create_vulkan_device_legacy(
     create_vulkan_device(&extension_names, vulkan_instance, physical_device)
 }
 
-#[cfg(any(target_os = "android", test))]
 fn create_vulkan_device(
     extension_names: &Vec<std::ffi::CString>,
     vulkan_instance: &AshInstance,

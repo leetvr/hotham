@@ -1,6 +1,7 @@
 use cgmath::{vec4, Matrix4, SquareMatrix, Vector4};
 
 #[derive(Clone, Debug)]
+#[repr(C)]
 pub struct UniformBufferObject {
     pub view: [Matrix4<f32>; 2],
     pub projection: [Matrix4<f32>; 2],

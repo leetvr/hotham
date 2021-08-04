@@ -3,6 +3,21 @@
 pub const OPENXR_H_: u32 = 1;
 pub const XR_VERSION_1_0: u32 = 1;
 pub const OPENXR_PLATFORM_DEFINES_H_: u32 = 1;
+pub const _VCRT_COMPILER_PREPROCESSOR: u32 = 1;
+pub const _SAL_VERSION: u32 = 20;
+pub const __SAL_H_VERSION: u32 = 180000000;
+pub const _USE_DECLSPECS_FOR_SAL: u32 = 0;
+pub const _USE_ATTRIBUTES_FOR_SAL: u32 = 0;
+pub const _CRT_PACKING: u32 = 8;
+pub const _HAS_EXCEPTIONS: u32 = 1;
+pub const _STL_LANG: u32 = 0;
+pub const _HAS_CXX17: u32 = 0;
+pub const _HAS_CXX20: u32 = 0;
+pub const _HAS_NODISCARD: u32 = 0;
+pub const WCHAR_MIN: u32 = 0;
+pub const WCHAR_MAX: u32 = 65535;
+pub const WINT_MIN: u32 = 0;
+pub const WINT_MAX: u32 = 65535;
 pub const XR_PTR_SIZE: u32 = 8;
 pub const XR_NULL_HANDLE: u32 = 0;
 pub const XR_NULL_SYSTEM_ID: u32 = 0;
@@ -199,71 +214,44 @@ pub const XR_RUNTIME_INFO_STRUCT_VERSION: u32 = 1;
 pub const XR_API_LAYER_NEXT_INFO_STRUCT_VERSION: u32 = 1;
 pub const XR_API_LAYER_MAX_SETTINGS_PATH_SIZE: u32 = 512;
 pub const XR_API_LAYER_CREATE_INFO_STRUCT_VERSION: u32 = 1;
-pub type size_t = ::std::os::raw::c_ulong;
-pub type wchar_t = ::std::os::raw::c_uint;
-#[repr(C)]
-#[repr(align(16))]
-#[derive(Debug, Copy, Clone)]
-pub struct max_align_t {
-    pub __clang_max_align_nonce1: ::std::os::raw::c_longlong,
-    pub __bindgen_padding_0: u64,
-    pub __clang_max_align_nonce2: u128,
+pub type size_t = ::std::os::raw::c_ulonglong;
+pub type wchar_t = ::std::os::raw::c_ushort;
+pub type max_align_t = f64;
+pub type va_list = *mut ::std::os::raw::c_char;
+extern "C" {
+    pub fn __va_start(arg1: *mut *mut ::std::os::raw::c_char, ...);
 }
-#[test]
-fn bindgen_test_layout_max_align_t() {
-    assert_eq!(
-        ::std::mem::size_of::<max_align_t>(),
-        32usize,
-        concat!("Size of: ", stringify!(max_align_t))
-    );
-    assert_eq!(
-        ::std::mem::align_of::<max_align_t>(),
-        16usize,
-        concat!("Alignment of ", stringify!(max_align_t))
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<max_align_t>())).__clang_max_align_nonce1 as *const _ as usize
-        },
-        0usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(max_align_t),
-            "::",
-            stringify!(__clang_max_align_nonce1)
-        )
-    );
-    assert_eq!(
-        unsafe {
-            &(*(::std::ptr::null::<max_align_t>())).__clang_max_align_nonce2 as *const _ as usize
-        },
-        16usize,
-        concat!(
-            "Offset of field: ",
-            stringify!(max_align_t),
-            "::",
-            stringify!(__clang_max_align_nonce2)
-        )
-    );
+pub type __vcrt_bool = bool;
+extern "C" {
+    pub fn __security_init_cookie();
 }
-pub type int_least64_t = i64;
-pub type uint_least64_t = u64;
-pub type int_fast64_t = i64;
-pub type uint_fast64_t = u64;
-pub type int_least32_t = i32;
-pub type uint_least32_t = u32;
-pub type int_fast32_t = i32;
-pub type uint_fast32_t = u32;
-pub type int_least16_t = i16;
-pub type uint_least16_t = u16;
-pub type int_fast16_t = i16;
-pub type uint_fast16_t = u16;
-pub type int_least8_t = i8;
-pub type uint_least8_t = u8;
-pub type int_fast8_t = i8;
-pub type uint_fast8_t = u8;
-pub type intmax_t = ::std::os::raw::c_long;
-pub type uintmax_t = ::std::os::raw::c_ulong;
+extern "C" {
+    pub fn __security_check_cookie(_StackCookie: usize);
+}
+extern "C" {
+    pub fn __report_gsfailure(_StackCookie: usize);
+}
+extern "C" {
+    pub static mut __security_cookie: usize;
+}
+pub type int_least8_t = ::std::os::raw::c_schar;
+pub type int_least16_t = ::std::os::raw::c_short;
+pub type int_least32_t = ::std::os::raw::c_int;
+pub type int_least64_t = ::std::os::raw::c_longlong;
+pub type uint_least8_t = ::std::os::raw::c_uchar;
+pub type uint_least16_t = ::std::os::raw::c_ushort;
+pub type uint_least32_t = ::std::os::raw::c_uint;
+pub type uint_least64_t = ::std::os::raw::c_ulonglong;
+pub type int_fast8_t = ::std::os::raw::c_schar;
+pub type int_fast16_t = ::std::os::raw::c_int;
+pub type int_fast32_t = ::std::os::raw::c_int;
+pub type int_fast64_t = ::std::os::raw::c_longlong;
+pub type uint_fast8_t = ::std::os::raw::c_uchar;
+pub type uint_fast16_t = ::std::os::raw::c_uint;
+pub type uint_fast32_t = ::std::os::raw::c_uint;
+pub type uint_fast64_t = ::std::os::raw::c_ulonglong;
+pub type intmax_t = ::std::os::raw::c_longlong;
+pub type uintmax_t = ::std::os::raw::c_ulonglong;
 pub type XrVersion = u64;
 pub type XrFlags64 = u64;
 pub type XrSystemId = u64;
@@ -533,11 +521,11 @@ pub const XrStructureType_XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR: XrStructureType 
 pub const XrStructureType_XR_TYPE_SWAPCHAIN_IMAGE_VULKAN2_KHR: XrStructureType = 1000025001;
 pub const XrStructureType_XR_TYPE_GRAPHICS_REQUIREMENTS_VULKAN2_KHR: XrStructureType = 1000025002;
 pub const XrStructureType_XR_STRUCTURE_TYPE_MAX_ENUM: XrStructureType = 2147483647;
-pub type XrStructureType = ::std::os::raw::c_uint;
+pub type XrStructureType = ::std::os::raw::c_int;
 pub const XrFormFactor_XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY: XrFormFactor = 1;
 pub const XrFormFactor_XR_FORM_FACTOR_HANDHELD_DISPLAY: XrFormFactor = 2;
 pub const XrFormFactor_XR_FORM_FACTOR_MAX_ENUM: XrFormFactor = 2147483647;
-pub type XrFormFactor = ::std::os::raw::c_uint;
+pub type XrFormFactor = ::std::os::raw::c_int;
 pub const XrViewConfigurationType_XR_VIEW_CONFIGURATION_TYPE_PRIMARY_MONO: XrViewConfigurationType =
     1;
 pub const XrViewConfigurationType_XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO:
@@ -547,13 +535,13 @@ pub const XrViewConfigurationType_XR_VIEW_CONFIGURATION_TYPE_PRIMARY_QUAD_VARJO:
 pub const XrViewConfigurationType_XR_VIEW_CONFIGURATION_TYPE_SECONDARY_MONO_FIRST_PERSON_OBSERVER_MSFT : XrViewConfigurationType = 1000054000 ;
 pub const XrViewConfigurationType_XR_VIEW_CONFIGURATION_TYPE_MAX_ENUM: XrViewConfigurationType =
     2147483647;
-pub type XrViewConfigurationType = ::std::os::raw::c_uint;
+pub type XrViewConfigurationType = ::std::os::raw::c_int;
 pub const XrEnvironmentBlendMode_XR_ENVIRONMENT_BLEND_MODE_OPAQUE: XrEnvironmentBlendMode = 1;
 pub const XrEnvironmentBlendMode_XR_ENVIRONMENT_BLEND_MODE_ADDITIVE: XrEnvironmentBlendMode = 2;
 pub const XrEnvironmentBlendMode_XR_ENVIRONMENT_BLEND_MODE_ALPHA_BLEND: XrEnvironmentBlendMode = 3;
 pub const XrEnvironmentBlendMode_XR_ENVIRONMENT_BLEND_MODE_MAX_ENUM: XrEnvironmentBlendMode =
     2147483647;
-pub type XrEnvironmentBlendMode = ::std::os::raw::c_uint;
+pub type XrEnvironmentBlendMode = ::std::os::raw::c_int;
 pub const XrReferenceSpaceType_XR_REFERENCE_SPACE_TYPE_VIEW: XrReferenceSpaceType = 1;
 pub const XrReferenceSpaceType_XR_REFERENCE_SPACE_TYPE_LOCAL: XrReferenceSpaceType = 2;
 pub const XrReferenceSpaceType_XR_REFERENCE_SPACE_TYPE_STAGE: XrReferenceSpaceType = 3;
@@ -562,19 +550,19 @@ pub const XrReferenceSpaceType_XR_REFERENCE_SPACE_TYPE_UNBOUNDED_MSFT: XrReferen
 pub const XrReferenceSpaceType_XR_REFERENCE_SPACE_TYPE_COMBINED_EYE_VARJO: XrReferenceSpaceType =
     1000121000;
 pub const XrReferenceSpaceType_XR_REFERENCE_SPACE_TYPE_MAX_ENUM: XrReferenceSpaceType = 2147483647;
-pub type XrReferenceSpaceType = ::std::os::raw::c_uint;
+pub type XrReferenceSpaceType = ::std::os::raw::c_int;
 pub const XrActionType_XR_ACTION_TYPE_BOOLEAN_INPUT: XrActionType = 1;
 pub const XrActionType_XR_ACTION_TYPE_FLOAT_INPUT: XrActionType = 2;
 pub const XrActionType_XR_ACTION_TYPE_VECTOR2F_INPUT: XrActionType = 3;
 pub const XrActionType_XR_ACTION_TYPE_POSE_INPUT: XrActionType = 4;
 pub const XrActionType_XR_ACTION_TYPE_VIBRATION_OUTPUT: XrActionType = 100;
 pub const XrActionType_XR_ACTION_TYPE_MAX_ENUM: XrActionType = 2147483647;
-pub type XrActionType = ::std::os::raw::c_uint;
+pub type XrActionType = ::std::os::raw::c_int;
 pub const XrEyeVisibility_XR_EYE_VISIBILITY_BOTH: XrEyeVisibility = 0;
 pub const XrEyeVisibility_XR_EYE_VISIBILITY_LEFT: XrEyeVisibility = 1;
 pub const XrEyeVisibility_XR_EYE_VISIBILITY_RIGHT: XrEyeVisibility = 2;
 pub const XrEyeVisibility_XR_EYE_VISIBILITY_MAX_ENUM: XrEyeVisibility = 2147483647;
-pub type XrEyeVisibility = ::std::os::raw::c_uint;
+pub type XrEyeVisibility = ::std::os::raw::c_int;
 pub const XrSessionState_XR_SESSION_STATE_UNKNOWN: XrSessionState = 0;
 pub const XrSessionState_XR_SESSION_STATE_IDLE: XrSessionState = 1;
 pub const XrSessionState_XR_SESSION_STATE_READY: XrSessionState = 2;
@@ -585,7 +573,7 @@ pub const XrSessionState_XR_SESSION_STATE_STOPPING: XrSessionState = 6;
 pub const XrSessionState_XR_SESSION_STATE_LOSS_PENDING: XrSessionState = 7;
 pub const XrSessionState_XR_SESSION_STATE_EXITING: XrSessionState = 8;
 pub const XrSessionState_XR_SESSION_STATE_MAX_ENUM: XrSessionState = 2147483647;
-pub type XrSessionState = ::std::os::raw::c_uint;
+pub type XrSessionState = ::std::os::raw::c_int;
 pub const XrObjectType_XR_OBJECT_TYPE_UNKNOWN: XrObjectType = 0;
 pub const XrObjectType_XR_OBJECT_TYPE_INSTANCE: XrObjectType = 1;
 pub const XrObjectType_XR_OBJECT_TYPE_SESSION: XrObjectType = 2;
@@ -597,7 +585,7 @@ pub const XrObjectType_XR_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT: XrObjectType = 
 pub const XrObjectType_XR_OBJECT_TYPE_SPATIAL_ANCHOR_MSFT: XrObjectType = 1000039000;
 pub const XrObjectType_XR_OBJECT_TYPE_HAND_TRACKER_EXT: XrObjectType = 1000051000;
 pub const XrObjectType_XR_OBJECT_TYPE_MAX_ENUM: XrObjectType = 2147483647;
-pub type XrObjectType = ::std::os::raw::c_uint;
+pub type XrObjectType = ::std::os::raw::c_int;
 pub type XrInstanceCreateFlags = XrFlags64;
 pub type XrSessionCreateFlags = XrFlags64;
 pub type XrSpaceVelocityFlags = XrFlags64;
@@ -6651,7 +6639,7 @@ pub const XrVisibilityMaskTypeKHR_XR_VISIBILITY_MASK_TYPE_LINE_LOOP_KHR: XrVisib
     3;
 pub const XrVisibilityMaskTypeKHR_XR_VISIBILITY_MASK_TYPE_MAX_ENUM_KHR: XrVisibilityMaskTypeKHR =
     2147483647;
-pub type XrVisibilityMaskTypeKHR = ::std::os::raw::c_uint;
+pub type XrVisibilityMaskTypeKHR = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct XrVisibilityMaskKHR {
@@ -7269,7 +7257,7 @@ pub const XrPerfSettingsDomainEXT_XR_PERF_SETTINGS_DOMAIN_CPU_EXT: XrPerfSetting
 pub const XrPerfSettingsDomainEXT_XR_PERF_SETTINGS_DOMAIN_GPU_EXT: XrPerfSettingsDomainEXT = 2;
 pub const XrPerfSettingsDomainEXT_XR_PERF_SETTINGS_DOMAIN_MAX_ENUM_EXT: XrPerfSettingsDomainEXT =
     2147483647;
-pub type XrPerfSettingsDomainEXT = ::std::os::raw::c_uint;
+pub type XrPerfSettingsDomainEXT = ::std::os::raw::c_int;
 pub const XrPerfSettingsSubDomainEXT_XR_PERF_SETTINGS_SUB_DOMAIN_COMPOSITING_EXT:
     XrPerfSettingsSubDomainEXT = 1;
 pub const XrPerfSettingsSubDomainEXT_XR_PERF_SETTINGS_SUB_DOMAIN_RENDERING_EXT:
@@ -7278,7 +7266,7 @@ pub const XrPerfSettingsSubDomainEXT_XR_PERF_SETTINGS_SUB_DOMAIN_THERMAL_EXT:
     XrPerfSettingsSubDomainEXT = 3;
 pub const XrPerfSettingsSubDomainEXT_XR_PERF_SETTINGS_SUB_DOMAIN_MAX_ENUM_EXT:
     XrPerfSettingsSubDomainEXT = 2147483647;
-pub type XrPerfSettingsSubDomainEXT = ::std::os::raw::c_uint;
+pub type XrPerfSettingsSubDomainEXT = ::std::os::raw::c_int;
 pub const XrPerfSettingsLevelEXT_XR_PERF_SETTINGS_LEVEL_POWER_SAVINGS_EXT: XrPerfSettingsLevelEXT =
     0;
 pub const XrPerfSettingsLevelEXT_XR_PERF_SETTINGS_LEVEL_SUSTAINED_LOW_EXT: XrPerfSettingsLevelEXT =
@@ -7288,7 +7276,7 @@ pub const XrPerfSettingsLevelEXT_XR_PERF_SETTINGS_LEVEL_SUSTAINED_HIGH_EXT: XrPe
 pub const XrPerfSettingsLevelEXT_XR_PERF_SETTINGS_LEVEL_BOOST_EXT: XrPerfSettingsLevelEXT = 75;
 pub const XrPerfSettingsLevelEXT_XR_PERF_SETTINGS_LEVEL_MAX_ENUM_EXT: XrPerfSettingsLevelEXT =
     2147483647;
-pub type XrPerfSettingsLevelEXT = ::std::os::raw::c_uint;
+pub type XrPerfSettingsLevelEXT = ::std::os::raw::c_int;
 pub const XrPerfSettingsNotificationLevelEXT_XR_PERF_SETTINGS_NOTIF_LEVEL_NORMAL_EXT:
     XrPerfSettingsNotificationLevelEXT = 0;
 pub const XrPerfSettingsNotificationLevelEXT_XR_PERF_SETTINGS_NOTIF_LEVEL_WARNING_EXT:
@@ -7297,7 +7285,7 @@ pub const XrPerfSettingsNotificationLevelEXT_XR_PERF_SETTINGS_NOTIF_LEVEL_IMPAIR
     XrPerfSettingsNotificationLevelEXT = 75;
 pub const XrPerfSettingsNotificationLevelEXT_XR_PERF_SETTINGS_NOTIFICATION_LEVEL_MAX_ENUM_EXT:
     XrPerfSettingsNotificationLevelEXT = 2147483647;
-pub type XrPerfSettingsNotificationLevelEXT = ::std::os::raw::c_uint;
+pub type XrPerfSettingsNotificationLevelEXT = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct XrEventDataPerfSettingsEXT {
@@ -8447,7 +8435,7 @@ pub const XrSpatialGraphNodeTypeMSFT_XR_SPATIAL_GRAPH_NODE_TYPE_DYNAMIC_MSFT:
     XrSpatialGraphNodeTypeMSFT = 2;
 pub const XrSpatialGraphNodeTypeMSFT_XR_SPATIAL_GRAPH_NODE_TYPE_MAX_ENUM_MSFT:
     XrSpatialGraphNodeTypeMSFT = 2147483647;
-pub type XrSpatialGraphNodeTypeMSFT = ::std::os::raw::c_uint;
+pub type XrSpatialGraphNodeTypeMSFT = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct XrSpatialGraphNodeSpaceCreateInfoMSFT {
@@ -8557,7 +8545,7 @@ pub type XrHandTrackerEXT = *mut XrHandTrackerEXT_T;
 pub const XrHandEXT_XR_HAND_LEFT_EXT: XrHandEXT = 1;
 pub const XrHandEXT_XR_HAND_RIGHT_EXT: XrHandEXT = 2;
 pub const XrHandEXT_XR_HAND_MAX_ENUM_EXT: XrHandEXT = 2147483647;
-pub type XrHandEXT = ::std::os::raw::c_uint;
+pub type XrHandEXT = ::std::os::raw::c_int;
 pub const XrHandJointEXT_XR_HAND_JOINT_PALM_EXT: XrHandJointEXT = 0;
 pub const XrHandJointEXT_XR_HAND_JOINT_WRIST_EXT: XrHandJointEXT = 1;
 pub const XrHandJointEXT_XR_HAND_JOINT_THUMB_METACARPAL_EXT: XrHandJointEXT = 2;
@@ -8585,10 +8573,10 @@ pub const XrHandJointEXT_XR_HAND_JOINT_LITTLE_INTERMEDIATE_EXT: XrHandJointEXT =
 pub const XrHandJointEXT_XR_HAND_JOINT_LITTLE_DISTAL_EXT: XrHandJointEXT = 24;
 pub const XrHandJointEXT_XR_HAND_JOINT_LITTLE_TIP_EXT: XrHandJointEXT = 25;
 pub const XrHandJointEXT_XR_HAND_JOINT_MAX_ENUM_EXT: XrHandJointEXT = 2147483647;
-pub type XrHandJointEXT = ::std::os::raw::c_uint;
+pub type XrHandJointEXT = ::std::os::raw::c_int;
 pub const XrHandJointSetEXT_XR_HAND_JOINT_SET_DEFAULT_EXT: XrHandJointSetEXT = 0;
 pub const XrHandJointSetEXT_XR_HAND_JOINT_SET_MAX_ENUM_EXT: XrHandJointSetEXT = 2147483647;
-pub type XrHandJointSetEXT = ::std::os::raw::c_uint;
+pub type XrHandJointSetEXT = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct XrSystemHandTrackingPropertiesEXT {
@@ -9048,7 +9036,7 @@ pub type PFN_xrLocateHandJointsEXT = ::std::option::Option<
 pub const XrHandPoseTypeMSFT_XR_HAND_POSE_TYPE_TRACKED_MSFT: XrHandPoseTypeMSFT = 0;
 pub const XrHandPoseTypeMSFT_XR_HAND_POSE_TYPE_REFERENCE_OPEN_PALM_MSFT: XrHandPoseTypeMSFT = 1;
 pub const XrHandPoseTypeMSFT_XR_HAND_POSE_TYPE_MAX_ENUM_MSFT: XrHandPoseTypeMSFT = 2147483647;
-pub type XrHandPoseTypeMSFT = ::std::os::raw::c_uint;
+pub type XrHandPoseTypeMSFT = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct XrSystemHandTrackingMeshPropertiesMSFT {
@@ -10709,7 +10697,7 @@ pub const XrHandJointsMotionRangeEXT_XR_HAND_JOINTS_MOTION_RANGE_CONFORMING_TO_C
     XrHandJointsMotionRangeEXT = 2;
 pub const XrHandJointsMotionRangeEXT_XR_HAND_JOINTS_MOTION_RANGE_MAX_ENUM_EXT:
     XrHandJointsMotionRangeEXT = 2147483647;
-pub type XrHandJointsMotionRangeEXT = ::std::os::raw::c_uint;
+pub type XrHandJointsMotionRangeEXT = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct XrHandJointsMotionRangeInfoEXT {
@@ -10869,7 +10857,7 @@ pub const XrColorSpaceFB_XR_COLOR_SPACE_QUEST_FB: XrColorSpaceFB = 5;
 pub const XrColorSpaceFB_XR_COLOR_SPACE_P3_FB: XrColorSpaceFB = 6;
 pub const XrColorSpaceFB_XR_COLOR_SPACE_ADOBE_RGB_FB: XrColorSpaceFB = 7;
 pub const XrColorSpaceFB_XR_COLOR_SPACE_MAX_ENUM_FB: XrColorSpaceFB = 2147483647;
-pub type XrColorSpaceFB = ::std::os::raw::c_uint;
+pub type XrColorSpaceFB = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct XrSystemColorSpacePropertiesFB {
@@ -11224,7 +11212,7 @@ pub const XrLoaderInterfaceStructs_XR_LOADER_INTERFACE_STRUCT_API_LAYER_CREATE_I
     XrLoaderInterfaceStructs = 4;
 pub const XrLoaderInterfaceStructs_XR_LOADER_INTERFACE_STRUCT_API_LAYER_NEXT_INFO:
     XrLoaderInterfaceStructs = 5;
-pub type XrLoaderInterfaceStructs = ::std::os::raw::c_uint;
+pub type XrLoaderInterfaceStructs = ::std::os::raw::c_int;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct XrNegotiateLoaderInfo {

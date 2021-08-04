@@ -8,6 +8,8 @@ pub struct Vertex {
     pub texture_coords: Vector2<f32>,
     pub normal: Vector3<f32>,
     pub tangent: Vector4<f32>,
+    pub joint_indices: Vector4<f32>,
+    pub joint_weights: Vector4<f32>,
 }
 
 impl Vertex {
@@ -16,17 +18,30 @@ impl Vertex {
         texture_coords: Vector2<f32>,
         normal: Vector3<f32>,
         tangent: Vector4<f32>,
+        joint_indices: Vector4<f32>,
+        joint_weights: Vector4<f32>,
     ) -> Self {
         Self {
             position,
             texture_coords,
             normal,
             tangent,
+            joint_indices,
+            joint_weights,
         }
     }
 
-    pub fn from_zip(t: (Vector3<f32>, Vector2<f32>, Vector3<f32>, Vector4<f32>)) -> Self {
-        Vertex::new(t.0, t.1, t.2, t.3)
+    pub fn from_zip(
+        t: (
+            Vector3<f32>,
+            Vector2<f32>,
+            Vector3<f32>,
+            Vector4<f32>,
+            Vector4<f32>,
+            Vector4<f32>,
+        ),
+    ) -> Self {
+        Vertex::new(t.0, t.1, t.2, t.3, t.4, t.5)
     }
 }
 
@@ -60,6 +75,27 @@ impl Vertex {
             .offset(memoffset::offset_of!(Vertex, tangent) as _)
             .build();
 
-        vec![position, texture_coords, normal, tangent]
+        let joint_indices = vk::VertexInputAttributeDescription::builder()
+            .binding(0)
+            .location(4)
+            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
+            .build();
+
+        let joint_weights = vk::VertexInputAttributeDescription::builder()
+            .binding(0)
+            .location(5)
+            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
+            .build();
+
+        vec![
+            position,
+            texture_coords,
+            normal,
+            tangent,
+            joint_indices,
+            joint_weights,
+        ]
     }
 }

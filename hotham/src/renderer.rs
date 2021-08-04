@@ -1,28 +1,25 @@
-use std::{collections::HashMap, ffi::CStr, io::Cursor, mem::size_of, time::Instant, u64};
+use std::{
+    cell::RefCell, collections::HashMap, ffi::CStr, io::Cursor, mem::size_of, rc::Rc,
+    time::Instant, u64,
+};
 
 use crate::{
-    buffer::Buffer,
-    camera::Camera,
-    frame::Frame,
-    image::Image,
-    model::{load_models, Model, SceneObject},
-    swapchain::Swapchain,
-    vulkan_context::VulkanContext,
-    UniformBufferObject, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    buffer::Buffer, camera::Camera, frame::Frame, gltf_loader::load_gltf_nodes, image::Image,
+    node::Node, swapchain::Swapchain, vulkan_context::VulkanContext, UniformBufferObject, Vertex,
+    COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
 use cgmath::{vec4, Deg, Euler, Matrix4};
-use console::Term;
 use openxr as xr;
 
 use xr::VulkanLegacy;
 
 pub(crate) struct Renderer {
     _swapchain: Swapchain,
-    vulkan_context: VulkanContext,
+    pub vulkan_context: VulkanContext,
     frames: Vec<Frame>,
-    descriptor_set_layout: vk::DescriptorSetLayout,
+    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
     pipeline_layout: vk::PipelineLayout,
     pipeline: vk::Pipeline,
     render_pass: vk::RenderPass,
@@ -31,8 +28,8 @@ pub(crate) struct Renderer {
     uniform_buffer: Buffer<UniformBufferObject>,
     render_start_time: Instant,
     cameras: Vec<Camera>,
-    term: Term,
     views: Vec<xr::View>,
+    last_frame_time: Instant,
     pub frame_index: usize,
 }
 
@@ -44,9 +41,11 @@ impl Drop for Renderer {
                 .queue_wait_idle(self.vulkan_context.graphics_queue)
                 .expect("Unable to wait for queue to become idle!");
 
-            self.vulkan_context
-                .device
-                .destroy_descriptor_set_layout(self.descriptor_set_layout, None);
+            for layout in &self.descriptor_set_layouts {
+                self.vulkan_context
+                    .device
+                    .destroy_descriptor_set_layout(*layout, None);
+            }
             self.depth_image.destroy(&self.vulkan_context);
             self.uniform_buffer.destroy(&self.vulkan_context);
             for frame in self.frames.drain(..) {
@@ -80,11 +79,11 @@ impl Renderer {
             offset: vk::Offset2D::default(),
         };
 
-        let descriptor_set_layout = create_descriptor_set_layout(&vulkan_context)?;
+        let descriptor_set_layouts = create_descriptor_set_layouts(&vulkan_context)?;
 
         // Pipeline, render pass
         let render_pass = create_render_pass(&vulkan_context)?;
-        let pipeline_layout = create_pipeline_layout(&vulkan_context, &[descriptor_set_layout])?;
+        let pipeline_layout = create_pipeline_layout(&vulkan_context, &descriptor_set_layouts)?;
         let pipeline =
             create_pipeline(&vulkan_context, pipeline_layout, &render_area, render_pass)?;
 
@@ -109,7 +108,7 @@ impl Renderer {
             _swapchain: swapchain,
             vulkan_context,
             frames,
-            descriptor_set_layout,
+            descriptor_set_layouts,
             pipeline,
             pipeline_layout,
             render_pass,
@@ -119,20 +118,18 @@ impl Renderer {
             uniform_buffer,
             render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
-            term: Term::buffered_stdout(),
             views: Vec::new(),
+            last_frame_time: Instant::now(),
         })
     }
 
-    pub fn draw(&mut self, frame_index: usize, scene_objects: &Vec<SceneObject>) -> Result<()> {
+    pub fn draw(&mut self, frame_index: usize, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
         self.frame_index += 1;
 
-        self.show_debug_info()?;
+        // self.show_debug_info(nodes)?;
 
         let device = &self.vulkan_context.device;
         let frame = &self.frames[frame_index];
-
-        self.prepare_frame(frame, scene_objects)?;
 
         let command_buffer = frame.command_buffer;
         let submit_info = vk::SubmitInfo::builder()
@@ -140,12 +137,16 @@ impl Renderer {
             .build();
         let fence = frame.fence;
         let fences = [fence];
+        self.prepare_frame(frame, nodes)?;
 
         unsafe {
             device.reset_fences(&fences)?;
             device.queue_submit(self.vulkan_context.graphics_queue, &[submit_info], fence)?;
             device.wait_for_fences(&fences, true, u64::MAX)?;
         };
+
+        // Update our frame timer
+        self.last_frame_time = Instant::now();
 
         Ok(())
     }
@@ -191,7 +192,7 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn prepare_frame(&self, frame: &Frame, scene_objects: &Vec<SceneObject>) -> Result<()> {
+    pub fn prepare_frame(&self, frame: &Frame, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
         let device = &self.vulkan_context.device;
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
@@ -231,32 +232,8 @@ impl Renderer {
                 self.pipeline,
             );
 
-            for scene_object in scene_objects.iter() {
-                let model = &scene_object.model;
-                let transform_constant = to_push_constant(&scene_object.transform);
-                device.cmd_bind_descriptor_sets(
-                    command_buffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    self.pipeline_layout,
-                    0,
-                    &model.descriptor_sets,
-                    &[],
-                );
-                device.cmd_bind_vertex_buffers(command_buffer, 0, &[model.vertex_buffer], &[0]);
-                device.cmd_bind_index_buffer(
-                    command_buffer,
-                    model.index_buffer,
-                    0,
-                    vk::IndexType::UINT32,
-                );
-                device.cmd_push_constants(
-                    command_buffer,
-                    self.pipeline_layout,
-                    vk::ShaderStageFlags::VERTEX,
-                    0,
-                    transform_constant,
-                );
-                device.cmd_draw_indexed(command_buffer, model.num_indices, 1, 0, 0, 1);
+            for node in nodes {
+                self.draw_node(&(**node).borrow(), device, command_buffer)?;
             }
 
             device.cmd_end_render_pass(command_buffer);
@@ -266,72 +243,88 @@ impl Renderer {
         Ok(())
     }
 
-    fn show_debug_info(&self) -> Result<()> {
-        if self.frame_index % 72 != 0 {
-            return Ok(());
-        };
-        let e1 = Euler::from(self.cameras[0].orientation);
-        let e2 = Euler::from(self.cameras[1].orientation);
+    unsafe fn draw_node(
+        &self,
+        node: &Node,
+        device: &ash::Device,
+        command_buffer: vk::CommandBuffer,
+    ) -> Result<()> {
+        // Update any animations
+        // node.update_animation(
+        //     self.last_frame_time.elapsed().as_secs_f32(),
+        //     &self.vulkan_context,
+        // )?;
 
-        self.term.clear_screen()?;
-        self.term.write_line("[RENDER_DEBUG]")?;
-        self.term
-            .write_line(&format!("[Frame]: {}", self.frame_index))?;
-        self.term.write_line(&format!(
-            "[Camera 0 Position]: {:?}",
-            self.cameras[0].position
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 0 Orientation]: Pitch {:?}, Yaw: {:?}, Roll: {:?}",
-            Deg::from(e1.x),
-            Deg::from(e1.y),
-            Deg::from(e1.z)
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 0 Matrix]: {:?}",
-            self.cameras[0].view_matrix
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 1 Position]: {:?}",
-            self.cameras[1].position
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 1 Orientation]: Pitch {:?}, Yaw: {:?}, Roll: {:?}",
-            Deg::from(e2.x),
-            Deg::from(e2.y),
-            Deg::from(e2.z)
-        ))?;
-        self.term.write_line(&format!(
-            "[Camera 1 Matrix]: {:?}",
-            self.cameras[1].view_matrix
-        ))?;
-        let view = &self.views[0];
-        let camera_position: mint::Vector3<f32> = view.pose.position.into();
-        let angle_left = view.fov.angle_left;
-        let angle_right = view.fov.angle_right;
-        let angle_up = view.fov.angle_up;
-        let angle_down = view.fov.angle_down;
-        self.term.write_line(&format!(
-            "[View 0]: Position: {:?}, angleLeft: {}, angleRight: {}, angleDown: {}, angleUp: {}",
-            camera_position, angle_left, angle_right, angle_up, angle_down
-        ))?;
-        self.term.flush()?;
+        if let Some(mesh) = node.mesh.as_ref() {
+            // Bind mesh descriptor sets
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout,
+                0,
+                &mesh.descriptor_sets,
+                &[],
+            );
+
+            // Bind vertex and index buffers
+            device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer.handle], &[0]);
+            device.cmd_bind_index_buffer(
+                command_buffer,
+                mesh.index_buffer.handle,
+                0,
+                vk::IndexType::UINT32,
+            );
+
+            // Bind skin descriptor sets, if present.
+            if let Some(skin) = node.skin.as_ref() {
+                device.cmd_bind_descriptor_sets(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    self.pipeline_layout,
+                    1,
+                    &skin.descriptor_sets,
+                    &[],
+                )
+            }
+
+            // Push constants
+            let node_matrix = node.get_node_matrix();
+            let node_matrix = create_push_constant(&node_matrix);
+
+            device.cmd_push_constants(
+                command_buffer,
+                self.pipeline_layout,
+                vk::ShaderStageFlags::VERTEX,
+                0,
+                node_matrix,
+            );
+            device.cmd_draw_indexed(command_buffer, mesh.num_indices, 1, 0, 0, 1);
+        }
+
+        for child in &node.children {
+            let child = (*child).borrow();
+            self.draw_node(&child, device, command_buffer)?;
+        }
 
         Ok(())
     }
 
-    pub(crate) fn load_models(&self, model_data: (&[u8], &[u8])) -> Result<HashMap<String, Model>> {
-        load_models(
-            model_data.0,
-            model_data.1,
+    pub(crate) fn load_gltf_nodes(
+        &self,
+        gltf_data: (&[u8], &[u8]),
+    ) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
+        let buffers = vec![gltf_data.1];
+        load_gltf_nodes(
+            gltf_data.0,
+            &buffers,
             &self.vulkan_context,
-            &[self.descriptor_set_layout],
+            &self.descriptor_set_layouts,
             self.uniform_buffer.handle,
         )
     }
 }
 
-fn to_push_constant<T: Sized>(p: &T) -> &[u8] {
+fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(std::mem::transmute(p), size_of::<T>()) }
 }
 
@@ -370,38 +363,60 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     );
 }
 
-pub(crate) fn create_descriptor_set_layout(
+pub(crate) fn create_descriptor_set_layouts(
     vulkan_context: &VulkanContext,
-) -> VkResult<vk::DescriptorSetLayout> {
-    let vertex = vk::DescriptorSetLayoutBinding::builder()
+) -> VkResult<Vec<vk::DescriptorSetLayout>> {
+    let uniform_buffer = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .build();
 
-    let base_color = vk::DescriptorSetLayoutBinding::builder()
+    let base_color_image_sampler = vk::DescriptorSetLayoutBinding::builder()
         .binding(1)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .build();
 
-    let normal = vk::DescriptorSetLayoutBinding::builder()
+    let normal_image_sampler = vk::DescriptorSetLayoutBinding::builder()
         .binding(2)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .build();
 
-    let bindings = [vertex, base_color, normal];
-    let create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&bindings);
+    let mesh_bindings = [
+        uniform_buffer,
+        base_color_image_sampler,
+        normal_image_sampler,
+    ];
+    let mesh_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&mesh_bindings);
 
-    unsafe {
+    let mesh_layout = unsafe {
         vulkan_context
             .device
-            .create_descriptor_set_layout(&create_info, None)
-    }
+            .create_descriptor_set_layout(&mesh_create_info, None)
+    }?;
+
+    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .build();
+
+    let skin_bindings = [skin_joint_buffer];
+    let skin_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&skin_bindings);
+
+    let skin_layout = unsafe {
+        vulkan_context
+            .device
+            .create_descriptor_set_layout(&skin_create_info, None)
+    }?;
+
+    Ok(vec![mesh_layout, skin_layout])
 }
 
 fn create_frames(

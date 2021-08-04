@@ -4,16 +4,10 @@
 			"path": "."
 		},
 		{
-			"path": "..\\OpenXR-SDK-Source"
-		},
-		{
 			"path": "..\\..\\Documents\\Devlogs"
 		},
 		{
 			"path": "..\\Vulkan"
-		},
-		{
-			"path": "..\\openxrs"
 		}
 	],
 	"settings": {
