@@ -10,7 +10,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{vec4, Deg, Euler, Matrix4};
+use cgmath::{vec4, Matrix4};
 use openxr as xr;
 
 use xr::VulkanLegacy;

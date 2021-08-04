@@ -4,7 +4,7 @@ use std::{
 };
 
 use anyhow::Result;
-use cgmath::{vec3, Deg, Euler, Quaternion, Rotation, Rotation3, Vector3};
+use cgmath::{Deg, Quaternion, Vector3};
 
 use crate::{
     animation::Animation, node::Node, util::to_euler_degrees, vulkan_context::VulkanContext,
@@ -103,7 +103,7 @@ impl Hand {
 
 #[cfg(test)]
 mod tests {
-    use cgmath::{assert_relative_eq, vec3, Deg, Euler, Matrix4, Quaternion, Rad, Rotation3};
+    use cgmath::{assert_relative_eq, vec3, Deg, Euler, Matrix4, Quaternion, Rotation3};
 
     use crate::{
         gltf_loader, renderer::create_descriptor_set_layouts, vulkan_context::VulkanContext,

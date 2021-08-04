@@ -8,7 +8,7 @@ use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
 };
-use cgmath::Euler;
+
 use openxr as xr;
 
 use std::{
