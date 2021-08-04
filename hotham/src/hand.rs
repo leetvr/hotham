@@ -16,7 +16,7 @@ pub(crate) struct Hand {
     root_bone_node_inner: Rc<RefCell<Node>>,
     default_animation: Rc<RefCell<Animation>>,
     grip_animation: Rc<RefCell<Animation>>,
-    grip_offset: (Vector3<f32>, Quaternion<f32>),
+    pub grip_offset: (Vector3<f32>, Quaternion<f32>),
 }
 
 impl Hand {
@@ -36,12 +36,8 @@ impl Hand {
         let grip_rotation = to_euler_degrees(grip_node.rotation);
         let hand_rotation = to_euler_degrees(hand_node.rotation);
 
-        let mut offset_rotation = Euler {
-            x: Deg(00.0),
-            y: Deg(00.0),
-            z: Deg(0.0),
-        };
-        // offset_rotation.y = offset_rotation.y - Deg(24.0);
+        let mut offset_rotation = to_euler_degrees(root_bone_node.rotation * grip_node.rotation);
+        offset_rotation.z = Deg(0.0);
 
         let grip_offset = (
             hand_node.translation + grip_node.translation,
@@ -82,14 +78,22 @@ impl Hand {
     ) -> () {
         let mut root_bone_node = (*self.root_bone_node_inner).borrow_mut();
         let (translation_offset, rotation_offset) = &self.grip_offset;
-        // let (translation_offset, rotation_offset) =
-        //     (vec3(0.0, 0.0, 0.0), Quaternion::new(0.0, 0.0, 0.0, 0.0));
+        // let rotation_offset = to_euler_degrees(*rotation_offset);
+        // let mut rotation = to_euler_degrees(rotation);
+        // rotation.x = rotation.x - rotation_offset.x;
+        // rotation.y = rotation.y - rotation_offset.y;
+        // rotation.z = rotation.z - rotation_offset.z;
+
         root_bone_node.translation = translation - translation_offset;
         root_bone_node.rotation = rotation * rotation_offset;
     }
 
     pub(crate) fn node<'a>(&'a self) -> Ref<'a, Node> {
         (*self.parent_node_inner).borrow()
+    }
+
+    pub(crate) fn root_bone_node<'a>(&'a self) -> Ref<'a, Node> {
+        (*self.root_bone_node_inner).borrow()
     }
 
     pub(crate) fn _node_mut<'a>(&'a self) -> RefMut<'a, Node> {

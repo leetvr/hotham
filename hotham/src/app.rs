@@ -336,16 +336,6 @@ where
         self.term.write_line("[APP_DEBUG]")?;
         self.term.write_line(&format!("[Frame]: {}", frame_index))?;
 
-        let left_hand = nodes.get(0).unwrap().borrow();
-        let left_hand = left_hand.find(4);
-        let left_hand = left_hand.as_ref().unwrap().borrow();
-        let left_hand_position = left_hand.translation;
-        let left_hand_rotation = left_hand.rotation;
-        let left_hand_matrix = left_hand.get_node_matrix();
-        self.term.write_line(&format!(
-            "[Left Hand]: Position: {:?}, rotation: {:?}, matrix: {:?}",
-            left_hand_position, left_hand_rotation, left_hand_matrix
-        ))?;
         for (tag, message) in &self.debug_messages {
             self.term.write_line(&format!("[{}]: {}", tag, message))?;
         }
@@ -368,12 +358,24 @@ where
         .current_state;
         let position = mint::Vector3::from(left_hand_pose.position).into();
         let orientation = mint::Quaternion::from(left_hand_pose.orientation).into();
+        self.left_hand.update_position(position, orientation);
 
         let tag = "HANDS".to_string();
         let message = format!("Incoming orientation: {:?}", to_euler_degrees(orientation));
-        self.debug_messages.push((tag, message));
+        self.debug_messages.push((tag.clone(), message));
 
-        self.left_hand.update_position(position, orientation);
+        let message = format!(
+            "Offset orientation: {:?}",
+            to_euler_degrees(self.left_hand.grip_offset.1)
+        );
+        self.debug_messages.push((tag.clone(), message));
+
+        let updated_orientation = (*self.left_hand.root_bone_node()).rotation;
+        let message = format!(
+            "Updated orientation: {:?}",
+            to_euler_degrees(updated_orientation)
+        );
+        self.debug_messages.push((tag, message));
 
         self.left_hand
             .grip(left_hand_grabbed, &self.renderer.vulkan_context)
