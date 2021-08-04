@@ -380,7 +380,7 @@ where
         }
 
         let right_hand_pose = self
-            .left_hand_space
+            .right_hand_space
             .locate(&self.reference_space, predicted_display_time)?
             .pose;
         let right_hand_grabbed = xr::ActionInput::get(
