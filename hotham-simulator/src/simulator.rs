@@ -224,11 +224,18 @@ pub unsafe extern "system" fn create_vulkan_device(
     }
 
     let device = device.unwrap();
-    state.device = Some(device.clone());
-    let info = vk::FenceCreateInfo::default();
-    state.swapchain_fence = device.create_fence(&info, None).unwrap();
+    *vulkan_device = transmute(device.handle());
     let queue_family_index =
         slice::from_raw_parts(create_info.p_queue_create_infos, 1)[0].queue_family_index;
+
+    create_and_store_device(device, queue_family_index, &mut state);
+
+    Result::SUCCESS
+}
+
+unsafe fn create_and_store_device(device: ash::Device, queue_family_index: u32, state: &mut State) {
+    let info = vk::FenceCreateInfo::default();
+    state.swapchain_fence = device.create_fence(&info, None).unwrap();
     state.command_pool = device
         .create_command_pool(
             &vk::CommandPoolCreateInfo::builder()
@@ -243,14 +250,12 @@ pub unsafe extern "system" fn create_vulkan_device(
     state.present_queue = device.get_device_queue(queue_family_index, 0);
     state.present_queue_family_index = queue_family_index;
     state.render_complete_semaphores = create_semaphores(&device);
+    state.device = Some(device);
 
     println!(
         "[HOTHAM_SIMULATOR] Done! Device created: {:?}",
-        device.handle()
+        state.device.as_ref().unwrap().handle()
     );
-
-    *vulkan_device = transmute(device.handle());
-    Result::SUCCESS
 }
 
 unsafe fn create_semaphores(device: &Device) -> Vec<vk::Semaphore> {
@@ -391,7 +396,8 @@ pub unsafe extern "system" fn create_session(
         let vk_device = graphics_binding.device;
         let instance = state.vulkan_instance.as_ref().unwrap();
         let device = ash::Device::load(instance.fp_v1_0(), transmute(vk_device));
-        state.device = Some(device);
+        let queue_family_index = graphics_binding.queue_family_index;
+        create_and_store_device(device, queue_family_index, &mut state);
     }
 
     Result::SUCCESS
@@ -1751,22 +1757,62 @@ pub unsafe extern "system" fn get_action_state_boolean(
 pub unsafe extern "system" fn get_vulkan_instance_extensions(
     _instance: Instance,
     _system_id: SystemId,
-    _buffer_capacity_input: u32,
+    buffer_capacity_input: u32,
     buffer_count_output: *mut u32,
-    _buffer: *mut c_char,
+    buffer: *mut c_char,
 ) -> Result {
-    (*buffer_count_output) = 0;
+    let event_loop: EventLoop<()> = EventLoop::new_any_thread();
+    let window = WindowBuilder::new()
+        .with_drag_and_drop(false)
+        .with_visible(false)
+        .build(&event_loop)
+        .unwrap();
+    let enabled_extensions = ash_window::enumerate_required_extensions(&window).unwrap();
+    let extensions = enabled_extensions
+        .iter()
+        .map(|e| e.to_str().unwrap())
+        .collect::<Vec<&str>>()
+        .join(" ")
+        .into_bytes();
+
+    let length = extensions.len() + 1;
+
+    if buffer_capacity_input == 0 {
+        (*buffer_count_output) = length as _;
+        return Result::SUCCESS;
+    }
+
+    let extensions = CString::from_vec_unchecked(extensions);
+
+    let buffer = slice::from_raw_parts_mut(buffer, length);
+    let bytes = extensions.as_bytes_with_nul();
+    for i in 0..length {
+        buffer[i] = bytes[i] as _;
+    }
+
     Result::SUCCESS
 }
 
 pub unsafe extern "system" fn get_vulkan_device_extensions(
     _instance: Instance,
     _system_id: SystemId,
-    _buffer_capacity_input: u32,
+    buffer_capacity_input: u32,
     buffer_count_output: *mut u32,
-    _buffer: *mut c_char,
+    buffer: *mut c_char,
 ) -> Result {
-    (*buffer_count_output) = 0;
+    let extensions = khr::Swapchain::name();
+    let bytes = extensions.to_bytes_with_nul();
+    let length = bytes.len();
+    if buffer_capacity_input == 0 {
+        *buffer_count_output = length as _;
+        return Result::SUCCESS;
+    }
+
+    let buffer = slice::from_raw_parts_mut(buffer, length);
+    for i in 0..length {
+        buffer[i] = bytes[i] as _;
+    }
+
     Result::SUCCESS
 }
 
