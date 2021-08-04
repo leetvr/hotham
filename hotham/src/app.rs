@@ -542,9 +542,20 @@ fn load_hands(renderer: &Renderer, app_nodes: &mut Vec<Rc<RefCell<Node>>>) -> Re
 
     let left_hand_node = Rc::clone(&left_hand);
     let left_hand = Hand::new(left_hand);
-    let right_hand = left_hand.clone(); // todo
+
+    let gltf = include_bytes!("../assets/right_hand.gltf");
+    let data = include_bytes!("../assets/right_hand.bin");
+    let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
+    let (_, right_hand) = nodes
+        .drain()
+        .next()
+        .ok_or_else(|| anyhow!("Couldn't find right hand in gltf file"))?;
+
+    let right_hand_node = Rc::clone(&right_hand);
+    let right_hand = Hand::new(right_hand);
 
     app_nodes.push(left_hand_node);
+    app_nodes.push(right_hand_node);
 
     Ok((left_hand, right_hand))
 }
