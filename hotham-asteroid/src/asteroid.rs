@@ -44,9 +44,11 @@ impl Program for Asteroid {
         let refinery = Node::clone(&refinery.borrow());
 
         let refinery = Rc::new(RefCell::new(refinery));
+        let refinery_parent = Rc::downgrade(&asteroid);
         (*refinery).borrow_mut().children.iter_mut().for_each(|c| {
             (*c).borrow_mut().parent = Rc::downgrade(&refinery);
         });
+        (*refinery).borrow_mut().parent = refinery_parent;
 
         Ok(vec![asteroid, refinery])
     }
