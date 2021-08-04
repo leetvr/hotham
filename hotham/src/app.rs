@@ -58,9 +58,9 @@ pub struct App<P: Program> {
     left_hand: Hand,
     left_hand_space: xr::Space,
     left_hand_subaction_path: xr::Path,
-    _right_hand: Hand,
-    _right_hand_space: xr::Space,
-    _right_hand_subaction_path: xr::Path,
+    right_hand: Hand,
+    right_hand_space: xr::Space,
+    right_hand_subaction_path: xr::Path,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
@@ -172,11 +172,11 @@ where
             _pose_action: pose_action,
             grab_action,
             left_hand_space,
-            _right_hand_space: right_hand_space,
+            right_hand_space,
             left_hand_subaction_path,
-            _right_hand_subaction_path: right_hand_subaction_path,
+            right_hand_subaction_path,
             left_hand,
-            _right_hand: right_hand,
+            right_hand,
             swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,
@@ -331,7 +331,6 @@ where
             return Ok(());
         };
 
-        let nodes = &self.nodes;
         self.term.clear_screen()?;
         self.term.write_line("[APP_DEBUG]")?;
         self.term.write_line(&format!("[Frame]: {}", frame_index))?;
@@ -349,7 +348,6 @@ where
             .left_hand_space
             .locate(&self.reference_space, predicted_display_time)?
             .pose;
-
         let left_hand_grabbed = xr::ActionInput::get(
             &self.grab_action,
             &self.xr_session,
@@ -359,26 +357,45 @@ where
         let position = mint::Vector3::from(left_hand_pose.position).into();
         let orientation = mint::Quaternion::from(left_hand_pose.orientation).into();
         self.left_hand.update_position(position, orientation);
-
-        let tag = "HANDS".to_string();
-        let message = format!("Incoming orientation: {:?}", to_euler_degrees(orientation));
-        self.debug_messages.push((tag.clone(), message));
-
-        let message = format!(
-            "Offset orientation: {:?}",
-            to_euler_degrees(self.left_hand.grip_offset.1)
-        );
-        self.debug_messages.push((tag.clone(), message));
-
-        let updated_orientation = (*self.left_hand.root_bone_node()).rotation;
-        let message = format!(
-            "Updated orientation: {:?}",
-            to_euler_degrees(updated_orientation)
-        );
-        self.debug_messages.push((tag, message));
-
         self.left_hand
-            .grip(left_hand_grabbed, &self.renderer.vulkan_context)
+            .grip(left_hand_grabbed, &self.renderer.vulkan_context)?;
+
+        {
+            let tag = "HANDS".to_string();
+            let message = format!("Incoming orientation: {:?}", to_euler_degrees(orientation));
+            self.debug_messages.push((tag.clone(), message));
+
+            let message = format!(
+                "Offset orientation: {:?}",
+                to_euler_degrees(self.left_hand.grip_offset.1)
+            );
+            self.debug_messages.push((tag.clone(), message));
+
+            let updated_orientation = (*self.left_hand.root_bone_node()).rotation;
+            let message = format!(
+                "Updated orientation: {:?}",
+                to_euler_degrees(updated_orientation)
+            );
+            self.debug_messages.push((tag, message));
+        }
+
+        let right_hand_pose = self
+            .left_hand_space
+            .locate(&self.reference_space, predicted_display_time)?
+            .pose;
+        let right_hand_grabbed = xr::ActionInput::get(
+            &self.grab_action,
+            &self.xr_session,
+            self.right_hand_subaction_path,
+        )?
+        .current_state;
+        let position = mint::Vector3::from(right_hand_pose.position).into();
+        let orientation = mint::Quaternion::from(right_hand_pose.orientation).into();
+        self.right_hand.update_position(position, orientation);
+        self.right_hand
+            .grip(right_hand_grabbed, &self.renderer.vulkan_context)?;
+
+        Ok(())
     }
 
     #[cfg(target_os = "android")]
