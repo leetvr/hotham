@@ -10,6 +10,7 @@ use ash::{
 };
 
 use kira::{
+    arrangement::{Arrangement, LoopArrangementSettings},
     instance::InstanceSettings,
     manager::{AudioManager, AudioManagerSettings},
     sequence::{Sequence, SequenceInstanceSettings, SequenceSettings},
@@ -214,16 +215,25 @@ where
                 .map_err(anyhow::Error::new)?;
         }
 
-        let sound_handle = &self.sounds[0];
+        let hello = &self.sounds[0];
         let mut sequence = Sequence::<()>::new(SequenceSettings::default());
-        // wait 2 seconds
         sequence.wait(kira::Duration::Seconds(2.0));
-        // play a sound
-        sequence.play(sound_handle, InstanceSettings::default());
-
+        sequence.play(hello, InstanceSettings::default());
         let _sequence_instance_handle = self
             .audio_manager
             .start_sequence(sequence, SequenceInstanceSettings::default())?;
+
+        let background = &self.sounds[1];
+        let mut arrangement_handle = self
+            .audio_manager
+            .add_arrangement(Arrangement::new_loop(
+                background,
+                LoopArrangementSettings::default(),
+            ))
+            .map_err(anyhow::Error::new)?;
+        arrangement_handle
+            .play(InstanceSettings::default())
+            .map_err(anyhow::Error::new)?;
 
         while !self.should_quit.load(Ordering::Relaxed) {
             #[cfg(target_os = "android")]
