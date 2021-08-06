@@ -9,6 +9,12 @@ use ash::{
     vk::{self, Handle},
 };
 
+use kira::{
+    instance::InstanceSettings,
+    manager::{AudioManager, AudioManagerSettings},
+    sequence::{Sequence, SequenceInstanceSettings, SequenceSettings},
+    sound::handle::SoundHandle,
+};
 use openxr as xr;
 
 use std::{
@@ -68,6 +74,8 @@ pub struct App<P: Program> {
     nodes: Vec<Rc<RefCell<Node>>>,
     term: console::Term,
     debug_messages: Vec<(String, String)>,
+    audio_manager: AudioManager,
+    sounds: Vec<SoundHandle>,
     #[allow(dead_code)]
     resumed: bool,
 }
@@ -151,13 +159,21 @@ where
             "[HOTHAM_INIT] done! Loaded {} models. Getting scene nodes..",
             nodes.len()
         );
-        let mut nodes = program.init(nodes)?;
+        let mut init = program.init(nodes)?;
+        let mut nodes = init.nodes;
         println!("[HOTHAM_INIT] done! Loaded {} scene nodes.", nodes.len());
 
         println!("[HOTHAM_INIT] Loading hands..");
         let (left_hand, right_hand) = load_hands(&renderer, &mut nodes)?;
 
         println!("[HOTHAM_INIT] INIT COMPLETE!");
+        let mut audio_manager = AudioManager::new(AudioManagerSettings::default())
+            .map_err(|e| anyhow!("Error with Kira: {:?}", e))?;
+        let sounds = init
+            .sounds
+            .drain(..)
+            .map(|s| audio_manager.add_sound(s).unwrap())
+            .collect::<Vec<_>>();
 
         Ok(Self {
             _program: program,
@@ -185,6 +201,8 @@ where
             term: console::Term::buffered_stdout(),
             nodes,
             debug_messages: Default::default(),
+            audio_manager,
+            sounds,
         })
     }
 
@@ -195,6 +213,17 @@ where
             ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
                 .map_err(anyhow::Error::new)?;
         }
+
+        let sound_handle = &self.sounds[0];
+        let mut sequence = Sequence::<()>::new(SequenceSettings::default());
+        // wait 2 seconds
+        sequence.wait(kira::Duration::Seconds(2.0));
+        // play a sound
+        sequence.play(sound_handle, InstanceSettings::default());
+
+        let _sequence_instance_handle = self
+            .audio_manager
+            .start_sequence(sequence, SequenceInstanceSettings::default())?;
 
         while !self.should_quit.load(Ordering::Relaxed) {
             #[cfg(target_os = "android")]
@@ -583,7 +612,6 @@ pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId
 
 #[cfg(target_os = "android")]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
-    use anyhow::anyhow;
     use openxr::sys::{InstanceCreateInfoAndroidKHR, LoaderInitInfoAndroidKHR};
 
     let xr_entry = xr::Entry::load()?;

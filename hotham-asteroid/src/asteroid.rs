@@ -1,7 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use cgmath::{vec3, Euler, Quaternion, Rad};
-use hotham::{node::Node, HothamError, HothamResult as Result, Program};
+use hotham::{
+    load_sound, node::Node, HothamError, HothamResult as Result, Program, ProgramInitialization,
+};
 
 #[derive(Debug, Clone)]
 pub struct Asteroid {}
@@ -14,10 +16,7 @@ impl Asteroid {
 
 impl Program for Asteroid {
     // TODO: Make more ergonomic
-    fn init(
-        &mut self,
-        nodes: HashMap<String, Rc<RefCell<Node>>>,
-    ) -> Result<Vec<Rc<RefCell<Node>>>> {
+    fn init(&mut self, nodes: HashMap<String, Rc<RefCell<Node>>>) -> Result<ProgramInitialization> {
         let asteroid = nodes
             .get("Asteroid")
             .ok_or(HothamError::EmptyListError)?
@@ -50,7 +49,11 @@ impl Program for Asteroid {
         });
         (*refinery).borrow_mut().parent = refinery_parent;
 
-        Ok(vec![asteroid, refinery])
+        let nodes = vec![asteroid, refinery];
+        let hello = load_sound("hello.ogg")?;
+        let sounds = vec![hello];
+
+        Ok(ProgramInitialization { nodes, sounds })
     }
 
     fn get_gltf_data(&self) -> (&[u8], &[u8]) {

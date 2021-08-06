@@ -250,18 +250,12 @@ fn get_ktx_file(file_name: &PathBuf) -> Result<Box<std::fs::File>> {
 
 #[cfg(target_os = "android")]
 fn get_ktx_file(path: &PathBuf) -> Result<Box<Cursor<Vec<u8>>>> {
-    use std::ffi::CStr;
-    let native_activity = ndk_glue::native_activity();
-
-    let asset_manager = native_activity.asset_manager();
-    let path = path.to_str().ok_or(anyhow!("Can't parse string!"))?;
-    let path_with_nul = format!("{}\0", path);
-    let path = unsafe { CStr::from_bytes_with_nul_unchecked(path_with_nul.as_bytes()) };
-
-    let mut asset = asset_manager
-        .open(path)
-        .ok_or(anyhow!("Can't open: {:?}", path))?;
+    use crate::util::get_asset_from_path;
+    let path = path
+        .to_str()
+        .ok_or(anyhow!("Unable to convert {:?} to string", path))?;
+    let asset = get_asset_from_path(path)?;
 
     // delicious
-    Ok(Box::new(Cursor::new(asset.get_buffer()?.to_vec())))
+    Ok(Box::new(Cursor::new(asset)))
 }

@@ -1,4 +1,5 @@
 use ash::vk::Result as VulkanResult;
+use kira::manager::error::StartSequenceError;
 use openxr::sys::Result as OpenXRResult;
 use thiserror::Error;
 
@@ -18,4 +19,6 @@ pub enum HothamError {
     IO(#[from] std::io::Error),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
+    #[error(transparent)]
+    SoundSequenceError(#[from] StartSequenceError),
 }

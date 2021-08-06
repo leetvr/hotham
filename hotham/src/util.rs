@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 use cgmath::{Deg, Euler, Quaternion};
@@ -30,4 +31,19 @@ pub(crate) fn to_euler_degrees(rotation: Quaternion<f32>) -> Euler<Deg<f32>> {
     let euler = Euler::from(rotation);
     let degrees = Euler::new(Deg::from(euler.x), Deg::from(euler.y), Deg::from(euler.z));
     degrees
+}
+
+#[cfg(target_os = "android")]
+pub(crate) fn get_asset_from_path(path: &str) -> Result<Vec<u8>> {
+    let native_activity = ndk_glue::native_activity();
+
+    let asset_manager = native_activity.asset_manager();
+    let path_with_nul = format!("{}\0", path);
+    let path = unsafe { CStr::from_bytes_with_nul_unchecked(path_with_nul.as_bytes()) };
+
+    let mut asset = asset_manager
+        .open(path)
+        .ok_or(anyhow!("Can't open: {:?}", path))?;
+
+    Ok(asset.get_buffer()?.to_vec())
 }

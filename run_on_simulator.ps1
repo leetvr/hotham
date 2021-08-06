@@ -1,10 +1,12 @@
 ${env:RUST_BACKTRACE} = 1
 
-cargo build -p hotham-simulator
+cargo build
 if ($?) {
-    cargo run -p hotham-asteroid
+    Set-Location hotham-asteroid
+    cargo run
 
-    Write-Output "HelloXR exited with $LASTEXITCODE";
+    Write-Output "Hello Asteroid exited with $LASTEXITCODE";
+    Pop-Location
 }
 else {
     Write-Warning "Hotham simulator failed to compile."
