@@ -51,7 +51,8 @@ impl Program for Asteroid {
 
         let nodes = vec![asteroid, refinery];
         let hello = load_sound("hello.ogg")?;
-        let sounds = vec![hello];
+        let background = load_sound("background.mp3")?;
+        let sounds = vec![hello, background];
 
         Ok(ProgramInitialization { nodes, sounds })
     }
