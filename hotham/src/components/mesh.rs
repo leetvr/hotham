@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use ash::vk;
 use libktx_rs::{sources::StreamSource, RustKtxStream, TextureCreateFlags, TextureSource};
 
-use crate::{buffer::Buffer, texture::Texture, vulkan_context::VulkanContext, Vertex};
-use cgmath::{vec2, vec3, vec4};
+use crate::{buffer::Buffer, resources::VulkanContext, texture::Texture, Vertex};
+use cgmath::{vec2, vec3, vec4, Matrix4};
 use itertools::izip;
 use std::{
     path::{Path, PathBuf},
@@ -27,7 +27,7 @@ impl Mesh {
         buffers: &Vec<&[u8]>,
         vulkan_context: &VulkanContext,
         mesh_descriptor_set_layout: vk::DescriptorSetLayout,
-        ubo_buffer: vk::Buffer,
+        skin_buffer: &Buffer<Matrix4<f32>>,
     ) -> Result<Mesh> {
         let name = mesh_data.name().unwrap_or("");
         let mut indices = Vec::new();
@@ -192,7 +192,7 @@ impl Mesh {
         println!("[HOTHAM_MODEL] Creating descriptor sets for {}", name);
         let descriptor_sets = vulkan_context.create_mesh_descriptor_set(
             mesh_descriptor_set_layout,
-            ubo_buffer,
+            &skin_buffer,
             &base_color_texture.unwrap(),
             &normal_texture.unwrap(),
         )?;

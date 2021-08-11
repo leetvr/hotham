@@ -2,6 +2,8 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_multiview : enable
 
+
+// Scene Uniform Buffer
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view[2];
     mat4 projection[2];
@@ -9,13 +11,15 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     vec4 lightPos;
 } ubo;
 
+// Skin SSBO
+layout(std430, set = 1, binding = 0) readonly buffer JointMatrices {
+    mat4 jointMatrices[];
+};
+
 layout(push_constant) uniform PushConsts {
 	mat4 model;
 } pushConsts;
 
-layout(std430, set = 1, binding = 0) readonly buffer JointMatrices {
-    mat4 jointMatrices[];
-};
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec2 inTextureCoordinates;

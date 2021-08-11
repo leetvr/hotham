@@ -1,6 +1,6 @@
 use std::{cell::RefCell, mem::size_of, rc::Rc};
 
-use crate::{buffer::Buffer, node::Node, vulkan_context::VulkanContext};
+use crate::{buffer::Buffer, node::Node, resources::VulkanContext};
 use anyhow::{anyhow, Result};
 use ash::vk;
 use cgmath::Matrix4;

@@ -19,6 +19,7 @@ ctrlc = {version = "3", features = ["termination"]}
 gltf = "0.16"
 itertools = "0.10.0"
 kira = "0.5.3"
+legion = "0.4"
 libktx-rs = "0.2"
 memoffset = "0.5.1"
 mint = "0.5.6"
