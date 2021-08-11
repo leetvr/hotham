@@ -1,6 +1,6 @@
 use crate::{
-    hotham_error::HothamError, image::Image, texture::Texture, UniformBufferObject, COLOR_FORMAT,
-    DEPTH_FORMAT, SWAPCHAIN_LENGTH, TEXTURE_FORMAT,
+    buffer::Buffer, hotham_error::HothamError, image::Image, texture::Texture, UniformBufferObject,
+    COLOR_FORMAT, DEPTH_FORMAT, SWAPCHAIN_LENGTH, TEXTURE_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -9,6 +9,7 @@ use ash::{
     vk::{self, Handle},
     Device, Entry, Instance as AshInstance,
 };
+use cgmath::Matrix4;
 use openxr as xr;
 use std::{fmt::Debug, intrinsics::transmute, mem::size_of, ptr::copy};
 
@@ -22,7 +23,6 @@ type XrVulkan = xr::VulkanLegacy;
 pub(crate) struct VulkanContext {
     pub entry: Entry,
     pub instance: AshInstance,
-
     pub physical_device: vk::PhysicalDevice,
     pub device: Device,
     pub command_pool: vk::CommandPool,
@@ -34,11 +34,12 @@ pub(crate) struct VulkanContext {
 // NOTE: OpenXR created the instance / device etc. and is therefore the owner. We'll let it do the cleanup.
 impl Drop for VulkanContext {
     fn drop(&mut self) {
-        unsafe {
-            self.device
-                .destroy_descriptor_pool(self.descriptor_pool, None);
-            self.device.destroy_command_pool(self.command_pool, None);
-        }
+        // TODO: Currently we have a bug where if VulkanContext is cloned, each clone will try and cleanup.
+        // Let's fix this.
+
+        // self.device
+        //     .destroy_descriptor_pool(self.descriptor_pool, None);
+        // self.device.destroy_command_pool(self.command_pool, None);
     }
 }
 
@@ -592,7 +593,7 @@ impl VulkanContext {
     pub fn create_mesh_descriptor_set(
         &self,
         set_layout: vk::DescriptorSetLayout,
-        ubo_buffer: vk::Buffer,
+        skin_buffer: &Buffer<Matrix4<f32>>,
         base_color_texture: &Texture,
         normal_texture: &Texture,
     ) -> VkResult<Vec<vk::DescriptorSet>> {
@@ -607,7 +608,7 @@ impl VulkanContext {
         println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
 
         let ubo_info = vk::DescriptorBufferInfo::builder()
-            .buffer(ubo_buffer)
+            .buffer(skin_buffer.handle)
             .offset(0)
             .range(size_of::<UniformBufferObject>() as _)
             .build();

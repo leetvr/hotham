@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ash::vk::{self};
 
-use crate::{image::Image, vulkan_context::VulkanContext};
+use crate::{image::Image, resources::VulkanContext};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Texture {

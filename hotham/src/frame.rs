@@ -1,11 +1,11 @@
 use ash::{version::DeviceV1_0, vk};
 
-use crate::{hotham_error::HothamError, vulkan_context::VulkanContext};
+use crate::{hotham_error::HothamError, resources::VulkanContext};
 use anyhow::Result;
 
 /// A container for all the resources necessary to render a single frame.
 #[derive(Debug, Clone)]
-pub(crate) struct Frame {
+pub struct Frame {
     pub fence: vk::Fence,
     pub command_buffer: vk::CommandBuffer,
     pub framebuffer: vk::Framebuffer,
@@ -60,7 +60,7 @@ impl Frame {
         })
     }
 
-    pub fn destroy(&self, vulkan_context: &VulkanContext) {
+    pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) {
         unsafe {
             vulkan_context
                 .device

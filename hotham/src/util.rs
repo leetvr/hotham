@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 use cgmath::{Deg, Euler, Quaternion};
@@ -35,6 +35,7 @@ pub(crate) fn to_euler_degrees(rotation: Quaternion<f32>) -> Euler<Deg<f32>> {
 
 #[cfg(target_os = "android")]
 pub(crate) fn get_asset_from_path(path: &str) -> Result<Vec<u8>> {
+    use anyhow::anyhow;
     let native_activity = ndk_glue::native_activity();
 
     let asset_manager = native_activity.asset_manager();

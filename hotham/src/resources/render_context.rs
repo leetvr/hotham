@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     buffer::Buffer, camera::Camera, frame::Frame, gltf_loader::load_gltf_nodes, image::Image,
-    node::Node, swapchain::Swapchain, vulkan_context::VulkanContext, UniformBufferObject, Vertex,
+    node::Node, resources::VulkanContext, swapchain::Swapchain, UniformBufferObject, Vertex,
     COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
@@ -15,59 +15,65 @@ use openxr as xr;
 
 use xr::VulkanLegacy;
 
-pub(crate) struct Renderer {
+pub struct DescriptorSetLayouts {
+    pub scene_layout: vk::DescriptorSetLayout,
+    pub mesh_layout: vk::DescriptorSetLayout,
+}
+
+pub struct RenderContext {
     _swapchain: Swapchain,
-    pub vulkan_context: VulkanContext,
-    frames: Vec<Frame>,
-    descriptor_set_layouts: Vec<vk::DescriptorSetLayout>,
-    pipeline_layout: vk::PipelineLayout,
-    pipeline: vk::Pipeline,
-    render_pass: vk::RenderPass,
-    depth_image: Image,
-    render_area: vk::Rect2D,
-    uniform_buffer: Buffer<UniformBufferObject>,
-    render_start_time: Instant,
-    cameras: Vec<Camera>,
-    views: Vec<xr::View>,
-    last_frame_time: Instant,
-    empty_skin_descriptor_sets: Vec<vk::DescriptorSet>,
+    pub frames: Vec<Frame>,
+    pub descriptor_set_layouts: DescriptorSetLayouts,
+    pub pipeline_layout: vk::PipelineLayout,
+    pub pipeline: vk::Pipeline,
+    pub render_pass: vk::RenderPass,
+    pub depth_image: Image,
+    pub render_area: vk::Rect2D,
+    pub uniform_buffer: Buffer<UniformBufferObject>,
+    pub render_start_time: Instant,
+    pub cameras: Vec<Camera>,
+    pub views: Vec<xr::View>,
+    pub last_frame_time: Instant,
+    pub empty_skin_descriptor_sets: Vec<vk::DescriptorSet>,
     pub frame_index: usize,
 }
 
-impl Drop for Renderer {
+impl Drop for RenderContext {
     fn drop(&mut self) {
         unsafe {
-            self.vulkan_context
-                .device
-                .queue_wait_idle(self.vulkan_context.graphics_queue)
-                .expect("Unable to wait for queue to become idle!");
+            // TODO: fix
 
-            for layout in &self.descriptor_set_layouts {
-                self.vulkan_context
-                    .device
-                    .destroy_descriptor_set_layout(*layout, None);
-            }
-            self.depth_image.destroy(&self.vulkan_context);
-            self.uniform_buffer.destroy(&self.vulkan_context);
-            for frame in self.frames.drain(..) {
-                frame.destroy(&self.vulkan_context);
-            }
-            self.vulkan_context
-                .device
-                .destroy_pipeline_layout(self.pipeline_layout, None);
-            self.vulkan_context
-                .device
-                .destroy_render_pass(self.render_pass, None);
-            self.vulkan_context
-                .device
-                .destroy_pipeline(self.pipeline, None);
+            // self.vulkan_context
+            //     .device
+            //     .queue_wait_idle(self.vulkan_context.graphics_queue)
+            //     .expect("Unable to wait for queue to become idle!");
+
+            // // for layout in &self.descriptor_set_layouts {
+            // //     self.vulkan_context
+            // //         .device
+            // //         .destroy_descriptor_set_layout(*layout, None);
+            // // }
+            // self.depth_image.destroy(&self.vulkan_context);
+            // self.uniform_buffer.destroy(&self.vulkan_context);
+            // for frame in self.frames.drain(..) {
+            //     frame.destroy(&self.vulkan_context);
+            // }
+            // self.vulkan_context
+            //     .device
+            //     .destroy_pipeline_layout(self.pipeline_layout, None);
+            // self.vulkan_context
+            //     .device
+            //     .destroy_render_pass(self.render_pass, None);
+            // self.vulkan_context
+            //     .device
+            //     .destroy_pipeline(self.pipeline, None);
         }
     }
 }
 
-impl Renderer {
+impl RenderContext {
     pub(crate) fn new(
-        vulkan_context: VulkanContext,
+        vulkan_context: &VulkanContext,
         xr_swapchain: &xr::Swapchain<VulkanLegacy>,
         swapchain_resolution: vk::Extent2D,
     ) -> Result<Self> {
@@ -84,7 +90,13 @@ impl Renderer {
 
         // Pipeline, render pass
         let render_pass = create_render_pass(&vulkan_context)?;
-        let pipeline_layout = create_pipeline_layout(&vulkan_context, &descriptor_set_layouts)?;
+        let pipeline_layout = create_pipeline_layout(
+            &vulkan_context,
+            &[
+                descriptor_set_layouts.scene_layout,
+                descriptor_set_layouts.mesh_layout,
+            ],
+        )?;
         let pipeline =
             create_pipeline(&vulkan_context, pipeline_layout, &render_area, render_pass)?;
 
@@ -112,14 +124,13 @@ impl Renderer {
             vk::BufferUsageFlags::STORAGE_BUFFER,
         )?;
         let empty_skin_descriptor_sets = vulkan_context.create_skin_descriptor_set(
-            descriptor_set_layouts[1],
+            descriptor_set_layouts.mesh_layout,
             empty_skin_buffer.handle,
             std::mem::size_of::<Matrix4<f32>>(),
         )?;
 
         Ok(Self {
             _swapchain: swapchain,
-            vulkan_context,
             frames,
             descriptor_set_layouts,
             pipeline,
@@ -137,35 +148,11 @@ impl Renderer {
         })
     }
 
-    pub fn draw(&mut self, frame_index: usize, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
-        self.frame_index += 1;
-
-        // self.show_debug_info(nodes)?;
-
-        let device = &self.vulkan_context.device;
-        let frame = &self.frames[frame_index];
-
-        let command_buffer = frame.command_buffer;
-        let submit_info = vk::SubmitInfo::builder()
-            .command_buffers(&[command_buffer])
-            .build();
-        let fence = frame.fence;
-        let fences = [fence];
-        self.prepare_frame(frame, nodes)?;
-
-        unsafe {
-            device.reset_fences(&fences)?;
-            device.queue_submit(self.vulkan_context.graphics_queue, &[submit_info], fence)?;
-            device.wait_for_fences(&fences, true, u64::MAX)?;
-        };
-
-        // Update our frame timer
-        self.last_frame_time = Instant::now();
-
-        Ok(())
-    }
-
-    pub fn update_uniform_buffer(&mut self, views: &Vec<xr::View>) -> Result<()> {
+    pub(crate) fn update_uniform_buffer(
+        &mut self,
+        views: &Vec<xr::View>,
+        vulkan_context: &VulkanContext,
+    ) -> Result<()> {
         self.views = views.clone();
         let delta_time = Instant::now()
             .duration_since(self.render_start_time)
@@ -200,128 +187,7 @@ impl Renderer {
         };
 
         self.uniform_buffer
-            .update(&self.vulkan_context, &uniform_buffer, 1)?;
-
-        Ok(())
-    }
-
-    pub fn prepare_frame(&self, frame: &Frame, nodes: &Vec<Rc<RefCell<Node>>>) -> Result<()> {
-        let device = &self.vulkan_context.device;
-        let command_buffer = frame.command_buffer;
-        let framebuffer = frame.framebuffer;
-        let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
-            .render_pass(self.render_pass)
-            .framebuffer(framebuffer)
-            .render_area(self.render_area)
-            .clear_values(&[
-                vk::ClearValue {
-                    color: vk::ClearColorValue {
-                        float32: [0.0, 0.0, 0.0, 1.0],
-                    },
-                },
-                vk::ClearValue {
-                    depth_stencil: vk::ClearDepthStencilValue {
-                        depth: 1.0,
-                        stencil: 0,
-                    },
-                },
-            ]);
-
-        unsafe {
-            device.begin_command_buffer(
-                command_buffer,
-                &vk::CommandBufferBeginInfo::builder()
-                    .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
-            )?;
-            device.cmd_begin_render_pass(
-                command_buffer,
-                &render_pass_begin_info,
-                vk::SubpassContents::INLINE,
-            );
-
-            device.cmd_bind_pipeline(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline,
-            );
-
-            for node in nodes {
-                self.draw_node(&(**node).borrow(), device, command_buffer)?;
-            }
-
-            device.cmd_end_render_pass(command_buffer);
-            device.end_command_buffer(command_buffer)?;
-        };
-
-        Ok(())
-    }
-
-    unsafe fn draw_node(
-        &self,
-        node: &Node,
-        device: &ash::Device,
-        command_buffer: vk::CommandBuffer,
-    ) -> Result<()> {
-        // Update any animations
-        // node.update_animation(
-        //     self.last_frame_time.elapsed().as_secs_f32(),
-        //     &self.vulkan_context,
-        // )?;
-
-        if let Some(mesh) = node.mesh.as_ref() {
-            // Bind mesh descriptor sets
-            device.cmd_bind_descriptor_sets(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout,
-                0,
-                &mesh.descriptor_sets,
-                &[],
-            );
-
-            // Bind vertex and index buffers
-            device.cmd_bind_vertex_buffers(command_buffer, 0, &[mesh.vertex_buffer.handle], &[0]);
-            device.cmd_bind_index_buffer(
-                command_buffer,
-                mesh.index_buffer.handle,
-                0,
-                vk::IndexType::UINT32,
-            );
-
-            // Bind skin descriptor sets. If this node has no skin, use an empty one.
-            let skin_descriptor_sets = if let Some(skin) = node.skin.as_ref() {
-                &skin.descriptor_sets
-            } else {
-                &self.empty_skin_descriptor_sets
-            };
-
-            device.cmd_bind_descriptor_sets(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                self.pipeline_layout,
-                1,
-                skin_descriptor_sets,
-                &[],
-            );
-
-            // Push constants
-            let node_matrix = node.get_node_matrix();
-            let node_matrix = create_push_constant(&node_matrix);
-
-            device.cmd_push_constants(
-                command_buffer,
-                self.pipeline_layout,
-                vk::ShaderStageFlags::VERTEX,
-                0,
-                node_matrix,
-            );
-            device.cmd_draw_indexed(command_buffer, mesh.num_indices, 1, 0, 0, 1);
-        }
-
-        for child in &node.children {
-            let child = (*child).borrow();
-            self.draw_node(&child, device, command_buffer)?;
-        }
+            .update(&vulkan_context, &uniform_buffer, 1)?;
 
         Ok(())
     }
@@ -330,18 +196,19 @@ impl Renderer {
         &self,
         gltf_data: (&[u8], &[u8]),
     ) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
-        let buffers = vec![gltf_data.1];
-        load_gltf_nodes(
-            gltf_data.0,
-            &buffers,
-            &self.vulkan_context,
-            &self.descriptor_set_layouts,
-            self.uniform_buffer.handle,
-        )
+        // let buffers = vec![gltf_data.1];
+        // load_gltf_nodes(
+        //     gltf_data.0,
+        //     &buffers,
+        //     &self.vulkan_context,
+        //     &[self.descriptor_set_layouts.mesh_layout],
+        //     self.uniform_buffer.handle,
+        // )
+        todo!();
     }
 }
 
-fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
+pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(std::mem::transmute(p), size_of::<T>()) }
 }
 
@@ -382,13 +249,23 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
 
 pub(crate) fn create_descriptor_set_layouts(
     vulkan_context: &VulkanContext,
-) -> VkResult<Vec<vk::DescriptorSetLayout>> {
-    let uniform_buffer = vk::DescriptorSetLayoutBinding::builder()
+) -> VkResult<DescriptorSetLayouts> {
+    let scene_buffer = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
         .stage_flags(vk::ShaderStageFlags::VERTEX)
         .build();
+
+    let scene_bindings = [scene_buffer];
+
+    let scene_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&scene_bindings);
+
+    let scene_layout = unsafe {
+        vulkan_context
+            .device
+            .create_descriptor_set_layout(&scene_create_info, None)
+    }?;
 
     let base_color_image_sampler = vk::DescriptorSetLayoutBinding::builder()
         .binding(1)
@@ -404,11 +281,19 @@ pub(crate) fn create_descriptor_set_layouts(
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
         .build();
 
+    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .build();
+
     let mesh_bindings = [
-        uniform_buffer,
+        skin_joint_buffer,
         base_color_image_sampler,
         normal_image_sampler,
     ];
+
     let mesh_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&mesh_bindings);
 
     let mesh_layout = unsafe {
@@ -417,23 +302,10 @@ pub(crate) fn create_descriptor_set_layouts(
             .create_descriptor_set_layout(&mesh_create_info, None)
     }?;
 
-    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX)
-        .build();
-
-    let skin_bindings = [skin_joint_buffer];
-    let skin_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&skin_bindings);
-
-    let skin_layout = unsafe {
-        vulkan_context
-            .device
-            .create_descriptor_set_layout(&skin_create_info, None)
-    }?;
-
-    Ok(vec![mesh_layout, skin_layout])
+    Ok(DescriptorSetLayouts {
+        scene_layout,
+        mesh_layout,
+    })
 }
 
 fn create_frames(
@@ -551,14 +423,14 @@ fn create_pipeline(
 
     // Vertex shader stage
     let (vertex_shader, vertex_stage) = create_shader(
-        include_bytes!("../shaders/model.vert.spv"),
+        include_bytes!("../../shaders/model.vert.spv"),
         vk::ShaderStageFlags::VERTEX,
         vulkan_context,
     )?;
 
     // Fragment shader stage
     let (fragment_shader, fragment_stage) = create_shader(
-        include_bytes!("../shaders/model.frag.spv"),
+        include_bytes!("../../shaders/model.frag.spv"),
         vk::ShaderStageFlags::FRAGMENT,
         vulkan_context,
     )?;

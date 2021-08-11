@@ -5,7 +5,9 @@ use std::{
 
 use cgmath::{vec3, Matrix4, Quaternion, Transform, Vector3};
 
-use crate::{animation::Animation, mesh::Mesh, skin::Skin, vulkan_context::VulkanContext};
+use crate::{
+    animation::Animation, buffer::Buffer, components::Mesh, resources::VulkanContext, skin::Skin,
+};
 use anyhow::{anyhow, Result};
 use ash::vk;
 
@@ -29,7 +31,7 @@ impl Node {
         buffers: &Vec<&[u8]>,
         vulkan_context: &VulkanContext,
         set_layouts: &[vk::DescriptorSetLayout],
-        ubo_buffer: vk::Buffer,
+        skin_buffer: &Buffer<Matrix4<f32>>,
         parent: Weak<RefCell<Node>>,
     ) -> Result<(String, Rc<RefCell<Node>>)> {
         let name = node_data.name().unwrap().to_string();
@@ -42,7 +44,7 @@ impl Node {
                 buffers,
                 vulkan_context,
                 set_layouts[0],
-                ubo_buffer,
+                skin_buffer,
             )?)
         } else {
             None
@@ -67,15 +69,15 @@ impl Node {
         let node = Rc::new(RefCell::new(node));
         let parent_node = Rc::downgrade(&node);
 
-        let children = (*node).borrow().get_children(
-            buffers,
-            vulkan_context,
-            set_layouts,
-            ubo_buffer,
-            node_data,
-            parent_node,
-        )?;
-        (*node).borrow_mut().children = children;
+        // let children = (*node).borrow().get_children(
+        //     buffers,
+        //     vulkan_context,
+        //     set_layouts,
+        //     ubo_buffer,
+        //     node_data,
+        //     parent_node,
+        // )?;
+        // (*node).borrow_mut().children = children;
 
         // Special case: the root node has no parent, so it must apply its own skin.
         if is_root {
@@ -246,30 +248,30 @@ impl Node {
         Ok(())
     }
 
-    fn get_children(
-        &self,
-        buffers: &Vec<&[u8]>,
-        vulkan_context: &VulkanContext,
-        set_layouts: &[vk::DescriptorSetLayout],
-        ubo_buffer: vk::Buffer,
-        node_data: &gltf::Node,
-        parent_node: Weak<RefCell<Node>>,
-    ) -> Result<Vec<Rc<RefCell<Node>>>> {
-        node_data
-            .children()
-            .map(|n| {
-                let (_, node) = Node::load(
-                    &n,
-                    buffers,
-                    vulkan_context,
-                    set_layouts,
-                    ubo_buffer,
-                    parent_node.clone(),
-                )?;
-                Ok(node)
-            })
-            .collect::<Result<Vec<_>>>()
-    }
+    // fn get_children(
+    //     &self,
+    //     buffers: &Vec<&[u8]>,
+    //     vulkan_context: &VulkanContext,
+    //     set_layouts: &[vk::DescriptorSetLayout],
+    //     ubo_buffer: vk::Buffer,
+    //     node_data: &gltf::Node,
+    //     parent_node: Weak<RefCell<Node>>,
+    // ) -> Result<Vec<Rc<RefCell<Node>>>> {
+    //     node_data
+    //         .children()
+    //         .map(|n| {
+    //             let (_, node) = Node::load(
+    //                 &n,
+    //                 buffers,
+    //                 vulkan_context,
+    //                 set_layouts,
+    //                 ubo_buffer,
+    //                 parent_node.clone(),
+    //             )?;
+    //             Ok(node)
+    //         })
+    //         .collect::<Result<Vec<_>>>()
+    // }
 }
 
 fn load_child_skins(

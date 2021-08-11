@@ -3,11 +3,11 @@ use std::marker::PhantomData;
 use anyhow::Result;
 use ash::{version::DeviceV1_0, vk};
 
-use crate::vulkan_context::VulkanContext;
+use crate::resources::VulkanContext;
 
 // TODO: Let Buffer<T> own the data
 #[derive(Debug, Clone)]
-pub(crate) struct Buffer<T> {
+pub struct Buffer<T> {
     pub handle: vk::Buffer,
     pub device_memory: vk::DeviceMemory,
     pub _phantom: PhantomData<T>,
@@ -17,7 +17,7 @@ impl<T> Buffer<T>
 where
     T: Sized,
 {
-    pub fn new_from_vec(
+    pub(crate) fn new_from_vec(
         vulkan_context: &VulkanContext,
         data: &Vec<T>,
         usage: vk::BufferUsageFlags,
@@ -33,7 +33,7 @@ where
         })
     }
 
-    pub fn new(
+    pub(crate) fn new(
         vulkan_context: &VulkanContext,
         data: &T,
         usage: vk::BufferUsageFlags,
@@ -51,7 +51,7 @@ where
 
     /// **NOTE**: If passing in a Vec, you MUST use vec.as_ptr(), passing in
     /// a reference will result in A Very Bad Time.
-    pub fn update(
+    pub(crate) fn update(
         &self,
         vulkan_context: &VulkanContext,
         data: *const T,
@@ -62,7 +62,7 @@ where
 }
 
 impl<T> Buffer<T> {
-    pub fn destroy(&self, vulkan_context: &VulkanContext) -> () {
+    pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) -> () {
         let device = &vulkan_context.device;
         unsafe {
             device.destroy_buffer(self.handle, None);

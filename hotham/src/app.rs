@@ -1,7 +1,9 @@
 use crate::{
-    hand::Hand, node::Node, renderer::Renderer, util::to_euler_degrees,
-    vulkan_context::VulkanContext, HothamResult, Program, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT,
-    VIEW_TYPE,
+    hand::Hand,
+    node::Node,
+    resources::{RenderContext, VulkanContext},
+    util::to_euler_degrees,
+    HothamResult, Program, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -16,6 +18,7 @@ use kira::{
     sequence::{Sequence, SequenceInstanceSettings, SequenceSettings},
     sound::handle::SoundHandle,
 };
+use legion::World;
 use openxr as xr;
 
 use std::{
@@ -53,7 +56,7 @@ pub const ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32:
 pub struct App<P: Program> {
     _program: P,
     should_quit: Arc<AtomicBool>,
-    renderer: Renderer,
+    renderer: RenderContext,
     xr_instance: openxr::Instance,
     xr_session: Session<VulkanLegacy>,
     xr_state: SessionState,
@@ -62,17 +65,17 @@ pub struct App<P: Program> {
     xr_action_set: xr::ActionSet,
     _pose_action: xr::Action<Posef>,
     grab_action: xr::Action<f32>,
-    left_hand: Hand,
+    // left_hand: Hand,
     left_hand_space: xr::Space,
     left_hand_subaction_path: xr::Path,
-    right_hand: Hand,
+    // right_hand: Hand,
     right_hand_space: xr::Space,
     right_hand_subaction_path: xr::Path,
     swapchain_resolution: vk::Extent2D,
     event_buffer: EventDataBuffer,
     frame_waiter: FrameWaiter,
     frame_stream: FrameStream<VulkanLegacy>,
-    nodes: Vec<Rc<RefCell<Node>>>,
+    world: World,
     term: console::Term,
     debug_messages: Vec<(String, String)>,
     audio_manager: AudioManager,
@@ -153,28 +156,24 @@ where
         // Attach the action set to the session
         xr_session.attach_action_sets(&[&xr_action_set])?;
 
-        let renderer = Renderer::new(vulkan_context, &xr_swapchain, swapchain_resolution)?;
+        let renderer = RenderContext::new(&vulkan_context, &xr_swapchain, swapchain_resolution)?;
         println!("[HOTHAM_INIT] Loading models..");
         let nodes = renderer.load_gltf_nodes(program.get_gltf_data())?;
         println!(
             "[HOTHAM_INIT] done! Loaded {} models. Getting scene nodes..",
             nodes.len()
         );
-        let mut init = program.init(nodes)?;
-        let mut nodes = init.nodes;
-        println!("[HOTHAM_INIT] done! Loaded {} scene nodes.", nodes.len());
-
-        println!("[HOTHAM_INIT] Loading hands..");
-        let (left_hand, right_hand) = load_hands(&renderer, &mut nodes)?;
+        let world = program.init(nodes)?;
 
         println!("[HOTHAM_INIT] INIT COMPLETE!");
         let mut audio_manager = AudioManager::new(AudioManagerSettings::default())
             .map_err(|e| anyhow!("Error with Kira: {:?}", e))?;
-        let sounds = init
-            .sounds
-            .drain(..)
-            .map(|s| audio_manager.add_sound(s).unwrap())
-            .collect::<Vec<_>>();
+        let sounds = Default::default();
+        // let sounds = init
+        //     .sounds
+        //     .drain(..)
+        //     .map(|s| audio_manager.add_sound(s).unwrap())
+        //     .collect::<Vec<_>>();
 
         Ok(Self {
             _program: program,
@@ -192,15 +191,15 @@ where
             right_hand_space,
             left_hand_subaction_path,
             right_hand_subaction_path,
-            left_hand,
-            right_hand,
+            // left_hand,
+            // right_hand,
             swapchain_resolution,
             event_buffer: Default::default(),
             frame_stream,
             frame_waiter,
             resumed: true,
             term: console::Term::buffered_stdout(),
-            nodes,
+            world,
             debug_messages: Default::default(),
             audio_manager,
             sounds,
@@ -214,26 +213,6 @@ where
             ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed))
                 .map_err(anyhow::Error::new)?;
         }
-
-        let hello = &self.sounds[0];
-        let mut sequence = Sequence::<()>::new(SequenceSettings::default());
-        sequence.wait(kira::Duration::Seconds(2.0));
-        sequence.play(hello, InstanceSettings::default());
-        let _sequence_instance_handle = self
-            .audio_manager
-            .start_sequence(sequence, SequenceInstanceSettings::default())?;
-
-        let background = &self.sounds[1];
-        let mut arrangement_handle = self
-            .audio_manager
-            .add_arrangement(Arrangement::new_loop(
-                background,
-                LoopArrangementSettings::default(),
-            ))
-            .map_err(anyhow::Error::new)?;
-        arrangement_handle
-            .play(InstanceSettings::default())
-            .map_err(anyhow::Error::new)?;
 
         while !self.should_quit.load(Ordering::Relaxed) {
             #[cfg(target_os = "android")]
@@ -250,27 +229,7 @@ where
                 break;
             }
 
-            let active_action_set = ActiveActionSet::new(&self.xr_action_set);
-            self.xr_session.sync_actions(&[active_action_set])?;
-
-            // Wait for a frame to become available from the runtime
-            let (frame_state, swapchain_image_index) = self.begin_frame()?;
-
-            let (_, views) = self.xr_session.locate_views(
-                VIEW_TYPE,
-                frame_state.predicted_display_time,
-                &self.reference_space,
-            )?;
-
-            self.update_hands(frame_state.predicted_display_time)?;
-
-            if frame_state.should_render {
-                self.renderer.update_uniform_buffer(&views)?;
-                self.renderer.draw(swapchain_image_index, &self.nodes)?;
-            }
-
-            // Release the image back to OpenXR
-            self.end_frame(frame_state, &views)?;
+            // self.update_hands(frame_state.predicted_display_time)?;
 
             // Clear out any debug messages
             self.show_debug_info()?;
@@ -393,30 +352,30 @@ where
             self.left_hand_subaction_path,
         )?
         .current_state;
-        let position = mint::Vector3::from(left_hand_pose.position).into();
-        let orientation = mint::Quaternion::from(left_hand_pose.orientation).into();
-        self.left_hand.update_position(position, orientation);
-        self.left_hand
-            .grip(left_hand_grabbed, &self.renderer.vulkan_context)?;
+        // let position = mint::Vector3::from(left_hand_pose.position).into();
+        // let orientation = mint::Quaternion::from(left_hand_pose.orientation).into();
+        // self.left_hand.update_position(position, orientation);
+        // self.left_hand
+        //     .grip(left_hand_grabbed, &self.renderer.vulkan_context)?;
 
-        {
-            let tag = "HANDS".to_string();
-            let message = format!("Incoming orientation: {:?}", to_euler_degrees(orientation));
-            self.debug_messages.push((tag.clone(), message));
+        // {
+        //     let tag = "HANDS".to_string();
+        //     let message = format!("Incoming orientation: {:?}", to_euler_degrees(orientation));
+        //     self.debug_messages.push((tag.clone(), message));
 
-            let message = format!(
-                "Offset orientation: {:?}",
-                to_euler_degrees(self.left_hand.grip_offset.1)
-            );
-            self.debug_messages.push((tag.clone(), message));
+        //     let message = format!(
+        //         "Offset orientation: {:?}",
+        //         to_euler_degrees(self.left_hand.grip_offset.1)
+        //     );
+        //     self.debug_messages.push((tag.clone(), message));
 
-            let updated_orientation = (*self.left_hand.root_bone_node()).rotation;
-            let message = format!(
-                "Updated orientation: {:?}",
-                to_euler_degrees(updated_orientation)
-            );
-            self.debug_messages.push((tag, message));
-        }
+        //     let updated_orientation = (*self.left_hand.root_bone_node()).rotation;
+        //     let message = format!(
+        //         "Updated orientation: {:?}",
+        //         to_euler_degrees(updated_orientation)
+        //     );
+        //     self.debug_messages.push((tag, message));
+        // }
 
         let right_hand_pose = self
             .right_hand_space
@@ -428,11 +387,11 @@ where
             self.right_hand_subaction_path,
         )?
         .current_state;
-        let position = mint::Vector3::from(right_hand_pose.position).into();
-        let orientation = mint::Quaternion::from(right_hand_pose.orientation).into();
-        self.right_hand.update_position(position, orientation);
-        self.right_hand
-            .grip(right_hand_grabbed, &self.renderer.vulkan_context)?;
+        // let position = mint::Vector3::from(right_hand_pose.position).into();
+        // let orientation = mint::Quaternion::from(right_hand_pose.orientation).into();
+        // self.right_hand.update_position(position, orientation);
+        // self.right_hand
+        //     .grip(right_hand_grabbed, &self.renderer.vulkan_context)?;
 
         Ok(())
     }
@@ -492,7 +451,7 @@ where
 }
 
 #[cfg(target_os = "windows")]
-fn create_vulkan_context(
+pub(crate) fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
@@ -511,7 +470,7 @@ fn create_vulkan_context(
     Ok(vulkan_context)
 }
 
-fn get_swapchain_resolution(
+pub(crate) fn get_swapchain_resolution(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
 ) -> Result<vk::Extent2D> {
@@ -525,7 +484,7 @@ fn get_swapchain_resolution(
     Ok(resolution)
 }
 
-fn create_xr_swapchain(
+pub(crate) fn create_xr_swapchain(
     xr_session: &Session<VulkanLegacy>,
     resolution: &vk::Extent2D,
     array_size: u32,
@@ -545,7 +504,7 @@ fn create_xr_swapchain(
         .map_err(Into::into)
 }
 
-fn create_xr_session(
+pub(crate) fn create_xr_session(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
     vulkan_context: &VulkanContext,
@@ -570,7 +529,10 @@ fn create_xr_session(
     .unwrap())
 }
 
-fn load_hands(renderer: &Renderer, app_nodes: &mut Vec<Rc<RefCell<Node>>>) -> Result<(Hand, Hand)> {
+fn load_hands(
+    renderer: &RenderContext,
+    app_nodes: &mut Vec<Rc<RefCell<Node>>>,
+) -> Result<(Hand, Hand)> {
     let gltf = include_bytes!("../assets/left_hand.gltf");
     let data = include_bytes!("../assets/left_hand.bin");
     let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
@@ -694,3 +656,24 @@ fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     println!(" ..done!");
     Ok((instance, system))
 }
+
+// TODO: Add sounds to legion
+// let hello = &self.sounds[0];
+// let mut sequence = Sequence::<()>::new(SequenceSettings::default());
+// sequence.wait(kira::Duration::Seconds(2.0));
+// sequence.play(hello, InstanceSettings::default());
+// let _sequence_instance_handle = self
+//     .audio_manager
+//     .start_sequence(sequence, SequenceInstanceSettings::default())?;
+
+// let background = &self.sounds[1];
+// let mut arrangement_handle = self
+//     .audio_manager
+//     .add_arrangement(Arrangement::new_loop(
+//         background,
+//         LoopArrangementSettings::default(),
+//     ))
+//     .map_err(anyhow::Error::new)?;
+// arrangement_handle
+//     .play(InstanceSettings::default())
+//     .map_err(anyhow::Error::new)?;

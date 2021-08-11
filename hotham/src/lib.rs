@@ -1,6 +1,7 @@
 use crate::node::Node;
 use anyhow::anyhow;
 use ash::vk;
+pub use legion::World;
 use openxr as xr;
 use std::{cell::RefCell, collections::HashMap, io::Seek, rc::Rc};
 
@@ -14,21 +15,22 @@ mod animation;
 mod app;
 mod buffer;
 mod camera;
+pub mod components;
 mod frame;
 mod gltf_loader;
 mod hand;
 mod hotham_error;
 mod image;
-pub mod mesh;
 pub mod node;
-mod renderer;
+mod resources;
+mod schedule_functions;
 mod skin;
 mod swapchain;
+pub mod systems;
 mod texture;
 mod uniform_buffer_object;
 mod util;
 mod vertex;
-mod vulkan_context;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
@@ -46,10 +48,7 @@ pub const TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
 
 pub trait Program {
     fn get_gltf_data(&self) -> (&[u8], &[u8]);
-    fn init(
-        &mut self,
-        nodes: HashMap<String, Rc<RefCell<Node>>>,
-    ) -> HothamResult<ProgramInitialization>;
+    fn init(&mut self, nodes: HashMap<String, Rc<RefCell<Node>>>) -> HothamResult<World>;
 }
 
 #[derive(Debug, Clone)]
@@ -65,7 +64,7 @@ pub fn read_spv_from_bytes<R: std::io::Read + Seek>(bytes: &mut R) -> std::io::R
 #[cfg(target_os = "windows")]
 pub fn load_sound(path: &str) -> HothamResult<Sound> {
     let path = format!("assets/{}", path);
-    Sound::from_file(path, Default::default())
+    Sound::from_file(&path, Default::default())
         .map_err(|e| anyhow!("Error loading sound: {} - {:?}", path, e))
         .map_err(|e| HothamError::Other(e))
 }
