@@ -1,19 +1,13 @@
 use crate::{
     buffer::Buffer,
-    components::{joint, skin, Joint, Mesh, Parent, Skin, Transform, TransformMatrix},
+    components::{Joint, Mesh, Parent, Skin, Transform, TransformMatrix},
     resources::VulkanContext,
 };
 use anyhow::Result;
 use ash::vk;
 use cgmath::{Matrix4, SquareMatrix};
-use itertools::Itertools;
-use legion::{Entity, EntityStore, World};
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet},
-    io::Cursor,
-    rc::{Rc, Weak},
-};
+use legion::{Entity, World};
+use std::{collections::HashMap, io::Cursor};
 
 struct SkinData {
     skeleton_root: Entity,
@@ -22,7 +16,7 @@ struct SkinData {
 
 pub(crate) fn load_models_from_gltf(
     gltf_bytes: &[u8],
-    buffers: &Vec<&[u8]>,
+    buffers: &[&[u8]],
     vulkan_context: &VulkanContext,
     mesh_descriptor_set_layout: vk::DescriptorSetLayout,
 ) -> Result<HashMap<String, World>> {
@@ -51,17 +45,17 @@ pub(crate) fn load_models_from_gltf(
         );
     }
 
-    for animation in document.animations() {
-        // TODO
-        // Animation::load(&animation, blob, &nodes_vec)?;
-    }
+    // TODO: Load animation data
+    // for animation in document.animations() {
+    // Animation::load(&animation, blob, &nodes_vec)?;
+    // }
 
     Ok(models)
 }
 
 fn load_node(
     node_data: &gltf::Node,
-    gltf_buffers: &Vec<&[u8]>,
+    gltf_buffers: &[&[u8]],
     vulkan_context: &VulkanContext,
     mesh_descriptor_set_layout: vk::DescriptorSetLayout,
     world: &mut World,
@@ -159,14 +153,11 @@ fn load_node(
 
 #[cfg(test)]
 mod tests {
-    use ash::version::DeviceV1_0;
-    use cgmath::{vec3, vec4, Matrix4, Quaternion};
-
     use super::*;
     use crate::{
+        add_model_to_world,
         components::Transform,
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
-        Vertex,
     };
     use legion::IntoQuery;
     #[test]
@@ -185,6 +176,15 @@ mod tests {
         let mut query = <(&Mesh, &Transform, &TransformMatrix)>::query();
         let meshes = query.iter(asteroid).collect::<Vec<_>>();
         assert_eq!(meshes.len(), 1);
+
+        let mut world = World::default();
+        let asteroid = add_model_to_world("Asteroid", &models, &mut world, None);
+        assert!(asteroid.is_some());
+
+        let mut query = <(&Transform, &Mesh, &TransformMatrix)>::query();
+        let asteroid = asteroid.unwrap();
+        let entity = query.get(&mut world, asteroid);
+        assert!(entity.is_ok());
     }
 
     #[test]
@@ -194,7 +194,7 @@ mod tests {
 
         let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
         let gltf = document.into_json().to_vec().unwrap();
-        let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
+        let buffers = buffers.iter().map(|b| b.0.as_slice()).collect::<Vec<_>>();
         let models =
             load_models_from_gltf(&gltf, &buffers, &vulkan_context, set_layouts.mesh_layout)
                 .unwrap();

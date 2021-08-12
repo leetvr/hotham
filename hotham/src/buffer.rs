@@ -1,12 +1,12 @@
 use std::marker::PhantomData;
 
 use anyhow::Result;
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 
 use crate::resources::VulkanContext;
 
 // TODO: Let Buffer<T> own the data
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Buffer<T> {
     pub handle: vk::Buffer,
     pub device_memory: vk::DeviceMemory,
@@ -66,12 +66,13 @@ where
     }
 }
 
-impl<T> Buffer<T> {
-    pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) -> () {
-        let device = &vulkan_context.device;
-        unsafe {
-            device.destroy_buffer(self.handle, None);
-            device.free_memory(self.device_memory, None);
-        };
-    }
-}
+// TODO: Need to be able to drop Buffers
+// impl<T> Buffer<T> {
+//     pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) -> () {
+//         let device = &vulkan_context.device;
+//         unsafe {
+//             device.destroy_buffer(self.handle, None);
+//             device.free_memory(self.device_memory, None);
+//         };
+//     }
+// }

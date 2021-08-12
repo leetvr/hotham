@@ -1,7 +1,7 @@
 use cgmath::{Quaternion, Vector3, Zero};
 use gltf::scene::Transform as TransformData;
 
-#[derive(Clone, PartialEq, Debug)]
+#[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Transform {
     pub translation: Vector3<f32>,
     pub rotation: Quaternion<f32>,

@@ -20,7 +20,7 @@ static CLEAR_VALUES: [vk::ClearValue; 2] = [
     },
 ];
 
-pub(crate) fn begin_frame(world: &mut World, resources: &mut Resources) {
+pub(crate) fn begin_frame(_world: &mut World, resources: &mut Resources) {
     // Get resources
     let mut xr_context = resources.get_mut::<XrContext>().unwrap();
     let mut render_context = resources.get_mut::<RenderContext>().unwrap();
@@ -50,7 +50,7 @@ pub(crate) fn begin_frame(world: &mut World, resources: &mut Resources) {
     // Update uniform buffers
     // TODO: We should do this ourselves.
     render_context
-        .update_uniform_buffer(&views, &vulkan_context)
+        .update_scene_data(&views, &vulkan_context)
         .unwrap();
     xr_context.views = views;
 
@@ -85,6 +85,14 @@ pub(crate) fn begin_frame(world: &mut World, resources: &mut Resources) {
             vk::PipelineBindPoint::GRAPHICS,
             render_context.pipeline,
         );
+        device.cmd_bind_descriptor_sets(
+            command_buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            render_context.pipeline_layout,
+            0,
+            &render_context.scene_data_descriptor_sets,
+            &[],
+        );
     }
 
     // ..and we're off!
@@ -101,12 +109,7 @@ mod tests {
     #[test]
     pub fn test_begin_frame() {
         let (xr_context, vulkan_context) = XrContext::new().unwrap();
-        let render_context = RenderContext::new(
-            &vulkan_context,
-            &xr_context.swapchain,
-            xr_context.swapchain_resolution,
-        )
-        .unwrap();
+        let render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
 
         let mut world = World::default();
         let mut resources = Resources::default();

@@ -270,6 +270,8 @@ pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId
 #[cfg(target_os = "android")]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     use openxr::sys::{InstanceCreateInfoAndroidKHR, LoaderInitInfoAndroidKHR};
+    use std::{ffi::CStr, intrinsics::transmute, ptr::null};
+    use xr::sys::pfn::InitializeLoaderKHR;
 
     let xr_entry = xr::Entry::load()?;
     let native_activity = ndk_glue::native_activity();

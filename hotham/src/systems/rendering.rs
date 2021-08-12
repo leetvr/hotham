@@ -24,7 +24,7 @@ pub(crate) fn rendering(
             command_buffer,
             vk::PipelineBindPoint::GRAPHICS,
             render_context.pipeline_layout,
-            0,
+            1,
             &mesh.descriptor_sets,
             &[],
         );
@@ -56,32 +56,18 @@ mod tests {
     use super::*;
     use legion::{Resources, Schedule, World};
 
-    use crate::{
-        app::{
-            create_vulkan_context, create_xr_instance, create_xr_session, create_xr_swapchain,
-            get_swapchain_resolution,
-        },
-        resources::RenderContext,
-        VIEW_COUNT,
-    };
+    use crate::resources::{RenderContext, XrContext};
 
     #[test]
     pub fn test_rendering_system() {
         let mut world = World::default();
-        let (xr_instance, system) = create_xr_instance().unwrap();
-        let vulkan_context = create_vulkan_context(&xr_instance, system).unwrap();
-        let (xr_session, _frame_waiter, _frame_stream) =
-            create_xr_session(&xr_instance, system, &vulkan_context).unwrap(); // TODO: Extract to XRContext
-        let swapchain_resolution = get_swapchain_resolution(&xr_instance, system).unwrap();
-        let xr_swapchain =
-            create_xr_swapchain(&xr_session, &swapchain_resolution, VIEW_COUNT).unwrap();
-
-        let renderer =
-            RenderContext::new(&vulkan_context, &xr_swapchain, swapchain_resolution).unwrap();
+        let (xr_context, vulkan_context) = XrContext::new().unwrap();
+        let render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
 
         let mut schedule = Schedule::builder().add_system(rendering_system()).build();
         let mut resources = Resources::default();
-        resources.insert(vulkan_context.clone());
+        resources.insert(vulkan_context);
+        resources.insert(render_context);
         resources.insert(0 as usize);
         schedule.execute(&mut world, &mut resources);
 

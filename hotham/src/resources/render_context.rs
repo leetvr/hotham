@@ -1,22 +1,21 @@
-use std::{
-    cell::RefCell, collections::HashMap, ffi::CStr, io::Cursor, mem::size_of, rc::Rc,
-    time::Instant, u64,
-};
+use std::{ffi::CStr, io::Cursor, mem::size_of, time::Instant};
 
 use crate::{
-    buffer::Buffer, camera::Camera, frame::Frame, gltf_loader::load_models_from_gltf, image::Image,
-    resources::VulkanContext, swapchain::Swapchain, UniformBufferObject, Vertex, COLOR_FORMAT,
-    DEPTH_FORMAT, VIEW_COUNT,
+    buffer::Buffer,
+    camera::Camera,
+    frame::Frame,
+    image::Image,
+    resources::{VulkanContext, XrContext},
+    swapchain::Swapchain,
+    SceneData, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{vec4, Matrix4, SquareMatrix};
+use cgmath::{vec4, Matrix4};
 use openxr as xr;
 
-use xr::VulkanLegacy;
-
 pub struct DescriptorSetLayouts {
-    pub scene_layout: vk::DescriptorSetLayout,
+    pub scene_data_layout: vk::DescriptorSetLayout,
     pub mesh_layout: vk::DescriptorSetLayout,
 }
 
@@ -29,7 +28,8 @@ pub struct RenderContext {
     pub render_pass: vk::RenderPass,
     pub depth_image: Image,
     pub render_area: vk::Rect2D,
-    pub uniform_buffer: Buffer<UniformBufferObject>,
+    pub scene_data: Buffer<SceneData>,
+    pub scene_data_descriptor_sets: Vec<vk::DescriptorSet>,
     pub render_start_time: Instant,
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
@@ -41,42 +41,40 @@ impl Drop for RenderContext {
     fn drop(&mut self) {
         // TODO: fix
 
-        unsafe {
-            // self.vulkan_context
-            //     .device
-            //     .queue_wait_idle(self.vulkan_context.graphics_queue)
-            //     .expect("Unable to wait for queue to become idle!");
+        // unsafe {
+        // self.vulkan_context
+        //     .device
+        //     .queue_wait_idle(self.vulkan_context.graphics_queue)
+        //     .expect("Unable to wait for queue to become idle!");
 
-            // // for layout in &self.descriptor_set_layouts {
-            // //     self.vulkan_context
-            // //         .device
-            // //         .destroy_descriptor_set_layout(*layout, None);
-            // // }
-            // self.depth_image.destroy(&self.vulkan_context);
-            // self.uniform_buffer.destroy(&self.vulkan_context);
-            // for frame in self.frames.drain(..) {
-            //     frame.destroy(&self.vulkan_context);
-            // }
-            // self.vulkan_context
-            //     .device
-            //     .destroy_pipeline_layout(self.pipeline_layout, None);
-            // self.vulkan_context
-            //     .device
-            //     .destroy_render_pass(self.render_pass, None);
-            // self.vulkan_context
-            //     .device
-            //     .destroy_pipeline(self.pipeline, None);
-        }
+        // // for layout in &self.descriptor_set_layouts {
+        // //     self.vulkan_context
+        // //         .device
+        // //         .destroy_descriptor_set_layout(*layout, None);
+        // // }
+        // self.depth_image.destroy(&self.vulkan_context);
+        // self.uniform_buffer.destroy(&self.vulkan_context);
+        // for frame in self.frames.drain(..) {
+        //     frame.destroy(&self.vulkan_context);
+        // }
+        // self.vulkan_context
+        //     .device
+        //     .destroy_pipeline_layout(self.pipeline_layout, None);
+        // self.vulkan_context
+        //     .device
+        //     .destroy_render_pass(self.render_pass, None);
+        // self.vulkan_context
+        //     .device
+        //     .destroy_pipeline(self.pipeline, None);
+        // }
     }
 }
 
 impl RenderContext {
-    pub(crate) fn new(
-        vulkan_context: &VulkanContext,
-        xr_swapchain: &xr::Swapchain<VulkanLegacy>,
-        swapchain_resolution: vk::Extent2D,
-    ) -> Result<Self> {
+    pub(crate) fn new(vulkan_context: &VulkanContext, xr_context: &XrContext) -> Result<Self> {
         println!("[HOTHAM_RENDERER] Creating renderer..");
+        let xr_swapchain = &xr_context.swapchain;
+        let swapchain_resolution = xr_context.swapchain_resolution;
 
         // Build swapchain
         let swapchain = Swapchain::new(xr_swapchain, swapchain_resolution)?;
@@ -92,7 +90,7 @@ impl RenderContext {
         let pipeline_layout = create_pipeline_layout(
             &vulkan_context,
             &[
-                descriptor_set_layouts.scene_layout,
+                descriptor_set_layouts.scene_data_layout,
                 descriptor_set_layouts.mesh_layout,
             ],
         )?;
@@ -106,13 +104,18 @@ impl RenderContext {
         let frames = create_frames(&vulkan_context, &render_pass, &swapchain, &depth_image)?;
 
         println!("[HOTHAM_RENDERER] Creating UBO..");
-        let view_matrix = UniformBufferObject::default();
-        let uniform_buffer = Buffer::new(
+        let scene_data = SceneData::default();
+        let scene_data = Buffer::new(
             &vulkan_context,
-            &view_matrix,
+            &scene_data,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
-        println!("[HOTHAM_RENDERER] ..done! {:?}", uniform_buffer);
+        let scene_data_descriptor_sets = vulkan_context.create_scene_data_descriptor_sets(
+            descriptor_set_layouts.scene_data_layout,
+            &scene_data,
+        )?;
+
+        println!("[HOTHAM_RENDERER] ..done! {:?}", scene_data);
 
         println!("[HOTHAM_RENDERER] Done! Renderer initialised!");
 
@@ -126,7 +129,8 @@ impl RenderContext {
             frame_index: 0,
             depth_image,
             render_area,
-            uniform_buffer,
+            scene_data,
+            scene_data_descriptor_sets,
             render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
             views: Vec::new(),
@@ -134,22 +138,20 @@ impl RenderContext {
         })
     }
 
-    pub(crate) fn update_uniform_buffer(
+    // TODO: Make this update the scene data rather than creating a new one
+    pub(crate) fn update_scene_data(
         &mut self,
         views: &Vec<xr::View>,
         vulkan_context: &VulkanContext,
     ) -> Result<()> {
         self.views = views.clone();
-        let delta_time = Instant::now()
-            .duration_since(self.render_start_time)
-            .as_secs_f32();
 
         // View (camera)
         let view_matrices = &self
             .cameras
             .iter_mut()
             .enumerate()
-            .map(|(n, c)| c.update_view_matrix(&views[n], delta_time))
+            .map(|(n, c)| c.update_view_matrix(&views[n]))
             .collect::<Result<Vec<_>>>()?;
 
         // Projection
@@ -165,15 +167,13 @@ impl RenderContext {
 
         let light_pos = vec4(0.0, 2.0, 2.0, 1.0);
 
-        let uniform_buffer = UniformBufferObject {
+        let scene_data = SceneData {
             view,
             projection,
-            delta_time,
             light_pos,
         };
 
-        self.uniform_buffer
-            .update(&vulkan_context, &uniform_buffer, 1)?;
+        self.scene_data.update(&vulkan_context, &scene_data, 1)?;
 
         Ok(())
     }
@@ -247,11 +247,18 @@ pub(crate) fn create_descriptor_set_layouts(
 
     let scene_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&scene_bindings);
 
-    let scene_layout = unsafe {
+    let scene_data_layout = unsafe {
         vulkan_context
             .device
             .create_descriptor_set_layout(&scene_create_info, None)
     }?;
+
+    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+        .stage_flags(vk::ShaderStageFlags::VERTEX)
+        .build();
 
     let base_color_image_sampler = vk::DescriptorSetLayoutBinding::builder()
         .binding(1)
@@ -265,13 +272,6 @@ pub(crate) fn create_descriptor_set_layouts(
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-        .build();
-
-    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX)
         .build();
 
     let mesh_bindings = [
@@ -289,7 +289,7 @@ pub(crate) fn create_descriptor_set_layouts(
     }?;
 
     Ok(DescriptorSetLayouts {
-        scene_layout,
+        scene_data_layout,
         mesh_layout,
     })
 }

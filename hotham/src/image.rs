@@ -1,6 +1,4 @@
-use ash::{version::DeviceV1_0, vk};
-
-use crate::resources::VulkanContext;
+use ash::vk;
 
 /// Thin wrapper around a locally created Vulkan image.
 #[derive(Debug, Clone)]
@@ -26,12 +24,13 @@ impl Image {
         }
     }
 
-    pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) {
-        let device = &vulkan_context.device;
-        unsafe {
-            device.free_memory(self.device_memory, None);
-            device.destroy_image_view(self.view, None);
-            device.destroy_image(self.handle, None);
-        };
-    }
+    // TODO: Handle destruction
+    // pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) {
+    //     let device = &vulkan_context.device;
+    //     unsafe {
+    //         device.free_memory(self.device_memory, None);
+    //         device.destroy_image_view(self.view, None);
+    //         device.destroy_image(self.handle, None);
+    //     };
+    // }
 }

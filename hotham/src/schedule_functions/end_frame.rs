@@ -101,12 +101,7 @@ mod tests {
     #[test]
     pub fn test_end_frame() {
         let (xr_context, vulkan_context) = XrContext::new().unwrap();
-        let renderer = RenderContext::new(
-            &vulkan_context,
-            &xr_context.swapchain,
-            xr_context.swapchain_resolution,
-        )
-        .unwrap();
+        let renderer = RenderContext::new(&vulkan_context, &xr_context).unwrap();
 
         let mut world = World::default();
         let mut resources = Resources::default();
