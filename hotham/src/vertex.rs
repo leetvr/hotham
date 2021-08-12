@@ -2,7 +2,7 @@ use ash::vk;
 use cgmath::{Vector2, Vector3, Vector4};
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy, PartialEq)]
 pub struct Vertex {
     pub position: Vector3<f32>,
     pub texture_coords: Vector2<f32>,

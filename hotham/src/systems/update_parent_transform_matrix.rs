@@ -4,7 +4,7 @@ use legion::{system, world::SubWorld, EntityStore, IntoQuery};
 #[system]
 #[write_component(TransformMatrix)]
 #[read_component(Parent)]
-pub(crate) fn update_parent_transform_matrix(world: &mut SubWorld) -> () {
+pub fn update_parent_transform_matrix(world: &mut SubWorld) -> () {
     unsafe {
         let mut query = <(&mut TransformMatrix, &Parent)>::query();
         query.for_each_unchecked(world, |(transform_matrix, parent)| {

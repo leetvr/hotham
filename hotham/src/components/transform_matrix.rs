@@ -1,6 +1,6 @@
 use cgmath::{Matrix4, SquareMatrix};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TransformMatrix(pub Matrix4<f32>);
 
 impl Default for TransformMatrix {

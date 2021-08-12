@@ -20,7 +20,7 @@ impl Default for Camera {
 }
 
 impl Camera {
-    pub fn update_view_matrix(&mut self, view: &View, _delta_time: f32) -> Result<Matrix4<f32>> {
+    pub fn update_view_matrix(&mut self, view: &View) -> Result<Matrix4<f32>> {
         // Convert values from OpenXR format
         let (camera_position, camera_orientation) = convert_view(view);
         self.position = camera_position;

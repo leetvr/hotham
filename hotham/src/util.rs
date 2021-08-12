@@ -1,9 +1,10 @@
+#![allow(dead_code)]
+
 use anyhow::Result;
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 use cgmath::{Deg, Euler, Quaternion};
 
-#[allow(dead_code)]
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
     strings
         .iter()
@@ -11,7 +12,6 @@ pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
         .collect::<Vec<_>>()
 }
 
-#[allow(dead_code)]
 pub(crate) unsafe fn parse_raw_strings(raw_strings: &[*const c_char]) -> Vec<&str> {
     raw_strings
         .iter()
@@ -19,7 +19,6 @@ pub(crate) unsafe fn parse_raw_strings(raw_strings: &[*const c_char]) -> Vec<&st
         .collect::<Vec<_>>()
 }
 
-#[allow(dead_code)]
 pub(crate) unsafe fn parse_raw_string(
     raw_string: *const c_char,
 ) -> Result<&'static str, Utf8Error> {

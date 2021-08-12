@@ -1,5 +1,5 @@
 use crate::{
-    buffer::Buffer, hotham_error::HothamError, image::Image, texture::Texture, UniformBufferObject,
+    buffer::Buffer, hotham_error::HothamError, image::Image, texture::Texture, SceneData,
     COLOR_FORMAT, DEPTH_FORMAT, SWAPCHAIN_LENGTH, TEXTURE_FORMAT,
 };
 use anyhow::{anyhow, Result};
@@ -597,7 +597,7 @@ impl VulkanContext {
         base_color_texture: &Texture,
         normal_texture: &Texture,
     ) -> VkResult<Vec<vk::DescriptorSet>> {
-        println!("[HOTHAM_VULKAN] Allocating descriptor sets..");
+        println!("[HOTHAM_VULKAN] Allocating mesh descriptor sets..");
         let descriptor_sets = unsafe {
             self.device.allocate_descriptor_sets(
                 &vk::DescriptorSetAllocateInfo::builder()
@@ -643,6 +643,40 @@ impl VulkanContext {
                 &[],
             )
         };
+
+        Ok(descriptor_sets)
+    }
+
+    pub fn create_scene_data_descriptor_sets(
+        &self,
+        set_layout: vk::DescriptorSetLayout,
+        scene_data: &Buffer<SceneData>,
+    ) -> VkResult<Vec<vk::DescriptorSet>> {
+        println!("[HOTHAM_VULKAN] Allocating scene data sets..");
+        let descriptor_sets = unsafe {
+            self.device.allocate_descriptor_sets(
+                &vk::DescriptorSetAllocateInfo::builder()
+                    .set_layouts(&[set_layout])
+                    .descriptor_pool(self.descriptor_pool),
+            )
+        }?;
+
+        let scene_data_info = vk::DescriptorBufferInfo::builder()
+            .buffer(scene_data.handle)
+            .offset(0)
+            .range(scene_data.size)
+            .build();
+
+        let scene_data = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_sets[0])
+            .dst_binding(0)
+            .dst_array_element(0)
+            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+            .buffer_info(&[scene_data_info])
+            .build();
+        println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
+
+        unsafe { self.device.update_descriptor_sets(&[scene_data], &[]) };
 
         Ok(descriptor_sets)
     }

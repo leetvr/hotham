@@ -13,9 +13,9 @@ use std::{
 #[cfg(target_os = "android")]
 use std::io::Cursor;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub struct Mesh {
-    pub descriptor_sets: Vec<vk::DescriptorSet>,
+    pub descriptor_sets: [vk::DescriptorSet; 1],
     pub(crate) index_buffer: Buffer<u32>,
     pub(crate) vertex_buffer: Buffer<Vertex>,
     pub num_indices: u32,
@@ -24,7 +24,7 @@ pub struct Mesh {
 impl Mesh {
     pub(crate) fn load(
         mesh_data: &gltf::Mesh,
-        buffers: &Vec<&[u8]>,
+        buffers: &[&[u8]],
         vulkan_context: &VulkanContext,
         mesh_descriptor_set_layout: vk::DescriptorSetLayout,
         skin_buffer: &Buffer<Matrix4<f32>>,
@@ -196,6 +196,7 @@ impl Mesh {
             &base_color_texture.unwrap(),
             &normal_texture.unwrap(),
         )?;
+        let descriptor_sets = [descriptor_sets[0]];
         println!("[HOTHAM_MODEL] ..done!");
 
         Ok(Mesh {

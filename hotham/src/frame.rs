@@ -60,18 +60,19 @@ impl Frame {
         })
     }
 
-    pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) {
-        unsafe {
-            vulkan_context
-                .device
-                .destroy_framebuffer(self.framebuffer, None);
-            vulkan_context.device.destroy_fence(self.fence, None);
-            vulkan_context
-                .device
-                .free_command_buffers(vulkan_context.command_pool, &[self.command_buffer]);
-            vulkan_context
-                .device
-                .destroy_image_view(self.swapchain_image_view, None)
-        }
-    }
+    // TODO: Handle destroy
+    // pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) {
+    //     unsafe {
+    //         vulkan_context
+    //             .device
+    //             .destroy_framebuffer(self.framebuffer, None);
+    //         vulkan_context.device.destroy_fence(self.fence, None);
+    //         vulkan_context
+    //             .device
+    //             .free_command_buffers(vulkan_context.command_pool, &[self.command_buffer]);
+    //         vulkan_context
+    //             .device
+    //             .destroy_image_view(self.swapchain_image_view, None)
+    //     }
+    // }
 }
