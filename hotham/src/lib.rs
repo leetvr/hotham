@@ -1,4 +1,3 @@
-use crate::node::Node;
 use anyhow::anyhow;
 use ash::vk;
 pub use legion::World;
@@ -11,7 +10,7 @@ pub use kira::sound::Sound;
 pub use uniform_buffer_object::UniformBufferObject;
 pub use vertex::Vertex;
 
-mod animation;
+// mod animation;
 mod app;
 mod buffer;
 mod camera;
@@ -21,10 +20,8 @@ mod gltf_loader;
 mod hand;
 mod hotham_error;
 mod image;
-pub mod node;
 mod resources;
 mod schedule_functions;
-mod skin;
 mod swapchain;
 pub mod systems;
 mod texture;
@@ -48,13 +45,7 @@ pub const TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
 
 pub trait Program {
     fn get_gltf_data(&self) -> (&[u8], &[u8]);
-    fn init(&mut self, nodes: HashMap<String, Rc<RefCell<Node>>>) -> HothamResult<World>;
-}
-
-#[derive(Debug, Clone)]
-pub struct ProgramInitialization {
-    pub nodes: Vec<Rc<RefCell<Node>>>,
-    pub sounds: Vec<Sound>,
+    fn init(&mut self, models: HashMap<String, World>) -> HothamResult<World>;
 }
 
 pub fn read_spv_from_bytes<R: std::io::Read + Seek>(bytes: &mut R) -> std::io::Result<Vec<u32>> {

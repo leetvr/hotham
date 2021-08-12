@@ -1,167 +1,211 @@
-use crate::{animation::Animation, buffer::Buffer, node::Node, resources::VulkanContext};
+use crate::{
+    buffer::Buffer,
+    components::{joint, skin, Joint, Mesh, Parent, Skin, Transform, TransformMatrix},
+    resources::VulkanContext,
+};
 use anyhow::Result;
 use ash::vk;
-use cgmath::Matrix4;
+use cgmath::{Matrix4, SquareMatrix};
+use itertools::Itertools;
+use legion::{Entity, EntityStore, World};
 use std::{
     cell::RefCell,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::Cursor,
     rc::{Rc, Weak},
 };
 
-pub(crate) fn load_gltf_nodes(
+struct SkinData {
+    skeleton_root: Entity,
+    inverse_bind_matrices: HashMap<usize, Matrix4<f32>>,
+}
+
+pub(crate) fn load_models_from_gltf(
     gltf_bytes: &[u8],
     buffers: &Vec<&[u8]>,
     vulkan_context: &VulkanContext,
-    descriptor_set_layouts: &[vk::DescriptorSetLayout],
-    skin_buffer: &Buffer<Matrix4<f32>>,
-) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
+    mesh_descriptor_set_layout: vk::DescriptorSetLayout,
+) -> Result<HashMap<String, World>> {
+    let mut models = HashMap::new();
     let gtlf_buf = Cursor::new(gltf_bytes);
     let gltf = gltf::Gltf::from_reader(gtlf_buf)?;
     let document = gltf.document;
     let blob = buffers;
 
-    let mut nodes = HashMap::new();
     let root_scene = document.scenes().next().unwrap(); // safe as there is always one scene
 
     for node_data in root_scene.nodes() {
-        let (name, node) = Node::load(
+        let mut world = World::default();
+        load_node(
             &node_data,
-            buffers,
+            blob,
             vulkan_context,
-            descriptor_set_layouts,
-            skin_buffer,
-            Weak::new(),
+            mesh_descriptor_set_layout,
+            &mut world,
+            None,
+            &None,
         )?;
-        (*node).borrow().update_joints(vulkan_context)?;
-        nodes.insert(name, node);
+        models.insert(
+            node_data.name().expect("Node has no name!").to_string(),
+            world,
+        );
     }
-
-    let nodes_vec = nodes.values().collect::<Vec<_>>();
 
     for animation in document.animations() {
-        Animation::load(&animation, blob, &nodes_vec)?;
+        // TODO
+        // Animation::load(&animation, blob, &nodes_vec)?;
     }
 
-    Ok(nodes)
+    Ok(models)
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use ash::version::DeviceV1_0;
-//     use cgmath::{vec3, vec4, Matrix4, Quaternion};
+fn load_node(
+    node_data: &gltf::Node,
+    gltf_buffers: &Vec<&[u8]>,
+    vulkan_context: &VulkanContext,
+    mesh_descriptor_set_layout: vk::DescriptorSetLayout,
+    world: &mut World,
+    parent: Option<Parent>,
+    skin_data: &Option<SkinData>,
+) -> Result<()> {
+    let transform = Transform::load(node_data.transform());
+    let transform_matrix = TransformMatrix(node_data.transform().matrix().into());
+    let this_entity = world.push((transform, transform_matrix));
+    let mut e = world.entry(this_entity).unwrap();
 
-//     use super::*;
-//     use crate::{renderer::create_descriptor_set_layouts, resources::VulkanContext, Vertex};
-//     #[test]
-//     pub fn test_asteroid() {
-//         let vulkan_context = VulkanContext::testing().unwrap();
-//         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
+    if let Some(mesh) = node_data.mesh() {
+        let empty_matrix: Matrix4<f32> = Matrix4::identity();
+        let empty_skin_buffer = Buffer::new(
+            &vulkan_context,
+            &empty_matrix,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+        )?;
+        let mesh = Mesh::load(
+            &mesh,
+            gltf_buffers,
+            vulkan_context,
+            mesh_descriptor_set_layout,
+            &empty_skin_buffer,
+        )?;
 
-//         let gltf = include_bytes!("../../hotham-asteroid/assets/asteroid.gltf");
-//         let data = include_bytes!("../../hotham-asteroid/assets/asteroid_data.bin").to_vec();
-//         let buffer = vk::Buffer::null();
-//         let buffers = vec![data.as_slice()];
-//         let nodes = load_gltf_nodes(
-//             gltf,
-//             &buffers,
-//             &vulkan_context,
-//             &[set_layouts.mesh_layout],
-//             buffer,
-//         )
-//         .unwrap();
-//         assert!(nodes.len() != 0);
-//     }
+        e.add_component(mesh);
+    }
 
-//     #[test]
-//     pub fn test_hand() {
-//         let vulkan_context = VulkanContext::testing().unwrap();
-//         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
+    // Do we need to add a Parent?
+    if let Some(parent) = parent {
+        e.add_component(parent);
+    }
 
-//         let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
-//         let gltf = document.into_json().to_vec().unwrap();
-//         let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
-//         let buffer = vk::Buffer::null();
-//         let nodes = load_gltf_nodes(
-//             &gltf,
-//             &buffers,
-//             &vulkan_context,
-//             &[set_layouts.mesh_layout],
-//             buffer,
-//         )
-//         .unwrap();
-//         assert!(nodes.len() == 1);
+    // Do we need to add a joint?
+    if let Some(skin_data) = skin_data {
+        if let Some(inverse_bind_matrix) = skin_data.inverse_bind_matrices.get(&node_data.index()) {
+            let joint = Joint {
+                skeleton_root: skin_data.skeleton_root,
+                inverse_bind_matrix: inverse_bind_matrix.clone(),
+            };
+            e.add_component(joint);
+        }
+    }
 
-//         let hand = nodes.get("Hand").unwrap();
+    // Do we need to add a Skin?
+    let skin_data = if let Some(node_skin_data) = node_data.skin() {
+        let mut joint_matrices = Vec::new();
+        let reader = node_skin_data.reader(|buffer| Some(&gltf_buffers[buffer.index()]));
+        let matrices = reader.read_inverse_bind_matrices().unwrap();
+        for m in matrices {
+            let m = Matrix4::from(m);
+            joint_matrices.push(m);
+        }
+        let buffer = Buffer::new_from_vec(
+            vulkan_context,
+            &joint_matrices,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+        )?;
 
-//         let children = &hand.borrow().children;
-//         assert!(children.len() == 2);
+        let mut inverse_bind_matrices = HashMap::new();
+        for (joint, inverse_bind_matrix) in node_skin_data.joints().zip(joint_matrices.iter()) {
+            inverse_bind_matrices.insert(joint.index(), inverse_bind_matrix.clone());
+        }
 
-//         let palm = children.get(1).unwrap();
-//         assert!(palm.borrow().children.len() == 5);
-//         assert!(Rc::ptr_eq(&palm.borrow().parent.upgrade().unwrap(), hand));
+        let skin = Skin {
+            joint_matrices,
+            buffer,
+        };
 
-//         let hand_base = children.get(0).unwrap().borrow();
-//         assert!(Rc::ptr_eq(&hand_base.parent.upgrade().unwrap(), hand));
+        e.add_component(skin);
 
-//         let skin = hand_base.skin.as_ref().unwrap();
-//         assert_eq!(skin.inverse_bind_matrices.len(), 16);
-//         assert_eq!(skin.joints.len(), 16);
+        Some(SkinData {
+            skeleton_root: this_entity,
+            inverse_bind_matrices,
+        })
+    } else {
+        None
+    };
 
-//         let mesh = hand_base.mesh.as_ref().unwrap();
-//         let vertex_buffer = &mesh.vertex_buffer;
+    for child in node_data.children() {
+        load_node(
+            &child,
+            gltf_buffers,
+            vulkan_context,
+            mesh_descriptor_set_layout,
+            world,
+            Some(Parent(this_entity)),
+            &skin_data,
+        )?;
+    }
 
-//         unsafe {
-//             let memory = vulkan_context
-//                 .device
-//                 .map_memory(
-//                     vertex_buffer.device_memory,
-//                     0,
-//                     vk::WHOLE_SIZE,
-//                     vk::MemoryMapFlags::empty(),
-//                 )
-//                 .unwrap();
-//             let vertices: &[Vertex] =
-//                 std::slice::from_raw_parts_mut(std::mem::transmute(memory), 2376);
-//             assert_eq!(vertices.len(), 2376);
-//             let first = &vertices[0];
-//             assert_eq!(
-//                 first.joint_weights,
-//                 vec4(0.67059284, 0.19407976, 0.115477115, 0.019850286)
-//             );
-//         }
-//     }
+    Ok(())
+}
 
-//     #[test]
-//     pub fn test_simple() {
-//         let (document, buffers, _) = gltf::import("../test_assets/animation_test.gltf").unwrap();
-//         let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
-//         let vulkan_context = VulkanContext::testing().unwrap();
-//         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
-//         let ubo_buffer = vk::Buffer::null();
+#[cfg(test)]
+mod tests {
+    use ash::version::DeviceV1_0;
+    use cgmath::{vec3, vec4, Matrix4, Quaternion};
 
-//         let gltf_bytes = document.into_json().to_vec().unwrap();
-//         let nodes = load_gltf_nodes(
-//             &gltf_bytes,
-//             &buffers,
-//             &vulkan_context,
-//             &[set_layouts.mesh_layout],
-//             ubo_buffer,
-//         )
-//         .unwrap();
+    use super::*;
+    use crate::{
+        components::Transform,
+        resources::{render_context::create_descriptor_set_layouts, VulkanContext},
+        Vertex,
+    };
+    use legion::IntoQuery;
+    #[test]
+    pub fn test_asteroid() {
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
-//         let test = nodes.get("Test").unwrap();
-//         {
-//             let mut hand = test.borrow_mut();
-//             hand.active_animation_index.replace(0);
-//         }
+        let gltf = include_bytes!("../../hotham-asteroid/assets/asteroid.gltf");
+        let data = include_bytes!("../../hotham-asteroid/assets/asteroid_data.bin").to_vec();
+        let buffers = vec![data.as_slice()];
+        let models =
+            load_models_from_gltf(gltf, &buffers, &vulkan_context, set_layouts.mesh_layout)
+                .unwrap();
 
-//         let test = test.borrow();
-//         assert_eq!(test.translation, vec3(0.0, 0.0, 0.0));
-//         assert_eq!(test.scale, vec3(1.0, 1.0, 1.0));
-//         assert_eq!(test.rotation, Quaternion::new(1.0, 0.0, 0.0, 0.0));
-//         let expected_matrix = Matrix4::from_scale(1.0);
-//         let node_matrix = test.get_node_matrix();
-//         assert_eq!(node_matrix, expected_matrix);
-//     }
-// }
+        let asteroid = models.get("Asteroid").unwrap();
+        let mut query = <(&Mesh, &Transform, &TransformMatrix)>::query();
+        let meshes = query.iter(asteroid).collect::<Vec<_>>();
+        assert_eq!(meshes.len(), 1);
+    }
+
+    #[test]
+    pub fn test_hand() {
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
+
+        let (document, buffers, _) = gltf::import("../test_assets/hand.gltf").unwrap();
+        let gltf = document.into_json().to_vec().unwrap();
+        let buffers = buffers.iter().map(|b| b.0.as_slice()).collect();
+        let models =
+            load_models_from_gltf(&gltf, &buffers, &vulkan_context, set_layouts.mesh_layout)
+                .unwrap();
+
+        let hand = models.get("Hand").unwrap();
+        let mut query = <(&Mesh, &Transform, &TransformMatrix)>::query();
+        let meshes = query.iter(hand).collect::<Vec<_>>();
+        assert_eq!(meshes.len(), 1);
+
+        let mut query = <&Transform>::query();
+        let transforms = query.iter(hand).collect::<Vec<_>>();
+        assert_eq!(transforms.len(), 18);
+    }
+}

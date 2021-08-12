@@ -4,9 +4,9 @@ use std::{
 };
 
 use crate::{
-    buffer::Buffer, camera::Camera, frame::Frame, gltf_loader::load_gltf_nodes, image::Image,
-    node::Node, resources::VulkanContext, swapchain::Swapchain, UniformBufferObject, Vertex,
-    COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    buffer::Buffer, camera::Camera, frame::Frame, gltf_loader::load_models_from_gltf, image::Image,
+    resources::VulkanContext, swapchain::Swapchain, UniformBufferObject, Vertex, COLOR_FORMAT,
+    DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
@@ -34,15 +34,14 @@ pub struct RenderContext {
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
     pub last_frame_time: Instant,
-    pub empty_skin_descriptor_sets: Vec<vk::DescriptorSet>,
     pub frame_index: usize,
 }
 
 impl Drop for RenderContext {
     fn drop(&mut self) {
-        unsafe {
-            // TODO: fix
+        // TODO: fix
 
+        unsafe {
             // self.vulkan_context
             //     .device
             //     .queue_wait_idle(self.vulkan_context.graphics_queue)
@@ -117,18 +116,6 @@ impl RenderContext {
 
         println!("[HOTHAM_RENDERER] Done! Renderer initialised!");
 
-        let empty_matrix: Matrix4<f32> = Matrix4::identity();
-        let empty_skin_buffer = Buffer::new(
-            &vulkan_context,
-            &empty_matrix,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
-        )?;
-        let empty_skin_descriptor_sets = vulkan_context.create_skin_descriptor_set(
-            descriptor_set_layouts.mesh_layout,
-            empty_skin_buffer.handle,
-            std::mem::size_of::<Matrix4<f32>>(),
-        )?;
-
         Ok(Self {
             _swapchain: swapchain,
             frames,
@@ -144,7 +131,6 @@ impl RenderContext {
             cameras: vec![Default::default(); 2],
             views: Vec::new(),
             last_frame_time: Instant::now(),
-            empty_skin_descriptor_sets,
         })
     }
 
@@ -192,20 +178,20 @@ impl RenderContext {
         Ok(())
     }
 
-    pub(crate) fn load_gltf_nodes(
-        &self,
-        gltf_data: (&[u8], &[u8]),
-    ) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
-        // let buffers = vec![gltf_data.1];
-        // load_gltf_nodes(
-        //     gltf_data.0,
-        //     &buffers,
-        //     &self.vulkan_context,
-        //     &[self.descriptor_set_layouts.mesh_layout],
-        //     self.uniform_buffer.handle,
-        // )
-        todo!();
-    }
+    // pub(crate) fn load_gltf_nodes(
+    //     &self,
+    //     gltf_data: (&[u8], &[u8]),
+    // ) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
+    //     // let buffers = vec![gltf_data.1];
+    //     // load_gltf_nodes(
+    //     //     gltf_data.0,
+    //     //     &buffers,
+    //     //     &self.vulkan_context,
+    //     //     &[self.descriptor_set_layouts.mesh_layout],
+    //     //     self.uniform_buffer.handle,
+    //     // )
+    //     todo!();
+    // }
 }
 
 pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {

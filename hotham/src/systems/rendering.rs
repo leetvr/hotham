@@ -1,8 +1,8 @@
 use ash::{version::DeviceV1_0, vk};
-use legion::{system, world::SubWorld, Entity, EntityStore, IntoQuery};
+use legion::system;
 
 use crate::{
-    components::{Mesh, Transform},
+    components::{Mesh, TransformMatrix},
     resources::VulkanContext,
     resources::{render_context::create_push_constant, RenderContext},
 };
@@ -10,7 +10,7 @@ use crate::{
 #[system(for_each)]
 pub(crate) fn rendering(
     mesh: &Mesh,
-    transform: &Transform,
+    transform_matrix: &TransformMatrix,
     #[resource] vulkan_context: &VulkanContext,
     #[resource] swapchain_image_index: &usize,
     #[resource] render_context: &RenderContext,
@@ -39,7 +39,7 @@ pub(crate) fn rendering(
         );
 
         // Push constants
-        let model_matrix = create_push_constant(&transform.global_matrix);
+        let model_matrix = create_push_constant(&transform_matrix.0);
         device.cmd_push_constants(
             command_buffer,
             render_context.pipeline_layout,
@@ -61,7 +61,7 @@ mod tests {
             create_vulkan_context, create_xr_instance, create_xr_session, create_xr_swapchain,
             get_swapchain_resolution,
         },
-        resources::{RenderContext, VulkanContext},
+        resources::RenderContext,
         VIEW_COUNT,
     };
 

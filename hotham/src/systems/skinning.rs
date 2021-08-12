@@ -3,28 +3,29 @@ use legion::{system, world::SubWorld, Entity, EntityStore, IntoQuery};
 use std::collections::HashMap;
 
 use crate::{
-    components::{Joint, Skin, Transform},
+    components::{Joint, Skin, TransformMatrix},
     resources::VulkanContext,
 };
 
 #[system]
 #[read_component(Joint)]
-#[read_component(Transform)]
+#[read_component(TransformMatrix)]
 #[read_component(Skin)]
 pub(crate) fn skinning(world: &mut SubWorld, #[resource] vulkan_context: &VulkanContext) -> () {
     let mut joint_matrices: HashMap<Entity, Vec<Matrix4<f32>>> = HashMap::new();
     unsafe {
-        let mut query = <(&Transform, &Joint)>::query();
-        query.for_each_unchecked(world, |(transform, joint)| {
-            let parent = transform.parent.unwrap();
-            let parent = world.entry_ref(parent).unwrap();
-            let parent_transform = parent.get_component::<Transform>().unwrap();
-
+        let mut query = <(&TransformMatrix, &Joint)>::query();
+        query.for_each_unchecked(world, |(transform_matrix, joint)| {
             let skeleton_root = joint.skeleton_root;
-            let inverse_transform = parent_transform.global_matrix.invert().unwrap();
+            let skeleton_root_entity = world.entry_ref(skeleton_root).unwrap();
+            let inverse_transform = skeleton_root_entity
+                .get_component::<TransformMatrix>()
+                .unwrap()
+                .0
+                .invert()
+                .unwrap();
 
-            let joint_matrix =
-                inverse_transform * transform.global_matrix * joint.inverse_bind_matrix;
+            let joint_matrix = inverse_transform * transform_matrix.0 * joint.inverse_bind_matrix;
             let matrices = joint_matrices.entry(skeleton_root).or_default();
             matrices.push(joint_matrix);
         });
@@ -47,9 +48,8 @@ mod tests {
 
     use crate::{
         buffer::Buffer,
-        components::{Joint, Skin, Transform},
+        components::{Joint, Parent, Skin},
         resources::VulkanContext,
-        systems::transform::{get_global_matrix, get_local_matrix},
     };
 
     use super::*;
@@ -63,13 +63,11 @@ mod tests {
         let vulkan_context = VulkanContext::testing().unwrap();
 
         // Create the transform for the skin entity
-        let mut root_transform = Transform::default();
-        root_transform.translation = vec3(1.0, 2.0, 3.0);
-        root_transform.local_matrix = get_local_matrix(&root_transform);
+        let translation = vec3(1.0, 2.0, 3.0);
+        let root_transform_matrix = Matrix4::from_translation(translation);
 
-        root_transform.global_matrix = get_local_matrix(&root_transform);
         // Create a skin
-        let inverse = root_transform.local_matrix.invert().unwrap();
+        let inverse = root_transform_matrix.invert().unwrap();
         let joint_matrices = vec![inverse.clone(), inverse];
         let buffer = Buffer::new_from_vec(
             &vulkan_context,
@@ -84,7 +82,7 @@ mod tests {
         };
 
         // Now create the skin entity
-        let skinned_entity = world.push((skin, root_transform));
+        let skinned_entity = world.push((skin, TransformMatrix(root_transform_matrix)));
 
         // Create a child joint
         let child_joint = Joint {
@@ -92,13 +90,9 @@ mod tests {
             inverse_bind_matrix: Matrix4::identity(),
         };
 
-        let mut child_transform = Transform::default();
-        child_transform.translation = vec3(1.0, 0.0, 0.0);
-        child_transform.parent = Some(skinned_entity);
-        child_transform.local_matrix = get_local_matrix(&child_transform);
-        child_transform.global_matrix = get_global_matrix(&child_transform, &world);
-        println!("child_transform: {:?}", child_transform);
-        let child = world.push((child_joint, child_transform));
+        let child_translation = vec3(1.0, 0.0, 0.0);
+        let matrix = Matrix4::from_translation(child_translation);
+        let child = world.push((child_joint, TransformMatrix(matrix), Parent(skinned_entity)));
 
         // Create a grandchild joint
         let grandchild_joint = Joint {
@@ -106,12 +100,9 @@ mod tests {
             inverse_bind_matrix: Matrix4::identity(),
         };
 
-        let mut grandchild_transform = Transform::default();
-        grandchild_transform.translation = vec3(0.0, 1.0, 0.0);
-        grandchild_transform.parent = Some(child);
-        grandchild_transform.local_matrix = get_local_matrix(&grandchild_transform);
-        grandchild_transform.global_matrix = get_global_matrix(&grandchild_transform, &world);
-        let _grandchild = world.push((grandchild_joint, grandchild_transform));
+        let grandchild_translation = vec3(1.0, 0.0, 0.0);
+        let matrix = Matrix4::from_translation(grandchild_translation);
+        let _grandchild = world.push((grandchild_joint, TransformMatrix(matrix), Parent(child)));
 
         let mut schedule = Schedule::builder().add_system(skinning_system()).build();
         let mut resources = Resources::default();
