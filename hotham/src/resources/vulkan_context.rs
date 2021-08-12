@@ -607,18 +607,18 @@ impl VulkanContext {
         }?;
         println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
 
-        let ubo_info = vk::DescriptorBufferInfo::builder()
+        let ssbo_info = vk::DescriptorBufferInfo::builder()
             .buffer(skin_buffer.handle)
             .offset(0)
-            .range(size_of::<UniformBufferObject>() as _)
+            .range(skin_buffer.size as _)
             .build();
 
-        let ubo = vk::WriteDescriptorSet::builder()
+        let ssbo = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_sets[0])
             .dst_binding(0)
             .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-            .buffer_info(&[ubo_info])
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .buffer_info(&[ssbo_info])
             .build();
 
         let base_color_texture_sampler = vk::WriteDescriptorSet::builder()
@@ -639,45 +639,10 @@ impl VulkanContext {
 
         unsafe {
             self.device.update_descriptor_sets(
-                &[ubo, base_color_texture_sampler, normal_texture_sampler],
+                &[ssbo, base_color_texture_sampler, normal_texture_sampler],
                 &[],
             )
         };
-
-        Ok(descriptor_sets)
-    }
-
-    pub fn create_skin_descriptor_set(
-        &self,
-        set_layout: vk::DescriptorSetLayout,
-        skin_ssbo: vk::Buffer,
-        buffer_size: usize,
-    ) -> VkResult<Vec<vk::DescriptorSet>> {
-        println!("[HOTHAM_VULKAN] Allocating skin descriptor sets..");
-        let descriptor_sets = unsafe {
-            self.device.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::builder()
-                    .set_layouts(&[set_layout])
-                    .descriptor_pool(self.descriptor_pool),
-            )
-        }?;
-        println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
-
-        let ssbo_info = vk::DescriptorBufferInfo::builder()
-            .buffer(skin_ssbo)
-            .offset(0)
-            .range(buffer_size as _)
-            .build();
-
-        let ssbo = vk::WriteDescriptorSet::builder()
-            .dst_set(descriptor_sets[0])
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&[ssbo_info])
-            .build();
-
-        unsafe { self.device.update_descriptor_sets(&[ssbo], &[]) };
 
         Ok(descriptor_sets)
     }

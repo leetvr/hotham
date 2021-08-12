@@ -4,8 +4,6 @@ use anyhow::{anyhow, Result};
 use cgmath::{vec3, InnerSpace, Quaternion, Vector3, VectorSpace};
 use gltf::animation::util::ReadOutputs;
 
-use crate::node::Node;
-
 #[derive(Debug, Clone)]
 pub struct Animation {
     channels: Vec<AnimationChannel>,
@@ -15,95 +13,95 @@ pub struct Animation {
 }
 
 impl Animation {
-    pub(crate) fn load(
-        animation: &gltf::Animation,
-        buffers: &Vec<&[u8]>,
-        nodes: &[&Rc<RefCell<Node>>],
-    ) -> Result<()> {
-        let mut channels = Vec::new();
-        let mut start_time = 0.0;
-        let mut end_time = 0.0;
-        let mut first_target_node = None;
+    // pub(crate) fn load(
+    //     animation: &gltf::Animation,
+    //     buffers: &Vec<&[u8]>,
+    //     nodes: &[&Rc<RefCell<Node>>],
+    // ) -> Result<()> {
+    //     let mut channels = Vec::new();
+    //     let mut start_time = 0.0;
+    //     let mut end_time = 0.0;
+    //     let mut first_target_node = None;
 
-        for channel in animation.channels() {
-            let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]));
+    //     for channel in animation.channels() {
+    //         let reader = channel.reader(|buffer| Some(&buffers[buffer.index()]));
 
-            let mut inputs = Vec::new();
-            let outputs;
+    //         let mut inputs = Vec::new();
+    //         let outputs;
 
-            if let Some(iter) = reader.read_inputs() {
-                for input in iter {
-                    if input < start_time {
-                        start_time = input;
-                    }
-                    if input > end_time {
-                        end_time = input;
-                    }
-                    inputs.push(input);
-                }
-            }
+    //         if let Some(iter) = reader.read_inputs() {
+    //             for input in iter {
+    //                 if input < start_time {
+    //                     start_time = input;
+    //                 }
+    //                 if input > end_time {
+    //                     end_time = input;
+    //                 }
+    //                 inputs.push(input);
+    //             }
+    //         }
 
-            match reader.read_outputs() {
-                Some(ReadOutputs::Translations(translations)) => {
-                    let mut values = Vec::new();
-                    for t in translations {
-                        values.push(vec3(t[0], t[1], t[2]));
-                    }
-                    outputs = AnimationOutputs::Translations(values);
-                }
-                Some(ReadOutputs::Scales(scales)) => {
-                    let mut values = Vec::new();
-                    for t in scales {
-                        values.push(vec3(t[0], t[1], t[2]));
-                    }
-                    outputs = AnimationOutputs::Scales(values);
-                }
-                Some(ReadOutputs::Rotations(rotations)) => {
-                    let mut values = Vec::new();
-                    for t in rotations.into_f32() {
-                        values.push(Quaternion::new(t[3], t[0], t[1], t[2])); // gltf gives us a quaternion in [x, y, z, w] but we need [w, x, y, z]
-                    }
-                    outputs = AnimationOutputs::Rotations(values);
-                }
-                _ => panic!("Invalid data!"),
-            }
+    //         match reader.read_outputs() {
+    //             Some(ReadOutputs::Translations(translations)) => {
+    //                 let mut values = Vec::new();
+    //                 for t in translations {
+    //                     values.push(vec3(t[0], t[1], t[2]));
+    //                 }
+    //                 outputs = AnimationOutputs::Translations(values);
+    //             }
+    //             Some(ReadOutputs::Scales(scales)) => {
+    //                 let mut values = Vec::new();
+    //                 for t in scales {
+    //                     values.push(vec3(t[0], t[1], t[2]));
+    //                 }
+    //                 outputs = AnimationOutputs::Scales(values);
+    //             }
+    //             Some(ReadOutputs::Rotations(rotations)) => {
+    //                 let mut values = Vec::new();
+    //                 for t in rotations.into_f32() {
+    //                     values.push(Quaternion::new(t[3], t[0], t[1], t[2])); // gltf gives us a quaternion in [x, y, z, w] but we need [w, x, y, z]
+    //                 }
+    //                 outputs = AnimationOutputs::Rotations(values);
+    //             }
+    //             _ => panic!("Invalid data!"),
+    //         }
 
-            let sampler = AnimationSampler { inputs, outputs };
-            let target_node_index = channel.target().node().index();
-            let target_node = find_node(nodes, target_node_index)?;
+    //         let sampler = AnimationSampler { inputs, outputs };
+    //         let target_node_index = channel.target().node().index();
+    //         let target_node = find_node(nodes, target_node_index)?;
 
-            if first_target_node.is_none() {
-                first_target_node.replace(target_node.clone());
-            }
+    //         if first_target_node.is_none() {
+    //             first_target_node.replace(target_node.clone());
+    //         }
 
-            channels.push(AnimationChannel {
-                sampler,
-                target_node,
-            })
-        }
+    //         channels.push(AnimationChannel {
+    //             sampler,
+    //             target_node,
+    //         })
+    //     }
 
-        let animation = Animation {
-            channels,
-            start_time,
-            end_time,
-            current_time: 0.0,
-        };
+    //     let animation = Animation {
+    //         channels,
+    //         start_time,
+    //         end_time,
+    //         current_time: 0.0,
+    //     };
 
-        let parent_node = first_target_node
-            .unwrap()
-            .borrow()
-            .get_root_node()
-            .ok_or_else(|| anyhow!("Unable to find parent node"))?;
+    //     let parent_node = first_target_node
+    //         .unwrap()
+    //         .borrow()
+    //         .get_root_node()
+    //         .ok_or_else(|| anyhow!("Unable to find parent node"))?;
 
-        println!(
-            "Found parent node {} for animation!",
-            (*parent_node).borrow().index,
-        );
-        let animation = Rc::new(RefCell::new(animation));
-        (*parent_node).borrow_mut().animations.push(animation);
+    //     println!(
+    //         "Found parent node {} for animation!",
+    //         (*parent_node).borrow().index,
+    //     );
+    //     let animation = Rc::new(RefCell::new(animation));
+    //     (*parent_node).borrow_mut().animations.push(animation);
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 
     pub(crate) fn _update_to_percentage(&mut self, percentage: f32) -> () {
         self.current_time = self.end_time * percentage;
@@ -219,15 +217,15 @@ impl Animation {
     }
 }
 
-fn find_node(nodes: &[&Rc<RefCell<Node>>], index: usize) -> Result<Rc<RefCell<Node>>> {
-    for n in nodes {
-        if let Some(found) = (***n).borrow().find(index) {
-            return Ok(found);
-        }
-    }
+// fn find_node(nodes: &[&Rc<RefCell<Node>>], index: usize) -> Result<Rc<RefCell<Node>>> {
+//     for n in nodes {
+//         if let Some(found) = (***n).borrow().find(index) {
+//             return Ok(found);
+//         }
+//     }
 
-    Err(anyhow!("Unable to find node with index: {}", index))
-}
+//     Err(anyhow!("Unable to find node with index: {}", index))
+// }
 
 #[derive(Debug, Clone)]
 pub(crate) struct AnimationSampler {
@@ -238,7 +236,7 @@ pub(crate) struct AnimationSampler {
 #[derive(Debug, Clone)]
 pub(crate) struct AnimationChannel {
     sampler: AnimationSampler,
-    target_node: Rc<RefCell<Node>>,
+    // target_node: Rc<RefCell<Node>>,
 }
 
 #[derive(Debug, Clone)]

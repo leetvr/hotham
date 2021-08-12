@@ -11,6 +11,7 @@ pub struct Buffer<T> {
     pub handle: vk::Buffer,
     pub device_memory: vk::DeviceMemory,
     pub _phantom: PhantomData<T>,
+    pub size: vk::DeviceSize,
 }
 
 impl<T> Buffer<T>
@@ -25,10 +26,12 @@ where
         let item_count = data.len();
         let (handle, device_memory) =
             vulkan_context.create_buffer_with_data(data.as_ptr(), usage, item_count)?;
+        let size = (std::mem::size_of::<T>() * item_count) as _;
 
         Ok(Self {
             handle,
             device_memory,
+            size,
             _phantom: PhantomData,
         })
     }
@@ -41,10 +44,12 @@ where
         let item_count = 1;
         let (handle, device_memory) =
             vulkan_context.create_buffer_with_data(data, usage, item_count)?;
+        let size = std::mem::size_of::<T>() as _;
 
         Ok(Self {
             handle,
             device_memory,
+            size,
             _phantom: PhantomData,
         })
     }

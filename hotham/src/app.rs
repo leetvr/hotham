@@ -1,9 +1,13 @@
 use crate::{
-    hand::Hand,
-    node::Node,
+    // hand::Hand,
     resources::{RenderContext, VulkanContext},
     util::to_euler_degrees,
-    HothamResult, Program, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
+    HothamResult,
+    Program,
+    BLEND_MODE,
+    COLOR_FORMAT,
+    VIEW_COUNT,
+    VIEW_TYPE,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -158,12 +162,9 @@ where
 
         let renderer = RenderContext::new(&vulkan_context, &xr_swapchain, swapchain_resolution)?;
         println!("[HOTHAM_INIT] Loading models..");
-        let nodes = renderer.load_gltf_nodes(program.get_gltf_data())?;
-        println!(
-            "[HOTHAM_INIT] done! Loaded {} models. Getting scene nodes..",
-            nodes.len()
-        );
-        let world = program.init(nodes)?;
+        // let nodes = renderer.load_gltf_nodes(program.get_gltf_data())?;
+        let models = Default::default();
+        let world = program.init(models)?;
 
         println!("[HOTHAM_INIT] INIT COMPLETE!");
         let mut audio_manager = AudioManager::new(AudioManagerSettings::default())
@@ -529,37 +530,37 @@ pub(crate) fn create_xr_session(
     .unwrap())
 }
 
-fn load_hands(
-    renderer: &RenderContext,
-    app_nodes: &mut Vec<Rc<RefCell<Node>>>,
-) -> Result<(Hand, Hand)> {
-    let gltf = include_bytes!("../assets/left_hand.gltf");
-    let data = include_bytes!("../assets/left_hand.bin");
-    let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
-    let (_, left_hand) = nodes
-        .drain()
-        .next()
-        .ok_or_else(|| anyhow!("Couldn't find left hand in gltf file"))?;
+// fn load_hands(
+//     renderer: &RenderContext,
+//     app_nodes: &mut Vec<Rc<RefCell<Node>>>,
+// ) -> Result<(Hand, Hand)> {
+//     let gltf = include_bytes!("../assets/left_hand.gltf");
+//     let data = include_bytes!("../assets/left_hand.bin");
+//     let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
+//     let (_, left_hand) = nodes
+//         .drain()
+//         .next()
+//         .ok_or_else(|| anyhow!("Couldn't find left hand in gltf file"))?;
 
-    let left_hand_node = Rc::clone(&left_hand);
-    let left_hand = Hand::new(left_hand);
+//     let left_hand_node = Rc::clone(&left_hand);
+//     let left_hand = Hand::new(left_hand);
 
-    let gltf = include_bytes!("../assets/right_hand.gltf");
-    let data = include_bytes!("../assets/right_hand.bin");
-    let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
-    let (_, right_hand) = nodes
-        .drain()
-        .next()
-        .ok_or_else(|| anyhow!("Couldn't find right hand in gltf file"))?;
+//     let gltf = include_bytes!("../assets/right_hand.gltf");
+//     let data = include_bytes!("../assets/right_hand.bin");
+//     let mut nodes = renderer.load_gltf_nodes((gltf, data))?;
+//     let (_, right_hand) = nodes
+//         .drain()
+//         .next()
+//         .ok_or_else(|| anyhow!("Couldn't find right hand in gltf file"))?;
 
-    let right_hand_node = Rc::clone(&right_hand);
-    let right_hand = Hand::new(right_hand);
+//     let right_hand_node = Rc::clone(&right_hand);
+//     let right_hand = Hand::new(right_hand);
 
-    app_nodes.push(left_hand_node);
-    app_nodes.push(right_hand_node);
+//     app_nodes.push(left_hand_node);
+//     app_nodes.push(right_hand_node);
 
-    Ok((left_hand, right_hand))
-}
+//     Ok((left_hand, right_hand))
+// }
 
 #[cfg(not(target_os = "android"))]
 pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
