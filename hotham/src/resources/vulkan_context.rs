@@ -44,7 +44,6 @@ impl Drop for VulkanContext {
 }
 
 impl VulkanContext {
-    #[cfg(test)]
     pub fn testing() -> Result<Self> {
         let (instance, entry) = vulkan_init_test()?;
         let physical_device = get_test_physical_device(&instance);
@@ -593,7 +592,7 @@ impl VulkanContext {
     pub fn create_mesh_descriptor_set(
         &self,
         set_layout: vk::DescriptorSetLayout,
-        skin_buffer: &Buffer<Matrix4<f32>>,
+        storage_buffer: &Buffer<Matrix4<f32>>,
         base_color_texture: &Texture,
         normal_texture: &Texture,
     ) -> VkResult<Vec<vk::DescriptorSet>> {
@@ -608,43 +607,63 @@ impl VulkanContext {
         println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
 
         let ssbo_info = vk::DescriptorBufferInfo::builder()
-            .buffer(skin_buffer.handle)
+            .buffer(storage_buffer.handle)
             .offset(0)
-            .range(skin_buffer.size as _)
+            .range(storage_buffer.size as _)
             .build();
 
+        let ssbo_info = [ssbo_info];
         let ssbo = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_sets[0])
             .dst_binding(0)
             .dst_array_element(0)
             .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .buffer_info(&[ssbo_info])
-            .build();
+            .buffer_info(&ssbo_info);
 
+        let base_color_info = [base_color_texture.descriptor];
         let base_color_texture_sampler = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_sets[0])
             .dst_binding(1)
             .dst_array_element(0)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&[base_color_texture.descriptor])
-            .build();
+            .image_info(&base_color_info);
 
+        let normal_texture_info = [normal_texture.descriptor];
         let normal_texture_sampler = vk::WriteDescriptorSet::builder()
             .dst_set(descriptor_sets[0])
             .dst_binding(2)
             .dst_array_element(0)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&[normal_texture.descriptor])
-            .build();
+            .image_info(&normal_texture_info);
 
-        unsafe {
-            self.device.update_descriptor_sets(
-                &[ssbo, base_color_texture_sampler, normal_texture_sampler],
-                &[],
-            )
-        };
+        let writes = [*ssbo, *base_color_texture_sampler, *normal_texture_sampler];
+        unsafe { self.device.update_descriptor_sets(&writes, &[]) };
 
         Ok(descriptor_sets)
+    }
+
+    pub fn update_buffer_descriptor_set<T>(
+        &self,
+        buffer: &Buffer<T>,
+        descriptor_set: vk::DescriptorSet,
+        binding: usize,
+        descriptor_type: vk::DescriptorType,
+    ) -> () {
+        let buffer_info = vk::DescriptorBufferInfo::builder()
+            .buffer(buffer.handle)
+            .offset(0)
+            .range(buffer.size as _)
+            .build();
+
+        let buffer = vk::WriteDescriptorSet::builder()
+            .dst_set(descriptor_set)
+            .dst_binding(binding as _)
+            .dst_array_element(0)
+            .descriptor_type(descriptor_type)
+            .buffer_info(&[buffer_info])
+            .build();
+
+        unsafe { self.device.update_descriptor_sets(&[buffer], &[]) };
     }
 
     pub fn create_scene_data_descriptor_sets(
@@ -807,7 +826,6 @@ fn vulkan_init_legacy(
     Ok((instance, entry))
 }
 
-#[cfg(test)]
 fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
     use std::ffi::CString;
 
@@ -951,7 +969,6 @@ fn get_stage(
     panic!("Invalid layout transition!");
 }
 
-#[cfg(test)]
 pub fn get_test_physical_device(instance: &AshInstance) -> vk::PhysicalDevice {
     unsafe {
         println!("[HOTHAM_VULKAN] Getting physical device..");

@@ -47,11 +47,7 @@ pub(crate) fn end_frame(_world: &mut World, resources: &mut Resources) {
         },
     };
 
-    let display_time = xr_context
-        .frame_state
-        .as_ref()
-        .unwrap()
-        .predicted_display_time;
+    let display_time = xr_context.frame_state.predicted_display_time;
 
     let views = [
         xr::CompositionLayerProjectionView::new()

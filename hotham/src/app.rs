@@ -3,8 +3,8 @@ use crate::{
     resources::{RenderContext, XrContext},
     schedule_functions::{begin_frame, end_frame},
     systems::{
-        rendering_system, skinning_system, update_parent_transform_matrix_system,
-        update_transform_matrix_system,
+        animation_system, hands_system, rendering_system, skinning_system,
+        update_parent_transform_matrix_system, update_transform_matrix_system,
     },
     HothamResult, Program,
 };
@@ -53,10 +53,9 @@ where
         let (xr_context, vulkan_context) = XrContext::new()?;
         let render_context = RenderContext::new(&vulkan_context, &xr_context)?;
         println!("[HOTHAM_INIT] Loading models..");
-        let (gltf_bytes, buffers) = program.get_gltf_data();
+        let gltf_data = program.get_gltf_data();
         let models = load_models_from_gltf(
-            gltf_bytes,
-            &[buffers],
+            gltf_data,
             &vulkan_context,
             render_context.descriptor_set_layouts.mesh_layout,
         )?;
@@ -71,10 +70,12 @@ where
         println!("[HOTHAM_INIT] Creating schedule..");
         let schedule = Schedule::builder()
             .add_thread_local_fn(begin_frame)
-            .add_system(rendering_system())
+            .add_system(hands_system())
+            .add_system(animation_system())
             .add_system(update_transform_matrix_system())
             .add_system(update_parent_transform_matrix_system())
             .add_system(skinning_system())
+            .add_system(rendering_system())
             .add_thread_local_fn(end_frame)
             .build();
         println!("[HOTHAM_INIT] DONE! INIT COMPLETE!");
@@ -99,11 +100,13 @@ where
                 .map_err(anyhow::Error::new)?;
         }
 
+        let mut event_buffer = Default::default();
+
         while !self.should_quit.load(Ordering::Relaxed) {
             #[cfg(target_os = "android")]
             self.process_android_events();
             let mut xr_context = self.resources.get_mut::<XrContext>().unwrap();
-            let current_state = xr_context.poll_xr_event()?;
+            let current_state = xr_context.poll_xr_event(&mut event_buffer)?;
 
             if current_state == SessionState::IDLE {
                 sleep(Duration::from_secs(1));

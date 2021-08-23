@@ -13,7 +13,7 @@ shaderc = "0.7"
 [dependencies]
 anyhow = "1.0"
 ash = "0.32"
-cgmath = {version = "0.18", features = ["mint"]}
+cgmath = {version = "0.18", features = ["mint", "serde"]}
 console = "0.14"
 ctrlc = {version = "3", features = ["termination"]}
 gltf = "0.16"
@@ -25,6 +25,8 @@ memoffset = "0.5.1"
 mint = "0.5.6"
 openxr = {features = ["loaded", "mint"], path = "../../openxrs/openxr"}
 rand = "0.8"
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
 thiserror = "1.0"
 winit = "0.24"
 
@@ -37,6 +39,10 @@ ndk-glue = "0.3"
 features = ["html_reports"]
 version = "0.3"
 
+# [[bench]]
+# harness = false
+# name = "model_loading"
+
 [[bench]]
 harness = false
-name = "model_loading"
+name = "transform_system"

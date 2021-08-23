@@ -34,9 +34,10 @@ pub(crate) fn begin_frame(_world: &mut World, resources: &mut Resources) {
         .unwrap();
 
     // Wait for a frame to become available from the runtime
+    // TODO: Push current_swapchain_image_index into RenderContext
     let (frame_state, available_swapchain_image_index) = xr_context.begin_frame().unwrap();
     (*current_swapchain_image_index) = available_swapchain_image_index;
-    xr_context.frame_state = Some(frame_state);
+    xr_context.frame_state = frame_state;
 
     let (_, views) = xr_context
         .session

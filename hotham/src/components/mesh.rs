@@ -13,21 +13,22 @@ use std::{
 #[cfg(target_os = "android")]
 use std::io::Cursor;
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Mesh {
     pub descriptor_sets: [vk::DescriptorSet; 1],
     pub(crate) index_buffer: Buffer<u32>,
     pub(crate) vertex_buffer: Buffer<Vertex>,
+    pub(crate) storage_buffer: Buffer<Matrix4<f32>>,
     pub num_indices: u32,
 }
 
 impl Mesh {
     pub(crate) fn load(
         mesh_data: &gltf::Mesh,
-        buffers: &[&[u8]],
+        buffer: &[u8],
         vulkan_context: &VulkanContext,
         mesh_descriptor_set_layout: vk::DescriptorSetLayout,
-        skin_buffer: &Buffer<Matrix4<f32>>,
+        empty_storage_buffer: &Buffer<Matrix4<f32>>,
     ) -> Result<Mesh> {
         let name = mesh_data.name().unwrap_or("");
         let mut indices = Vec::new();
@@ -42,7 +43,7 @@ impl Mesh {
         let mut base_color_texture = None;
 
         for primitive in mesh_data.primitives() {
-            let reader = primitive.reader(|buffer| Some(&buffers[buffer.index()]));
+            let reader = primitive.reader(|_| Some(buffer));
 
             for v in reader
                 .read_positions()
@@ -192,7 +193,7 @@ impl Mesh {
         println!("[HOTHAM_MODEL] Creating descriptor sets for {}", name);
         let descriptor_sets = vulkan_context.create_mesh_descriptor_set(
             mesh_descriptor_set_layout,
-            &skin_buffer,
+            &empty_storage_buffer,
             &base_color_texture.unwrap(),
             &normal_texture.unwrap(),
         )?;
@@ -202,6 +203,7 @@ impl Mesh {
         Ok(Mesh {
             vertex_buffer,
             index_buffer,
+            storage_buffer: empty_storage_buffer.clone(),
             descriptor_sets,
             num_indices: indices.len() as u32,
         })
