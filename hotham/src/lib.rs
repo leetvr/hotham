@@ -1,18 +1,16 @@
 use anyhow::anyhow;
 use ash::vk;
-use components::{Mesh, Transform, TransformMatrix};
 pub use legion;
-use legion::{any, world::Duplicate, Entity, IntoQuery, World};
+use legion::World;
 use openxr as xr;
 use std::{collections::HashMap, io::Seek};
 
 pub use app::App;
+pub use gltf_loader::add_model_to_world;
 pub use hotham_error::HothamError;
 pub use kira::sound::Sound;
 pub use scene_data::SceneData;
 pub use vertex::Vertex;
-
-use crate::components::{Joint, Parent, Skin};
 
 // mod animation;
 mod app;
@@ -30,7 +28,7 @@ mod schedule_functions;
 mod swapchain;
 pub mod systems;
 mod texture;
-mod util;
+pub mod util;
 mod vertex;
 
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
@@ -48,39 +46,8 @@ pub const TEXTURE_FORMAT: vk::Format = vk::Format::BC7_SRGB_BLOCK;
 pub const TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
 
 pub trait Program {
-    fn get_gltf_data(&self) -> (&[u8], &[u8]);
+    fn get_gltf_data(&self) -> Vec<(&[u8], &[u8])>;
     fn init(&mut self, models: HashMap<String, World>) -> HothamResult<World>;
-}
-
-pub fn add_model_to_world(
-    name: &str,
-    models: &HashMap<String, World>,
-    world: &mut World,
-    parent: Option<Entity>,
-) -> Option<Entity> {
-    let mut merger = Duplicate::default();
-    merger.register_copy::<Transform>();
-    merger.register_copy::<Mesh>();
-    merger.register_copy::<TransformMatrix>();
-    merger.register_clone::<Skin>();
-    merger.register_copy::<Joint>();
-    merger.register_copy::<Parent>();
-
-    let source = models.get(name)?;
-    let mut query = <&Mesh>::query();
-    let (parent_entity, _) = query
-        .iter_chunks(source)
-        .next()?
-        .into_iter_entities()
-        .next()?;
-    let entities = world.clone_from(source, &any(), &mut merger);
-    let new_parent = entities.get(&parent_entity).cloned()?;
-    if let Some(parent) = parent {
-        let mut entity = world.entry(new_parent).unwrap();
-        entity.add_component(Parent(parent));
-    }
-
-    Some(new_parent)
 }
 
 pub fn read_spv_from_bytes<R: std::io::Read + Seek>(bytes: &mut R) -> std::io::Result<Vec<u32>> {

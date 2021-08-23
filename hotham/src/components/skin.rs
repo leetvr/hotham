@@ -1,8 +1,5 @@
-use crate::buffer::Buffer;
-use cgmath::Matrix4;
-
+// Empty struct, used as a "tag" to indicate this mesh has a skin.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Skin {
-    pub joint_matrices: Vec<Matrix4<f32>>,
-    pub(crate) buffer: Buffer<Matrix4<f32>>,
+    pub joint_ids: Vec<usize>,
 }

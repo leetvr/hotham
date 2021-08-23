@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use ash::{
     version::InstanceV1_0,
     vk::{self, Handle},
@@ -8,8 +8,8 @@ use openxr::{
     SessionState, Space, Swapchain, VulkanLegacy,
 };
 use xr::{
-    vulkan_legacy::SessionCreateInfo, FrameState, ReferenceSpaceType, SwapchainCreateFlags,
-    SwapchainCreateInfo, SwapchainUsageFlags, View,
+    vulkan_legacy::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType,
+    SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View,
 };
 
 use crate::{resources::VulkanContext, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
@@ -28,10 +28,9 @@ pub struct XrContext {
     pub right_hand_space: Space,
     pub right_hand_subaction_path: Path,
     pub swapchain_resolution: vk::Extent2D,
-    pub event_buffer: EventDataBuffer,
     pub frame_waiter: FrameWaiter,
     pub frame_stream: FrameStream<VulkanLegacy>,
-    pub frame_state: Option<FrameState>,
+    pub frame_state: FrameState,
     pub views: Vec<View>,
 }
 
@@ -40,7 +39,7 @@ impl XrContext {
         let (instance, system) = create_xr_instance()?;
         let vulkan_context = create_vulkan_context(&instance, system)?;
         let (session, frame_waiter, frame_stream) =
-            create_xr_session(&instance, system, &vulkan_context)?; // TODO: Extract to XRContext
+            create_xr_session(&instance, system, &vulkan_context)?;
         let reference_space =
             session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&instance, system)?;
@@ -98,6 +97,12 @@ impl XrContext {
             Posef::IDENTITY,
         )?;
 
+        let frame_state = FrameState {
+            predicted_display_time: Time::from_nanos(0),
+            predicted_display_period: Duration::from_nanos(0),
+            should_render: false,
+        };
+
         // Attach the action set to the session
         session.attach_action_sets(&[&action_set])?;
         let xr_context = XrContext {
@@ -114,19 +119,21 @@ impl XrContext {
             right_hand_space,
             right_hand_subaction_path,
             swapchain_resolution,
-            event_buffer: Default::default(),
             frame_waiter,
             frame_stream,
-            frame_state: None,
+            frame_state,
             views: Vec::new(),
         };
 
         Ok((xr_context, vulkan_context))
     }
 
-    pub(crate) fn poll_xr_event(&mut self) -> Result<SessionState> {
+    pub(crate) fn poll_xr_event(
+        &mut self,
+        event_buffer: &mut EventDataBuffer,
+    ) -> Result<SessionState> {
         loop {
-            match self.instance.poll_event(&mut self.event_buffer)? {
+            match self.instance.poll_event(event_buffer)? {
                 Some(xr::Event::SessionStateChanged(session_changed)) => {
                     let new_state = session_changed.state();
 
@@ -269,6 +276,8 @@ pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId
 
 #[cfg(target_os = "android")]
 fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
+    use anyhow::anyhow;
+
     use openxr::sys::{InstanceCreateInfoAndroidKHR, LoaderInitInfoAndroidKHR};
     use std::{ffi::CStr, intrinsics::transmute, ptr::null};
     use xr::sys::pfn::InitializeLoaderKHR;
