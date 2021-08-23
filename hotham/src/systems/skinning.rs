@@ -64,12 +64,10 @@ mod tests {
     use crate::{
         add_model_to_world,
         buffer::Buffer,
-        components::{skin, Joint, Parent, Skin, Transform},
+        components::{Joint, Parent, Skin},
         gltf_loader::load_models_from_gltf,
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
-        systems::{
-            skinning_system, update_parent_transform_matrix_system, update_transform_matrix_system,
-        },
+        systems::skinning_system,
         Vertex,
     };
 
