@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
-use legion::World;
+use legion::{Entity, World};
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 use cgmath::{vec3, Deg, Euler, Quaternion};
@@ -74,6 +74,13 @@ pub fn get_world_with_hands() -> World {
     }
 
     world
+}
+
+pub fn entity_to_u64(entity: Entity) -> u64 {
+    unsafe { std::mem::transmute(entity) }
+}
+pub fn u64_to_entity(entity: u64) -> Entity {
+    unsafe { std::mem::transmute(entity) }
 }
 
 #[cfg(target_os = "android")]

@@ -15,6 +15,7 @@ anyhow = "1.0"
 ash = "0.32"
 cgmath = {version = "0.18", features = ["mint", "serde"]}
 console = "0.14"
+crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 gltf = "0.16"
 itertools = "0.10.0"
@@ -25,6 +26,7 @@ memoffset = "0.5.1"
 mint = "0.5.6"
 openxr = {features = ["loaded", "mint"], path = "../../openxrs/openxr"}
 rand = "0.8"
+rapier3d = "0.11"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 thiserror = "1.0"
