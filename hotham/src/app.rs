@@ -59,12 +59,12 @@ where
             &vulkan_context,
             render_context.descriptor_set_layouts.mesh_layout,
         )?;
-        let world = program.init(models)?;
         let mut resources = Resources::default();
         resources.insert(xr_context);
         resources.insert(vulkan_context);
         resources.insert(render_context);
         resources.insert(0 as usize);
+        let world = program.init(models, &mut resources)?;
         println!("[HOTHAM_INIT] ..done!");
 
         println!("[HOTHAM_INIT] Creating schedule..");

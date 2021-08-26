@@ -1,6 +1,9 @@
 use crossbeam::channel::Receiver;
+use legion::Entity;
 use rapier3d::na::Matrix3x1;
 use rapier3d::prelude::*;
+
+use crate::util::entity_to_u64;
 
 pub struct PhysicsContext {
     pub physics_pipeline: PhysicsPipeline,
@@ -64,5 +67,24 @@ impl PhysicsContext {
             &(),
             &self.event_handler,
         );
+    }
+
+    pub fn add_rigid_body_and_collider(
+        &mut self,
+        entity: Entity,
+        rigid_body: RigidBody,
+        mut collider: Collider,
+    ) -> crate::components::Collider {
+        collider.user_data = entity_to_u64(entity) as _;
+        let rigid_body_handle = self.rigid_bodies.insert(rigid_body);
+
+        let a_collider_handle =
+            self.colliders
+                .insert_with_parent(collider, rigid_body_handle, &mut self.rigid_bodies);
+
+        crate::components::Collider {
+            collisions_this_frame: vec![],
+            handle: a_collider_handle,
+        }
     }
 }
