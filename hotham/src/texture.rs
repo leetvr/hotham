@@ -4,14 +4,14 @@ use ash::vk::{self};
 use crate::{image::Image, resources::VulkanContext};
 
 #[derive(Debug, Clone)]
-pub(crate) struct Texture {
+pub struct Texture {
     pub image: Image,
     pub sampler: vk::Sampler,
     pub descriptor: vk::DescriptorImageInfo,
 }
 
 impl Texture {
-    pub(crate) fn new(
+    pub fn new(
         vulkan_context: &VulkanContext,
         image_buf: &Vec<u8>,
         width: u32,
