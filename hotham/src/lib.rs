@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use ash::vk;
 pub use legion;
-use legion::World;
+use legion::{Resources, World};
 use openxr as xr;
 use std::{collections::HashMap, io::Seek};
 
@@ -9,6 +9,7 @@ pub use app::App;
 pub use gltf_loader::add_model_to_world;
 pub use hotham_error::HothamError;
 pub use kira::sound::Sound;
+pub use rapier3d;
 pub use scene_data::SceneData;
 pub use vertex::Vertex;
 
@@ -22,7 +23,7 @@ mod gltf_loader;
 mod hand;
 mod hotham_error;
 mod image;
-mod resources;
+pub mod resources;
 mod scene_data;
 mod schedule_functions;
 mod swapchain;
@@ -47,7 +48,11 @@ pub const TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
 
 pub trait Program {
     fn get_gltf_data(&self) -> Vec<(&[u8], &[u8])>;
-    fn init(&mut self, models: HashMap<String, World>) -> HothamResult<World>;
+    fn init(
+        &mut self,
+        models: HashMap<String, World>,
+        resources: &mut Resources,
+    ) -> HothamResult<World>;
 }
 
 pub fn read_spv_from_bytes<R: std::io::Read + Seek>(bytes: &mut R) -> std::io::Result<Vec<u32>> {
