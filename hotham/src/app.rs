@@ -1,10 +1,11 @@
 use crate::{
     gltf_loader::load_models_from_gltf,
-    resources::{RenderContext, XrContext},
-    schedule_functions::{begin_frame, end_frame},
+    resources::{PhysicsContext, RenderContext, XrContext},
+    schedule_functions::{begin_frame, end_frame, physics_step},
     systems::{
-        animation_system, hands_system, rendering_system, skinning_system,
-        update_parent_transform_matrix_system, update_transform_matrix_system,
+        animation_system, collision_system, grabbing_system, hands_system, rendering_system,
+        skinning_system, update_parent_transform_matrix_system,
+        update_rigid_body_transforms_system, update_transform_matrix_system,
     },
     HothamResult, Program,
 };
@@ -52,6 +53,7 @@ where
     pub fn new(mut program: P) -> HothamResult<Self> {
         let (xr_context, vulkan_context) = XrContext::new()?;
         let render_context = RenderContext::new(&vulkan_context, &xr_context)?;
+        let physics_context = PhysicsContext::default();
         println!("[HOTHAM_INIT] Loading models..");
         let gltf_data = program.get_gltf_data();
         let models = load_models_from_gltf(
@@ -63,6 +65,7 @@ where
         resources.insert(xr_context);
         resources.insert(vulkan_context);
         resources.insert(render_context);
+        resources.insert(physics_context);
         resources.insert(0 as usize);
         let world = program.init(models, &mut resources)?;
         println!("[HOTHAM_INIT] ..done!");
@@ -71,6 +74,10 @@ where
         let schedule = Schedule::builder()
             .add_thread_local_fn(begin_frame)
             .add_system(hands_system())
+            .add_system(collision_system())
+            .add_system(grabbing_system())
+            .add_thread_local_fn(physics_step)
+            .add_system(update_rigid_body_transforms_system())
             .add_system(animation_system())
             .add_system(update_transform_matrix_system())
             .add_system(update_parent_transform_matrix_system())

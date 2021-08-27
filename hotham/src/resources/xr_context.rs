@@ -12,7 +12,7 @@ use xr::{
     SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View,
 };
 
-use crate::{resources::VulkanContext, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
+use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
 
 pub struct XrContext {
     pub instance: openxr::Instance,
@@ -171,6 +171,49 @@ impl XrContext {
         self.swapchain.wait_image(openxr::Duration::INFINITE)?;
 
         Ok((frame_state, image_index as _))
+    }
+
+    pub fn end_frame(&mut self) -> std::result::Result<(), openxr::sys::Result> {
+        // Submit the image to OpenXR
+        self.swapchain.release_image().unwrap();
+
+        let rect = xr::Rect2Di {
+            offset: xr::Offset2Di { x: 0, y: 0 },
+            extent: xr::Extent2Di {
+                width: self.swapchain_resolution.width as _,
+                height: self.swapchain_resolution.height as _,
+            },
+        };
+
+        let display_time = self.frame_state.predicted_display_time;
+
+        let views = [
+            xr::CompositionLayerProjectionView::new()
+                .pose(self.views[0].pose)
+                .fov(self.views[0].fov)
+                .sub_image(
+                    xr::SwapchainSubImage::new()
+                        .swapchain(&self.swapchain)
+                        .image_array_index(0)
+                        .image_rect(rect),
+                ),
+            xr::CompositionLayerProjectionView::new()
+                .pose(self.views[1].pose)
+                .fov(self.views[1].fov)
+                .sub_image(
+                    xr::SwapchainSubImage::new()
+                        .swapchain(&self.swapchain)
+                        .image_array_index(1)
+                        .image_rect(rect),
+                ),
+        ];
+
+        let layer_projection = xr::CompositionLayerProjection::new()
+            .space(&self.reference_space)
+            .views(&views);
+
+        let layers = [&*layer_projection];
+        self.frame_stream.end(display_time, BLEND_MODE, &layers)
     }
 }
 

@@ -8,7 +8,7 @@ use hotham::{
     rapier3d::{
         na as nalgebra,
         na::vector,
-        prelude::{ColliderBuilder, RigidBodyBuilder},
+        prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     },
     resources::PhysicsContext,
     HothamResult as Result, Program,
@@ -38,13 +38,17 @@ impl Program for Asteroid {
             asteroid_transform.scale = vec3(0.1, 0.1, 0.1);
 
             // Give it a collider and rigid-body
-            let collider = ColliderBuilder::ball(0.25).build();
+            let collider = ColliderBuilder::ball(0.25)
+                .active_collision_types(ActiveCollisionTypes::all())
+                .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+                .build();
             let rigid_body = RigidBodyBuilder::new_dynamic()
                 .translation(vector![0.0, 1.0, 0.0])
                 .build();
-            let collider =
+            let (collider, rigid_body) =
                 physics_context.add_rigid_body_and_collider(asteroid, rigid_body, collider);
             asteroid_entry.add_component(collider);
+            asteroid_entry.add_component(rigid_body);
         }
 
         // Add the refinery model
@@ -53,43 +57,53 @@ impl Program for Asteroid {
         // Add the left hand
         let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
         {
-            let mut left_hand_entity = world.entry(left_hand).unwrap();
+            let mut left_hand_entry = world.entry(left_hand).unwrap();
 
             // Add a hand component
-            left_hand_entity.add_component(Hand::left());
+            left_hand_entry.add_component(Hand::left());
 
             // Modify the animation controller
-            let animation_controller = left_hand_entity
+            let animation_controller = left_hand_entry
                 .get_component_mut::<AnimationController>()
                 .unwrap();
             animation_controller.blend_from = 0;
             animation_controller.blend_to = 1;
 
             // Give it a collider and rigid-body
-            let collider = ColliderBuilder::capsule_y(0.05, 0.02).build();
-            let rigid_body = RigidBodyBuilder::new_dynamic().build();
-            let collider =
-                physics_context.add_rigid_body_and_collider(asteroid, rigid_body, collider);
-            left_hand_entity.add_component(collider);
+            let collider = ColliderBuilder::capsule_y(0.05, 0.02)
+                .sensor(true)
+                .active_collision_types(ActiveCollisionTypes::all())
+                .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+                .build();
+            let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
+            let (collider, rigid_body) =
+                physics_context.add_rigid_body_and_collider(left_hand, rigid_body, collider);
+            left_hand_entry.add_component(collider);
+            left_hand_entry.add_component(rigid_body);
         }
 
         // Add the right hand
         let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
         {
-            let mut right_hand_entity = world.entry(right_hand).unwrap();
-            right_hand_entity.add_component(Hand::right());
-            let animation_controller = right_hand_entity
+            let mut right_hand_entry = world.entry(right_hand).unwrap();
+            right_hand_entry.add_component(Hand::right());
+            let animation_controller = right_hand_entry
                 .get_component_mut::<AnimationController>()
                 .unwrap();
             animation_controller.blend_from = 0;
             animation_controller.blend_to = 1;
 
             // Give it a collider and rigid-body
-            let collider = ColliderBuilder::capsule_y(0.05, 0.02).build();
-            let rigid_body = RigidBodyBuilder::new_dynamic().build();
-            let collider =
-                physics_context.add_rigid_body_and_collider(asteroid, rigid_body, collider);
-            right_hand_entity.add_component(collider);
+            let collider = ColliderBuilder::capsule_y(0.05, 0.02)
+                .sensor(true)
+                .active_collision_types(ActiveCollisionTypes::all())
+                .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+                .build();
+            let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
+            let (collider, rigid_body) =
+                physics_context.add_rigid_body_and_collider(right_hand, rigid_body, collider);
+            right_hand_entry.add_component(collider);
+            right_hand_entry.add_component(rigid_body);
         }
 
         // let hello = load_sound("hello.ogg")?;
