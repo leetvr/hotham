@@ -1,9 +1,8 @@
 use std::time::Instant;
 
-use crate::{resources::RenderContext, resources::VulkanContext, resources::XrContext, BLEND_MODE};
+use crate::{resources::RenderContext, resources::VulkanContext, resources::XrContext};
 use ash::{version::DeviceV1_0, vk};
 use legion::{Resources, World};
-use openxr as xr;
 
 pub(crate) fn end_frame(_world: &mut World, resources: &mut Resources) {
     // Get resources
@@ -35,52 +34,7 @@ pub(crate) fn end_frame(_world: &mut World, resources: &mut Resources) {
     }
 
     render_context.last_frame_time = Instant::now();
-
-    // Submit the image to OpenXR
-    xr_context.swapchain.release_image().unwrap();
-
-    let rect = xr::Rect2Di {
-        offset: xr::Offset2Di { x: 0, y: 0 },
-        extent: xr::Extent2Di {
-            width: xr_context.swapchain_resolution.width as _,
-            height: xr_context.swapchain_resolution.height as _,
-        },
-    };
-
-    let display_time = xr_context.frame_state.predicted_display_time;
-
-    let views = [
-        xr::CompositionLayerProjectionView::new()
-            .pose(xr_context.views[0].pose)
-            .fov(xr_context.views[0].fov)
-            .sub_image(
-                xr::SwapchainSubImage::new()
-                    .swapchain(&xr_context.swapchain)
-                    .image_array_index(0)
-                    .image_rect(rect),
-            ),
-        xr::CompositionLayerProjectionView::new()
-            .pose(xr_context.views[1].pose)
-            .fov(xr_context.views[1].fov)
-            .sub_image(
-                xr::SwapchainSubImage::new()
-                    .swapchain(&xr_context.swapchain)
-                    .image_array_index(1)
-                    .image_rect(rect),
-            ),
-    ];
-
-    let layer_projection = xr::CompositionLayerProjection::new()
-        .space(&xr_context.reference_space)
-        .views(&views);
-
-    // Annoying but necessary due to lifetimes on xr_context.
-    let projection = unsafe { std::mem::transmute(&layer_projection.into_raw()) };
-
-    xr_context
-        .frame_stream
-        .end(display_time, BLEND_MODE, &[projection])
-        .unwrap();
+    xr_context.end_frame().unwrap();
 }
 
 #[cfg(test)]

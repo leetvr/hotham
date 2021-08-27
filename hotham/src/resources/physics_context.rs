@@ -1,6 +1,10 @@
 use crossbeam::channel::Receiver;
+use legion::Entity;
 use rapier3d::na::Matrix3x1;
 use rapier3d::prelude::*;
+
+use crate::components::{Collider as ColliderComponent, RigidBody as RigidBodyComponent};
+use crate::util::entity_to_u64;
 
 pub struct PhysicsContext {
     pub physics_pipeline: PhysicsPipeline,
@@ -24,7 +28,7 @@ impl Default for PhysicsContext {
         let (contact_send, contact_recv) = crossbeam::channel::unbounded();
         let (intersection_send, intersection_recv) = crossbeam::channel::unbounded();
         let event_handler = ChannelEventCollector::new(intersection_send, contact_send);
-        let gravity: Matrix3x1<f32> = vector![0.0, -9.81, 0.0];
+        let gravity: Matrix3x1<f32> = vector![0.0, 0.0, 0.0]; // no gravity in SPACE baby!
         let integration_parameters = IntegrationParameters::default();
         let physics_pipeline = PhysicsPipeline::new();
         let joint_set = JointSet::new();
@@ -64,5 +68,29 @@ impl PhysicsContext {
             &(),
             &self.event_handler,
         );
+    }
+
+    pub fn add_rigid_body_and_collider(
+        &mut self,
+        entity: Entity,
+        rigid_body: RigidBody,
+        mut collider: Collider,
+    ) -> (RigidBodyComponent, ColliderComponent) {
+        collider.user_data = entity_to_u64(entity) as _;
+        let rigid_body_handle = self.rigid_bodies.insert(rigid_body);
+
+        let a_collider_handle =
+            self.colliders
+                .insert_with_parent(collider, rigid_body_handle, &mut self.rigid_bodies);
+
+        let collider_component = ColliderComponent {
+            collisions_this_frame: vec![],
+            handle: a_collider_handle,
+        };
+        let rigid_body_component = RigidBodyComponent {
+            handle: rigid_body_handle,
+        };
+
+        (rigid_body_component, collider_component)
     }
 }

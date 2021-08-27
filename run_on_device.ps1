@@ -2,7 +2,7 @@ ${env:RUST_BACKTRACE} = 1
 adb shell am force-stop rust.hotham_asteroid
 
 Set-Location hotham-asteroid
-cargo apk run
+cargo apk run --release
 
 if ($?) {
     Start-Sleep -Seconds 2

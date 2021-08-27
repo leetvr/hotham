@@ -20,7 +20,7 @@ use std::{fmt::Debug, intrinsics::transmute, mem::size_of, ptr::copy};
 type XrVulkan = xr::VulkanLegacy;
 
 #[derive(Clone)]
-pub(crate) struct VulkanContext {
+pub struct VulkanContext {
     pub entry: Entry,
     pub instance: AshInstance,
     pub physical_device: vk::PhysicalDevice,
