@@ -25,7 +25,7 @@ libktx-rs = "0.2"
 memoffset = "0.5.1"
 mint = "0.5.6"
 nalgebra = {features = ["convert-mint"], version = "0.29.0"}
-openxr = {features = ["loaded", "mint"], path = "../../openxrs/openxr"}
+openxr = {features = ["loaded", "mint"], git = "https://github.com/Ralith/openxrs", rev = "8c23c05ce8395a58910d0e90ce6ac799b1013083"}
 rand = "0.8"
 rapier3d = "0.11"
 serde = {version = "1.0", features = ["derive"]}

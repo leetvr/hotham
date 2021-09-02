@@ -1,6 +1,5 @@
 use ash::{
     extensions::khr,
-    version::{DeviceV1_0, InstanceV1_0},
     vk::{self, Handle, SwapchainKHR},
     Device, Entry as AshEntry, Instance as AshInstance,
 };

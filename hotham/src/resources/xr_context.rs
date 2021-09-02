@@ -5,20 +5,20 @@ use ash::{
 };
 use openxr::{
     self as xr, Action, ActionSet, EventDataBuffer, FrameStream, FrameWaiter, Path, Posef, Session,
-    SessionState, Space, Swapchain, VulkanLegacy,
+    SessionState, Space, Swapchain, Vulkan,
 };
 use xr::{
-    vulkan_legacy::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType,
-    SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View,
+    vulkan::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType, SwapchainCreateFlags,
+    SwapchainCreateInfo, SwapchainUsageFlags, Time, View,
 };
 
 use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
 
 pub struct XrContext {
     pub instance: openxr::Instance,
-    pub session: Session<VulkanLegacy>,
+    pub session: Session<Vulkan>,
     pub session_state: SessionState,
-    pub swapchain: Swapchain<VulkanLegacy>,
+    pub swapchain: Swapchain<Vulkan>,
     pub reference_space: Space,
     pub action_set: ActionSet,
     pub pose_action: Action<Posef>,
@@ -29,7 +29,7 @@ pub struct XrContext {
     pub right_hand_subaction_path: Path,
     pub swapchain_resolution: vk::Extent2D,
     pub frame_waiter: FrameWaiter,
-    pub frame_stream: FrameStream<VulkanLegacy>,
+    pub frame_stream: FrameStream<Vulkan>,
     pub frame_state: FrameState,
     pub views: Vec<View>,
 }
@@ -252,10 +252,10 @@ pub(crate) fn get_swapchain_resolution(
 }
 
 pub(crate) fn create_xr_swapchain(
-    xr_session: &Session<VulkanLegacy>,
+    xr_session: &Session<Vulkan>,
     resolution: &vk::Extent2D,
     array_size: u32,
-) -> Result<Swapchain<VulkanLegacy>> {
+) -> Result<Swapchain<Vulkan>> {
     xr_session
         .create_swapchain(&SwapchainCreateInfo {
             create_flags: SwapchainCreateFlags::EMPTY,
@@ -275,11 +275,7 @@ pub(crate) fn create_xr_session(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
     vulkan_context: &VulkanContext,
-) -> Result<(
-    Session<VulkanLegacy>,
-    FrameWaiter,
-    FrameStream<VulkanLegacy>,
-)> {
+) -> Result<(Session<Vulkan>, FrameWaiter, FrameStream<Vulkan>)> {
     println!("[HOTHAM] Creating session..");
     Ok(unsafe {
         xr_instance.create_session(
