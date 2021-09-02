@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ash::vk::{self, Handle};
-use openxr::{Swapchain as SwapchainHandle, VulkanLegacy};
+use openxr::{Swapchain as SwapchainHandle, Vulkan};
 
 pub struct Swapchain {
     pub resolution: vk::Extent2D,
@@ -8,10 +8,7 @@ pub struct Swapchain {
 }
 
 impl Swapchain {
-    pub(crate) fn new(
-        handle: &SwapchainHandle<VulkanLegacy>,
-        resolution: vk::Extent2D,
-    ) -> Result<Self> {
+    pub(crate) fn new(handle: &SwapchainHandle<Vulkan>, resolution: vk::Extent2D) -> Result<Self> {
         print!("[HOTHAM_INIT] Creating swapchain..");
 
         let images = handle
