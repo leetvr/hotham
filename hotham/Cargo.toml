@@ -13,7 +13,7 @@ shaderc = "0.7"
 [dependencies]
 anyhow = "1.0"
 approx = "0.5"
-ash = "0.32"
+ash = "0.33.2"
 console = "0.14"
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
