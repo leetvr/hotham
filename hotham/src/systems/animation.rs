@@ -1,4 +1,3 @@
-use cgmath::VectorSpace;
 use legion::{system, world::SubWorld, EntityStore};
 
 use crate::components::{animation_controller::AnimationController, AnimationTarget, Transform};
@@ -23,11 +22,11 @@ pub fn animation(
 
     transform.translation = transform_from
         .translation
-        .lerp(transform_to.translation, blend_amount);
+        .lerp(&transform_to.translation, blend_amount);
     transform.rotation = transform_from
         .rotation
-        .slerp(transform_to.rotation, blend_amount);
-    transform.scale = transform_from.scale.lerp(transform_to.scale, blend_amount);
+        .slerp(&transform_to.rotation, blend_amount);
+    transform.scale = transform_from.scale.lerp(&transform_to.scale, blend_amount);
 }
 
 #[cfg(test)]

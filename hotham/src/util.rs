@@ -2,9 +2,11 @@
 
 use anyhow::Result;
 use legion::{Entity, World};
+use nalgebra::{
+    vector, Isometry, Isometry3, Quaternion, Translation3, Unit, UnitQuaternion, Vector3,
+};
+use openxr::Posef;
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
-
-use cgmath::{vec3, Deg, Euler, Quaternion};
 
 use crate::{
     add_model_to_world,
@@ -34,12 +36,6 @@ pub(crate) unsafe fn parse_raw_string(
     return cstr.to_str();
 }
 
-pub(crate) fn to_euler_degrees(rotation: Quaternion<f32>) -> Euler<Deg<f32>> {
-    let euler = Euler::from(rotation);
-    let degrees = Euler::new(Deg::from(euler.x), Deg::from(euler.y), Deg::from(euler.z));
-    degrees
-}
-
 pub fn get_world_with_hands() -> World {
     let vulkan_context = VulkanContext::testing().unwrap();
     let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
@@ -63,14 +59,14 @@ pub fn get_world_with_hands() -> World {
     {
         let mut left_hand_entity = world.entry(left_hand).unwrap();
         let transform = left_hand_entity.get_component_mut::<Transform>().unwrap();
-        transform.translation = vec3(-0.2, 1.4, 0.0);
+        transform.translation = vector![-0.2, 1.4, 0.0];
     }
 
     let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
     {
         let mut right_hand_entity = world.entry(right_hand).unwrap();
         let transform = right_hand_entity.get_component_mut::<Transform>().unwrap();
-        transform.translation = vec3(0.2, 1.4, 0.0);
+        transform.translation = vector![0.2, 1.4, 0.0];
     }
 
     world
@@ -81,6 +77,17 @@ pub fn entity_to_u64(entity: Entity) -> u64 {
 }
 pub fn u64_to_entity(entity: u64) -> Entity {
     unsafe { std::mem::transmute(entity) }
+}
+
+pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
+    let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
+    let translation: Translation3<f32> = Translation3::from(translation);
+    let rotation: Quaternion<f32> = mint::Quaternion::from(pose.orientation).into();
+    let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
+    Isometry {
+        rotation,
+        translation,
+    }
 }
 
 #[cfg(target_os = "android")]

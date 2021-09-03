@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-
-use cgmath::vec3;
 use hotham::{
     add_model_to_world,
     components::{AnimationController, Hand, Transform},
@@ -13,6 +10,7 @@ use hotham::{
     resources::PhysicsContext,
     HothamResult as Result, Program,
 };
+use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Asteroid {}
@@ -35,7 +33,7 @@ impl Program for Asteroid {
         {
             let mut asteroid_entry = world.entry(asteroid).unwrap();
             let asteroid_transform = asteroid_entry.get_component_mut::<Transform>().unwrap();
-            asteroid_transform.scale = vec3(0.1, 0.1, 0.1);
+            asteroid_transform.scale = vector![0.1, 0.1, 0.1];
 
             // Give it a collider and rigid-body
             let collider = ColliderBuilder::ball(0.25)

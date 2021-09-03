@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::components::{Info, Parent, Root, TransformMatrix};
-use cgmath::Matrix4;
 use itertools::Itertools;
 use legion::{component, system, world::SubWorld, Entity, EntityStore, IntoQuery};
+use nalgebra::Matrix4;
 
 #[system]
 #[write_component(TransformMatrix)]
@@ -13,14 +13,12 @@ use legion::{component, system, world::SubWorld, Entity, EntityStore, IntoQuery}
 pub fn update_parent_transform_matrix(world: &mut SubWorld) -> () {
     // Build heirarchy.
     let mut heirarchy: HashMap<Entity, Vec<Entity>> = HashMap::new();
-    let mut query = <(&Parent, &Info)>::query();
+    let mut query = <&Parent>::query();
     query.for_each_chunk(world, |chunk| {
-        chunk
-            .into_iter_entities()
-            .for_each(|(entity, (parent, _))| {
-                let children = heirarchy.entry(parent.0).or_default();
-                children.push(entity);
-            });
+        chunk.into_iter_entities().for_each(|(entity, parent)| {
+            let children = heirarchy.entry(parent.0).or_default();
+            children.push(entity);
+        });
     });
 
     let mut query = Entity::query().filter(!component::<Parent>());
@@ -56,8 +54,9 @@ fn update_transform_matrix(
 mod tests {
     use std::collections::HashMap;
 
-    use cgmath::{assert_relative_eq, relative_eq, vec3, Matrix4};
+    use approx::{assert_relative_eq, relative_eq};
     use legion::{Entity, Schedule, World};
+    use nalgebra::vector;
 
     use crate::{
         components::{Info, Transform},
@@ -69,7 +68,7 @@ mod tests {
     pub fn test_transform_system() {
         let mut world = World::default();
         let parent_transform_matrix =
-            TransformMatrix(Matrix4::from_translation(vec3(1.0, 1.0, 1.0)));
+            TransformMatrix(Matrix4::new_translation(&vector![1.0, 1.0, 100.0]));
 
         let parent = world.push((parent_transform_matrix.clone(),));
         let child = world.push((parent_transform_matrix.clone(), Parent(parent)));
@@ -83,12 +82,12 @@ mod tests {
 
         let grandchild = world.entry(grandchild).unwrap();
         let transform_matrix = grandchild.get_component::<TransformMatrix>().unwrap();
-        let expected_matrix = get_expected_matrix(3);
+        let expected_matrix = Matrix4::new_translation(&vector![3.0, 3.0, 300.0]);
         assert_relative_eq!(transform_matrix.0, expected_matrix);
 
         let child = world.entry(child).unwrap();
         let transform_matrix = child.get_component::<TransformMatrix>().unwrap();
-        let expected_matrix = get_expected_matrix(2);
+        let expected_matrix = Matrix4::new_translation(&vector![2.0, 2.0, 200.0]);
         assert_relative_eq!(transform_matrix.0, expected_matrix);
     }
 
@@ -113,7 +112,7 @@ mod tests {
                 node_id: n,
             };
             let mut transform = Transform::default();
-            transform.translation = vec3(1.0, 1.0, 1.0);
+            transform.translation = vector![1.0, 1.0, 1.0];
             let matrix = TransformMatrix::default();
             let entity = world.push((info, transform, matrix));
             node_entity.insert(n, entity);
@@ -133,7 +132,7 @@ mod tests {
         let root_entity = node_entity.get(&0).unwrap();
         let mut root = world.entry(*root_entity).unwrap();
         let transform = root.get_component_mut::<Transform>().unwrap();
-        transform.translation = vec3(100.0, 100.0, 100.0);
+        transform.translation = vector![100.0, 100.0, 100.0];
 
         let mut schedule = Schedule::builder()
             .add_system(update_transform_matrix_system())
@@ -171,9 +170,9 @@ mod tests {
     }
 
     fn get_expected_matrix(depth: usize) -> Matrix4<f32> {
-        let mut transform = Matrix4::from_translation(vec3(100.0, 100.0, 100.0));
+        let mut transform = Matrix4::new_translation(&vector![100.0, 100.0, 100.0]);
         for _ in 0..depth {
-            transform = transform * Matrix4::from_translation(vec3(1.0, 1.0, 1.0));
+            transform = transform * Matrix4::new_translation(&vector![1.0, 1.0, 1.0]);
         }
         transform
     }

@@ -9,7 +9,7 @@ use ash::{
     vk::{self, Handle},
     Device, Entry, Instance as AshInstance,
 };
-use cgmath::Matrix4;
+use nalgebra::Matrix4;
 use openxr as xr;
 use std::{fmt::Debug, intrinsics::transmute, mem::size_of, ptr::copy};
 

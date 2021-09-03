@@ -1,10 +1,9 @@
 use legion::{system, world::SubWorld, IntoQuery};
-use nalgebra::{Quaternion, Translation3, Unit, UnitQuaternion, Vector3};
-use rapier3d::math::Isometry;
 
 use crate::{
     components::{hand::Handedness, AnimationController, Hand, RigidBody},
     resources::{PhysicsContext, XrContext},
+    util::posef_to_isometry,
 };
 
 #[system(for_each)]
@@ -43,14 +42,7 @@ pub fn hands(
         .unwrap();
 
     // TODO: EW. No. No. No.
-    let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
-    let translation: Translation3<f32> = Translation3::from(translation);
-    let rotation: Quaternion<f32> = mint::Quaternion::from(pose.orientation).into();
-    let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
-    let position = Isometry {
-        rotation,
-        translation,
-    };
+    let position = posef_to_isometry(pose);
     rigid_body.set_next_kinematic_position(position);
 
     if let Some(grabbed_entity) = hand.grabbed_entity {
@@ -74,7 +66,7 @@ pub fn hands(
 
 #[cfg(test)]
 mod tests {
-    use cgmath::{assert_relative_eq, vec3};
+    use approx::assert_relative_eq;
     use legion::{Entity, IntoQuery, Resources, Schedule, World};
     use nalgebra::vector;
     use rapier3d::prelude::{
@@ -111,7 +103,7 @@ mod tests {
         let (transform, hand, animation_controller) = query.get(&world, hand).unwrap();
 
         assert_relative_eq!(hand.grip_value, 0.0);
-        assert_relative_eq!(transform.translation, vec3(-0.2, 1.4, -0.5));
+        assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
         assert_relative_eq!(animation_controller.blend_amount, 0.0);
     }
 
@@ -144,7 +136,7 @@ mod tests {
         let mut query = <&Transform>::query();
         let transform = query.get(&world, grabbed_entity).unwrap();
 
-        assert_relative_eq!(transform.translation, vec3(-0.2, 1.4, -0.5));
+        assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
     }
 
     fn add_hand_to_world(

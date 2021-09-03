@@ -13,14 +13,12 @@ pub use rapier3d;
 pub use scene_data::SceneData;
 pub use vertex::Vertex;
 
-// mod animation;
 mod app;
 mod buffer;
 mod camera;
 pub mod components;
 mod frame;
 mod gltf_loader;
-mod hand;
 mod hotham_error;
 mod image;
 pub mod resources;

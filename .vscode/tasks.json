@@ -42,7 +42,10 @@
 			"command": "test",
 			"args": [
 				"-p",
-				"hotham"
+				"hotham",
+				"--",
+				"--test-threads",
+				"1"
 			],
 			"env": {
 				"RUST_BACKTRACE": "1"

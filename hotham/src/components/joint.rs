@@ -1,5 +1,5 @@
-use cgmath::Matrix4;
 use legion::Entity;
+use nalgebra::Matrix4;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Joint {

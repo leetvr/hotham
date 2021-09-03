@@ -1,4 +1,5 @@
 use legion::system;
+use nalgebra::UnitQuaternion;
 
 use crate::{
     components::{RigidBody, Transform},
@@ -20,17 +21,16 @@ pub fn update_rigid_body_transforms(
     transform.translation.z = position.translation.z;
 
     // Update rotation
-    let rotation: mint::Quaternion<f32> = (*position.rotation.quaternion()).into();
-    transform.rotation = rotation.into();
+    transform.rotation = UnitQuaternion::new_normalize(*position.rotation.quaternion());
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::schedule_functions::physics_step;
-    use cgmath::{assert_relative_eq, vec3, Euler, Quaternion, Rad};
+    use approx::assert_relative_eq;
     use legion::{IntoQuery, Resources, Schedule, World};
-    use nalgebra::{vector, Unit, UnitQuaternion};
+    use nalgebra::{vector, UnitQuaternion};
     use rapier3d::{math::Isometry, prelude::RigidBodyBuilder};
 
     #[test]
@@ -42,16 +42,9 @@ mod tests {
         let entity = world.push((Transform::default(),));
         let mut entry = world.entry(entity).unwrap();
         let mut rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
-        let rotation: Quaternion<f32> = Euler {
-            x: Rad(0.1),
-            y: Rad(0.2),
-            z: Rad(0.3),
-        }
-        .into();
-        let rotation: mint::Quaternion<f32> = rotation.into();
-        let rotation: nalgebra::Quaternion<f32> = rotation.into();
-        let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
-        let position = Isometry::from_parts(vector![1.0, 2.0, 3.0].into(), rotation);
+        // let rotation = Quaternion::from_vector
+        let rotation = UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3);
+        let position = Isometry::from_parts(vector![1.0, 2.0, 3.0].into(), rotation.clone());
         rigid_body.set_next_kinematic_position(position);
 
         let handle = physics_context.rigid_bodies.insert(rigid_body);
@@ -72,15 +65,7 @@ mod tests {
 
         let mut query = <&Transform>::query();
         let transform = query.get(&world, entity).unwrap();
-        let rotation = Euler::from(transform.rotation);
-        assert_relative_eq!(transform.translation, vec3(1.0, 2.0, 3.0));
-        assert_relative_eq!(
-            Euler {
-                x: Rad(0.1),
-                y: Rad(0.2),
-                z: Rad(0.3)
-            },
-            rotation
-        );
+        assert_relative_eq!(transform.translation, vector![1.0, 2.0, 3.0]);
+        assert_relative_eq!(transform.rotation, rotation);
     }
 }
