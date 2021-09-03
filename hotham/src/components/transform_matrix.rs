@@ -1,4 +1,4 @@
-use cgmath::{Matrix4, SquareMatrix};
+use nalgebra::Matrix4;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TransformMatrix(pub Matrix4<f32>);

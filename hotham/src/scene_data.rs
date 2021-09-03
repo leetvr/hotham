@@ -1,4 +1,4 @@
-use cgmath::{vec4, Matrix4, SquareMatrix, Vector4};
+use nalgebra::{Matrix4, Vector4};
 
 #[derive(Clone, Debug)]
 #[repr(C)]
@@ -13,7 +13,7 @@ impl Default for SceneData {
         Self {
             view: [Matrix4::identity(), Matrix4::identity()],
             projection: [Matrix4::identity(), Matrix4::identity()],
-            light_pos: vec4(0.0, 0.0, 0.0, 0.0),
+            light_pos: Vector4::new(0.0, 0.0, 0.0, 0.0),
         }
     }
 }

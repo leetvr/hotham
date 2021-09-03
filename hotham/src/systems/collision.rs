@@ -1,13 +1,8 @@
-use legion::{system, Entity};
-
 use crate::{components::Collider, resources::PhysicsContext, util::u64_to_entity};
+use legion::system;
 
 #[system(for_each)]
-pub fn collision(
-    collider: &mut Collider,
-    entity: &Entity,
-    #[resource] physics_context: &mut PhysicsContext,
-) {
+pub fn collision(collider: &mut Collider, #[resource] physics_context: &mut PhysicsContext) {
     // Clear out any collisions from previous frames.
     collider.collisions_this_frame.clear();
     for (a, b, intersecting) in physics_context

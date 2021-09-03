@@ -12,7 +12,6 @@ name = "hotham-asteroid"
 path = "src/main.rs"
 
 [dependencies]
-cgmath = "0.18"
 hotham = {path = "../hotham"}
 
 [target.'cfg(target_os = "android")'.dependencies]

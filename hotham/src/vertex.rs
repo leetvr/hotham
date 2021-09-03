@@ -1,5 +1,5 @@
 use ash::vk;
-use cgmath::{Vector2, Vector3, Vector4};
+use nalgebra::{Vector2, Vector3, Vector4};
 
 #[repr(C)]
 #[derive(Clone, Debug, Copy, PartialEq)]

@@ -1,9 +1,9 @@
 use anyhow::{anyhow, Result};
 use ash::vk;
 use libktx_rs::{sources::StreamSource, RustKtxStream, TextureCreateFlags, TextureSource};
+use nalgebra::{Matrix4, Vector2, Vector3, Vector4};
 
 use crate::{buffer::Buffer, resources::VulkanContext, texture::Texture, Vertex};
-use cgmath::{vec2, vec3, vec4, Matrix4};
 use itertools::izip;
 use std::{
     path::{Path, PathBuf},
@@ -49,18 +49,18 @@ impl Mesh {
                 .read_positions()
                 .ok_or(anyhow!("Mesh {} has no positions!"))?
             {
-                positions.push(vec3(v[0], v[1], v[2]));
+                positions.push(Vector3::new(v[0], v[1], v[2]));
             }
 
             if let Some(iter) = reader.read_normals() {
                 for v in iter {
-                    normals.push(vec3(v[0], v[1], v[2]));
+                    normals.push(Vector3::new(v[0], v[1], v[2]));
                 }
             }
 
             if let Some(iter) = reader.read_tex_coords(0) {
                 for v in iter.into_f32() {
-                    tex_coords.push(vec2(v[0], v[1]));
+                    tex_coords.push(Vector2::new(v[0], v[1]));
                 }
             }
 
@@ -72,19 +72,29 @@ impl Mesh {
 
             if let Some(iter) = reader.read_tangents() {
                 for t in iter {
-                    tangents.push(vec4(t[0], t[1], t[2], t[3]));
+                    tangents.push(Vector4::new(t[0], t[1], t[2], t[3]));
                 }
             }
 
             if let Some(iter) = reader.read_joints(0) {
                 for t in iter.into_u16() {
-                    joint_indices.push(vec4(t[0] as f32, t[1] as f32, t[2] as f32, t[3] as f32));
+                    joint_indices.push(Vector4::new(
+                        t[0] as f32,
+                        t[1] as f32,
+                        t[2] as f32,
+                        t[3] as f32,
+                    ));
                 }
             }
 
             if let Some(iter) = reader.read_weights(0) {
                 for t in iter.into_f32() {
-                    joint_weights.push(vec4(t[0] as f32, t[1] as f32, t[2] as f32, t[3] as f32));
+                    joint_weights.push(Vector4::new(
+                        t[0] as f32,
+                        t[1] as f32,
+                        t[2] as f32,
+                        t[3] as f32,
+                    ));
                 }
             }
 
@@ -135,31 +145,31 @@ impl Mesh {
 
         if tex_coords.is_empty() {
             for _ in 0..positions.len() {
-                tex_coords.push(vec2(0.0, 0.0));
+                tex_coords.push(Vector2::new(0.0, 0.0));
             }
         }
 
         if normals.is_empty() {
             for _ in 0..positions.len() {
-                normals.push(vec3(0.0, 0.0, 0.0));
+                normals.push(Vector3::new(0.0, 0.0, 0.0));
             }
         }
 
         if tangents.is_empty() {
             for _ in 0..positions.len() {
-                tangents.push(vec4(0.0, 0.0, 0.0, 0.0));
+                tangents.push(Vector4::new(0.0, 0.0, 0.0, 0.0));
             }
         }
 
         if joint_indices.is_empty() {
             for _ in 0..positions.len() {
-                joint_indices.push(vec4(0.0, 0.0, 0.0, 0.0));
+                joint_indices.push(Vector4::new(0.0, 0.0, 0.0, 0.0));
             }
         }
 
         if joint_weights.is_empty() {
             for _ in 0..positions.len() {
-                joint_weights.push(vec4(1.0, 0.0, 0.0, 0.0));
+                joint_weights.push(Vector4::new(1.0, 0.0, 0.0, 0.0));
             }
         }
 

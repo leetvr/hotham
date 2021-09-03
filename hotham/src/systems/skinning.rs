@@ -1,5 +1,5 @@
-use cgmath::{Matrix4, SquareMatrix};
 use legion::{system, world::SubWorld, Entity, EntityStore, IntoQuery};
+use nalgebra::Matrix4;
 use std::collections::HashMap;
 
 use crate::{
@@ -24,7 +24,7 @@ pub(crate) fn skinning(world: &mut SubWorld, #[resource] vulkan_context: &Vulkan
                 .get_component::<TransformMatrix>()
                 .unwrap()
                 .0
-                .invert()
+                .try_inverse()
                 .unwrap();
             let joint_transform = transform_matrix.0;
             let inverse_bind_matrix = joint.inverse_bind_matrix;
@@ -49,6 +49,7 @@ pub(crate) fn skinning(world: &mut SubWorld, #[resource] vulkan_context: &Vulkan
                 let joint_matrix = matrices_map.remove(&joint_id).unwrap();
                 matrices.push(joint_matrix);
             }
+
             buffer
                 .update(vulkan_context, matrices.as_ptr(), matrices.len())
                 .unwrap();
@@ -72,9 +73,10 @@ mod tests {
     };
 
     use super::*;
+    use approx::relative_eq;
     use ash::{version::DeviceV1_0, vk};
-    use cgmath::{relative_eq, vec3, Matrix4, SquareMatrix};
     use legion::{component, Resources, Schedule, World};
+    use nalgebra::vector;
 
     #[test]
     pub fn test_skinning_system() {
@@ -82,11 +84,11 @@ mod tests {
         let vulkan_context = VulkanContext::testing().unwrap();
 
         // Create the transform for the skin entity
-        let translation = vec3(1.0, 2.0, 3.0);
-        let root_transform_matrix = Matrix4::from_translation(translation);
+        let translation = vector![1.0, 2.0, 3.0];
+        let root_transform_matrix = Matrix4::new_translation(&translation);
 
         // Create a skin
-        let inverse = root_transform_matrix.invert().unwrap();
+        let inverse = root_transform_matrix.try_inverse().unwrap();
         let joint_matrices = vec![inverse.clone(), inverse];
         let storage_buffer = Buffer::new_from_vec(
             &vulkan_context,
@@ -129,8 +131,8 @@ mod tests {
             inverse_bind_matrix: Matrix4::identity(),
         };
 
-        let child_translation = vec3(1.0, 0.0, 0.0);
-        let matrix = Matrix4::from_translation(child_translation);
+        let child_translation = vector![1.0, 0.0, 0.0];
+        let matrix = Matrix4::new_translation(&child_translation);
         let child = world.push((
             child_joint,
             TransformMatrix(matrix),
@@ -147,8 +149,8 @@ mod tests {
             inverse_bind_matrix: Matrix4::identity(),
         };
 
-        let grandchild_translation = vec3(1.0, 0.0, 0.0);
-        let matrix = Matrix4::from_translation(grandchild_translation);
+        let grandchild_translation = vector![1.0, 0.0, 0.0];
+        let matrix = Matrix4::new_translation(&grandchild_translation);
         let _grandchild = world.push((
             grandchild_joint,
             TransformMatrix(matrix),

@@ -8,10 +8,10 @@ use crate::{
 };
 use anyhow::Result;
 use ash::vk;
-use cgmath::{vec3, Matrix4, Quaternion, SquareMatrix};
 use gltf::animation::util::ReadOutputs;
 use itertools::{izip, Itertools};
 use legion::{any, component, world::Duplicate, Entity, IntoQuery, World};
+use nalgebra::{vector, Matrix4, Quaternion, UnitQuaternion};
 use std::{collections::HashMap, io::Cursor};
 
 pub(crate) fn load_models_from_gltf(
@@ -223,18 +223,20 @@ fn add_animations(
                 match reader.read_outputs() {
                     Some(ReadOutputs::Translations(translation_data)) => {
                         for t in translation_data {
-                            translations.push(vec3(t[0], t[1], t[2]));
+                            translations.push(vector![t[0], t[1], t[2]]);
                         }
                     }
                     Some(ReadOutputs::Rotations(rotation_data)) => {
                         for r in rotation_data.into_f32() {
-                            rotations.push(Quaternion::new(r[3], r[0], r[1], r[2]));
+                            rotations.push(UnitQuaternion::new_normalize(Quaternion::new(
+                                r[3], r[0], r[1], r[2],
+                            )));
                             // gltf gives us a quaternion in [x, y, z, w] but we need [w, x, y, z]
                         }
                     }
                     Some(ReadOutputs::Scales(scale_data)) => {
                         for s in scale_data {
-                            scales.push(vec3(s[0], s[1], s[2]));
+                            scales.push(vector![s[0], s[1], s[2]]);
                         }
                     }
                     _ => {}
@@ -355,8 +357,9 @@ mod tests {
         components::{Root, Transform},
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
     };
-    use cgmath::assert_relative_eq;
+    use approx::assert_relative_eq;
     use legion::{EntityStore, IntoQuery};
+
     #[test]
     pub fn test_asteroid() {
         let vulkan_context = VulkanContext::testing().unwrap();
@@ -404,8 +407,7 @@ mod tests {
         assert_eq!(&root.1.name, "Left Hand");
 
         // Make sure its transform is correct
-        assert_relative_eq!(root.2.translation, vec3(0.0, 1.4, 0.0));
-        assert_relative_eq!(root.2.rotation, Quaternion::new(0.707, 0.0, 0.0, 0.707));
+        assert_relative_eq!(root.2.translation, vector![0.0, 0.0, 0.0]);
 
         // Make sure we imported the mesh
         let mut query = <(&Mesh, &Transform, &TransformMatrix)>::query();

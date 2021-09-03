@@ -11,7 +11,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::{prelude::VkResult, version::DeviceV1_0, vk};
-use cgmath::{vec4, Matrix4};
+use nalgebra::{vector, Matrix4};
 use openxr as xr;
 
 pub struct DescriptorSetLayouts {
@@ -165,7 +165,7 @@ impl RenderContext {
             get_projection(views[1].fov, near, far),
         ];
 
-        let light_pos = vec4(0.0, 2.0, 2.0, 1.0);
+        let light_pos = vector![0.0, 2.0, 2.0, 1.0];
 
         let scene_data = SceneData {
             view,
@@ -177,21 +177,6 @@ impl RenderContext {
 
         Ok(())
     }
-
-    // pub(crate) fn load_gltf_nodes(
-    //     &self,
-    //     gltf_data: (&[u8], &[u8]),
-    // ) -> Result<HashMap<String, Rc<RefCell<Node>>>> {
-    //     // let buffers = vec![gltf_data.1];
-    //     // load_gltf_nodes(
-    //     //     gltf_data.0,
-    //     //     &buffers,
-    //     //     &self.vulkan_context,
-    //     //     &[self.descriptor_set_layouts.mesh_layout],
-    //     //     self.uniform_buffer.handle,
-    //     // )
-    //     todo!();
-    // }
 }
 
 pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
@@ -227,10 +212,13 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     let c2r3 = -1.0;
     let c3r3 = 0.0;
 
-    return Matrix4::new(
-        c0r0, c0r1, c0r2, c0r3, c1r0, c1r1, c1r2, c1r3, c2r0, c2r1, c2r2, c2r3, c3r0, c3r1, c3r2,
-        c3r3,
-    );
+    #[rustfmt::skip]
+    return Matrix4::from_column_slice(&[
+        c0r0, c0r1, c0r2, c0r3, 
+        c1r0, c1r1, c1r2, c1r3, 
+        c2r0, c2r1, c2r2, c2r3, 
+        c3r0, c3r1, c3r2, c3r3,
+    ]);
 }
 
 pub(crate) fn create_descriptor_set_layouts(
