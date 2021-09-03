@@ -8,11 +8,9 @@ use crate::openxr_loader::{self, XrExtensionProperties, XrResult};
 use crate::space_state::SpaceState;
 use crate::state::State;
 
-use ash::version::EntryV1_0;
 use ash::{
     extensions::khr,
     util::read_spv,
-    version::{DeviceV1_0, InstanceV1_0},
     vk::{self, DeviceCreateInfo, Handle},
     Device, Entry as AshEntry, Instance as AshInstance,
 };

@@ -13,11 +13,7 @@ use nalgebra::Matrix4;
 use openxr as xr;
 use std::{fmt::Debug, intrinsics::transmute, mem::size_of, ptr::copy};
 
-// #[cfg(target_os = "windows")]
-// type XrVulkan = xr::Vulkan;
-
-// #[cfg(target_os = "android")]
-type XrVulkan = xr::VulkanLegacy;
+type XrVulkan = xr::Vulkan;
 
 #[derive(Clone)]
 pub struct VulkanContext {
@@ -194,11 +190,11 @@ impl VulkanContext {
         }
 
         let (vulkan_instance, vulkan_entry) = vulkan_init_legacy(xr_instance, system)?;
-        let physical_device = unsafe {
+        let physical_device = vk::PhysicalDevice::from_raw(
             xr_instance
-                .get_vulkan_legacy_physical_device(system, transmute(vulkan_instance.handle()))
-        }?;
-        let physical_device = vk::PhysicalDevice::from_raw(physical_device as _);
+                .vulkan_graphics_device(system, vulkan_instance.handle().as_raw() as _)
+                .unwrap() as _,
+        );
         let (device, graphics_queue, queue_family_index) =
             create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device)?;
 
@@ -790,40 +786,49 @@ impl Debug for VulkanContext {
 }
 
 fn vulkan_init_legacy(
-    instance: &xr::Instance,
+    xr_instance: &xr::Instance,
     system: xr::SystemId,
 ) -> Result<(AshInstance, Entry)> {
     use crate::util::get_raw_strings;
     use std::ffi::CString;
 
     println!("[HOTHAM_VULKAN] Initialising Vulkan..");
-    let app_name = CString::new("Hotham Asteroid")?;
-    let entry = unsafe { Entry::new()? };
-    let layers = vec!["VK_LAYER_KHRONOS_validation\0"];
-    let layer_names = unsafe { get_raw_strings(layers) };
+    unsafe {
+        let app_name = CString::new("Hotham Asteroid")?;
+        let entry = Entry::new()?;
+        let layers = vec!["VK_LAYER_KHRONOS_validation\0"];
+        let layer_names = get_raw_strings(layers);
+        let vk_instance_exts = xr_instance
+            .vulkan_legacy_instance_extensions(system)
+            .unwrap()
+            .split(' ')
+            .map(|x| CString::new(x).unwrap())
+            .collect::<Vec<_>>();
+        println!(
+            "Required Vulkan instance extensions: {:?}",
+            vk_instance_exts
+        );
+        let vk_instance_ext_ptrs = vk_instance_exts
+            .iter()
+            .map(|x| x.as_ptr())
+            .collect::<Vec<_>>();
 
-    let extension_names = unsafe { instance.get_vulkan_legacy_instance_extensions(system) }?;
-    println!("[HOTHAM_VULKAN] Trying to use extensions: {:?}", {
-        &extension_names
-    });
-    let extension_names = extension_names
-        .iter()
-        .map(|e| e.as_ptr())
-        .collect::<Vec<_>>();
+        let app_info = vk::ApplicationInfo::builder()
+            .application_name(&app_name)
+            .api_version(vk::make_version(1, 2, 0));
 
-    let app_info = vk::ApplicationInfo::builder()
-        .application_name(&app_name)
-        .api_version(vk::make_version(1, 2, 0));
-    let create_info = vk::InstanceCreateInfo::builder()
-        .application_info(&app_info)
-        .enabled_extension_names(&extension_names)
-        .enabled_layer_names(&layer_names);
+        let instance = entry
+            .create_instance(
+                &vk::InstanceCreateInfo::builder()
+                    .application_info(&app_info)
+                    .enabled_extension_names(&vk_instance_ext_ptrs)
+                    .enabled_layer_names(&layer_names),
+                None,
+            )
+            .expect("Vulkan error creating Vulkan instance");
 
-    let instance = unsafe { entry.create_instance(&create_info, None) }?;
-
-    println!("[HOTHAM_VULKAN] ..done");
-
-    Ok((instance, entry))
+        Ok((instance, entry))
+    }
 }
 
 fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
@@ -868,12 +873,16 @@ pub fn create_vulkan_device_legacy(
     use std::ffi::CString;
 
     println!("[HOTHAM_VULKAN] Creating logical device.. ");
-    let mut extension_names = unsafe { xr_instance.get_vulkan_legacy_device_extensions(system) }?;
-    unsafe {
-        extension_names.push(CString::from_vec_unchecked(b"VK_KHR_multiview".to_vec()));
-    }
 
-    create_vulkan_device(&extension_names, vulkan_instance, physical_device)
+    unsafe {
+        let extension_names = xr_instance.vulkan_legacy_device_extensions(system)?;
+        let mut extension_names = extension_names
+            .split(' ')
+            .map(|x| CString::new(x).unwrap())
+            .collect::<Vec<_>>();
+        extension_names.push(CString::from_vec_unchecked(b"VK_KHR_multiview".to_vec()));
+        create_vulkan_device(&extension_names, vulkan_instance, physical_device)
+    }
 }
 
 fn create_vulkan_device(
