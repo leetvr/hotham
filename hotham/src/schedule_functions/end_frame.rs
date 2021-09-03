@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use crate::{resources::RenderContext, resources::VulkanContext, resources::XrContext};
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 use legion::{Resources, World};
 
 pub(crate) fn end_frame(_world: &mut World, resources: &mut Resources) {

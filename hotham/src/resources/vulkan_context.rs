@@ -5,7 +5,6 @@ use crate::{
 use anyhow::{anyhow, Result};
 use ash::{
     prelude::VkResult,
-    version::{DeviceV1_0, EntryV1_0, InstanceV1_0},
     vk::{self, Handle},
     Device, Entry, Instance as AshInstance,
 };
@@ -84,7 +83,7 @@ impl VulkanContext {
         let get_instance_proc_addr = unsafe { transmute(entry.static_fn().get_instance_proc_addr) };
 
         let app_info = vk::ApplicationInfo::builder()
-            .api_version(vk::make_version(1, 2, 0))
+            .api_version(vk::make_api_version(0, 1, 2, 0))
             .build();
 
         let create_info = vk::InstanceCreateInfo::builder().application_info(&app_info);
@@ -815,7 +814,7 @@ fn vulkan_init_legacy(
 
         let app_info = vk::ApplicationInfo::builder()
             .application_name(&app_name)
-            .api_version(vk::make_version(1, 2, 0));
+            .api_version(vk::make_api_version(0, 1, 2, 0));
 
         let instance = entry
             .create_instance(
@@ -851,7 +850,7 @@ fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
 
     let app_info = vk::ApplicationInfo::builder()
         .application_name(&app_name)
-        .api_version(vk::make_version(1, 2, 0));
+        .api_version(vk::make_api_version(0, 1, 2, 0));
     let create_info = vk::InstanceCreateInfo::builder()
         .application_info(&app_info)
         .enabled_extension_names(&extension_names)

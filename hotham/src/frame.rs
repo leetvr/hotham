@@ -1,4 +1,4 @@
-use ash::{version::DeviceV1_0, vk};
+use ash::vk;
 
 use crate::{hotham_error::HothamError, resources::VulkanContext};
 use anyhow::Result;

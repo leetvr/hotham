@@ -74,7 +74,7 @@ mod tests {
 
     use super::*;
     use approx::relative_eq;
-    use ash::{version::DeviceV1_0, vk};
+    use ash::vk;
     use legion::{component, Resources, Schedule, World};
     use nalgebra::vector;
 

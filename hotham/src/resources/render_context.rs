@@ -10,7 +10,7 @@ use crate::{
     SceneData, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
-use ash::{prelude::VkResult, version::DeviceV1_0, vk};
+use ash::{prelude::VkResult, vk};
 use nalgebra::{vector, Matrix4};
 use openxr as xr;
 

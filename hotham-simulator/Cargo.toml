@@ -11,8 +11,8 @@ crate-type = ["cdylib"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ash = "0.33"
-ash-window = "*"
+ash = "0.33.2"
+ash-window = "0.7"
 cgmath = "0.18"
 lazy_static = "1.4.0"
 openxr-sys = "0.9"

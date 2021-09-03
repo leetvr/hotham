@@ -1,8 +1,5 @@
 use anyhow::Result;
-use ash::{
-    version::InstanceV1_0,
-    vk::{self, Handle},
-};
+use ash::vk::{self, Handle};
 use openxr::{
     self as xr, Action, ActionSet, EventDataBuffer, FrameStream, FrameWaiter, Path, Posef, Session,
     SessionState, Space, Swapchain, Vulkan,
