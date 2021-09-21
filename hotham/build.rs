@@ -3,9 +3,10 @@ use std::fs;
 use shaderc::{Compiler, ShaderKind};
 
 fn main() {
-    println!("cargo:rerun-if-changed=./shaders");
+    println!("cargo:rerun-if-changed=./src/shaders");
+    eprintln!("HOTHAM BUILD IS RUNNING");
 
-    for path in fs::read_dir("./shaders").unwrap() {
+    for path in fs::read_dir("./src/shaders").unwrap() {
         let path = path.unwrap().path();
         let ext = path.extension().unwrap();
         let mut compiler = shaderc::Compiler::new().unwrap();
@@ -37,5 +38,13 @@ fn compile_shader(
     let extension = path.extension().unwrap().to_string_lossy();
     let mut output_path = path.clone();
     output_path.set_extension(format!("{}.spv", extension));
+    let output_path = format!(
+        "./shaders/{}",
+        output_path.file_name().unwrap().to_str().unwrap()
+    );
+    println!(
+        "Combining {:?} at {:?} to {:?}",
+        shader_kind, path, output_path
+    );
     fs::write(output_path, artifact.as_binary_u8()).unwrap();
 }

@@ -1,2 +1,15 @@
 [workspace]
 members = ["hotham", "hotham-asteroid", "hotham-simulator"]
+
+# Make performance critical packages compile with optimisations
+[profile.dev.package.rapier3d]
+opt-level = 3
+
+[profile.dev.package.base64]
+opt-level = 3
+
+[profile.dev.package.gltf]
+opt-level = 3
+
+[profile.dev.package.image]
+opt-level = 3

@@ -1,34 +1,58 @@
 use std::{ffi::CStr, io::Cursor, mem::size_of, time::Instant};
 
+static CLEAR_VALUES: [vk::ClearValue; 2] = [
+    vk::ClearValue {
+        color: vk::ClearColorValue {
+            float32: [0.0, 0.0, 0.0, 1.0],
+        },
+    },
+    vk::ClearValue {
+        depth_stencil: vk::ClearDepthStencilValue {
+            depth: 1.0,
+            stencil: 0,
+        },
+    },
+];
+
 use crate::{
     buffer::Buffer,
     camera::Camera,
+    components::Material,
     frame::Frame,
     image::Image,
     resources::{VulkanContext, XrContext},
+    scene_data::SceneParams,
     swapchain::Swapchain,
-    SceneData, Vertex, COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
+    texture::Texture,
+    SceneData, Vertex, COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
-use ash::{prelude::VkResult, vk};
-use nalgebra::{vector, Matrix4};
+use ash::{
+    prelude::VkResult,
+    vk::{self, Handle},
+};
+use nalgebra::Matrix4;
 use openxr as xr;
 
+#[derive(Debug, Copy, Clone)]
 pub struct DescriptorSetLayouts {
     pub scene_data_layout: vk::DescriptorSetLayout,
+    pub textures_layout: vk::DescriptorSetLayout,
     pub mesh_layout: vk::DescriptorSetLayout,
 }
 
+#[derive(Clone)]
 pub struct RenderContext {
-    _swapchain: Swapchain,
     pub frames: Vec<Frame>,
     pub descriptor_set_layouts: DescriptorSetLayouts,
     pub pipeline_layout: vk::PipelineLayout,
     pub pipeline: vk::Pipeline,
     pub render_pass: vk::RenderPass,
     pub depth_image: Image,
+    pub colour_image: Image,
     pub render_area: vk::Rect2D,
     pub scene_data: Buffer<SceneData>,
+    pub scene_params: Buffer<SceneParams>,
     pub scene_data_descriptor_sets: Vec<vk::DescriptorSet>,
     pub render_start_time: Instant,
     pub cameras: Vec<Camera>,
@@ -78,6 +102,13 @@ impl RenderContext {
 
         // Build swapchain
         let swapchain = Swapchain::new(xr_swapchain, swapchain_resolution)?;
+        Self::new_from_swapchain(vulkan_context, &swapchain)
+    }
+
+    pub(crate) fn new_from_swapchain(
+        vulkan_context: &VulkanContext,
+        swapchain: &Swapchain,
+    ) -> Result<Self> {
         let render_area = vk::Rect2D {
             extent: swapchain.resolution,
             offset: vk::Offset2D::default(),
@@ -91,6 +122,7 @@ impl RenderContext {
             &vulkan_context,
             &[
                 descriptor_set_layouts.scene_data_layout,
+                descriptor_set_layouts.textures_layout,
                 descriptor_set_layouts.mesh_layout,
             ],
         )?;
@@ -98,21 +130,70 @@ impl RenderContext {
             create_pipeline(&vulkan_context, pipeline_layout, &render_area, render_pass)?;
 
         // Depth image, shared between frames
-        let depth_image = vulkan_context.create_image(DEPTH_FORMAT, &swapchain.resolution)?;
+        let depth_image = vulkan_context.create_image(
+            DEPTH_FORMAT,
+            &swapchain.resolution,
+            DEPTH_ATTACHMENT_USAGE_FLAGS,
+            2,
+            1,
+        )?;
+
+        // Colour image, used for MSAA.
+        let colour_image = vulkan_context.create_image(
+            COLOR_FORMAT,
+            &swapchain.resolution,
+            vk::ImageUsageFlags::TRANSIENT_ATTACHMENT | vk::ImageUsageFlags::COLOR_ATTACHMENT,
+            2,
+            1,
+        )?;
 
         // Create all the per-frame resources we need
-        let frames = create_frames(&vulkan_context, &render_pass, &swapchain, &depth_image)?;
+        let frames = create_frames(
+            &vulkan_context,
+            &render_pass,
+            &swapchain,
+            &depth_image,
+            &colour_image,
+        )?;
 
         println!("[HOTHAM_RENDERER] Creating UBO..");
         let scene_data = SceneData::default();
         let scene_data = Buffer::new(
             &vulkan_context,
-            &scene_data,
+            &[scene_data],
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
+
+        let scene_params = SceneParams::default();
+        let scene_params = Buffer::new(
+            &vulkan_context,
+            &[scene_params],
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        )?;
+
+        let diffuse_ibl = Texture::from_ktx2(
+            "Diffuse IBL",
+            include_bytes!("../../data/diffuse_ibl.ktx2"),
+            vulkan_context,
+        )?;
+        let specular_ibl = Texture::from_ktx2(
+            "Specular IBL",
+            include_bytes!("../../data/specular_ibl.ktx2"),
+            vulkan_context,
+        )?;
+        let brdf_lut = Texture::from_ktx2(
+            "BRDF LUT",
+            include_bytes!("../../data/brdf_lut.ktx2"),
+            vulkan_context,
+        )?;
+
         let scene_data_descriptor_sets = vulkan_context.create_scene_data_descriptor_sets(
             descriptor_set_layouts.scene_data_layout,
             &scene_data,
+            &scene_params,
+            &diffuse_ibl,
+            &specular_ibl,
+            &brdf_lut,
         )?;
 
         println!("[HOTHAM_RENDERER] ..done! {:?}", scene_data);
@@ -120,7 +201,6 @@ impl RenderContext {
         println!("[HOTHAM_RENDERER] Done! Renderer initialised!");
 
         Ok(Self {
-            _swapchain: swapchain,
             frames,
             descriptor_set_layouts,
             pipeline,
@@ -128,8 +208,10 @@ impl RenderContext {
             render_pass,
             frame_index: 0,
             depth_image,
+            colour_image,
             render_area,
             scene_data,
+            scene_params,
             scene_data_descriptor_sets,
             render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
@@ -151,7 +233,7 @@ impl RenderContext {
             .cameras
             .iter_mut()
             .enumerate()
-            .map(|(n, c)| c.update_view_matrix(&views[n]))
+            .map(|(n, c)| c.update(&views[n]))
             .collect::<Result<Vec<_>>>()?;
 
         // Projection
@@ -159,23 +241,118 @@ impl RenderContext {
         let far = 100.0;
 
         let view = [view_matrices[0], view_matrices[1]];
+        let fov_left = views[0].fov;
+        let fov_right = views[1].fov;
+        if self.frame_index == 1 {
+            println!(
+                "[FOV Left]: up: {} down: {}, left: {}, right: {}",
+                fov_left.angle_up, fov_left.angle_down, fov_left.angle_left, fov_left.angle_right
+            );
+            println!(
+                "[FOV Right]: up: {} down: {}, left: {}, right: {}",
+                fov_right.angle_up,
+                fov_right.angle_down,
+                fov_right.angle_left,
+                fov_right.angle_right
+            );
+        }
 
         let projection = [
-            get_projection(views[0].fov, near, far),
-            get_projection(views[1].fov, near, far),
+            get_projection(fov_left, near, far),
+            get_projection(fov_right, near, far),
         ];
 
-        let light_pos = vector![0.0, 2.0, 2.0, 1.0];
+        let camera_position = [self.cameras[0].position(), self.cameras[1].position()];
+        if self.frame_index == 0 {
+            println!("Camera position: {:?}", camera_position);
+        }
 
         let scene_data = SceneData {
             view,
             projection,
-            light_pos,
+            camera_position,
         };
 
-        self.scene_data.update(&vulkan_context, &scene_data, 1)?;
+        self.scene_data.update(&vulkan_context, &[scene_data])?;
 
         Ok(())
+    }
+
+    pub(crate) fn begin_render_pass(
+        &self,
+        vulkan_context: &VulkanContext,
+        available_swapchain_image_index: usize,
+    ) {
+        // Get the values we need to start a renderpass
+        let device = &vulkan_context.device;
+        let frame = &self.frames[available_swapchain_image_index];
+        let command_buffer = frame.command_buffer;
+        let framebuffer = frame.framebuffer;
+
+        // Begin the renderpass.
+        let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
+            .render_pass(self.render_pass)
+            .framebuffer(framebuffer)
+            .render_area(self.render_area)
+            .clear_values(&CLEAR_VALUES);
+
+        unsafe {
+            device
+                .begin_command_buffer(
+                    command_buffer,
+                    &vk::CommandBufferBeginInfo::builder()
+                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                )
+                .unwrap();
+            device.cmd_begin_render_pass(
+                command_buffer,
+                &render_pass_begin_info,
+                vk::SubpassContents::INLINE,
+            );
+            device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline,
+            );
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::GRAPHICS,
+                self.pipeline_layout,
+                0,
+                &self.scene_data_descriptor_sets,
+                &[],
+            );
+        }
+    }
+
+    pub(crate) fn end_render_pass(
+        &mut self,
+        vulkan_context: &VulkanContext,
+        available_swapchain_image_index: usize,
+    ) {
+        // Get the values we need to end the renderpass
+        let device = &vulkan_context.device;
+        let frame = &self.frames[available_swapchain_image_index];
+        let command_buffer = frame.command_buffer;
+        let graphics_queue = vulkan_context.graphics_queue;
+
+        // End the render pass and submit.
+        unsafe {
+            device.cmd_end_render_pass(command_buffer);
+            device.end_command_buffer(command_buffer).unwrap();
+            let fence = frame.fence;
+            let submit_info = vk::SubmitInfo::builder()
+                .command_buffers(&[command_buffer])
+                .build();
+            device.reset_fences(&[fence]).unwrap();
+            device
+                .queue_submit(graphics_queue, &[submit_info], fence)
+                .unwrap();
+            device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
+        }
+
+        self.last_frame_time = Instant::now();
+        self.frame_index += 1;
     }
 }
 
@@ -224,61 +401,127 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
 pub(crate) fn create_descriptor_set_layouts(
     vulkan_context: &VulkanContext,
 ) -> VkResult<DescriptorSetLayouts> {
+    // Set 0 = SceneData
+    // set = 0 binding = 0
     let scene_buffer = vk::DescriptorSetLayoutBinding::builder()
         .binding(0)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX)
-        .build();
-
-    let scene_bindings = [scene_buffer];
-
-    let scene_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&scene_bindings);
-
-    let scene_data_layout = unsafe {
-        vulkan_context
-            .device
-            .create_descriptor_set_layout(&scene_create_info, None)
-    }?;
-
-    let skin_joint_buffer = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX)
-        .build();
-
-    let base_color_image_sampler = vk::DescriptorSetLayoutBinding::builder()
+        .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT);
+    // set = 0 binding = 1
+    let scene_params = vk::DescriptorSetLayoutBinding::builder()
         .binding(1)
         .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-        .build();
-
-    let normal_image_sampler = vk::DescriptorSetLayoutBinding::builder()
+        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    // set = 0 binding = 2
+    let sampler_irradiance = vk::DescriptorSetLayoutBinding::builder()
         .binding(2)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-        .build();
-
-    let mesh_bindings = [
-        skin_joint_buffer,
-        base_color_image_sampler,
-        normal_image_sampler,
-    ];
-
-    let mesh_create_info = vk::DescriptorSetLayoutCreateInfo::builder().bindings(&mesh_bindings);
-
-    let mesh_layout = unsafe {
-        vulkan_context
-            .device
-            .create_descriptor_set_layout(&mesh_create_info, None)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    // set = 0 binding = 3
+    let prefiltered_map = vk::DescriptorSetLayoutBinding::builder()
+        .binding(3)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    // set = 0 binding = 4
+    let sampler_brdflut = vk::DescriptorSetLayoutBinding::builder()
+        .binding(4)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    let scene_data_layout = unsafe {
+        vulkan_context.device.create_descriptor_set_layout(
+            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[
+                *scene_buffer,
+                *scene_params,
+                *sampler_irradiance,
+                *prefiltered_map,
+                *sampler_brdflut,
+            ]),
+            None,
+        )
     }?;
+    vulkan_context.set_debug_name(
+        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
+        scene_data_layout.as_raw(),
+        "Scene Data DescriptorSetLayout",
+    )?;
+
+    // Set 1 = MaterialData
+    // set = 1 binding = 0
+    let color_map = vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    // set = 1 binding = 1
+    let physical_descriptor_map = vk::DescriptorSetLayoutBinding::builder()
+        .binding(1)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    // set = 1 binding = 2
+    let normal_map = vk::DescriptorSetLayoutBinding::builder()
+        .binding(2)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    // set = 1 binding = 3
+    let ao_map = vk::DescriptorSetLayoutBinding::builder()
+        .binding(3)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    // set = 1 binding = 4
+    let emissive_map = vk::DescriptorSetLayoutBinding::builder()
+        .binding(4)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+    let material_layout = unsafe {
+        vulkan_context.device.create_descriptor_set_layout(
+            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[
+                *color_map,
+                *physical_descriptor_map,
+                *normal_map,
+                *ao_map,
+                *emissive_map,
+            ]),
+            None,
+        )
+    }?;
+    vulkan_context.set_debug_name(
+        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
+        material_layout.as_raw(),
+        "Material Data DescriptorSetLayout",
+    )?;
+
+    // Set 2 = MeshData
+    // set = 2, binding = 0
+    let mesh_data = vk::DescriptorSetLayoutBinding::builder()
+        .binding(0)
+        .descriptor_count(1)
+        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
+        .stage_flags(vk::ShaderStageFlags::VERTEX);
+    let mesh_data_layout = unsafe {
+        vulkan_context.device.create_descriptor_set_layout(
+            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[*mesh_data]),
+            None,
+        )
+    }?;
+    vulkan_context.set_debug_name(
+        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
+        mesh_data_layout.as_raw(),
+        "Mesh Data DescriptorSetLayout",
+    )?;
 
     Ok(DescriptorSetLayouts {
         scene_data_layout,
-        mesh_layout,
+        textures_layout: material_layout,
+        mesh_layout: mesh_data_layout,
     })
 }
 
@@ -287,12 +530,21 @@ fn create_frames(
     render_pass: &vk::RenderPass,
     swapchain: &Swapchain,
     depth_image: &Image,
+    colour_image: &Image,
 ) -> Result<Vec<Frame>> {
     print!("[HOTHAM_INIT] Creating frames..");
     let frames = swapchain
         .images
         .iter()
-        .flat_map(|i| vulkan_context.create_image_view(i, COLOR_FORMAT))
+        .flat_map(|i| {
+            vulkan_context.create_image_view(
+                i,
+                COLOR_FORMAT,
+                vk::ImageViewType::TYPE_2D_ARRAY,
+                2,
+                1,
+            )
+        })
         .map(|i| {
             Frame::new(
                 vulkan_context,
@@ -300,6 +552,7 @@ fn create_frames(
                 swapchain.resolution,
                 i,
                 depth_image.view,
+                colour_image.view,
             )
         })
         .collect::<Result<Vec<Frame>>>()?;
@@ -309,46 +562,62 @@ fn create_frames(
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     print!("[HOTHAM_INIT] Creating render pass..");
-    let color_attachment = vk::AttachmentDescription::builder()
+    // Attachment used for MSAA
+    let colour_attachment = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
-        .samples(vk::SampleCountFlags::TYPE_1)
+        .samples(vk::SampleCountFlags::TYPE_4)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::STORE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
-        .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-        .build();
+        .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
+
+    // Final attachment to be presented
+    let colour_attachment_resolve = vk::AttachmentDescription::builder()
+        .format(COLOR_FORMAT)
+        .samples(vk::SampleCountFlags::TYPE_1)
+        .load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .store_op(vk::AttachmentStoreOp::STORE)
+        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
     let depth_attachment = vk::AttachmentDescription::builder()
         .format(DEPTH_FORMAT)
-        .samples(vk::SampleCountFlags::TYPE_1)
+        .samples(vk::SampleCountFlags::TYPE_4)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::DONT_CARE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
-        .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-        .build();
-
-    let attachments = [color_attachment, depth_attachment];
+        .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     let color_attachment_reference = vk::AttachmentReference::builder()
         .attachment(0)
         .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
         .build();
-    let color_attachments = [color_attachment_reference];
+
+    let color_attachment_reference = [color_attachment_reference];
 
     let depth_stencil_reference = vk::AttachmentReference::builder()
         .attachment(1)
-        .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+        .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        .build();
+
+    let color_attachment_resolve_reference = vk::AttachmentReference::builder()
+        .attachment(2)
+        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
+        .build();
+
+    let color_attachment_resolve_reference = [color_attachment_resolve_reference];
 
     let subpass = vk::SubpassDescription::builder()
         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-        .color_attachments(&color_attachments)
-        .depth_stencil_attachment(&depth_stencil_reference)
-        .build();
-    let subpasses = [subpass];
+        .color_attachments(&color_attachment_reference)
+        .resolve_attachments(&color_attachment_resolve_reference)
+        .depth_stencil_attachment(&depth_stencil_reference);
 
     let dependency = vk::SubpassDependency::builder()
         .src_subpass(vk::SUBPASS_EXTERNAL)
@@ -365,22 +634,29 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .dst_access_mask(
             vk::AccessFlags::COLOR_ATTACHMENT_WRITE
                 | vk::AccessFlags::DEPTH_STENCIL_ATTACHMENT_WRITE,
-        )
-        .build();
-    let dependencies = [dependency];
+        );
 
     let view_masks = [!(!0 << VIEW_COUNT)];
     let mut multiview = vk::RenderPassMultiviewCreateInfo::builder()
         .view_masks(&view_masks)
         .correlation_masks(&view_masks);
 
-    let create_info = vk::RenderPassCreateInfo::builder()
-        .attachments(&attachments)
-        .subpasses(&subpasses)
-        .dependencies(&dependencies)
-        .push_next(&mut multiview);
+    let attachments = [
+        *colour_attachment,
+        *depth_attachment,
+        *colour_attachment_resolve,
+    ];
 
-    let render_pass = unsafe { vulkan_context.device.create_render_pass(&create_info, None) }?;
+    let render_pass = unsafe {
+        vulkan_context.device.create_render_pass(
+            &vk::RenderPassCreateInfo::builder()
+                .attachments(&attachments)
+                .subpasses(&[*subpass])
+                .dependencies(&[*dependency])
+                .push_next(&mut multiview),
+            None,
+        )
+    }?;
     println!("..done!");
 
     Ok(render_pass)
@@ -397,14 +673,14 @@ fn create_pipeline(
 
     // Vertex shader stage
     let (vertex_shader, vertex_stage) = create_shader(
-        include_bytes!("../../shaders/model.vert.spv"),
+        include_bytes!("../../shaders/pbr.vert.spv"),
         vk::ShaderStageFlags::VERTEX,
         vulkan_context,
     )?;
 
     // Fragment shader stage
     let (fragment_shader, fragment_stage) = create_shader(
-        include_bytes!("../../shaders/model.frag.spv"),
+        include_bytes!("../../shaders/pbr.frag.spv"),
         vk::ShaderStageFlags::FRAGMENT,
         vulkan_context,
     )?;
@@ -449,7 +725,7 @@ fn create_pipeline(
     // Rasterization state
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
-        .cull_mode(vk::CullModeFlags::NONE)
+        .cull_mode(vk::CullModeFlags::BACK)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)
@@ -461,7 +737,7 @@ fn create_pipeline(
 
     // Multisample state
     let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
-        .rasterization_samples(vk::SampleCountFlags::TYPE_1);
+        .rasterization_samples(vk::SampleCountFlags::TYPE_4);
 
     // Depth stencil state
     let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
@@ -557,9 +833,9 @@ fn create_pipeline_layout(
     set_layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout> {
     let push_constant_ranges = [vk::PushConstantRange {
-        stage_flags: vk::ShaderStageFlags::VERTEX,
+        stage_flags: vk::ShaderStageFlags::FRAGMENT,
         offset: 0,
-        size: size_of::<Matrix4<f32>>() as _,
+        size: size_of::<Material>() as _,
     }];
     let create_info = &vk::PipelineLayoutCreateInfo::builder()
         .set_layouts(set_layouts)

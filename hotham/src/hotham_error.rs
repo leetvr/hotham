@@ -1,5 +1,4 @@
 use ash::vk::Result as VulkanResult;
-use kira::manager::error::StartSequenceError;
 use openxr::sys::Result as OpenXRResult;
 use thiserror::Error;
 
@@ -13,12 +12,10 @@ pub enum HothamError {
     EmptyListError,
     #[error("The version of Vulkan or OpenXR is not supported")]
     UnsupportedVersionError,
-    #[error("The format provided is not supported for this operation")]
-    InvalidFormatError,
+    #[error("The format provided - {format:?} - is not supported for this operation")]
+    InvalidFormatError { format: String },
     #[error(transparent)]
     IO(#[from] std::io::Error),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
-    #[error(transparent)]
-    SoundSequenceError(#[from] StartSequenceError),
 }

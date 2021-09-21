@@ -2,7 +2,6 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_multiview : enable
 
-
 // Scene Uniform Buffer
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view[2];

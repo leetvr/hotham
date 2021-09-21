@@ -17,11 +17,12 @@ ash = "0.33.2"
 console = "0.14"
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
-gltf = "0.16"
+gltf = {version = "0.16", features = ["KHR_materials_pbrSpecularGlossiness"]}
 itertools = "0.10.0"
-kira = "0.5.3"
 legion = "0.4"
-libktx-rs = "0.2"
+# libktx-rs = {git = "https://github.com/UberLambda/libktx-rs"}
+image = "0.23"
+libktx-rs = "0.2.3"
 memoffset = "0.5.1"
 mint = "0.5.6"
 nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.29.0"}
@@ -31,12 +32,11 @@ rapier3d = "0.11"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
 thiserror = "1.0"
-winit = "0.24"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.18.0"
-ndk = "0.3.0"
-ndk-glue = "0.3"
+ndk = "0.4.0"
+ndk-glue = "0.4"
 
 [dev-dependencies.criterion]
 features = ["html_reports"]

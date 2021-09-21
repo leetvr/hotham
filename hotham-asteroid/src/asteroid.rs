@@ -1,12 +1,9 @@
+// use hotham::legion::IntoQuery;
 use hotham::{
     add_model_to_world,
     components::{AnimationController, Hand, Transform},
-    legion::{Resources, World},
-    rapier3d::{
-        na as nalgebra,
-        na::vector,
-        prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    },
+    legion::{IntoQuery, Resources, World},
+    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::PhysicsContext,
     HothamResult as Result, Program,
 };
@@ -27,30 +24,28 @@ impl Program for Asteroid {
         let mut world = World::default();
         let mut physics_context = resources.get_mut::<PhysicsContext>().unwrap();
 
-        // Add the asteroid model
-        let asteroid = add_model_to_world("Asteroid", &models, &mut world, None).unwrap();
+        // Add the damaged helmet
+        let helmet = add_model_to_world("Damaged Helmet", &models, &mut world, None)
+            .expect("Could not find Damaged Helmet");
 
+        // Add the helmet model
         {
-            let mut asteroid_entry = world.entry(asteroid).unwrap();
-            let asteroid_transform = asteroid_entry.get_component_mut::<Transform>().unwrap();
-            asteroid_transform.scale = vector![0.1, 0.1, 0.1];
+            let mut query = <&Transform>::query();
+            let transform = query.get(&mut world, helmet).unwrap();
+            let position = transform.position();
 
+            let mut helmet_entry = world.entry(helmet).unwrap();
             // Give it a collider and rigid-body
-            let collider = ColliderBuilder::ball(0.25)
+            let collider = ColliderBuilder::ball(0.35)
                 .active_collision_types(ActiveCollisionTypes::all())
                 .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
                 .build();
-            let rigid_body = RigidBodyBuilder::new_dynamic()
-                .translation(vector![0.0, 1.0, 0.0])
-                .build();
+            let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
             let (collider, rigid_body) =
-                physics_context.add_rigid_body_and_collider(asteroid, rigid_body, collider);
-            asteroid_entry.add_component(collider);
-            asteroid_entry.add_component(rigid_body);
+                physics_context.add_rigid_body_and_collider(helmet, rigid_body, collider);
+            helmet_entry.add_component(collider);
+            helmet_entry.add_component(rigid_body);
         }
-
-        // Add the refinery model
-        add_model_to_world("Refinery", &models, &mut world, Some(asteroid));
 
         // Add the left hand
         let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
@@ -104,18 +99,15 @@ impl Program for Asteroid {
             right_hand_entry.add_component(rigid_body);
         }
 
-        // let hello = load_sound("hello.ogg")?;
-        // let background = load_sound("background.mp3")?;
-        // let sounds = vec![hello, background];
         Ok(world)
     }
 
     fn get_gltf_data(&self) -> Vec<(&[u8], &[u8])> {
         vec![
-            (
-                include_bytes!("../assets/asteroid.gltf"),
-                include_bytes!("../assets/asteroid_data.bin"),
-            ),
+            // (
+            //     include_bytes!("../assets/asteroid.gltf"),
+            //     include_bytes!("../assets/asteroid_data.bin"),
+            // ),
             (
                 include_bytes!("../assets/left_hand.gltf"),
                 include_bytes!("../assets/left_hand.bin"),
@@ -124,6 +116,10 @@ impl Program for Asteroid {
                 include_bytes!("../assets/right_hand.gltf"),
                 include_bytes!("../assets/right_hand.bin"),
             ),
+            // (
+            //     include_bytes!("../../test_assets/damaged_helmet.gltf"),
+            //     include_bytes!("../../test_assets/damaged_helmet_data.bin"),
+            // ),
         ]
     }
 }

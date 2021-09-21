@@ -49,7 +49,7 @@ mod tests {
             include_bytes!("../../../hotham-asteroid/assets/left_hand.gltf"),
             include_bytes!("../../../hotham-asteroid/assets/left_hand.bin"),
         )];
-        let models = load_models_from_gltf(data, &vulkan_context, set_layouts.mesh_layout).unwrap();
+        let models = load_models_from_gltf(data, &vulkan_context, &set_layouts).unwrap();
 
         let mut world = World::default();
 

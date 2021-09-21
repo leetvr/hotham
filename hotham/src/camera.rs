@@ -1,5 +1,5 @@
 use anyhow::{anyhow, Result};
-use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3};
+use nalgebra::{vector, Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3, Vector4};
 use openxr::View;
 
 use crate::util::posef_to_isometry;
@@ -21,13 +21,18 @@ impl Default for Camera {
 }
 
 impl Camera {
-    pub fn update_view_matrix(&mut self, view: &View) -> Result<Matrix4<f32>> {
+    pub fn update(&mut self, view: &View) -> Result<Matrix4<f32>> {
         // Convert values from OpenXR format
         let camera_position = posef_to_isometry(view.pose);
         self.position = camera_position;
 
         self.view_matrix = self.build_matrix()?;
         Ok(self.view_matrix)
+    }
+
+    pub fn position(&self) -> Vector4<f32> {
+        let p = self.position.translation.vector;
+        vector![p[0], p[1], p[2], 0.]
     }
 
     pub fn build_matrix(&self) -> Result<Matrix4<f32>> {

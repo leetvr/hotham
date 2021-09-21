@@ -41,7 +41,6 @@ pub fn hands(
         .get_mut(rigid_body_component.handle)
         .unwrap();
 
-    // TODO: EW. No. No. No.
     let position = posef_to_isometry(pose);
     rigid_body.set_next_kinematic_position(position);
 

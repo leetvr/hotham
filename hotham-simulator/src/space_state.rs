@@ -13,12 +13,7 @@ impl SpaceState {
         Self {
             name: name.to_string(),
             position: Default::default(),
-            orientation: Quaternionf {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-                w: 1.0,
-            },
+            orientation: Quaternionf::IDENTITY,
         }
     }
 }

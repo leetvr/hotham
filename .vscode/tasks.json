@@ -33,6 +33,18 @@
 		},
 		{
 			"type": "shell",
+			"windows": {
+				"command": ".\\pbr_test.ps1"
+			},
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"label": "Test Physically Based rendering",
+			"problemMatcher": []
+		},
+		{
+			"type": "shell",
 			"label": "Run Renderdoc",
 			"command": ".\\cubeworld.cap",
 			"problemMatcher": []
@@ -53,10 +65,7 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			},
+			"group": "test",
 			"label": "rust: cargo test"
 		},
 		{

@@ -108,7 +108,7 @@ impl Default for State {
                     let mut pose = Posef::IDENTITY;
                     pose.position = Vector3f {
                         x: 0.0,
-                        y: 1.8,
+                        y: 1.4,
                         z: 0.0,
                     };
                     pose
