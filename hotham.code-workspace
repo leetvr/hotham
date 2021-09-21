@@ -2,18 +2,13 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "..\\..\\Documents\\Devlogs"
-		},
-		{
-			"path": "..\\Vulkan"
 		}
 	],
 	"settings": {
 		"files.associations": {
 			"algorithm": "cpp",
-			"map": "cpp"
+			"map": "cpp",
+			"xtree": "cpp"
 		},
 		"liveServer.settings.multiRootWorkspaceName": "hotham"
 	}

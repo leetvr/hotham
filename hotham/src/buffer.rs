@@ -12,57 +12,42 @@ pub struct Buffer<T> {
     pub device_memory: vk::DeviceMemory,
     pub _phantom: PhantomData<T>,
     pub size: vk::DeviceSize,
+    pub device_memory_size: vk::DeviceSize,
+    pub usage: vk::BufferUsageFlags,
 }
 
 impl<T> Buffer<T>
 where
-    T: Sized,
+    T: Sized + Copy,
 {
-    pub(crate) fn new_from_vec(
-        vulkan_context: &VulkanContext,
-        data: &Vec<T>,
-        usage: vk::BufferUsageFlags,
-    ) -> Result<Self> {
-        let item_count = data.len();
-        let (handle, device_memory) =
-            vulkan_context.create_buffer_with_data(data.as_ptr(), usage, item_count)?;
-        let size = (std::mem::size_of::<T>() * item_count) as _;
-
-        Ok(Self {
-            handle,
-            device_memory,
-            size,
-            _phantom: PhantomData,
-        })
-    }
-
     pub(crate) fn new(
         vulkan_context: &VulkanContext,
-        data: &T,
+        data: &[T],
         usage: vk::BufferUsageFlags,
     ) -> Result<Self> {
-        let item_count = 1;
-        let (handle, device_memory) =
-            vulkan_context.create_buffer_with_data(data, usage, item_count)?;
-        let size = std::mem::size_of::<T>() as _;
+        let size = std::mem::size_of_val(data) as vk::DeviceSize;
+        let (handle, device_memory, device_memory_size) =
+            vulkan_context.create_buffer_with_data(&data, usage, size)?;
 
         Ok(Self {
             handle,
             device_memory,
             size,
+            device_memory_size,
+            usage,
             _phantom: PhantomData,
         })
     }
 
     /// **NOTE**: If passing in a Vec, you MUST use vec.as_ptr(), passing in
     /// a reference will result in A Very Bad Time.
-    pub(crate) fn update(
-        &self,
-        vulkan_context: &VulkanContext,
-        data: *const T,
-        item_count: usize,
-    ) -> Result<()> {
-        vulkan_context.update_buffer(data, item_count, self.device_memory)
+    pub(crate) fn update(&self, vulkan_context: &VulkanContext, data: &[T]) -> Result<()> {
+        vulkan_context.update_buffer(
+            data,
+            self.device_memory,
+            self.device_memory_size,
+            self.usage,
+        )
     }
 }
 

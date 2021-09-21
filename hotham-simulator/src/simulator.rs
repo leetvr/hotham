@@ -23,7 +23,7 @@ use openxr_sys::{
     Duration, EnvironmentBlendMode, EventDataBuffer, EventDataSessionStateChanged, Fovf,
     FrameBeginInfo, FrameEndInfo, FrameState, FrameWaitInfo, GraphicsRequirementsVulkanKHR,
     Instance, InstanceCreateInfo, InstanceProperties, InteractionProfileSuggestedBinding, Path,
-    Posef, ReferenceSpaceCreateInfo, ReferenceSpaceType, Result, Session,
+    Posef, Quaternionf, ReferenceSpaceCreateInfo, ReferenceSpaceType, Result, Session,
     SessionActionSetsAttachInfo, SessionBeginInfo, SessionCreateInfo, SessionState, Space,
     SpaceLocation, SpaceLocationFlags, StructureType, Swapchain, SwapchainCreateInfo,
     SwapchainImageAcquireInfo, SwapchainImageBaseHeader, SwapchainImageReleaseInfo,
@@ -152,6 +152,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
     for ext in &(*xr_extensions) {
         enabled_extensions.push(CStr::from_ptr(*ext));
     }
+    enabled_extensions.push(CStr::from_bytes_with_nul_unchecked(b"VK_EXT_debug_utils\0"));
     create_info.pp_enabled_layer_names =
         [CStr::from_bytes_with_nul_unchecked(b"VK_LAYER_KHRONOS_validation\0").as_ptr()].as_ptr();
     create_info.enabled_layer_count = 1;
@@ -778,6 +779,12 @@ pub unsafe extern "system" fn create_action_space(
                 y: 1.4,
                 z: -0.50,
             };
+            space_state.orientation = Quaternionf {
+                x: 0.707,
+                y: 0.,
+                z: 0.,
+                w: 0.707,
+            };
             println!(
                 "[HOTHAM_SIMULATOR] Created left hand space: {:?}, {:?}",
                 space_state, space
@@ -787,6 +794,12 @@ pub unsafe extern "system" fn create_action_space(
         }
         Some("/user/hand/right") => {
             let mut space_state = SpaceState::new("Right Hand");
+            space_state.orientation = Quaternionf {
+                x: 0.707,
+                y: 0.,
+                z: 0.,
+                w: 0.707,
+            };
             space_state.position = Vector3f {
                 x: 0.20,
                 y: 1.4,

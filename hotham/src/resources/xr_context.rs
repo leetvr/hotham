@@ -289,7 +289,6 @@ pub(crate) fn create_xr_session(
     .unwrap())
 }
 
-#[cfg(not(target_os = "android"))]
 pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = xr::Entry::load()?;
     let xr_app_info = openxr::ApplicationInfo {
@@ -298,94 +297,23 @@ pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId
         engine_name: "Hotham",
         engine_version: 1,
     };
+    let mut required_extensions = xr::ExtensionSet::default();
+    // required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
+    required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
+
+    #[cfg(target_os = "android")]
+    {
+        required_extensions.khr_android_create_instance = true;
+        xr_entry.initialize_android_loader()?;
+    }
+
     println!(
         "Available extensions: {:?}",
         xr_entry.enumerate_extensions()?
     );
-    let mut required_extensions = xr::ExtensionSet::default();
-    // required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
-    required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
+
     let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
-    Ok((instance, system))
-}
-
-#[cfg(target_os = "android")]
-fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
-    use anyhow::anyhow;
-
-    use openxr::sys::{InstanceCreateInfoAndroidKHR, LoaderInitInfoAndroidKHR};
-    use std::{ffi::CStr, intrinsics::transmute, ptr::null};
-    use xr::sys::pfn::InitializeLoaderKHR;
-
-    let xr_entry = xr::Entry::load()?;
-    let native_activity = ndk_glue::native_activity();
-    let vm_ptr = native_activity.vm();
-    let context = native_activity.activity();
-
-    unsafe {
-        let mut initialize_loader = None;
-        let get_instance_proc_addr = xr_entry.fp().get_instance_proc_addr;
-        println!("[HOTHAM_ANDROID] About to call get_instance_proc_addr..");
-
-        get_instance_proc_addr(
-            Default::default(),
-            CStr::from_bytes_with_nul_unchecked(b"xrInitializeLoaderKHR\0").as_ptr(),
-            &mut initialize_loader,
-        );
-
-        let initialize_loader = initialize_loader.ok_or(anyhow!(
-            "Couldn't get function pointer for xrInitialiseLoaderKHR"
-        ))?;
-        let initialize_loader: InitializeLoaderKHR = transmute(initialize_loader);
-
-        let loader_init_info = LoaderInitInfoAndroidKHR {
-            ty: LoaderInitInfoAndroidKHR::TYPE,
-            next: null(),
-            application_vm: vm_ptr as _,
-            application_context: context as _,
-        };
-
-        println!(
-            "[HOTHAM_ANDROID] Done! Calling loader init info with: {:?}",
-            loader_init_info.ty
-        );
-        initialize_loader(transmute(&loader_init_info));
-        println!("[HOTHAM_ANDROID] Done! Loader initialized.");
-    }
-
-    let extensions = xr_entry.enumerate_extensions();
-    println!("[HOTHAM_ANDROID] Available extensions: {:?}", extensions);
-    let layers = xr_entry.enumerate_layers();
-    println!("[HOTHAM_ANDROID] Available layers: {:?}", layers);
-
-    let xr_app_info = openxr::ApplicationInfo {
-        application_name: "Hotham Asteroid",
-        application_version: 1,
-        engine_name: "Hotham",
-        engine_version: 1,
-    };
-    let mut required_extensions = xr::ExtensionSet::default();
-    required_extensions.ext_debug_utils = true;
-    required_extensions.khr_vulkan_enable = true;
-    required_extensions.khr_android_create_instance = true;
-    print!("[HOTHAM_ANDROID] Creating instance..");
-    let instance_create_info_android = InstanceCreateInfoAndroidKHR {
-        ty: InstanceCreateInfoAndroidKHR::TYPE,
-        next: null(),
-        application_vm: vm_ptr as _,
-        application_activity: context as _,
-    };
-
-    let instance = xr_entry.create_instance_android(
-        &xr_app_info,
-        &required_extensions,
-        &[],
-        &instance_create_info_android,
-    )?;
-
-    let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
-    println!(" ..done!");
     Ok((instance, system))
 }
 

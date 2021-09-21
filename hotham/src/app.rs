@@ -59,7 +59,7 @@ where
         let models = load_models_from_gltf(
             gltf_data,
             &vulkan_context,
-            render_context.descriptor_set_layouts.mesh_layout,
+            &render_context.descriptor_set_layouts,
         )?;
         let mut resources = Resources::default();
         resources.insert(xr_context);

@@ -1,5 +1,5 @@
 use gltf::scene::Transform as TransformData;
-use nalgebra::{vector, Quaternion, Unit, UnitQuaternion, Vector3};
+use nalgebra::{vector, Isometry3, Quaternion, Unit, UnitQuaternion, Vector3};
 
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Transform {
@@ -29,6 +29,13 @@ impl Transform {
             scale,
             rotation,
             translation,
+        }
+    }
+
+    pub fn position(&self) -> Isometry3<f32> {
+        Isometry3 {
+            rotation: self.rotation.clone(),
+            translation: self.translation.into(),
         }
     }
 }

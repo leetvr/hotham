@@ -50,7 +50,7 @@ pub fn get_world_with_hands() -> World {
             include_bytes!("../../hotham-asteroid/assets/right_hand.bin"),
         ),
     ];
-    let models = load_models_from_gltf(data, &vulkan_context, set_layouts.mesh_layout).unwrap();
+    let models = load_models_from_gltf(data, &vulkan_context, &set_layouts).unwrap();
 
     let mut world = World::default();
 
@@ -88,6 +88,26 @@ pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
         rotation,
         translation,
     }
+}
+
+#[cfg(test)]
+use crate::buffer::Buffer;
+
+#[cfg(test)]
+pub unsafe fn get_from_device_memory<'a, T: Sized>(
+    vulkan_context: &VulkanContext,
+    buffer: &'a Buffer<T>,
+) -> &'a [T] {
+    let memory = vulkan_context
+        .device
+        .map_memory(
+            buffer.device_memory,
+            0,
+            ash::vk::WHOLE_SIZE,
+            ash::vk::MemoryMapFlags::empty(),
+        )
+        .unwrap();
+    std::slice::from_raw_parts(std::mem::transmute(memory), buffer.size as _)
 }
 
 #[cfg(target_os = "android")]

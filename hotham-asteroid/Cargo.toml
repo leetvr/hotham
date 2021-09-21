@@ -15,17 +15,17 @@ path = "src/main.rs"
 hotham = {path = "../hotham"}
 
 [target.'cfg(target_os = "android")'.dependencies]
-ndk-glue = "0.3.0"
+ndk-glue = "0.4.0"
 
 [package.metadata.android]
 apk_label = "Hotham Asteroid"
 assets = "assets"
 fullscreen = true
-libs = [
-  "lib/libopenxr_loader.so",
-  "lib/libVkLayer_khronos_validation.so",
-]
+runtime_libs = "lib"
 target_sdk_version = 26
+
+[package.metadata.android.application]
+debuggable = true
 
 [[package.metadata.android.application.intent_filter]]
 actions = ["android.intent.action.MAIN"]
