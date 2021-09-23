@@ -80,31 +80,17 @@ impl Texture {
             gltf::image::Source::View { .. } => {
                 let index = texture.index();
                 let image = &images[index];
-                let format = parse_gltf_image_format(image.format);
-                if format != UNCOMPRESSED_TEXTURE_FORMAT {
-                    let pixels = add_alpha_channel(&image);
-                    Texture::new(
-                        texture_name,
-                        &vulkan_context,
-                        &pixels,
-                        image.width,
-                        image.height,
-                        UNCOMPRESSED_TEXTURE_FORMAT,
-                    )
-                    .map_err(|e| eprintln!("Failed to load texture {} - {:?}", index, e))
-                    .ok()
-                } else {
-                    Texture::new(
-                        texture_name,
-                        &vulkan_context,
-                        &image.pixels,
-                        image.width,
-                        image.height,
-                        format,
-                    )
-                    .map_err(|e| eprintln!("Failed to load texture {} - {:?}", index, e))
-                    .ok()
-                }
+                let pixels = add_alpha_channel(&image);
+                Texture::new(
+                    texture_name,
+                    &vulkan_context,
+                    &pixels,
+                    image.width,
+                    image.height,
+                    TEXTURE_FORMAT,
+                )
+                .map_err(|e| eprintln!("Failed to load texture {} - {:?}", index, e))
+                .ok()
             }
         }
     }
