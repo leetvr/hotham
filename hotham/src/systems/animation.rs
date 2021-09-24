@@ -45,9 +45,7 @@ mod tests {
         let vulkan_context = VulkanContext::testing().unwrap();
         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
-        let data: Vec<&[u8]> = vec![include_bytes!(
-            "../../../hotham-asteroid/assets/left_hand.glb"
-        )];
+        let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
         let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
 
         let mut world = World::default();

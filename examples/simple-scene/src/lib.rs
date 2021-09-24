@@ -1,3 +1,5 @@
+use hotham::{App, HothamResult};
+
 // use hotham::legion::IntoQuery;
 use hotham::{
     add_model_to_world,
@@ -104,8 +106,22 @@ impl Program for Asteroid {
 
     fn get_gltf_data(&self) -> Vec<&[u8]> {
         vec![
-            include_bytes!("../assets/left_hand.glb"),
-            include_bytes!("../assets/right_hand.glb"),
+            include_bytes!("../../../test_assets/left_hand.glb"),
+            include_bytes!("../../../test_assets/right_hand.glb"),
+            include_bytes!("../../../test_assets/damaged_helmet.glb"),
         ]
     }
+}
+
+#[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
+pub fn main() {
+    println!("[HOTHAM_ASTEROID_ANDROID] MAIN!");
+    real_main().unwrap();
+}
+
+pub fn real_main() -> HothamResult<()> {
+    let program = Asteroid::new();
+    let mut app = App::new(program)?;
+    app.run()?;
+    Ok(())
 }
