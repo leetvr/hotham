@@ -102,24 +102,10 @@ impl Program for Asteroid {
         Ok(world)
     }
 
-    fn get_gltf_data(&self) -> Vec<(&[u8], &[u8])> {
+    fn get_gltf_data(&self) -> Vec<&[u8]> {
         vec![
-            // (
-            //     include_bytes!("../assets/asteroid.gltf"),
-            //     include_bytes!("../assets/asteroid_data.bin"),
-            // ),
-            (
-                include_bytes!("../assets/left_hand.gltf"),
-                include_bytes!("../assets/left_hand.bin"),
-            ),
-            (
-                include_bytes!("../assets/right_hand.gltf"),
-                include_bytes!("../assets/right_hand.bin"),
-            ),
-            // (
-            //     include_bytes!("../../test_assets/damaged_helmet.gltf"),
-            //     include_bytes!("../../test_assets/damaged_helmet_data.bin"),
-            // ),
+            include_bytes!("../assets/left_hand.glb"),
+            include_bytes!("../assets/right_hand.glb"),
         ]
     }
 }

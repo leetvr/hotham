@@ -1,4 +1,4 @@
-use crate::{image::Image, resources::VulkanContext, UNCOMPRESSED_TEXTURE_FORMAT};
+use crate::{image::Image, resources::VulkanContext};
 use anyhow::{anyhow, Result};
 use ash::vk;
 use image::io::Reader as ImageReader;
@@ -102,7 +102,7 @@ impl Texture {
             &EMPTY_KTX.to_vec(),
             1,
             1,
-            UNCOMPRESSED_TEXTURE_FORMAT,
+            TEXTURE_FORMAT,
         )
     }
 
@@ -162,21 +162,6 @@ fn parse_image(path: &str) -> Result<(Vec<u8>, u32, u32)> {
     let width = img.width();
     let height = img.height();
     return Ok((img.into_raw(), width, height));
-}
-
-fn parse_gltf_image_format(format: gltf::image::Format) -> vk::Format {
-    match format {
-        gltf::image::Format::R8 => vk::Format::R8_SRGB,
-        gltf::image::Format::R8G8 => vk::Format::R8G8_SRGB,
-        gltf::image::Format::R8G8B8 => vk::Format::R8G8B8_SRGB,
-        gltf::image::Format::R8G8B8A8 => vk::Format::R8G8B8A8_SRGB,
-        gltf::image::Format::B8G8R8 => vk::Format::B8G8R8_SRGB,
-        gltf::image::Format::B8G8R8A8 => vk::Format::B8G8R8A8_SRGB,
-        gltf::image::Format::R16 => vk::Format::R16_UNORM,
-        gltf::image::Format::R16G16 => vk::Format::R16G16_UNORM,
-        gltf::image::Format::R16G16B16 => vk::Format::R16G16B16_UNORM,
-        gltf::image::Format::R16G16B16A16 => vk::Format::R16G16B16A16_UNORM,
-    }
 }
 
 #[cfg(target_os = "windows")]

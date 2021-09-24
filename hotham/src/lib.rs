@@ -36,18 +36,11 @@ pub const SWAPCHAIN_LENGTH: usize = 3;
 pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIMARY_STEREO;
 pub const BLEND_MODE: xr::EnvironmentBlendMode = xr::EnvironmentBlendMode::OPAQUE;
 
-#[cfg(target_os = "windows")]
-pub const COMPRESSED_TEXTURE_FORMAT: vk::Format = vk::Format::BC7_SRGB_BLOCK;
-
-#[cfg(target_os = "android")]
-pub const COMPRESSED_TEXTURE_FORMAT: vk::Format = vk::Format::ASTC_4X4_SRGB_BLOCK;
-
-pub const UNCOMPRESSED_TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB;
 pub const DEPTH_ATTACHMENT_USAGE_FLAGS: vk::ImageUsageFlags =
     vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT;
 
 pub trait Program {
-    fn get_gltf_data(&self) -> Vec<(&[u8], &[u8])>;
+    fn get_gltf_data(&self) -> Vec<&[u8]>;
     fn init(
         &mut self,
         models: HashMap<String, World>,

@@ -36,10 +36,7 @@
 			"windows": {
 				"command": ".\\pbr_test.ps1"
 			},
-			"group": {
-				"kind": "test",
-				"isDefault": true
-			},
+			"group": "test",
 			"label": "Test Physically Based rendering",
 			"problemMatcher": []
 		},
@@ -65,7 +62,10 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"group": "test",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
 			"label": "rust: cargo test"
 		},
 		{
