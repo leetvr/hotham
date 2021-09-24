@@ -1,5 +1,5 @@
 use crate::{
-    gltf_loader::load_models_from_gltf,
+    gltf_loader::load_models_from_glb,
     resources::{PhysicsContext, RenderContext, XrContext},
     schedule_functions::{begin_frame, end_frame, physics_step},
     systems::{
@@ -56,8 +56,8 @@ where
         let physics_context = PhysicsContext::default();
         println!("[HOTHAM_INIT] Loading models..");
         let gltf_data = program.get_gltf_data();
-        let models = load_models_from_gltf(
-            gltf_data,
+        let models = load_models_from_glb(
+            &gltf_data,
             &vulkan_context,
             &render_context.descriptor_set_layouts,
         )?;

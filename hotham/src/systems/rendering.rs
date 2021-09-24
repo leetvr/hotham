@@ -145,12 +145,9 @@ mod tests {
         //     include_bytes!("../../../test_assets/Sponza.gltf"),
         //     include_bytes!("../../../test_assets/Sponza.bin"),
         // )];
-        let gltf_data: Vec<(&[u8], &[u8])> = vec![(
-            include_bytes!("../../../test_assets/damaged_helmet.gltf"),
-            include_bytes!("../../../test_assets/damaged_helmet_data.bin"),
-        )];
-        let mut models = gltf_loader::load_models_from_gltf(
-            gltf_data,
+        let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
+        let mut models = gltf_loader::load_models_from_glb(
+            &gltf_data,
             &vulkan_context,
             &render_context.descriptor_set_layouts,
         )
@@ -276,7 +273,7 @@ mod tests {
         let image_from_vulkan = DynamicImage::ImageRgba8(
             RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
         );
-        let path = format!("../test_assets/render_{}", name);
+        let path = format!("../test_assets/render_{}.jpg", name);
         let path = std::path::Path::new(&path);
         let mut file = std::fs::File::create(path).unwrap();
         let mut jpeg_encoder = JpegEncoder::new(&mut file);

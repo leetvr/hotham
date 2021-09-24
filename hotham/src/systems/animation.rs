@@ -35,7 +35,7 @@ mod tests {
 
     use crate::{
         add_model_to_world,
-        gltf_loader::load_models_from_gltf,
+        gltf_loader::load_models_from_glb,
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
     };
 
@@ -45,11 +45,10 @@ mod tests {
         let vulkan_context = VulkanContext::testing().unwrap();
         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
-        let data: Vec<(&[u8], &[u8])> = vec![(
-            include_bytes!("../../../hotham-asteroid/assets/left_hand.gltf"),
-            include_bytes!("../../../hotham-asteroid/assets/left_hand.bin"),
+        let data: Vec<&[u8]> = vec![include_bytes!(
+            "../../../hotham-asteroid/assets/left_hand.glb"
         )];
-        let models = load_models_from_gltf(data, &vulkan_context, &set_layouts).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
 
         let mut world = World::default();
 

@@ -55,13 +55,11 @@ mod tests {
     use std::{io::Write, marker::PhantomData};
 
     use crate::{
-        add_model_to_world,
         buffer::Buffer,
         components::{mesh::MeshUBO, Joint, Parent, Skin},
-        gltf_loader::load_models_from_gltf,
-        resources::{render_context::create_descriptor_set_layouts, VulkanContext},
+        resources::VulkanContext,
         systems::skinning_system,
-        util::get_from_device_memory,
+        util::{get_from_device_memory, get_world_with_hands},
     };
 
     use super::*;
@@ -166,26 +164,8 @@ mod tests {
     #[test]
     pub fn test_hand_skinning() {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
-        let data: Vec<(&[u8], &[u8])> = vec![
-            (
-                include_bytes!("../../../hotham-asteroid/assets/left_hand.gltf"),
-                include_bytes!("../../../hotham-asteroid/assets/left_hand.bin"),
-            ),
-            (
-                include_bytes!("../../../hotham-asteroid/assets/right_hand.gltf"),
-                include_bytes!("../../../hotham-asteroid/assets/right_hand.bin"),
-            ),
-        ];
-        let models = load_models_from_gltf(data, &vulkan_context, &set_layouts).unwrap();
-
-        let mut world = World::default();
-
-        // Add two hands
-        let _left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
-        let _right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
-
+        let mut world = get_world_with_hands();
         let mut resources = Resources::default();
         resources.insert(vulkan_context);
 

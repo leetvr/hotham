@@ -1,5 +1,4 @@
 use crate::{
-    buffer::Buffer,
     components::{
         animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
         Root, Skin, Transform, TransformMatrix,
@@ -7,72 +6,31 @@ use crate::{
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
 use anyhow::Result;
-use ash::vk;
 use gltf::animation::util::ReadOutputs;
 use itertools::{izip, Itertools};
 use legion::{any, component, world::Duplicate, Entity, IntoQuery, World};
 use nalgebra::{vector, Matrix4, Quaternion, UnitQuaternion};
-use std::{collections::HashMap, io::Cursor};
+use std::collections::HashMap;
 
-pub(crate) fn load_models_from_gltf(
-    data: Vec<(&[u8], &[u8])>,
+pub fn load_models_from_glb(
+    glb_bufs: &Vec<&[u8]>,
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
 ) -> Result<HashMap<String, World>> {
     let mut models = HashMap::new();
 
-    // Create a shared, empty storage buffer for non-skin models.
-    // If the model has a skin, it'll be replaced with joint matrices.
-    let empty_matrix: Matrix4<f32> = Matrix4::identity();
-    let vec = vec![empty_matrix];
-    let empty_storage_buffer =
-        Buffer::new(&vulkan_context, &vec, vk::BufferUsageFlags::STORAGE_BUFFER)?;
-
-    for (gltf_bytes, buffer) in &data {
-        let gtlf_buf = Cursor::new(gltf_bytes);
-        let gltf = gltf::Gltf::from_reader(gtlf_buf)?;
-        let document = gltf.document;
+    for glb_buf in glb_bufs {
+        let (document, buffers, images) = gltf::import_slice(glb_buf).unwrap();
         load_models_from_gltf_data(
             &document,
-            buffer,
-            &Vec::new(),
+            &buffers[0],
+            &images,
             &vulkan_context,
             descriptor_set_layouts,
             &mut models,
-            &empty_storage_buffer,
         )
         .unwrap();
     }
-
-    Ok(models)
-}
-
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn load_models_from_glb_file(
-    path: &str,
-    vulkan_context: &VulkanContext,
-    descriptor_set_layouts: &DescriptorSetLayouts,
-) -> Result<HashMap<String, World>> {
-    let mut models = HashMap::new();
-
-    // Create a shared, empty storage buffer for non-skin models.
-    // If the model has a skin, it'll be replaced with joint matrices.
-    let empty_matrix: Matrix4<f32> = Matrix4::identity();
-    let vec = vec![empty_matrix];
-    let empty_storage_buffer =
-        Buffer::new(&vulkan_context, &vec, vk::BufferUsageFlags::STORAGE_BUFFER)?;
-
-    let (document, buffers, images) = gltf::import(path).unwrap();
-    load_models_from_gltf_data(
-        &document,
-        &buffers[0],
-        &images,
-        vulkan_context,
-        descriptor_set_layouts,
-        &mut models,
-        &empty_storage_buffer,
-    )?;
 
     Ok(models)
 }
@@ -84,7 +42,6 @@ pub fn load_models_from_gltf_data(
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
     models: &mut HashMap<String, World>,
-    empty_storage_buffer: &Buffer<Matrix4<f32>>,
 ) -> Result<()> {
     let root_scene = document.scenes().next().unwrap(); // safe as there is always one scene
     let mut node_entity_map = HashMap::new();
@@ -99,7 +56,6 @@ pub fn load_models_from_gltf_data(
             descriptor_set_layouts,
             &mut world,
             &mut node_entity_map,
-            &empty_storage_buffer,
             true,
             images,
         )?;
@@ -129,7 +85,6 @@ fn load_node(
     descriptor_set_layouts: &DescriptorSetLayouts,
     world: &mut World,
     node_entity_map: &mut HashMap<usize, Entity>,
-    empty_storage_buffer: &Buffer<Matrix4<f32>>,
     is_root: bool,
     images: &Vec<gltf::image::Data>,
 ) -> Result<()> {
@@ -152,7 +107,6 @@ fn load_node(
             gltf_buffer,
             vulkan_context,
             descriptor_set_layouts,
-            empty_storage_buffer,
             images,
         )?;
 
@@ -171,7 +125,6 @@ fn load_node(
             descriptor_set_layouts,
             world,
             node_entity_map,
-            empty_storage_buffer,
             false,
             images,
         )?;
@@ -411,17 +364,11 @@ mod tests {
         let vulkan_context = VulkanContext::testing().unwrap();
         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
-        let data: Vec<(&[u8], &[u8])> = vec![
-            (
-                include_bytes!("../../hotham-asteroid/assets/asteroid.gltf"),
-                include_bytes!("../../hotham-asteroid/assets/asteroid_data.bin"),
-            ),
-            (
-                include_bytes!("../../test_assets/damaged_helmet.gltf"),
-                include_bytes!("../../test_assets/damaged_helmet_data.bin"),
-            ),
+        let data: Vec<&[u8]> = vec![
+            include_bytes!("../../test_assets/damaged_helmet.glb"),
+            include_bytes!("../../hotham-asteroid/assets/asteroid.glb"),
         ];
-        let models = load_models_from_gltf(data, &vulkan_context, &set_layouts).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
         let test_data = vec![
             (
                 "Asteroid",
@@ -432,7 +379,7 @@ mod tests {
             (
                 "Refinery",
                 1,
-                vector![-0.06670809, -2.1408155, -0.46151406],
+                vector![-0.06670809, 2.1408155, -0.46151406],
                 Quaternion::new(
                     0.719318151473999,
                     -0.09325116872787476,
@@ -443,7 +390,7 @@ mod tests {
             (
                 "Damaged Helmet",
                 0,
-                vector![0., -1.4, 0.],
+                vector![0., 1.4, 0.],
                 Quaternion::new(0.707, 0.707, 0., 0.),
             ),
         ];
@@ -483,10 +430,8 @@ mod tests {
         let vulkan_context = VulkanContext::testing().unwrap();
         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
-        let gltf = include_bytes!("../../hotham-asteroid/assets/left_hand.gltf");
-        let data = include_bytes!("../../hotham-asteroid/assets/left_hand.bin");
-        let data: Vec<(&[u8], &[u8])> = vec![(gltf, data)];
-        let models = load_models_from_gltf(data, &vulkan_context, &set_layouts).unwrap();
+        let data: Vec<&[u8]> = vec![include_bytes!("../../hotham-asteroid/assets/left_hand.glb")];
+        let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
 
         let mut world = World::default();
         let _hand = add_model_to_world("Left Hand", &models, &mut world, None);

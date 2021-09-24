@@ -45,7 +45,6 @@ impl Mesh {
         buffer: &[u8],
         vulkan_context: &VulkanContext,
         descriptor_set_layouts: &DescriptorSetLayouts,
-        _empty_storage_buffer: &Buffer<Matrix4<f32>>,
         images: &Vec<gltf::image::Data>,
     ) -> Result<Mesh> {
         let name = mesh_data.name().unwrap_or("");
