@@ -273,7 +273,8 @@ mod tests {
         let image_from_vulkan = DynamicImage::ImageRgba8(
             RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
         );
-        let path = format!("../test_assets/render_{}.jpg", name);
+
+        let path = format!("../test_assets/render_{}.jpeg", name);
         let path = std::path::Path::new(&path);
         let mut file = std::fs::File::create(path).unwrap();
         let mut jpeg_encoder = JpegEncoder::new(&mut file);
