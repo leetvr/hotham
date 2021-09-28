@@ -1,27 +1,26 @@
 [package]
 authors = ["Kane Rogers <kane.m.rogers@gmail.com>"]
 edition = "2018"
-name = "hotham-asteroid"
+name = "simple-scene-example"
 version = "0.1.0"
 
 [lib]
 crate-type = ["lib", "cdylib"]
 
 [[bin]]
-name = "hotham-asteroid"
+name = "simple-scene-example"
 path = "src/main.rs"
 
 [dependencies]
-hotham = {path = "../hotham"}
+hotham = {path = "../../hotham"}
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.4.0"
 
 [package.metadata.android]
-apk_label = "Hotham Asteroid"
-assets = "assets"
+apk_label = "Hotham Simple Scene Example"
 fullscreen = true
-runtime_libs = "lib"
+runtime_libs = "../common_lib"
 target_sdk_version = 26
 
 [package.metadata.android.application]

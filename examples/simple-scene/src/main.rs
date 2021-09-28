@@ -1,5 +1,5 @@
 use hotham::HothamResult;
 
 fn main() -> HothamResult<()> {
-    hotham_asteroid::real_main()
+    simple_scene_example::real_main()
 }

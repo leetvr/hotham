@@ -41,8 +41,8 @@ pub fn get_world_with_hands() -> World {
     let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
     let data: Vec<&[u8]> = vec![
-        include_bytes!("../../hotham-asteroid/assets/left_hand.glb"),
-        include_bytes!("../../hotham-asteroid/assets/right_hand.glb"),
+        include_bytes!("../../test_assets/left_hand.glb"),
+        include_bytes!("../../test_assets/right_hand.glb"),
     ];
     let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
 
