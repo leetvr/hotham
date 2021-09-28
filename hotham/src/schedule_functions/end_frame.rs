@@ -1,7 +1,7 @@
 use crate::{resources::RenderContext, resources::VulkanContext, resources::XrContext};
 use legion::{Resources, World};
 
-pub(crate) fn end_frame(_world: &mut World, resources: &mut Resources) {
+pub fn end_frame(_world: &mut World, resources: &mut Resources) {
     // Get resources
     let mut xr_context = resources.get_mut::<XrContext>().unwrap();
     let vulkan_context = resources.get::<VulkanContext>().unwrap();

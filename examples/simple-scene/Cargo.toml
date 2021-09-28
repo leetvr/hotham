@@ -8,7 +8,7 @@ version = "0.1.0"
 crate-type = ["lib", "cdylib"]
 
 [[bin]]
-name = "simple-scene-example"
+name = "simple_scene_example"
 path = "src/main.rs"
 
 [dependencies]

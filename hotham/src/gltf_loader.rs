@@ -357,7 +357,6 @@ pub fn add_model_to_world(
 mod tests {
     use super::*;
     use crate::{
-        add_model_to_world,
         components::{Root, Transform},
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
     };

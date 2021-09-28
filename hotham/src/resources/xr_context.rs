@@ -32,7 +32,7 @@ pub struct XrContext {
 }
 
 impl XrContext {
-    pub(crate) fn new() -> Result<(XrContext, VulkanContext)> {
+    pub fn new() -> Result<(XrContext, VulkanContext)> {
         let (instance, system) = create_xr_instance()?;
         let vulkan_context = create_vulkan_context(&instance, system)?;
         let (session, frame_waiter, frame_stream) =

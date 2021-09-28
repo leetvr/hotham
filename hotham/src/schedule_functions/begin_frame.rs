@@ -5,7 +5,7 @@ use crate::{
     resources::xr_context::XrContext, resources::RenderContext, resources::VulkanContext, VIEW_TYPE,
 };
 
-pub(crate) fn begin_frame(_world: &mut World, resources: &mut Resources) {
+pub fn begin_frame(_world: &mut World, resources: &mut Resources) {
     // Get resources
     let mut xr_context = resources.get_mut::<XrContext>().unwrap();
     let mut render_context = resources.get_mut::<RenderContext>().unwrap();

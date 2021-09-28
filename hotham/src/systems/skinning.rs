@@ -10,7 +10,7 @@ use crate::components::{Info, Joint, Mesh, Skin, TransformMatrix};
 #[write_component(Mesh)]
 #[read_component(Info)]
 #[read_component(Skin)]
-pub(crate) fn skinning(world: &mut SubWorld) -> () {
+pub fn skinning(world: &mut SubWorld) -> () {
     let mut joint_matrices: HashMap<Entity, HashMap<usize, Matrix4<f32>>> = HashMap::new();
     unsafe {
         let mut query = <(&TransformMatrix, &Joint, &Info)>::query();

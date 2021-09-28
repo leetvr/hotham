@@ -9,9 +9,8 @@ use openxr::Posef;
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 use crate::{
-    add_model_to_world,
     components::Transform,
-    gltf_loader::load_models_from_glb,
+    gltf_loader::{add_model_to_world, load_models_from_glb},
     resources::{render_context::create_descriptor_set_layouts, VulkanContext},
 };
 
