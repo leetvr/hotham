@@ -1094,7 +1094,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
             .queue_family_indices(&[])
             .pre_transform(swapchain_support_details.capabilities.current_transform)
             .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-            .present_mode(vk::PresentModeKHR::FIFO)
+            .present_mode(vk::PresentModeKHR::IMMEDIATE)
             .clipped(true)
             .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT);
 
