@@ -78,7 +78,7 @@ impl Texture {
                 )
             }
             gltf::image::Source::View { .. } => {
-                let index = texture.index();
+                let index = texture.source().index();
                 let image = &images[index];
                 let pixels = add_alpha_channel(&image);
                 Texture::new(

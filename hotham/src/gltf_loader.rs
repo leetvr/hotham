@@ -243,7 +243,12 @@ fn add_animations(
             }
 
             let target_entity = node_entity_map.get(&target).unwrap();
-            let mut target_entry = world.entry(*target_entity).unwrap();
+            let mut target_entry = if let Some(target_entry) = world.entry(*target_entity) {
+                target_entry
+            } else {
+                println!("[HOTHAM_GLTF] - Error importing animation {:?}. No target, probably due to malformed file. Ignoring", animation.name());
+                return;
+            };
 
             assert!(
                 translations.len() == rotations.len() && rotations.len() == scales.len(),

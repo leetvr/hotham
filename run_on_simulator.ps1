@@ -1,6 +1,5 @@
 ${env:RUST_BACKTRACE} = 1
 
-cargo build -p hotham-simulator
 if ($?) {
-    cargo run simple-scene-example --release
+    cargo run --bin hotham_beat_saber_example --release
 }
