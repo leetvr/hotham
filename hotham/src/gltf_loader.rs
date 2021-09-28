@@ -243,7 +243,12 @@ fn add_animations(
             }
 
             let target_entity = node_entity_map.get(&target).unwrap();
-            let mut target_entry = world.entry(*target_entity).unwrap();
+            let mut target_entry = if let Some(target_entry) = world.entry(*target_entity) {
+                target_entry
+            } else {
+                println!("[HOTHAM_GLTF] - Error importing animation {:?}. No target, probably due to malformed file. Ignoring", animation.name());
+                return;
+            };
 
             assert!(
                 translations.len() == rotations.len() && rotations.len() == scales.len(),
@@ -352,7 +357,6 @@ pub fn add_model_to_world(
 mod tests {
     use super::*;
     use crate::{
-        add_model_to_world,
         components::{Root, Transform},
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
     };

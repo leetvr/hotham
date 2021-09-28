@@ -7,7 +7,7 @@ use ash::vk;
 use legion::system;
 
 #[system(for_each)]
-pub(crate) fn rendering(
+pub fn rendering(
     mesh: &mut Mesh,
     transform_matrix: &TransformMatrix,
     #[resource] vulkan_context: &VulkanContext,

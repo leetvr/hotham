@@ -95,7 +95,7 @@ impl Drop for RenderContext {
 }
 
 impl RenderContext {
-    pub(crate) fn new(vulkan_context: &VulkanContext, xr_context: &XrContext) -> Result<Self> {
+    pub fn new(vulkan_context: &VulkanContext, xr_context: &XrContext) -> Result<Self> {
         println!("[HOTHAM_RENDERER] Creating renderer..");
         let xr_swapchain = &xr_context.swapchain;
         let swapchain_resolution = xr_context.swapchain_resolution;

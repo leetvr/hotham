@@ -34,8 +34,7 @@ mod tests {
     use legion::{component, IntoQuery, Schedule, World};
 
     use crate::{
-        add_model_to_world,
-        gltf_loader::load_models_from_glb,
+        gltf_loader::{add_model_to_world, load_models_from_glb},
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
     };
 

@@ -1,11 +1,8 @@
 use ash::vk;
 pub use legion;
-use legion::{Resources, World};
 use openxr as xr;
-use std::{collections::HashMap, io::Seek};
 
 pub use app::App;
-pub use gltf_loader::add_model_to_world;
 pub use hotham_error::HothamError;
 pub use rapier3d;
 pub use scene_data::SceneData;
@@ -16,12 +13,12 @@ mod buffer;
 mod camera;
 pub mod components;
 mod frame;
-mod gltf_loader;
+pub mod gltf_loader;
 mod hotham_error;
 mod image;
 pub mod resources;
 mod scene_data;
-mod schedule_functions;
+pub mod schedule_functions;
 mod swapchain;
 pub mod systems;
 mod texture;
@@ -38,19 +35,6 @@ pub const BLEND_MODE: xr::EnvironmentBlendMode = xr::EnvironmentBlendMode::OPAQU
 
 pub const DEPTH_ATTACHMENT_USAGE_FLAGS: vk::ImageUsageFlags =
     vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT;
-
-pub trait Program {
-    fn get_gltf_data(&self) -> Vec<&[u8]>;
-    fn init(
-        &mut self,
-        models: HashMap<String, World>,
-        resources: &mut Resources,
-    ) -> HothamResult<World>;
-}
-
-pub fn read_spv_from_bytes<R: std::io::Read + Seek>(bytes: &mut R) -> std::io::Result<Vec<u32>> {
-    ash::util::read_spv(bytes)
-}
 
 // #[cfg(target_os = "windows")]
 // pub fn load_sound(path: &str) -> HothamResult<Sound> {
