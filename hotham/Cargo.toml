@@ -8,8 +8,6 @@ version = "0.1.0"
 [build-dependencies]
 shaderc = "0.7"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0"
 approx = "0.5"
@@ -18,15 +16,14 @@ console = "0.14"
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 gltf = {version = "0.16", features = ["KHR_materials_pbrSpecularGlossiness"]}
+image = "0.23"
 itertools = "0.10.0"
 legion = "0.4"
-# libktx-rs = {git = "https://github.com/UberLambda/libktx-rs"}
-image = "0.23"
 libktx-rs = "0.2.3"
 memoffset = "0.5.1"
 mint = "0.5.6"
 nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.29.0"}
-openxr = {features = ["loaded", "mint"], git = "https://github.com/Ralith/openxrs", rev = "8c23c05ce8395a58910d0e90ce6ac799b1013083"}
+openxr = {features = ["loaded", "mint"], version = "0.15.4"}
 rand = "0.8"
 rapier3d = "0.11"
 serde = {version = "1.0", features = ["derive"]}
@@ -41,10 +38,6 @@ ndk-glue = "0.4"
 [dev-dependencies.criterion]
 features = ["html_reports"]
 version = "0.3"
-
-# [[bench]]
-# harness = false
-# name = "model_loading"
 
 [[bench]]
 harness = false
