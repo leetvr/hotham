@@ -1,17 +1,14 @@
-${env:RUST_BACKTRACE} = 1
-adb shell am force-stop rust.hotham_asteroid
+adb shell am force-stop rust.beat_saber_example
 
-Set-Location hotham-asteroid
+Set-Location examples\beat-saber-clone
 cargo apk run --release
 
 if ($?) {
     Start-Sleep -Seconds 2
-    $processIdStr = (adb shell pidof rust.hotham_asteroid) | Out-String
+    $processIdStr = (adb shell pidof rust.beat_saber_example) | Out-String
     Write-Output $processIdStr
     $processId = $processIdStr -as [int]
     Write-Output $processId
     adb logcat --pid=$processId
+    Pop-Location
 }
-
-
-Set-Location C:\Users\kanem\Development\hotham

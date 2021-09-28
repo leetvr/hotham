@@ -966,6 +966,17 @@ impl VulkanContext {
         };
     }
 
+    #[cfg(not(debug_assertions))]
+    pub fn set_debug_name(
+        &self,
+        _object_type: ObjectType,
+        _object_handle: u64,
+        _object_name: &str,
+    ) -> VkResult<()> {
+        VkResult::Ok(())
+    }
+
+    #[cfg(debug_assertions)]
     pub fn set_debug_name(
         &self,
         object_type: ObjectType,
@@ -1064,7 +1075,9 @@ fn vulkan_init_legacy(
             .map(|x| CString::new(x).unwrap())
             .collect::<Vec<_>>();
 
+        #[cfg(debug_assertions)]
         vk_instance_exts.push(vk::ExtDebugUtilsFn::name().to_owned());
+
         println!(
             "Required Vulkan instance extensions: {:?}",
             vk_instance_exts
