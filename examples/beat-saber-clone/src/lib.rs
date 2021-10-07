@@ -36,30 +36,31 @@ pub fn real_main() -> HothamResult<()> {
     )?;
 
     // Add cubes
-    add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
-    add_model_to_world("Blue Cube", &models, &mut world, None).expect("Unable to add Blue Cube");
+    // add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
+    // add_model_to_world("Blue Cube", &models, &mut world, None).expect("Unable to add Blue Cube");
 
     // Add Red Saber
-    let red_saber = add_model_to_world("Red Saber", &models, &mut world, None)
+    let saber_offset = world.push((Transform::default(), TransformMatrix::default()));
+    {
+        add_saber_physics(&mut world, &mut physics_context, saber_offset);
+        let mut saber_entry = world.entry(saber_offset).unwrap();
+        saber_entry.add_component(Saber {
+            handedness: Handedness::Left,
+        });
+    }
+    let _red_saber = add_model_to_world("Red Saber", &models, &mut world, Some(saber_offset))
         .expect("Unable to add Red Saber");
-    add_saber_physics(&mut world, &mut physics_context, red_saber);
-    let mut red_saber_entry = world.entry(red_saber).unwrap();
-    red_saber_entry.add_component(Saber {
-        handedness: Handedness::Left,
-    });
-    red_saber_entry.add_component(Transform::default());
-    red_saber_entry.add_component(TransformMatrix::default());
 
     // Add Blue Saber
-    let blue_saber = add_model_to_world("Blue Saber", &models, &mut world, None)
-        .expect("Unable to add Blue Saber");
-    add_saber_physics(&mut world, &mut physics_context, blue_saber);
-    let mut blue_saber_entry = world.entry(blue_saber).unwrap();
-    blue_saber_entry.add_component(Saber {
-        handedness: Handedness::Left,
-    });
-    blue_saber_entry.add_component(Transform::default());
-    blue_saber_entry.add_component(TransformMatrix::default());
+    // let blue_saber = add_model_to_world("Blue Saber", &models, &mut world, None)
+    //     .expect("Unable to add Blue Saber");
+    // add_saber_physics(&mut world, &mut physics_context, blue_saber);
+    // let mut blue_saber_entry = world.entry(blue_saber).unwrap();
+    // blue_saber_entry.add_component(Saber {
+    //     handedness: Handedness::Right,
+    // });
+    // blue_saber_entry.add_component(Transform::default());
+    // blue_saber_entry.add_component(TransformMatrix::default());
 
     // Add Environment
     add_model_to_world("Environment", &models, &mut world, None)
