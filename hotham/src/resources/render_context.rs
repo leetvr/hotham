@@ -725,7 +725,7 @@ fn create_pipeline(
     // Rasterization state
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
-        .cull_mode(vk::CullModeFlags::BACK)
+        .cull_mode(vk::CullModeFlags::NONE)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)
