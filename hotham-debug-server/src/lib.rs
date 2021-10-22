@@ -3,24 +3,36 @@ use std::marker::Unpin;
 use std::thread::{self, JoinHandle};
 use tokio::net::{TcpListener, TcpStream};
 
-use futures::{join, TryFutureExt};
-use futures_util::{future, stream, SinkExt, StreamExt, TryStreamExt};
+use futures::join;
+use futures_util::{StreamExt, TryStreamExt};
 use tokio::runtime::Builder;
 use tokio::sync::broadcast::{channel as broadcast_channel, Receiver, Sender};
 
 use tokio_stream::wrappers::BroadcastStream;
-use tokio_tungstenite::tungstenite::{self, Message};
+use tokio_tungstenite::tungstenite;
 
 use serde::{Deserialize, Serialize};
+use serde_repr::*;
 use std::fmt::Debug;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-struct Test {
+use schemars::JsonSchema;
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
+pub struct Test {
     count: usize,
 }
-
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
 pub enum Command {
     Reset,
+    GetSchema,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub enum Message {
+    Data(Test),
+    Command(Command),
+    Schema(String),
 }
 
 pub fn create_server<T>() -> (Sender<T>, Receiver<T>, JoinHandle<()>)
@@ -50,13 +62,15 @@ where
     (s1.clone(), receiver, handle)
 }
 
-async fn accept_connection<T>(stream: TcpStream, to_client: Sender<T>, from_client: Receiver<T>)
+async fn accept_connection<T>(stream: TcpStream, to_hotham: Sender<T>, from_hotham: Receiver<T>)
 where
     T: Serialize + DeserializeOwned + Send + Sync + std::clone::Clone + Unpin + 'static + Debug,
 {
-    let from_client = BroadcastStream::new(from_client).map(|v| {
-        let json = serde_json::to_string(&v.unwrap()).expect("Unable to deserialize");
-        Ok(Message::Text(json))
+    let from_client = BroadcastStream::new(from_hotham).map(|message| {
+        let message = message.unwrap();
+        let json =
+            serde_json::to_string(&message).expect(&format!("Unable to deserialize {:?}", message));
+        Ok(tungstenite::Message::Text(json))
     });
     let addr = stream
         .peer_addr()
@@ -74,7 +88,7 @@ where
     let f1 = read
         .filter_map(|msg| async move {
             match msg {
-                Ok(Message::Text(m)) => {
+                Ok(tungstenite::Message::Text(m)) => {
                     println!("Received message from client: {:?}", m);
                     let t: T = serde_json::from_str(&m).expect("Unable to deserialize!");
                     println!("Deserialised: {:?}", t);
@@ -83,7 +97,7 @@ where
                 _ => None,
             }
         })
-        .try_for_each(|v| futures::future::ready(to_client.send(v).map(|_| ()).map_err(|_| ())));
+        .try_for_each(|v| futures::future::ready(to_hotham.send(v).map(|_| ()).map_err(|_| ())));
 
     let f2 = from_client.forward(write);
 
@@ -96,26 +110,47 @@ where
 mod tests {
     use std::time::Duration;
 
+    use schemars::schema_for;
+
     use super::*;
     #[test]
     fn it_works() {
         // This is simulating the inside of Hotham.
         let test = Test { count: 0 };
+        let test_message = Message::Data(test);
         let (sender, mut receiver, _handle) = create_server();
-        sender.send(test).expect("Unable to send");
+        sender.send(test_message).expect("Unable to send");
         let mut count = 0;
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
             println!("About to receive..");
-            count = match receiver.try_recv() {
-                Ok(v) => v.count,
-                Err(_) => count + 1,
+            let response = match receiver.try_recv() {
+                Ok(Message::Data(d)) => {
+                    count = d.count;
+                    None
+                }
+                Ok(Message::Command(Command::Reset)) => {
+                    count = 0;
+                    None
+                }
+                Ok(Message::Command(Command::GetSchema)) => {
+                    let schema = schema_for!(Test);
+                    let schema = serde_json::to_string_pretty(&schema).unwrap();
+                    Some(Message::Schema(schema))
+                }
+                Ok(Message::Schema(_)) => None,
+                Err(_) => {
+                    count = count + 1;
+                    Some(Message::Data(Test { count }))
+                }
             };
-            let val = Test { count };
             println!("Count is now {}", count);
-            sender.send(val).expect("Unable to update value");
-            let _ = receiver.try_recv();
+
+            if let Some(response) = response {
+                sender.send(response).expect("Unable to update value");
+                let _ = receiver.try_recv();
+            }
         }
     }
 }
