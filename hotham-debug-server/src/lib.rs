@@ -1,5 +1,5 @@
+use schemars::schema::RootSchema;
 use serde::de::DeserializeOwned;
-use std::marker::Unpin;
 use std::thread::{self, JoinHandle};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -15,29 +15,59 @@ use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::fmt::Debug;
 
-use schemars::JsonSchema;
+use schemars::{schema_for, JsonSchema};
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+pub struct Test {
+    name: String,
+}
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
-pub struct Test {
+pub struct Info {
     count: usize,
 }
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct Data<E, N> {
+    editable: Option<E>,
+    non_editable: Option<N>,
+}
+
 #[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 pub enum Command {
     Reset,
-    GetSchema,
+    Init,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub enum Message {
-    Data(Test),
-    Command(Command),
-    Schema(String),
+pub struct Schema {
+    editable: RootSchema,
+    non_editable: RootSchema,
 }
 
-pub fn create_server<T>() -> (Sender<T>, Receiver<T>, JoinHandle<()>)
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct InitData<E, N> {
+    data: Data<E, N>,
+    schema: Schema,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub enum Message<E, N> {
+    Data(Data<E, N>),
+    Command(Command),
+    Init(InitData<E, N>),
+    Error(String),
+}
+
+pub fn create_server<E, N>() -> (
+    Sender<Message<E, N>>,
+    Receiver<Message<E, N>>,
+    JoinHandle<()>,
+)
 where
-    T: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
+    E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
+    N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
 {
     let (sender, receiver) = broadcast_channel(16);
     let s1 = sender.clone();
@@ -62,9 +92,13 @@ where
     (s1.clone(), receiver, handle)
 }
 
-async fn accept_connection<T>(stream: TcpStream, to_hotham: Sender<T>, from_hotham: Receiver<T>)
-where
-    T: Serialize + DeserializeOwned + Send + Sync + std::clone::Clone + Unpin + 'static + Debug,
+async fn accept_connection<E, N>(
+    stream: TcpStream,
+    to_hotham: Sender<Message<E, N>>,
+    from_hotham: Receiver<Message<E, N>>,
+) where
+    E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
+    N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
 {
     let from_client = BroadcastStream::new(from_hotham).map(|message| {
         let message = message.unwrap();
@@ -90,9 +124,17 @@ where
             match msg {
                 Ok(tungstenite::Message::Text(m)) => {
                     println!("Received message from client: {:?}", m);
-                    let t: T = serde_json::from_str(&m).expect("Unable to deserialize!");
-                    println!("Deserialised: {:?}", t);
-                    Some(Ok(t))
+                    match serde_json::from_str::<Message<E, N>>(&m) {
+                        Ok(message) => {
+                            println!("Deserialised: {:?}", message);
+                            Some(Ok(message))
+                        }
+                        Err(e) => {
+                            let error_message = format!("Error deserialising: {:?}", e);
+                            eprintln!("{:?}", error_message);
+                            Some(Ok(Message::Error(error_message)))
+                        }
+                    }
                 }
                 _ => None,
             }
@@ -106,51 +148,88 @@ where
     r2.expect("Problem 2!");
 }
 
+pub fn run_server<E, N>(
+    editable_data: &mut E,
+    non_editable_data: &N,
+    to_server: &mut Sender<Message<E, N>>,
+    from_server: &mut Receiver<Message<E, N>>,
+) -> bool
+where
+    E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug + Default,
+    N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
+{
+    let mut changed = false;
+    let response = match from_server.try_recv() {
+        Ok(Message::Data(Data {
+            editable: Some(editible),
+            ..
+        })) => {
+            *editable_data = editible;
+            changed = true;
+            Some(Message::Data(Data {
+                editable: None,
+                non_editable: Some(non_editable_data.clone()),
+            }))
+        }
+        Ok(Message::Command(Command::Reset)) => {
+            *editable_data = E::default();
+            changed = true;
+            Some(Message::Data(Data {
+                editable: None,
+                non_editable: Some(non_editable_data.clone()),
+            }))
+        }
+        Ok(Message::Command(Command::Init)) => {
+            let editable = schema_for!(Test);
+            let non_editable = schema_for!(Info);
+            Some(Message::Init(InitData {
+                schema: Schema {
+                    editable,
+                    non_editable,
+                },
+                data: Data {
+                    editable: Some(editable_data.clone()),
+                    non_editable: Some(non_editable_data.clone()),
+                },
+            }))
+        }
+        Ok(error_message @ Message::Error(_)) => Some(error_message),
+        Ok(_) => None,
+        Err(_) => Some(Message::Data(Data {
+            editable: None,
+            non_editable: Some(non_editable_data.clone()),
+        })),
+    };
+
+    if let Some(response) = response {
+        to_server.send(response).expect("Unable to update value");
+        let _ = from_server.try_recv();
+    }
+
+    changed
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
-
-    use schemars::schema_for;
 
     use super::*;
     #[test]
     fn it_works() {
         // This is simulating the inside of Hotham.
-        let test = Test { count: 0 };
-        let test_message = Message::Data(test);
-        let (sender, mut receiver, _handle) = create_server();
-        sender.send(test_message).expect("Unable to send");
-        let mut count = 0;
+        let (mut sender, mut receiver, _handle) = create_server();
+        let mut data = Test {
+            name: "Железного́рск".to_string(),
+        };
+        let mut info = Info { count: 0 };
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            println!("About to receive..");
-            let response = match receiver.try_recv() {
-                Ok(Message::Data(d)) => {
-                    count = d.count;
-                    None
-                }
-                Ok(Message::Command(Command::Reset)) => {
-                    count = 0;
-                    None
-                }
-                Ok(Message::Command(Command::GetSchema)) => {
-                    let schema = schema_for!(Test);
-                    let schema = serde_json::to_string_pretty(&schema).unwrap();
-                    Some(Message::Schema(schema))
-                }
-                Ok(Message::Schema(_)) => None,
-                Err(_) => {
-                    count = count + 1;
-                    Some(Message::Data(Test { count }))
-                }
-            };
-            println!("Count is now {}", count);
-
-            if let Some(response) = response {
-                sender.send(response).expect("Unable to update value");
-                let _ = receiver.try_recv();
+            let changed = run_server(&mut data, &info, &mut sender, &mut receiver);
+            if changed {
+                println!("Changed! Data is now {:?}", data);
             }
+            info.count += 1;
         }
     }
 }
