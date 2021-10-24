@@ -1,6 +1,10 @@
 use crate::{
-    buffer::Buffer, hotham_error::HothamError, image::Image, scene_data::SceneParams,
-    texture::Texture, SceneData, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
+    buffer::Buffer,
+    hotham_error::HothamError,
+    image::Image,
+    scene_data::{SceneData, SceneParams},
+    texture::Texture,
+    DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
 };
 use anyhow::{anyhow, Result};
 use ash::{

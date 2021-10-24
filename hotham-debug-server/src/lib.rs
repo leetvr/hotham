@@ -60,11 +60,13 @@ pub enum Message<E, N> {
     Error(String),
 }
 
-pub fn create_server<E, N>() -> (
-    Sender<Message<E, N>>,
-    Receiver<Message<E, N>>,
-    JoinHandle<()>,
-)
+pub struct DebugServer<E, N> {
+    pub sender: Sender<Message<E, N>>,
+    pub receiver: Receiver<Message<E, N>>,
+    _handle: JoinHandle<()>,
+}
+
+pub fn create_server<E, N>() -> DebugServer<E, N>
 where
     E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
     N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
@@ -80,16 +82,16 @@ where
             let try_socket = TcpListener::bind(&addr).await;
             let listener = try_socket.expect("Failed to bind");
             while let Ok((stream, _)) = listener.accept().await {
-                tokio::spawn(accept_connection(
-                    stream,
-                    sender.clone(),
-                    sender.subscribe(),
-                ));
+                tokio::spawn(accept_connection(stream, s1.clone(), s1.subscribe()));
             }
         })
     });
 
-    (s1.clone(), receiver, handle)
+    DebugServer {
+        sender,
+        receiver,
+        _handle: handle,
+    }
 }
 
 async fn accept_connection<E, N>(
@@ -149,31 +151,28 @@ async fn accept_connection<E, N>(
 }
 
 pub fn run_server<E, N>(
-    editable_data: &mut E,
     non_editable_data: &N,
     to_server: &mut Sender<Message<E, N>>,
     from_server: &mut Receiver<Message<E, N>>,
-) -> bool
+) -> Option<E>
 where
     E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug + Default,
     N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
 {
-    let mut changed = false;
-    let response = match from_server.try_recv() {
+    let mut editable_data = None;
+    let response: Option<Message<E, N>> = match from_server.try_recv() {
         Ok(Message::Data(Data {
             editable: Some(editible),
             ..
         })) => {
-            *editable_data = editible;
-            changed = true;
+            editable_data = Some(editible);
             Some(Message::Data(Data {
                 editable: None,
                 non_editable: Some(non_editable_data.clone()),
             }))
         }
         Ok(Message::Command(Command::Reset)) => {
-            *editable_data = E::default();
-            changed = true;
+            editable_data = Some(E::default());
             Some(Message::Data(Data {
                 editable: None,
                 non_editable: Some(non_editable_data.clone()),
@@ -188,7 +187,7 @@ where
                     non_editable,
                 },
                 data: Data {
-                    editable: Some(editable_data.clone()),
+                    editable: Some(E::default()),
                     non_editable: Some(non_editable_data.clone()),
                 },
             }))
@@ -206,7 +205,7 @@ where
         let _ = from_server.try_recv();
     }
 
-    changed
+    editable_data
 }
 
 #[cfg(test)]
@@ -217,7 +216,7 @@ mod tests {
     #[test]
     fn it_works() {
         // This is simulating the inside of Hotham.
-        let (mut sender, mut receiver, _handle) = create_server();
+        let mut server_handle = create_server();
         let mut data = Test {
             name: "Железного́рск".to_string(),
         };
@@ -225,9 +224,13 @@ mod tests {
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            let changed = run_server(&mut data, &info, &mut sender, &mut receiver);
-            if changed {
-                println!("Changed! Data is now {:?}", data);
+            let changed = run_server::<Test, Info>(
+                &info,
+                &mut server_handle.sender,
+                &mut server_handle.receiver,
+            );
+            if let Some(changed) = changed {
+                println!("Changed! Data is now {:?}", changed);
             }
             info.count += 1;
         }

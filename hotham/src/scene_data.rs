@@ -1,7 +1,8 @@
 // TODO: Should these be components?
 use nalgebra::{vector, Matrix4, Vector3, Vector4};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Deserialize, Serialize, Clone, Debug, Copy)]
 #[repr(C)]
 pub struct SceneData {
     pub projection: [Matrix4<f32>; 2],
@@ -19,7 +20,7 @@ impl Default for SceneData {
     }
 }
 
-#[derive(Clone, Debug, Copy)]
+#[derive(Deserialize, Serialize, Clone, Debug, Copy)]
 #[repr(C)]
 pub struct SceneParams {
     pub light_direction: Vector4<f32>,
