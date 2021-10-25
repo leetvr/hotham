@@ -223,7 +223,7 @@ mod tests {
                     .update_scene_data(&views, &vulkan_context)
                     .unwrap();
                 render_context
-                    .scene_params
+                    .scene_params_buffer
                     .update(
                         &vulkan_context,
                         &[SceneParams {

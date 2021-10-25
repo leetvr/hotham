@@ -20,7 +20,7 @@ impl<T> Buffer<T>
 where
     T: Sized + Copy,
 {
-    pub(crate) fn new(
+    pub fn new(
         vulkan_context: &VulkanContext,
         data: &[T],
         usage: vk::BufferUsageFlags,
@@ -41,7 +41,7 @@ where
 
     /// **NOTE**: If passing in a Vec, you MUST use vec.as_ptr(), passing in
     /// a reference will result in A Very Bad Time.
-    pub(crate) fn update(&self, vulkan_context: &VulkanContext, data: &[T]) -> Result<()> {
+    pub fn update(&self, vulkan_context: &VulkanContext, data: &[T]) -> Result<()> {
         vulkan_context.update_buffer(
             data,
             self.device_memory,

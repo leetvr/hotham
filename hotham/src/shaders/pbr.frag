@@ -354,6 +354,37 @@ void main()
 	outColor = vec4(color, baseColor.a);
 
 	// Debugging
+
+	// Shader inputs debug visualization
+	// "none", "Base Color Texture", "Normal Texture", "Occlusion Texture", "Emissive Texture", "Metalic (?)", "Roughness (?)"
+	if (uboParams.debugViewInputs > 0.0) {
+		int index = int(uboParams.debugViewInputs);
+		switch (index) {
+			case 1:
+				outColor.rgba = material.baseColorTextureSet > -1 ? texture(colorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1) : vec4(1.0f);
+				break;
+			case 2:
+				outColor.rgb = (material.normalTextureSet > -1) ? texture(normalMap, material.normalTextureSet == 0 ? inUV0 : inUV1).rgb : normalize(inNormal);
+				break;
+			case 3:
+				outColor.rgb = (material.occlusionTextureSet > -1) ? texture(aoMap, material.occlusionTextureSet == 0 ? inUV0 : inUV1).rrr : vec3(0.0f);
+				break;
+			case 4:
+				outColor.rgb = (material.emissiveTextureSet > -1) ? texture(emissiveMap, material.emissiveTextureSet == 0 ? inUV0 : inUV1).rgb : vec3(0.0f);
+				break;
+			case 5:
+				outColor.rgb = texture(physicalDescriptorMap, inUV0).bbb;
+				break;
+			case 6:
+				outColor.rgb = texture(physicalDescriptorMap, inUV0).ggg;
+				break;
+			case 7:
+				outColor.rgba = material.baseColorTextureSet > -1 ? texture(colorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1) * material.baseColorFactor: vec4(1.0f);
+				break;
+		}
+		outColor = SRGBtoLINEAR(outColor);
+	}
+
 	// "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
 	if (uboParams.debugViewEquation > 0.0) {
 		int index = int(uboParams.debugViewEquation);
@@ -375,4 +406,5 @@ void main()
 				break;				
 		}
 	}
+	
 }
