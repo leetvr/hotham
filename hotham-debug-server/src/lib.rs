@@ -1,5 +1,6 @@
 use schemars::schema::RootSchema;
 use serde::de::DeserializeOwned;
+use std::io::{Error as IOError, ErrorKind};
 use std::thread::{self, JoinHandle};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -15,17 +16,7 @@ use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::fmt::Debug;
 
-use schemars::{schema_for, JsonSchema};
-
-#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
-pub struct Test {
-    name: String,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema)]
-pub struct Info {
-    count: usize,
-}
+use schemars::schema_for_value;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Data<E, N> {
@@ -66,34 +57,6 @@ pub struct DebugServer<E, N> {
     _handle: JoinHandle<()>,
 }
 
-pub fn create_server<E, N>() -> DebugServer<E, N>
-where
-    E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
-    N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
-{
-    let (sender, receiver) = broadcast_channel(16);
-    let s1 = sender.clone();
-
-    let handle = thread::spawn(move || {
-        let rt = Builder::new_current_thread().enable_all().build().unwrap();
-        rt.block_on(async {
-            let addr = "127.0.0.1:8080".to_string();
-            // Create the event loop and TCP listener we'll accept connections on.
-            let try_socket = TcpListener::bind(&addr).await;
-            let listener = try_socket.expect("Failed to bind");
-            while let Ok((stream, _)) = listener.accept().await {
-                tokio::spawn(accept_connection(stream, s1.clone(), s1.subscribe()));
-            }
-        })
-    });
-
-    DebugServer {
-        sender,
-        receiver,
-        _handle: handle,
-    }
-}
-
 async fn accept_connection<E, N>(
     stream: TcpStream,
     to_hotham: Sender<Message<E, N>>,
@@ -102,12 +65,6 @@ async fn accept_connection<E, N>(
     E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
     N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
 {
-    let from_client = BroadcastStream::new(from_hotham).map(|message| {
-        let message = message.unwrap();
-        let json =
-            serde_json::to_string(&message).expect(&format!("Unable to deserialize {:?}", message));
-        Ok(tungstenite::Message::Text(json))
-    });
     let addr = stream
         .peer_addr()
         .expect("connected streams should have a peer address");
@@ -119,9 +76,9 @@ async fn accept_connection<E, N>(
 
     println!("New WebSocket connection: {}", addr);
 
-    let (write, read) = ws_stream.split();
+    let (to_client, from_client) = ws_stream.split();
 
-    let f1 = read
+    let client_to_hotham = from_client
         .filter_map(|msg| async move {
             match msg {
                 Ok(tungstenite::Message::Text(m)) => {
@@ -143,80 +100,131 @@ async fn accept_connection<E, N>(
         })
         .try_for_each(|v| futures::future::ready(to_hotham.send(v).map(|_| ()).map_err(|_| ())));
 
-    let f2 = from_client.forward(write);
+    let from_hotham = BroadcastStream::new(from_hotham).map(|message| match message {
+        Ok(message) => {
+            let json = serde_json::to_string(&message)
+                .expect(&format!("Unable to deserialize {:?}", message));
+            Ok(tungstenite::Message::Text(json))
+        }
+        Err(e) => Err(tokio_tungstenite::tungstenite::Error::Io(IOError::new(
+            ErrorKind::Other,
+            e.to_string(),
+        ))),
+    });
+    let hotham_to_client = from_hotham.forward(to_client);
 
-    let (r1, r2) = join!(f1, f2);
+    let (r1, r2) = join!(client_to_hotham, hotham_to_client);
     r1.expect("Problem!");
     r2.expect("Problem 2!");
 }
 
-pub fn run_server<E, N>(
-    non_editable_data: &N,
-    to_server: &mut Sender<Message<E, N>>,
-    from_server: &mut Receiver<Message<E, N>>,
-) -> Option<E>
+impl<E, N> DebugServer<E, N>
 where
     E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug + Default,
     N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
 {
-    let mut editable_data = None;
-    let response: Option<Message<E, N>> = match from_server.try_recv() {
-        Ok(Message::Data(Data {
-            editable: Some(editible),
-            ..
-        })) => {
-            editable_data = Some(editible);
-            Some(Message::Data(Data {
-                editable: None,
-                non_editable: Some(non_editable_data.clone()),
-            }))
-        }
-        Ok(Message::Command(Command::Reset)) => {
-            editable_data = Some(E::default());
-            Some(Message::Data(Data {
-                editable: None,
-                non_editable: Some(non_editable_data.clone()),
-            }))
-        }
-        Ok(Message::Command(Command::Init)) => {
-            let editable = schema_for!(Test);
-            let non_editable = schema_for!(Info);
-            Some(Message::Init(InitData {
-                schema: Schema {
-                    editable,
-                    non_editable,
-                },
-                data: Data {
-                    editable: Some(E::default()),
-                    non_editable: Some(non_editable_data.clone()),
-                },
-            }))
-        }
-        Ok(error_message @ Message::Error(_)) => Some(error_message),
-        Ok(_) => None,
-        Err(_) => Some(Message::Data(Data {
-            editable: None,
-            non_editable: Some(non_editable_data.clone()),
-        })),
-    };
+    pub fn new() -> DebugServer<E, N>
+    where
+        E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
+        N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
+    {
+        let (sender, receiver) = broadcast_channel(16);
+        let s1 = sender.clone();
 
-    if let Some(response) = response {
-        to_server.send(response).expect("Unable to update value");
-        let _ = from_server.try_recv();
+        let handle = thread::spawn(move || {
+            let rt = Builder::new_current_thread().enable_all().build().unwrap();
+            rt.block_on(async {
+                let addr = "127.0.0.1:8080".to_string();
+                // Create the event loop and TCP listener we'll accept connections on.
+                let try_socket = TcpListener::bind(&addr).await;
+                let listener = try_socket.expect("Failed to bind");
+                while let Ok((stream, _)) = listener.accept().await {
+                    tokio::spawn(accept_connection(stream, s1.clone(), s1.subscribe()));
+                }
+            })
+        });
+
+        DebugServer {
+            sender,
+            receiver,
+            _handle: handle,
+        }
     }
 
-    editable_data
+    pub fn sync(&mut self, non_editable_data: &N) -> Option<E> {
+        let mut editable_data = None;
+        let response: Option<Message<E, N>> = match self.receiver.try_recv() {
+            Ok(Message::Data(Data {
+                editable: Some(editible),
+                ..
+            })) => {
+                editable_data = Some(editible);
+                Some(Message::Data(Data {
+                    editable: None,
+                    non_editable: Some(non_editable_data.clone()),
+                }))
+            }
+            Ok(Message::Command(Command::Reset)) => {
+                editable_data = Some(E::default());
+                Some(Message::Data(Data {
+                    editable: None,
+                    non_editable: Some(non_editable_data.clone()),
+                }))
+            }
+            Ok(Message::Command(Command::Init)) => {
+                let editable = E::default();
+                let non_editable = non_editable_data.clone();
+
+                let editable_schema = schema_for_value!(editable);
+                let non_editable_schema = schema_for_value!(non_editable_data);
+                Some(Message::Init(InitData {
+                    schema: Schema {
+                        editable: editable_schema,
+                        non_editable: non_editable_schema,
+                    },
+                    data: Data {
+                        editable: Some(editable),
+                        non_editable: Some(non_editable),
+                    },
+                }))
+            }
+            Ok(error_message @ Message::Error(_)) => Some(error_message),
+            Ok(_) => None,
+            Err(_) => Some(Message::Data(Data {
+                editable: None,
+                non_editable: Some(non_editable_data.clone()),
+            })),
+        };
+
+        if let Some(response) = response {
+            self.sender.send(response).expect("Unable to update value");
+            let _ = self.receiver.try_recv();
+        }
+
+        editable_data
+    }
 }
 
 #[cfg(test)]
+#[allow(unused_assignments)]
 mod tests {
     use std::time::Duration;
+    #[derive(Deserialize, Serialize, Clone, Debug, Default)]
+    struct Test {
+        name: String,
+    }
+
+    #[derive(Deserialize, Serialize, Clone, Debug)]
+    struct Info {
+        count: usize,
+    }
 
     use super::*;
     #[test]
     fn it_works() {
         // This is simulating the inside of Hotham.
-        let mut server_handle = create_server();
+        let mut server: DebugServer<Test, Info> = DebugServer::new();
+
         let mut data = Test {
             name: "Железного́рск".to_string(),
         };
@@ -224,13 +232,10 @@ mod tests {
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            let changed = run_server::<Test, Info>(
-                &info,
-                &mut server_handle.sender,
-                &mut server_handle.receiver,
-            );
+            let changed = server.sync(&info);
             if let Some(changed) = changed {
-                println!("Changed! Data is now {:?}", changed);
+                data = changed;
+                println!("Changed! Data is now {:?}", data);
             }
             info.count += 1;
         }
