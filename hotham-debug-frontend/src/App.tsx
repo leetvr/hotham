@@ -5,7 +5,8 @@ import './App.css';
 import { JSONSchema7 } from 'json-schema';
 import Box from '@material-ui/core/Box';
 import Button from '@material-ui/core/Button';
-const ws = new WebSocket('ws://localhost:8080');
+const SERVER_IP = 'localhost';
+const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
 
 const Form = withTheme<Record<any, string>>(MaterialUITheme);
 
@@ -44,6 +45,8 @@ function Container(props: { children: JSX.Element }): JSX.Element {
   return <div className="App">{props.children}</div>;
 }
 
+let lastUpdate = new Date().getTime();
+
 function App() {
   const [editableData, setEditableData] = useState<
     Record<string, any> | undefined
@@ -67,8 +70,11 @@ function App() {
           setEditableData(message.Data.editable);
         }
         if (message.Data.non_editable) {
-          console.log('Received non data!');
-          setNonEditableData(message.Data.non_editable);
+          const deltaTime = lastUpdate - new Date().getTime();
+          if (deltaTime > 500) {
+            setNonEditableData(message.Data.non_editable);
+            lastUpdate = new Date().getTime();
+          }
         }
       }
       if (message.Init) {
@@ -98,21 +104,15 @@ function App() {
           <></>
         </Form>
         <Form
-          liveValidate
+          noHtml5Validate
           formData={editableData}
           schema={schema.editable}
           onChange={(e, _) => {
             setEditableData(e.formData);
-          }}
-          onSubmit={(e) => {
             if (e.errors.length === 0) update(e.formData);
           }}
         >
-          <Box marginTop={3}>
-            <Button type="submit" variant="contained" color="primary">
-              Submit
-            </Button>
-          </Box>
+          {null}
         </Form>
       </>
     </Container>

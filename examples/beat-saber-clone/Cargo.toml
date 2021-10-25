@@ -26,6 +26,12 @@ target_sdk_version = 26
 [package.metadata.android.application]
 debuggable = true
 
+[[package.metadata.android.uses_permission]]
+name = "android.permission.INTERNET"
+
+[[package.metadata.android.uses_permission]]
+name = "android.permission.ACCESS_NETWORK_STATE"
+
 [[package.metadata.android.application.intent_filter]]
 actions = ["android.intent.action.MAIN"]
 categories = ["com.oculus.intent.category.VR", "android.intent.category.LAUNCHER"]

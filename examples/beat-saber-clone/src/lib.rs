@@ -10,7 +10,7 @@ use hotham::systems::{
     update_transform_matrix_system,
 };
 use hotham::{gltf_loader, App, HothamResult};
-use hotham_debug_server::{create_server, run_server, DebugServer};
+use hotham_debug_server::DebugServer;
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -29,7 +29,7 @@ pub fn real_main() -> HothamResult<()> {
         &vulkan_context,
         &render_context.descriptor_set_layouts,
     )?;
-    let debug_server = create_server::<SceneParams, SceneData>();
+    let debug_server: DebugServer<SceneParams, SceneData> = DebugServer::new();
 
     add_model_to_world("Blue Cube", &models, &mut world, None).expect("Unable to add Blue Cube");
     add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
@@ -50,16 +50,17 @@ pub fn real_main() -> HothamResult<()> {
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
         .add_thread_local_fn(|_, resources| {
-            let mut render_context = resources.get_mut::<RenderContext>().unwrap();
+            let render_context = resources.get::<RenderContext>().unwrap();
             let vulkan_context = resources.get::<VulkanContext>().unwrap();
             let mut debug_server = resources
                 .get_mut::<DebugServer<SceneParams, SceneData>>()
                 .unwrap();
-            let updated = run_server(
-                &render_context.scene_data,
-                &mut debug_server.sender,
-                &mut debug_server.receiver,
-            );
+            if let Some(updated) = debug_server.sync(&render_context.scene_data) {
+                render_context
+                    .scene_params_buffer
+                    .update(&vulkan_context, &[updated])
+                    .expect("Unable to update data");
+            };
         })
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
