@@ -29,9 +29,10 @@ Hotham's development is only possible thanks to the support of the community. It
 - [x] [Basic PBR support](https://github.com/leetvr/hotham/issues/65)
 - [x] [Simple debug UI](https://github.com/leetvr/hotham/issues/96)
 - [ ] [Sound support](https://github.com/leetvr/hotham/issues/52)
+- [ ] [Text/UI support](https://github.com/leetvr/hotham/issues/93)
 
 # Future goals ✨
-- [ ] Text/UI support
+
 - [ ] Visual editor
 - [ ] Fast reloading
 - [ ] OpenXR record/playback for integration testing
