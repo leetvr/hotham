@@ -1,11 +1,11 @@
 use hotham::{
     components::{hand::Handedness, RigidBody},
-    components::{Transform, TransformMatrix},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::{PhysicsContext, XrContext},
     util::posef_to_isometry,
 };
 use legion::{system, Entity, World};
+use nalgebra::{UnitQuaternion, Vector3};
 
 use crate::components::Saber;
 
@@ -41,7 +41,7 @@ pub fn sabers(
         .get_mut(rigid_body_component.handle)
         .unwrap();
 
-    let position = posef_to_isometry(pose);
+    let mut position = posef_to_isometry(pose);
     rigid_body.set_next_kinematic_position(position);
 }
 
@@ -65,7 +65,7 @@ pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext
 mod tests {
     use super::*;
     use hotham::{
-        components::Transform,
+        components::{Transform, TransformMatrix},
         resources::{PhysicsContext, XrContext},
         schedule_functions::physics_step,
         systems::update_rigid_body_transforms_system,
