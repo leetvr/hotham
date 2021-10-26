@@ -21,10 +21,10 @@ use crate::{
     frame::Frame,
     image::Image,
     resources::{VulkanContext, XrContext},
-    scene_data::SceneParams,
+    scene_data::{SceneData, SceneParams},
     swapchain::Swapchain,
     texture::Texture,
-    SceneData, Vertex, COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
+    Vertex, COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{
@@ -51,8 +51,9 @@ pub struct RenderContext {
     pub depth_image: Image,
     pub colour_image: Image,
     pub render_area: vk::Rect2D,
-    pub scene_data: Buffer<SceneData>,
-    pub scene_params: Buffer<SceneParams>,
+    pub scene_data: SceneData,
+    pub scene_data_buffer: Buffer<SceneData>,
+    pub scene_params_buffer: Buffer<SceneParams>,
     pub scene_data_descriptor_sets: Vec<vk::DescriptorSet>,
     pub render_start_time: Instant,
     pub cameras: Vec<Camera>,
@@ -158,14 +159,14 @@ impl RenderContext {
 
         println!("[HOTHAM_RENDERER] Creating UBO..");
         let scene_data = SceneData::default();
-        let scene_data = Buffer::new(
+        let scene_data_buffer = Buffer::new(
             &vulkan_context,
             &[scene_data],
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
 
         let scene_params = SceneParams::default();
-        let scene_params = Buffer::new(
+        let scene_params_buffer = Buffer::new(
             &vulkan_context,
             &[scene_params],
             vk::BufferUsageFlags::UNIFORM_BUFFER,
@@ -189,14 +190,14 @@ impl RenderContext {
 
         let scene_data_descriptor_sets = vulkan_context.create_scene_data_descriptor_sets(
             descriptor_set_layouts.scene_data_layout,
-            &scene_data,
-            &scene_params,
+            &scene_data_buffer,
+            &scene_params_buffer,
             &diffuse_ibl,
             &specular_ibl,
             &brdf_lut,
         )?;
 
-        println!("[HOTHAM_RENDERER] ..done! {:?}", scene_data);
+        println!("[HOTHAM_RENDERER] ..done! {:?}", scene_data_buffer);
 
         println!("[HOTHAM_RENDERER] Done! Renderer initialised!");
 
@@ -211,7 +212,8 @@ impl RenderContext {
             colour_image,
             render_area,
             scene_data,
-            scene_params,
+            scene_data_buffer,
+            scene_params_buffer,
             scene_data_descriptor_sets,
             render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
@@ -267,13 +269,14 @@ impl RenderContext {
             println!("Camera position: {:?}", camera_position);
         }
 
-        let scene_data = SceneData {
+        self.scene_data = SceneData {
             view,
             projection,
             camera_position,
         };
 
-        self.scene_data.update(&vulkan_context, &[scene_data])?;
+        self.scene_data_buffer
+            .update(&vulkan_context, &[self.scene_data])?;
 
         Ok(())
     }

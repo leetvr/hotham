@@ -5,7 +5,6 @@ use openxr as xr;
 pub use app::App;
 pub use hotham_error::HothamError;
 pub use rapier3d;
-pub use scene_data::SceneData;
 pub use vertex::Vertex;
 
 mod app;
@@ -17,7 +16,7 @@ pub mod gltf_loader;
 mod hotham_error;
 mod image;
 pub mod resources;
-mod scene_data;
+pub mod scene_data;
 pub mod schedule_functions;
 mod swapchain;
 pub mod systems;

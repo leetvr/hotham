@@ -1,6 +1,10 @@
 use crate::{
-    buffer::Buffer, hotham_error::HothamError, image::Image, scene_data::SceneParams,
-    texture::Texture, SceneData, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
+    buffer::Buffer,
+    hotham_error::HothamError,
+    image::Image,
+    scene_data::{SceneData, SceneParams},
+    texture::Texture,
+    DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -1091,12 +1095,22 @@ fn vulkan_init_legacy(
             .application_name(&app_name)
             .api_version(vk::make_api_version(0, 1, 2, 0));
 
+        let validation_features_enables = [
+            // vk::ValidationFeatureEnableEXT::BEST_PRACTICES,
+        ];
+        let validation_features_disables = [];
+        let mut validation_features = vk::ValidationFeaturesEXT::builder()
+            .enabled_validation_features(&validation_features_enables)
+            .disabled_validation_features(&validation_features_disables);
+
+        // TODO: Disable validation in release
         let instance = entry
             .create_instance(
                 &vk::InstanceCreateInfo::builder()
                     .application_info(&app_info)
                     .enabled_extension_names(&vk_instance_ext_ptrs)
-                    .enabled_layer_names(&layer_names),
+                    .enabled_layer_names(&layer_names)
+                    .push_next(&mut validation_features),
                 None,
             )
             .expect("Vulkan error creating Vulkan instance");

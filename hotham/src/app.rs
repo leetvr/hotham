@@ -33,7 +33,6 @@ pub struct App {
 
 impl App {
     pub fn new(world: World, resources: Resources, schedule: Schedule) -> HothamResult<Self> {
-
         Ok(Self {
             should_quit: Arc::new(AtomicBool::from(false)),
             resumed: true,
