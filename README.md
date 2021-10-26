@@ -27,6 +27,7 @@ Hotham's development is only possible thanks to the support of the community. It
 - [x] Grabbing support
 - [x] Basic physics (eg. collision detection) support
 - [x] [Basic PBR support](https://github.com/leetvr/hotham/issues/65)
+- [x] [Simple debug UI](https://github.com/leetvr/hotham/issues/96)
 - [ ] [Sound support](https://github.com/leetvr/hotham/issues/52)
 
 # Future goals ✨
