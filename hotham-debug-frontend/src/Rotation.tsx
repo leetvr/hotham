@@ -201,40 +201,34 @@ function QuaternionMultiplier(props: {
 }
 
 export default function Rotation({ quaternion }: { quaternion: number[] }) {
-  // const [rotationA, setRotationA] = useState<THREE.Euler>(new THREE.Euler());
-  // const [rotationB, setRotationB] = useState<THREE.Euler>(new THREE.Euler());
+  const [offsetRotation, setOffsetRotation] = useState<THREE.Euler>(
+    new THREE.Euler()
+  );
+
   const [x, y, z, w] = quaternion;
-  const q = new THREE.Quaternion(x, y, z, w);
-  const rotation = new Euler();
-  rotation.setFromQuaternion(q);
+  const rotationFromApp = new THREE.Quaternion(x, y, z, w);
+
+  const offsetQuaternion = new THREE.Quaternion();
+  offsetQuaternion.setFromEuler(offsetRotation);
+
+  rotationFromApp.multiply(offsetQuaternion);
+  const rotationResult = new THREE.Euler();
+  rotationResult.setFromQuaternion(rotationFromApp);
+
   return (
     <div className="App">
       <Canvas style={{ flex: 1 }}>
         <Suspense fallback={null}>
-          <Model rotation={rotation} />
+          <Model rotation={rotationResult} />
           <Environment preset="sunset" />
           <OrbitControls />
         </Suspense>
       </Canvas>
 
-      <code>{prettyEuler(rotation)}</code>
-
-      {/* <div className="Rotators">
-        <RotationEditor
-          rotation={rotationA}
-          setRotation={(r: THREE.Euler) => setRotationA(r)}
-        />
-        <RotationEditor
-          rotation={rotationB}
-          setRotation={(r: THREE.Euler) => setRotationB(r)}
-        />
-        <QuaternionMultiplier
-          rotationResult={rotation}
-          rotationA={rotationA}
-          rotationB={rotationB}
-          setRotation={setRotation}
-        />
-      </div> */}
+      <RotationEditor
+        rotation={offsetRotation}
+        setRotation={setOffsetRotation}
+      />
     </div>
   );
 }

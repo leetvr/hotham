@@ -43,7 +43,7 @@ function update(editable: Record<string, any>) {
 }
 
 function Container(props: { children: JSX.Element }): JSX.Element {
-  return <div className="App">{props.children}</div>;
+  return <div>{props.children}</div>;
 }
 
 let lastUpdate = new Date().getTime();
@@ -97,7 +97,6 @@ function App() {
     <Container>
       <>
         <h1>{error}</h1>
-        <code>{JSON.stringify(noneditableData['rotation'])}</code>
         <Rotation quaternion={noneditableData['rotation']} />
       </>
     </Container>
