@@ -3,8 +3,6 @@ import { withTheme } from '@rjsf/core';
 import { Theme as MaterialUITheme } from '@rjsf/material-ui';
 import './App.css';
 import { JSONSchema7 } from 'json-schema';
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
 import Rotation from './Rotation';
 const SERVER_IP = 'localhost';
 const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
@@ -85,7 +83,7 @@ function App() {
     };
   });
 
-  if (!schema || !editableData || !noneditableData) {
+  if (!schema || !editableData) {
     return (
       <Container>
         <h1>Loading..</h1>
@@ -97,7 +95,18 @@ function App() {
     <Container>
       <>
         <h1>{error}</h1>
-        <Rotation quaternion={noneditableData['rotation']} />
+        <Form
+          schema={schema.editable}
+          formData={editableData}
+          noHtml5Validate
+          liveValidate
+          onChange={({ formData, errors }) => {
+            setEditableData(formData);
+            if (!errors.length) {
+              update(formData);
+            }
+          }}
+        />
       </>
     </Container>
   );

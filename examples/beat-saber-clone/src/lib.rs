@@ -1,15 +1,11 @@
 mod components;
 mod systems;
 
-use std::pin::Pin;
-
 use hotham::components::hand::Handedness;
-use hotham::components::{Transform, TransformMatrix};
+use hotham::components::Transform;
 use hotham::gltf_loader::add_model_to_world;
-use hotham::legion::{EntityStore, Resources, Schedule, World};
-use hotham::resources::vulkan_context::VulkanContext;
+use hotham::legion::{Resources, Schedule, World};
 use hotham::resources::{PhysicsContext, RenderContext, XrContext};
-use hotham::scene_data::{SceneData, SceneParams};
 use hotham::schedule_functions::{begin_frame, end_frame, physics_step};
 use hotham::systems::rendering::rendering_system;
 use hotham::systems::{
@@ -19,7 +15,8 @@ use hotham::systems::{
 use hotham::{gltf_loader, App, HothamResult};
 use hotham_debug_server::DebugServer as DebugServerT;
 
-use nalgebra::Quaternion;
+use legion::EntityStore;
+use nalgebra::{vector, Quaternion};
 use serde::{Deserialize, Serialize};
 use systems::sabers::{add_saber_physics, sabers_system};
 
@@ -31,11 +28,14 @@ pub fn main() {
     real_main().unwrap();
 }
 
-type DebugServer = DebugServerT<Transform, DebugInfo>;
+type EditableData = DebugInfo;
+type NonEditableData = ();
+type DebugServer = DebugServerT<EditableData, NonEditableData>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct DebugInfo {
-    pub rotation: Quaternion<f32>,
+    pub environment: Transform,
+    pub ramp: Transform,
 }
 
 pub fn real_main() -> HothamResult<()> {
@@ -43,22 +43,22 @@ pub fn real_main() -> HothamResult<()> {
     let render_context = RenderContext::new(&vulkan_context, &xr_context)?;
     let mut physics_context = PhysicsContext::default();
     let mut world = World::default();
-    let glb_bufs: Vec<&[u8]> = vec![
-        include_bytes!("../assets/beat_saber.glb"),
-        include_bytes!("../assets/axis_widget.glb"),
-    ];
+    let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../assets/beat_saber.glb")];
     let models = gltf_loader::load_models_from_glb(
         &glb_bufs,
         &vulkan_context,
         &render_context.descriptor_set_layouts,
     )?;
 
+    // Add Environment
+    let environment = add_model_to_world("Environment", &models, &mut world, None).unwrap();
+    let ramp = add_model_to_world("Ramp", &models, &mut world, None).unwrap();
+
     // Add cubes
     // add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
     // add_model_to_world("Blue Cube", &models, &mut world, None).expect("Unable to add Blue Cube");
 
     // Add Red Saber
-    // let saber_offset = world.push((Transform::default(), TransformMatrix::default()));
     let red_saber = add_model_to_world("Red Saber", &models, &mut world, None).unwrap();
     {
         add_saber_physics(&mut world, &mut physics_context, red_saber);
@@ -69,8 +69,14 @@ pub fn real_main() -> HothamResult<()> {
     }
 
     // Add Blue Saber
-    // let blue_saber = add_model_to_world("Blue Saber", &models, &mut world, None)
-    //     .expect("Unable to add Blue Saber");
+    let blue_saber = add_model_to_world("Blue Saber", &models, &mut world, None).unwrap();
+    {
+        add_saber_physics(&mut world, &mut physics_context, blue_saber);
+        let mut saber_entry = world.entry(blue_saber).unwrap();
+        saber_entry.add_component(Saber {
+            handedness: Handedness::Right,
+        });
+    }
 
     let debug_server = DebugServer::new();
 
@@ -85,17 +91,13 @@ pub fn real_main() -> HothamResult<()> {
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
         .add_thread_local_fn(move |world, r| {
-            // let vulkan_context = r.get::<VulkanContext>().unwrap();
-            // let render_context = r.get_mut::<RenderContext>().unwrap();
-            let saber_entity = world.entry(red_saber).unwrap();
-            let transform = saber_entity.get_component::<Transform>().unwrap();
-            let rotation = transform.rotation.quaternion().clone();
-
             let mut debug_server = r.get_mut::<DebugServer>().unwrap();
-            if let Some(updated) = debug_server.sync(&DebugInfo { rotation }) {
-                let mut red_saber_entity = world.entry_mut(red_saber).unwrap();
-                *red_saber_entity.get_component_mut::<Transform>().unwrap() = updated;
+            if let Some(updated) = debug_server.sync(&()) {
+                // let mut entity = world.entry_mut(environment).unwrap();
+                // *entity.get_component_mut::<Transform>().unwrap() = updated.environment;
 
+                // let mut entity = world.entry_mut(ramp).unwrap();
+                // *entity.get_component_mut::<Transform>().unwrap() = updated.ramp;
                 // render_context
                 //     .scene_params_buffer
                 //     .update(&vulkan_context, &[updated])

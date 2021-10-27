@@ -142,7 +142,7 @@ function RotationEditor({ rotation, setRotation }: RotationProps): JSX.Element {
 }
 
 function prettyQuaternion(q: THREE.Quaternion): string {
-  return `[${q.x}, ${q.y}, ${q.z}, ${q.w}]`;
+  return `Quaternion::new(${q.w}, ${q.x}, ${q.y}, ${q.z})`;
 }
 
 function prettyEuler(e: THREE.Euler): string {
@@ -227,11 +227,13 @@ export default function Rotation({ quaternion }: { quaternion: number[] }) {
         </Suspense>
       </Canvas>
 
-      <RotationEditor
-        rotation={offsetRotation}
-        setRotation={setOffsetRotation}
-      />
-      <code>{prettyQuaternion(offsetQuaternion)}</code>
+      <div className="RotationEditor">
+        <RotationEditor
+          rotation={offsetRotation}
+          setRotation={setOffsetRotation}
+        />
+        <code>{prettyQuaternion(offsetQuaternion)}</code>
+      </div>
     </div>
   );
 }

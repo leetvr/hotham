@@ -5,9 +5,17 @@ use hotham::{
     util::posef_to_isometry,
 };
 use legion::{system, Entity, World};
-use nalgebra::{UnitQuaternion, Vector3};
+use nalgebra::{vector, Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
 
 use crate::components::Saber;
+
+const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
+const ROTATION_OFFSET: Quaternion<f32> = Quaternion::new(
+    -0.5581498959847122,
+    0.8274912503663805,
+    0.03413791007514528,
+    -0.05061153302400824,
+);
 
 #[system(for_each)]
 pub fn sabers(
@@ -42,8 +50,7 @@ pub fn sabers(
         .unwrap();
 
     let mut position = posef_to_isometry(pose);
-    position.rotation = position.rotation
-        * UnitQuaternion::from_axis_angle(&Vector3::z_axis(), std::f32::consts::PI); //??
+    apply_offset(&mut position);
     rigid_body.set_next_kinematic_position(position);
 }
 
@@ -63,6 +70,14 @@ pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext
     saber_entry.add_component(rigid_body);
 }
 
+fn apply_offset(position: &mut Isometry3<f32>) {
+    let updated_rotation = position.rotation.quaternion() * ROTATION_OFFSET;
+    let updated_translation = position.translation.vector
+        - vector!(POSITION_OFFSET[0], POSITION_OFFSET[1], POSITION_OFFSET[2]);
+    position.rotation = UnitQuaternion::from_quaternion(updated_rotation);
+    position.translation = Translation3::from(updated_translation);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,7 +88,7 @@ mod tests {
         systems::update_rigid_body_transforms_system,
     };
     use legion::{IntoQuery, Resources, Schedule, World};
-    use nalgebra::vector;
+    use nalgebra::{vector, Quaternion, Translation3};
 
     #[test]
     fn test_sabers() {
@@ -106,5 +121,26 @@ mod tests {
         let (transform, _) = query.get(&world, saber).unwrap();
 
         approx::assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
+    }
+
+    #[test]
+    fn test_add_offset() {
+        let q1 = UnitQuaternion::from_quaternion(Quaternion::new(
+            4.329780281177467e-17,
+            0.7071067811865476,
+            4.329780281177466e-17,
+            0.7071067811865475,
+        ));
+        let t = Translation3::new(0.2, 1.4, 2.);
+        let mut position = Isometry3::from_parts(t, q1);
+        apply_offset(&mut position);
+        let expected_result = Quaternion::new(
+            -0.5493369162990798,
+            -0.4188107240790279,
+            0.6209124327141259,
+            -0.3705324286596844,
+        );
+        approx::assert_relative_eq!(position.rotation.quaternion(), &expected_result);
+        approx::assert_relative_eq!(position.translation, t);
     }
 }
