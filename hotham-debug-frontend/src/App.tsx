@@ -3,7 +3,6 @@ import { withTheme } from '@rjsf/core';
 import { Theme as MaterialUITheme } from '@rjsf/material-ui';
 import './App.css';
 import { JSONSchema7 } from 'json-schema';
-import Rotation from './Rotation';
 const SERVER_IP = 'localhost';
 const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
 
@@ -44,12 +43,11 @@ function Container(props: { children: JSX.Element }): JSX.Element {
   return <div>{props.children}</div>;
 }
 
-let lastUpdate = new Date().getTime();
-
 function App() {
   const [editableData, setEditableData] = useState<
     Record<string, any> | undefined
   >();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [noneditableData, setNonEditableData] = useState<
     Record<string, any> | undefined
   >();

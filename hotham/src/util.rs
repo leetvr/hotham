@@ -79,7 +79,7 @@ pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     let translation: Translation3<f32> = Translation3::from(translation);
 
     let rotation: Quaternion<f32> = mint::Quaternion::from(pose.orientation).into();
-    let mut rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
+    let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
     Isometry {
         rotation,
         translation,

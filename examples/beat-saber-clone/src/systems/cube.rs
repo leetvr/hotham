@@ -1,11 +1,9 @@
-use hotham::{components::Transform, resources::vulkan_context::VulkanContext};
+use hotham::components::Transform;
 use legion::{system, world::SubWorld, Entity};
-
-use crate::Models;
 
 #[system]
 #[write_component(Transform)]
-pub fn cubes(world: &mut SubWorld, #[resource] cube_state: &CubeState) {}
+pub fn cubes(_world: &mut SubWorld, #[resource] _cube_state: &CubeState) {}
 
 pub struct CubeState {
     pub blue_cube: Entity,

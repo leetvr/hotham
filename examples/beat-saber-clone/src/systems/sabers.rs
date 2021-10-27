@@ -5,7 +5,7 @@ use hotham::{
     util::posef_to_isometry,
 };
 use legion::{system, Entity, World};
-use nalgebra::{vector, Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
+use nalgebra::{vector, Isometry3, Quaternion, Translation3, UnitQuaternion};
 
 use crate::components::Saber;
 

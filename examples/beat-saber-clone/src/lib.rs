@@ -17,8 +17,6 @@ use hotham::systems::{
 use hotham::{gltf_loader, App, HothamResult};
 use hotham_debug_server::DebugServer as DebugServerT;
 
-use legion::EntityStore;
-use nalgebra::{vector, Quaternion};
 use serde::{Deserialize, Serialize};
 use systems::sabers::{add_saber_physics, sabers_system};
 
@@ -54,8 +52,8 @@ pub fn real_main() -> HothamResult<()> {
     )?;
 
     // Add Environment
-    let environment = add_model_to_world("Environment", &models, &mut world, None).unwrap();
-    let ramp = add_model_to_world("Ramp", &models, &mut world, None).unwrap();
+    let _environment = add_model_to_world("Environment", &models, &mut world, None).unwrap();
+    let _ramp = add_model_to_world("Ramp", &models, &mut world, None).unwrap();
 
     // Add cubes
     // add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
@@ -94,20 +92,19 @@ pub fn real_main() -> HothamResult<()> {
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
-        .add_thread_local_fn(move |world, r| {
-            let mut debug_server = r.get_mut::<DebugServer>().unwrap();
-            if let Some(updated) = debug_server.sync(&()) {
-                // let mut entity = world.entry_mut(environment).unwrap();
-                // *entity.get_component_mut::<Transform>().unwrap() = updated.environment;
-
-                // let mut entity = world.entry_mut(ramp).unwrap();
-                // *entity.get_component_mut::<Transform>().unwrap() = updated.ramp;
-                // render_context
-                //     .scene_params_buffer
-                //     .update(&vulkan_context, &[updated])
-                //     .expect("Unable to update data");
-            };
-        })
+        // .add_thread_local_fn(move |world, r| {
+        //     let mut debug_server = r.get_mut::<DebugServer>().unwrap();
+        //     if let Some(updated) = debug_server.sync(&()) {
+        //         // let mut entity = world.entry_mut(environment).unwrap();
+        //         // *entity.get_component_mut::<Transform>().unwrap() = updated.environment;
+        //         // let mut entity = world.entry_mut(ramp).unwrap();
+        //         // *entity.get_component_mut::<Transform>().unwrap() = updated.ramp;
+        //         // render_context
+        //         //     .scene_params_buffer
+        //         //     .update(&vulkan_context, &[updated])
+        //         //     .expect("Unable to update data");
+        //     };
+        // })
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
         .add_system(sabers_system())
