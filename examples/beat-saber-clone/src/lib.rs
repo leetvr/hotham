@@ -1,6 +1,8 @@
 mod components;
 mod systems;
 
+use std::collections::HashMap;
+
 use hotham::components::hand::Handedness;
 use hotham::components::Transform;
 use hotham::gltf_loader::add_model_to_world;
@@ -31,6 +33,7 @@ pub fn main() {
 type EditableData = DebugInfo;
 type NonEditableData = ();
 type DebugServer = DebugServerT<EditableData, NonEditableData>;
+type Models = HashMap<String, World>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct DebugInfo {
@@ -44,7 +47,7 @@ pub fn real_main() -> HothamResult<()> {
     let mut physics_context = PhysicsContext::default();
     let mut world = World::default();
     let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../assets/beat_saber.glb")];
-    let models = gltf_loader::load_models_from_glb(
+    let models: Models = gltf_loader::load_models_from_glb(
         &glb_bufs,
         &vulkan_context,
         &render_context.descriptor_set_layouts,
@@ -86,6 +89,7 @@ pub fn real_main() -> HothamResult<()> {
     resources.insert(physics_context);
     resources.insert(debug_server);
     resources.insert(render_context);
+    resources.insert(models);
     resources.insert(0 as usize);
 
     let schedule = Schedule::builder()
