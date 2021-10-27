@@ -8,7 +8,7 @@ import { OrbitControls, useGLTF, Environment } from '@react-three/drei';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
 import { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import './App.css';
+import './Rotation.css';
 import { Euler } from 'three';
 
 type GLTFResult = GLTF & {
@@ -217,7 +217,7 @@ export default function Rotation({ quaternion }: { quaternion: number[] }) {
 
   return (
     <div className="App">
-      <Canvas style={{ flex: 1 }}>
+      <Canvas style={{ flex: 4 }}>
         <Suspense fallback={null}>
           <Model rotation={rotationResult} />
           <Environment preset="sunset" />
