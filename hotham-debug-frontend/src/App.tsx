@@ -5,6 +5,7 @@ import './App.css';
 import { JSONSchema7 } from 'json-schema';
 import Box from '@material-ui/core/Box';
 import Button from '@material-ui/core/Button';
+import Rotation from './Rotation';
 const SERVER_IP = 'localhost';
 const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
 
@@ -70,12 +71,7 @@ function App() {
           setEditableData(message.Data.editable);
         }
         if (message.Data.non_editable) {
-          const deltaTime = new Date().getTime() - lastUpdate;
-          console.log(deltaTime);
-          if (deltaTime > 500) {
-            setNonEditableData(message.Data.non_editable);
-            lastUpdate = new Date().getTime();
-          }
+          setNonEditableData(message.Data.non_editable);
         }
       }
       if (message.Init) {
@@ -89,7 +85,7 @@ function App() {
     };
   });
 
-  if (!schema || !editableData) {
+  if (!schema || !editableData || !noneditableData) {
     return (
       <Container>
         <h1>Loading..</h1>
@@ -101,20 +97,8 @@ function App() {
     <Container>
       <>
         <h1>{error}</h1>
-        <Form formData={noneditableData} schema={schema.non_editable} readonly>
-          <></>
-        </Form>
-        <Form
-          noHtml5Validate
-          formData={editableData}
-          schema={schema.editable}
-          onChange={(e, _) => {
-            setEditableData(e.formData);
-            if (e.errors.length === 0) update(e.formData);
-          }}
-        >
-          {null}
-        </Form>
+        <code>{JSON.stringify(noneditableData['rotation'])}</code>
+        <Rotation quaternion={noneditableData['rotation']} />
       </>
     </Container>
   );

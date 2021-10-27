@@ -8,6 +8,9 @@ use nalgebra::{
 use openxr::Posef;
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
+const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
+const ROTATION_OFFSET: [f32; 4] = [0.4, 0., 0., 0.916628];
+
 use crate::{
     components::Transform,
     gltf_loader::{add_model_to_world, load_models_from_glb},
@@ -74,8 +77,14 @@ pub fn u64_to_entity(entity: u64) -> Entity {
 
 pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
+
+    // Add position offset.
+    let translation = translation + Vector3::from(POSITION_OFFSET);
     let translation: Translation3<f32> = Translation3::from(translation);
+
     let rotation: Quaternion<f32> = mint::Quaternion::from(pose.orientation).into();
+
+    // Add rotation offset.
     let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
     Isometry {
         rotation,

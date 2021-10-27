@@ -19,6 +19,7 @@ use hotham::systems::{
 use hotham::{gltf_loader, App, HothamResult};
 use hotham_debug_server::DebugServer as DebugServerT;
 
+use nalgebra::Quaternion;
 use serde::{Deserialize, Serialize};
 use systems::sabers::{add_saber_physics, sabers_system};
 
@@ -34,9 +35,7 @@ type DebugServer = DebugServerT<Transform, DebugInfo>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DebugInfo {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
+    pub rotation: Quaternion<f32>,
 }
 
 pub fn real_main() -> HothamResult<()> {
@@ -60,16 +59,14 @@ pub fn real_main() -> HothamResult<()> {
 
     // Add Red Saber
     // let saber_offset = world.push((Transform::default(), TransformMatrix::default()));
-    let saber_offset = add_model_to_world("Axis Helper", &models, &mut world, None).unwrap();
+    let red_saber = add_model_to_world("Red Saber", &models, &mut world, None).unwrap();
     {
-        add_saber_physics(&mut world, &mut physics_context, saber_offset);
-        let mut saber_entry = world.entry(saber_offset).unwrap();
+        add_saber_physics(&mut world, &mut physics_context, red_saber);
+        let mut saber_entry = world.entry(red_saber).unwrap();
         saber_entry.add_component(Saber {
             handedness: Handedness::Left,
         });
     }
-    let red_saber = add_model_to_world("Red Saber", &models, &mut world, None)
-        .expect("Unable to add Red Saber");
 
     // Add Blue Saber
     // let blue_saber = add_model_to_world("Blue Saber", &models, &mut world, None)
@@ -90,16 +87,12 @@ pub fn real_main() -> HothamResult<()> {
         .add_thread_local_fn(move |world, r| {
             // let vulkan_context = r.get::<VulkanContext>().unwrap();
             // let render_context = r.get_mut::<RenderContext>().unwrap();
-            let saber_entity = world.entry(saber_offset).unwrap();
+            let saber_entity = world.entry(red_saber).unwrap();
             let transform = saber_entity.get_component::<Transform>().unwrap();
-            let (x, y, z) = transform.rotation.euler_angles();
+            let rotation = transform.rotation.quaternion().clone();
 
             let mut debug_server = r.get_mut::<DebugServer>().unwrap();
-            if let Some(updated) = debug_server.sync(&DebugInfo {
-                x: x.to_degrees(),
-                y: y.to_degrees(),
-                z: z.to_degrees(),
-            }) {
+            if let Some(updated) = debug_server.sync(&DebugInfo { rotation }) {
                 let mut red_saber_entity = world.entry_mut(red_saber).unwrap();
                 *red_saber_entity.get_component_mut::<Transform>().unwrap() = updated;
 
