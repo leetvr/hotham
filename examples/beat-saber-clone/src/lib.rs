@@ -34,7 +34,9 @@ type DebugServer = DebugServerT<Transform, DebugInfo>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct DebugInfo {
-    pub saber_transform: Transform,
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
 pub fn real_main() -> HothamResult<()> {
@@ -90,10 +92,13 @@ pub fn real_main() -> HothamResult<()> {
             // let render_context = r.get_mut::<RenderContext>().unwrap();
             let saber_entity = world.entry(saber_offset).unwrap();
             let transform = saber_entity.get_component::<Transform>().unwrap();
+            let (x, y, z) = transform.rotation.euler_angles();
 
             let mut debug_server = r.get_mut::<DebugServer>().unwrap();
             if let Some(updated) = debug_server.sync(&DebugInfo {
-                saber_transform: transform.clone(),
+                x: x.to_degrees(),
+                y: y.to_degrees(),
+                z: z.to_degrees(),
             }) {
                 let mut red_saber_entity = world.entry_mut(red_saber).unwrap();
                 *red_saber_entity.get_component_mut::<Transform>().unwrap() = updated;

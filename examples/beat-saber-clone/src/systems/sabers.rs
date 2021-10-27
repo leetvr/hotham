@@ -42,6 +42,8 @@ pub fn sabers(
         .unwrap();
 
     let mut position = posef_to_isometry(pose);
+    // position.rotation = position.rotation
+    //     * UnitQuaternion::from_axis_angle(&Vector3::y_axis(), std::f32::consts::PI);
     rigid_body.set_next_kinematic_position(position);
 }
 

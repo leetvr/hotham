@@ -70,7 +70,8 @@ function App() {
           setEditableData(message.Data.editable);
         }
         if (message.Data.non_editable) {
-          const deltaTime = lastUpdate - new Date().getTime();
+          const deltaTime = new Date().getTime() - lastUpdate;
+          console.log(deltaTime);
           if (deltaTime > 500) {
             setNonEditableData(message.Data.non_editable);
             lastUpdate = new Date().getTime();
