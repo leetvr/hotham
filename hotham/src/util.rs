@@ -9,7 +9,14 @@ use openxr::Posef;
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
-const ROTATION_OFFSET: [f32; 4] = [0.4, 0., 0., 0.916628];
+
+// x, y, z, w
+const ROTATION_OFFSET: [f32; 4] = [
+    0.01581725185663863,
+    -0.42255389493243883,
+    0.9061697519708839,
+    -0.007375705671716895,
+];
 
 use crate::{
     components::Transform,
@@ -79,13 +86,16 @@ pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
 
     // Add position offset.
-    let translation = translation + Vector3::from(POSITION_OFFSET);
+    // let translation = translation + Vector3::from(POSITION_OFFSET);
     let translation: Translation3<f32> = Translation3::from(translation);
 
     let rotation: Quaternion<f32> = mint::Quaternion::from(pose.orientation).into();
 
     // Add rotation offset.
-    let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
+    let mut rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
+    let rotation_offset: UnitQuaternion<f32> =
+        Unit::new_normalize(Quaternion::from(ROTATION_OFFSET));
+    rotation = rotation * rotation_offset;
     Isometry {
         rotation,
         translation,

@@ -207,6 +207,8 @@ export default function Rotation({ quaternion }: { quaternion: number[] }) {
 
   const [x, y, z, w] = quaternion;
   const rotationFromApp = new THREE.Quaternion(x, y, z, w);
+  const rotationFromAppEuler = new Euler();
+  rotationFromAppEuler.setFromQuaternion(rotationFromApp);
 
   const offsetQuaternion = new THREE.Quaternion();
   offsetQuaternion.setFromEuler(offsetRotation);
@@ -229,6 +231,7 @@ export default function Rotation({ quaternion }: { quaternion: number[] }) {
         rotation={offsetRotation}
         setRotation={setOffsetRotation}
       />
+      <code>{prettyQuaternion(offsetQuaternion)}</code>
     </div>
   );
 }
