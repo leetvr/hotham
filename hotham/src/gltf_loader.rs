@@ -296,6 +296,7 @@ pub fn add_model_to_world(
     models: &HashMap<String, World>,
     world: &mut World,
     parent: Option<Entity>,
+    vulkan_context: &VulkanContext,
 ) -> Option<Entity> {
     let mut merger = Duplicate::default();
     merger.register_clone::<Transform>();
@@ -407,7 +408,7 @@ mod tests {
             assert_eq!(meshes.len(), 1);
 
             let mut world = World::default();
-            let model = add_model_to_world(*name, &models, &mut world, None);
+            let model = add_model_to_world(*name, &models, &mut world, None, &vulkan_context);
             assert!(model.is_some(), "Model {} could not be added", name);
 
             let mut query = <(&Info, &Transform, &Mesh, &TransformMatrix, &Root)>::query();
@@ -438,7 +439,7 @@ mod tests {
         let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
 
         let mut world = World::default();
-        let _hand = add_model_to_world("Left Hand", &models, &mut world, None);
+        let _hand = add_model_to_world("Left Hand", &models, &mut world, None, &vulkan_context);
 
         // Make sure there is only one root
         let mut query = <(&Root, &Info, &Transform)>::query();

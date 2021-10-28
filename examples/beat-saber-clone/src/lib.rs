@@ -56,8 +56,9 @@ pub fn real_main() -> HothamResult<()> {
     )?;
 
     // Add Environment
-    let _environment = add_model_to_world("Environment", &models, &mut world, None).unwrap();
-    let _ramp = add_model_to_world("Ramp", &models, &mut world, None).unwrap();
+    let _environment =
+        add_model_to_world("Environment", &models, &mut world, None, &vulkan_context).unwrap();
+    let _ramp = add_model_to_world("Ramp", &models, &mut world, None, &vulkan_context).unwrap();
 
     // Add cubes
     let red_cubes = create_cubes(
@@ -66,6 +67,7 @@ pub fn real_main() -> HothamResult<()> {
         &models,
         &mut world,
         &mut physics_context,
+        &vulkan_context,
     );
     let blue_cubes = create_cubes(
         10,
@@ -73,10 +75,12 @@ pub fn real_main() -> HothamResult<()> {
         &models,
         &mut world,
         &mut physics_context,
+        &vulkan_context,
     );
 
     // Add Red Saber
-    let red_saber = add_model_to_world("Red Saber", &models, &mut world, None).unwrap();
+    let red_saber =
+        add_model_to_world("Red Saber", &models, &mut world, None, &vulkan_context).unwrap();
     {
         add_saber_physics(&mut world, &mut physics_context, red_saber);
         let mut saber_entry = world.entry(red_saber).unwrap();
@@ -86,7 +90,8 @@ pub fn real_main() -> HothamResult<()> {
     }
 
     // Add Blue Saber
-    let blue_saber = add_model_to_world("Blue Saber", &models, &mut world, None).unwrap();
+    let blue_saber =
+        add_model_to_world("Blue Saber", &models, &mut world, None, &vulkan_context).unwrap();
     {
         add_saber_physics(&mut world, &mut physics_context, blue_saber);
         let mut saber_entry = world.entry(blue_saber).unwrap();

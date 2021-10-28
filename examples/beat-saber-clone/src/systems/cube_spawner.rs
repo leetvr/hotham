@@ -1,7 +1,11 @@
 use hotham::{
     components::{Mesh, RigidBody, Transform},
     gltf_loader::add_model_to_world,
-    resources::{physics_context, PhysicsContext},
+    resources::{
+        physics_context,
+        vulkan_context::{self, VulkanContext},
+        PhysicsContext,
+    },
 };
 use legion::{
     system,
@@ -89,6 +93,7 @@ pub fn create_cubes(
     models: &Models,
     mut world: &mut World,
     mut physics_context: &mut PhysicsContext,
+    vulkan_context: &VulkanContext,
 ) -> Vec<Entity> {
     let model_name = match colour {
         cube::Colour::Blue => "Blue Cube",
@@ -96,7 +101,7 @@ pub fn create_cubes(
     };
     (0..count)
         .map(|_| {
-            let e = add_model_to_world(model_name, &models, &mut world, None)
+            let e = add_model_to_world(model_name, &models, &mut world, None, &vulkan_context)
                 .expect("Unable to add Red Cube");
             add_cube_physics(&mut world, &mut physics_context, e);
 
@@ -145,6 +150,7 @@ mod tests {
             &models,
             &mut world,
             &mut physics_context,
+            &vulkan_context,
         );
         let blue_cubes = create_cubes(
             10,
@@ -152,6 +158,7 @@ mod tests {
             &models,
             &mut world,
             &mut physics_context,
+            &vulkan_context,
         );
 
         let mut resources = Resources::default();

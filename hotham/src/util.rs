@@ -52,14 +52,16 @@ pub fn get_world_with_hands() -> World {
     let mut world = World::default();
 
     // Add two hands
-    let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
+    let left_hand =
+        add_model_to_world("Left Hand", &models, &mut world, None, &vulkan_context).unwrap();
     {
         let mut left_hand_entity = world.entry(left_hand).unwrap();
         let transform = left_hand_entity.get_component_mut::<Transform>().unwrap();
         transform.translation = vector![-0.2, 1.4, 0.0];
     }
 
-    let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
+    let right_hand =
+        add_model_to_world("Right Hand", &models, &mut world, None, &vulkan_context).unwrap();
     {
         let mut right_hand_entity = world.entry(right_hand).unwrap();
         let transform = right_hand_entity.get_component_mut::<Transform>().unwrap();
