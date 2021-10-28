@@ -14,6 +14,11 @@ pub fn rendering(
     #[resource] swapchain_image_index: &usize,
     #[resource] render_context: &RenderContext,
 ) -> () {
+    // A mesh may declare that it doesn't want to be rendered
+    if !mesh.should_render {
+        return;
+    };
+
     let device = &vulkan_context.device;
     let command_buffer = render_context.frames[*swapchain_image_index].command_buffer;
 

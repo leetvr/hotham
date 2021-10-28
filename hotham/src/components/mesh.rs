@@ -37,6 +37,7 @@ pub struct Mesh {
     pub ubo_buffer: Buffer<MeshUBO>,
     pub ubo_data: MeshUBO,
     pub primitives: Vec<Primitive>,
+    pub should_render: bool,
 }
 
 impl Mesh {
@@ -91,6 +92,7 @@ impl Mesh {
             ubo_data: mesh_ubo,
             descriptor_sets,
             primitives,
+            should_render: true,
         })
     }
 }

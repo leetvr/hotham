@@ -8,13 +8,15 @@ use nalgebra::{
 use openxr::Posef;
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
-// x, y, z, w
-
 use crate::{
     components::Transform,
     gltf_loader::{add_model_to_world, load_models_from_glb},
     resources::{render_context::create_descriptor_set_layouts, VulkanContext},
 };
+
+use crate::components::Mesh;
+use ash::vk;
+use std::marker::PhantomData;
 
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
     strings
@@ -86,7 +88,6 @@ pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     }
 }
 
-#[cfg(test)]
 use crate::buffer::Buffer;
 
 #[cfg(test)]
@@ -104,6 +105,29 @@ pub unsafe fn get_from_device_memory<'a, T: Sized>(
         )
         .unwrap();
     std::slice::from_raw_parts(std::mem::transmute(memory), buffer.size as _)
+}
+
+pub fn test_mesh() -> Mesh {
+    use crate::components::mesh::MeshUBO;
+
+    Mesh {
+        should_render: false,
+        descriptor_sets: [vk::DescriptorSet::null()],
+        ubo_buffer: test_buffer(),
+        ubo_data: MeshUBO::default(),
+        primitives: Vec::new(),
+    }
+}
+
+pub fn test_buffer<T>() -> Buffer<T> {
+    Buffer {
+        handle: vk::Buffer::null(),
+        device_memory: vk::DeviceMemory::null(),
+        _phantom: PhantomData,
+        size: 0,
+        device_memory_size: 0,
+        usage: vk::BufferUsageFlags::empty(),
+    }
 }
 
 #[cfg(target_os = "android")]

@@ -100,6 +100,7 @@ mod tests {
             primitives: Vec::new(),
             ubo_data,
             ubo_buffer,
+            should_render: true,
         };
 
         // Now create the skin entity
