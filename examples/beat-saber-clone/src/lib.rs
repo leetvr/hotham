@@ -2,11 +2,12 @@ mod components;
 mod systems;
 
 use crate::systems::cube_spawner::{create_cubes, cube_spawner_system};
+use cube::Cube;
 use legion::IntoQuery;
 use std::collections::HashMap;
 
 use hotham::components::hand::Handedness;
-use hotham::components::{Mesh, RigidBody, Transform};
+use hotham::components::{Mesh, RigidBody, Transform, TransformMatrix};
 use hotham::gltf_loader::add_model_to_world;
 use hotham::legion::{Resources, Schedule, World};
 use hotham::resources::{PhysicsContext, RenderContext, XrContext};
@@ -19,7 +20,7 @@ use hotham::systems::{
 use hotham::{gltf_loader, App, HothamResult};
 use hotham_debug_server::DebugServer as DebugServerT;
 
-use nalgebra::Vector3;
+use nalgebra::{Isometry, Matrix4, Vector3};
 use serde::{Deserialize, Serialize};
 use systems::sabers::{add_saber_physics, sabers_system};
 
@@ -39,7 +40,7 @@ type Models = HashMap<String, World>;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct DebugInfo {
     position: Vector3<f32>,
-    velocity: Vector3<f32>,
+    translation: Matrix4<f32>,
 }
 
 pub fn real_main() -> HothamResult<()> {
@@ -107,18 +108,25 @@ pub fn real_main() -> HothamResult<()> {
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
+        .add_system(collision_system())
+        .add_thread_local_fn(physics_step)
+        .add_system(sabers_system())
+        .add_system(cube_spawner_system(red_cubes, blue_cubes, 0))
+        .add_system(update_rigid_body_transforms_system())
+        .add_system(update_transform_matrix_system())
+        .add_system(update_parent_transform_matrix_system())
         .add_thread_local_fn(move |world, r| {
             let mut debug_server = r.get_mut::<DebugServer>().unwrap();
             let physics_context = r.get::<PhysicsContext>().unwrap();
-            let mut query = <(&Mesh, &RigidBody)>::query();
+            let mut query = <(&Mesh, &RigidBody, &Cube, &TransformMatrix)>::query();
             let renderable_objects = query
                 .iter(world)
-                .filter(|(m, _)| m.should_render)
-                .map(|(_, r)| {
+                .filter(|(m, _, _, _)| m.should_render)
+                .map(|(_, r, _, t)| {
                     let rigid_body = &physics_context.rigid_bodies[r.handle];
                     DebugInfo {
                         position: rigid_body.position().translation.vector,
-                        velocity: rigid_body.linvel().clone(),
+                        translation: t.0,
                     }
                 })
                 .collect::<Vec<_>>();
@@ -133,13 +141,6 @@ pub fn real_main() -> HothamResult<()> {
                 //     .expect("Unable to update data");
             };
         })
-        .add_system(collision_system())
-        .add_thread_local_fn(physics_step)
-        .add_system(sabers_system())
-        .add_system(cube_spawner_system(red_cubes, blue_cubes, 0))
-        .add_system(update_rigid_body_transforms_system())
-        .add_system(update_transform_matrix_system())
-        .add_system(update_parent_transform_matrix_system())
         .add_system(rendering_system())
         .add_thread_local_fn(end_frame)
         .build();
