@@ -31,6 +31,9 @@ Hotham's development is only possible thanks to the support of the community. It
 - [ ] [Sound support](https://github.com/leetvr/hotham/issues/52)
 - [ ] [Text/UI support](https://github.com/leetvr/hotham/issues/93)
 
+![Beat Saber](https://user-images.githubusercontent.com/2022375/139247547-d683c598-0e30-4c39-a511-e9d17d0d25e2.gif)
+
+
 # Future goals ✨
 
 - [ ] Visual editor
