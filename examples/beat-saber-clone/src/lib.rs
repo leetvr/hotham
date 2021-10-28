@@ -2,10 +2,11 @@ mod components;
 mod systems;
 
 use crate::systems::cube_spawner::{create_cubes, cube_spawner_system};
+use legion::IntoQuery;
 use std::collections::HashMap;
 
 use hotham::components::hand::Handedness;
-use hotham::components::Transform;
+use hotham::components::{Mesh, RigidBody, Transform};
 use hotham::gltf_loader::add_model_to_world;
 use hotham::legion::{Resources, Schedule, World};
 use hotham::resources::{PhysicsContext, RenderContext, XrContext};
@@ -18,6 +19,7 @@ use hotham::systems::{
 use hotham::{gltf_loader, App, HothamResult};
 use hotham_debug_server::DebugServer as DebugServerT;
 
+use nalgebra::Vector3;
 use serde::{Deserialize, Serialize};
 use systems::sabers::{add_saber_physics, sabers_system};
 
@@ -29,15 +31,15 @@ pub fn main() {
     real_main().unwrap();
 }
 
-type EditableData = DebugInfo;
-type NonEditableData = ();
+type EditableData = ();
+type NonEditableData = Vec<DebugInfo>;
 type DebugServer = DebugServerT<EditableData, NonEditableData>;
 type Models = HashMap<String, World>;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct DebugInfo {
-    pub environment: Transform,
-    pub ramp: Transform,
+    position: Vector3<f32>,
+    velocity: Vector3<f32>,
 }
 
 pub fn real_main() -> HothamResult<()> {
@@ -105,19 +107,32 @@ pub fn real_main() -> HothamResult<()> {
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
-        // .add_thread_local_fn(move |world, r| {
-        //     let mut debug_server = r.get_mut::<DebugServer>().unwrap();
-        //     if let Some(updated) = debug_server.sync(&()) {
-        //         // let mut entity = world.entry_mut(environment).unwrap();
-        //         // *entity.get_component_mut::<Transform>().unwrap() = updated.environment;
-        //         // let mut entity = world.entry_mut(ramp).unwrap();
-        //         // *entity.get_component_mut::<Transform>().unwrap() = updated.ramp;
-        //         // render_context
-        //         //     .scene_params_buffer
-        //         //     .update(&vulkan_context, &[updated])
-        //         //     .expect("Unable to update data");
-        //     };
-        // })
+        .add_thread_local_fn(move |world, r| {
+            let mut debug_server = r.get_mut::<DebugServer>().unwrap();
+            let physics_context = r.get::<PhysicsContext>().unwrap();
+            let mut query = <(&Mesh, &RigidBody)>::query();
+            let renderable_objects = query
+                .iter(world)
+                .filter(|(m, _)| m.should_render)
+                .map(|(_, r)| {
+                    let rigid_body = &physics_context.rigid_bodies[r.handle];
+                    DebugInfo {
+                        position: rigid_body.position().translation.vector,
+                        velocity: rigid_body.linvel().clone(),
+                    }
+                })
+                .collect::<Vec<_>>();
+            if let Some(_) = debug_server.sync(&renderable_objects) {
+                // let mut entity = world.entry_mut(environment).unwrap();
+                // *entity.get_component_mut::<Transform>().unwrap() = updated.environment;
+                // let mut entity = world.entry_mut(ramp).unwrap();
+                // *entity.get_component_mut::<Transform>().unwrap() = updated.ramp;
+                // render_context
+                //     .scene_params_buffer
+                //     .update(&vulkan_context, &[updated])
+                //     .expect("Unable to update data");
+            };
+        })
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
         .add_system(sabers_system())

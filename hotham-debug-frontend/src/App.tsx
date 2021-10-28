@@ -81,7 +81,7 @@ function App() {
     };
   });
 
-  if (!schema || !editableData) {
+  if (!schema || !noneditableData) {
     return (
       <Container>
         <h1>Loading..</h1>
@@ -93,6 +93,11 @@ function App() {
     <Container>
       <>
         <h1>{error}</h1>
+        <Form
+          schema={schema.non_editable}
+          formData={noneditableData}
+          disabled
+        />
         <Form
           schema={schema.editable}
           formData={editableData}

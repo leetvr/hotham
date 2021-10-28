@@ -30,6 +30,10 @@ pub fn cube_spawner(
     #[state] frames_since_last_cube: &mut usize,
     #[resource] mut physics_context: &mut PhysicsContext,
 ) {
+    if red_cube_pool.len() == 0 || blue_cube_pool.len() == 0 {
+        return;
+    }
+
     if *frames_since_last_cube == 50 {
         let entity = red_cube_pool.pop().unwrap();
         println!("Activating red cube: {:?}", entity);
