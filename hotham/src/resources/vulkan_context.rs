@@ -207,7 +207,7 @@ impl VulkanContext {
         })
     }
 
-    pub(crate) fn testing() -> Result<Self> {
+    pub fn testing() -> Result<Self> {
         let (instance, entry) = vulkan_init_test()?;
         let physical_device = get_test_physical_device(&instance);
         let extension_names = Vec::new();
@@ -215,8 +215,6 @@ impl VulkanContext {
             create_vulkan_device(&extension_names, &instance, physical_device)?;
 
         let command_pool = create_command_pool(&device, queue_family_index)?;
-
-        // HACK: This needs to be updated based on the actual data in the system.
         let descriptor_pool = create_descriptor_pool(&device)?;
         let debug_utils = DebugUtils::new(&entry, &instance);
         let physical_device_properties =
@@ -1018,6 +1016,7 @@ fn create_command_pool(
     Ok(command_pool)
 }
 
+// TODO HACK: Make these values real
 fn create_descriptor_pool(device: &Device) -> Result<vk::DescriptorPool, anyhow::Error> {
     let descriptor_pool = unsafe {
         device.create_descriptor_pool(

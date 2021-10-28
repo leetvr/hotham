@@ -401,7 +401,7 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     ]);
 }
 
-pub(crate) fn create_descriptor_set_layouts(
+pub fn create_descriptor_set_layouts(
     vulkan_context: &VulkanContext,
 ) -> VkResult<DescriptorSetLayouts> {
     // Set 0 = SceneData

@@ -1,6 +1,7 @@
 mod components;
 mod systems;
 
+use crate::systems::cube_spawner::{create_cubes, cube_spawner_system};
 use std::collections::HashMap;
 
 use hotham::components::hand::Handedness;
@@ -20,7 +21,7 @@ use hotham_debug_server::DebugServer as DebugServerT;
 use serde::{Deserialize, Serialize};
 use systems::sabers::{add_saber_physics, sabers_system};
 
-use crate::components::Saber;
+use crate::components::{cube, Saber};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -56,8 +57,20 @@ pub fn real_main() -> HothamResult<()> {
     let _ramp = add_model_to_world("Ramp", &models, &mut world, None).unwrap();
 
     // Add cubes
-    // add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
-    // add_model_to_world("Blue Cube", &models, &mut world, None).expect("Unable to add Blue Cube");
+    let red_cubes = create_cubes(
+        10,
+        cube::Colour::Red,
+        &models,
+        &mut world,
+        &mut physics_context,
+    );
+    let blue_cubes = create_cubes(
+        10,
+        cube::Colour::Blue,
+        &models,
+        &mut world,
+        &mut physics_context,
+    );
 
     // Add Red Saber
     let red_saber = add_model_to_world("Red Saber", &models, &mut world, None).unwrap();
@@ -108,6 +121,7 @@ pub fn real_main() -> HothamResult<()> {
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
         .add_system(sabers_system())
+        .add_system(cube_spawner_system(red_cubes, blue_cubes, 0))
         .add_system(update_rigid_body_transforms_system())
         .add_system(update_transform_matrix_system())
         .add_system(update_parent_transform_matrix_system())

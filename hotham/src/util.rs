@@ -107,18 +107,6 @@ pub unsafe fn get_from_device_memory<'a, T: Sized>(
     std::slice::from_raw_parts(std::mem::transmute(memory), buffer.size as _)
 }
 
-pub fn test_mesh() -> Mesh {
-    use crate::components::mesh::MeshUBO;
-
-    Mesh {
-        should_render: false,
-        descriptor_sets: [vk::DescriptorSet::null()],
-        ubo_buffer: test_buffer(),
-        ubo_data: MeshUBO::default(),
-        primitives: Vec::new(),
-    }
-}
-
 pub fn test_buffer<T>() -> Buffer<T> {
     Buffer {
         handle: vk::Buffer::null(),
