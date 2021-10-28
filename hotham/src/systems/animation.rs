@@ -50,7 +50,15 @@ mod tests {
         let mut world = World::default();
 
         // Add the left hand
-        let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
+        let left_hand = add_model_to_world(
+            "Left Hand",
+            &models,
+            &mut world,
+            None,
+            &vulkan_context,
+            &set_layouts,
+        )
+        .unwrap();
         {
             let mut left_hand_entry = world.entry_mut(left_hand).unwrap();
             let left_hand_controller = left_hand_entry

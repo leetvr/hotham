@@ -3,6 +3,7 @@ use hotham::{
     gltf_loader::add_model_to_world,
     resources::{
         physics_context,
+        render_context::DescriptorSetLayouts,
         vulkan_context::{self, VulkanContext},
         PhysicsContext,
     },
@@ -51,7 +52,7 @@ pub fn cube_spawner(
     }
 
     // Reset counter
-    if *frames_since_last_cube >= 200 {
+    if *frames_since_last_cube >= 2000 {
         *frames_since_last_cube = 0;
     } else {
         *frames_since_last_cube = *frames_since_last_cube + 1;
@@ -94,6 +95,7 @@ pub fn create_cubes(
     mut world: &mut World,
     mut physics_context: &mut PhysicsContext,
     vulkan_context: &VulkanContext,
+    descriptor_set_layouts: &DescriptorSetLayouts,
 ) -> Vec<Entity> {
     let model_name = match colour {
         cube::Colour::Blue => "Blue Cube",
@@ -101,8 +103,15 @@ pub fn create_cubes(
     };
     (0..count)
         .map(|_| {
-            let e = add_model_to_world(model_name, &models, &mut world, None, &vulkan_context)
-                .expect("Unable to add Red Cube");
+            let e = add_model_to_world(
+                model_name,
+                &models,
+                &mut world,
+                None,
+                &vulkan_context,
+                &descriptor_set_layouts,
+            )
+            .expect("Unable to add Red Cube");
             add_cube_physics(&mut world, &mut physics_context, e);
 
             // Make un-renderable
@@ -151,6 +160,7 @@ mod tests {
             &mut world,
             &mut physics_context,
             &vulkan_context,
+            &set_layouts,
         );
         let blue_cubes = create_cubes(
             10,
@@ -159,6 +169,7 @@ mod tests {
             &mut world,
             &mut physics_context,
             &vulkan_context,
+            &set_layouts,
         );
 
         let mut resources = Resources::default();

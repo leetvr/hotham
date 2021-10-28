@@ -1,11 +1,13 @@
 use crate::{
+    buffer::Buffer,
     components::{
-        animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
-        Root, Skin, Transform, TransformMatrix,
+        animation_controller::AnimationController, mesh::MeshUBO, AnimationTarget, Info, Joint,
+        Mesh, Parent, Root, Skin, Transform, TransformMatrix,
     },
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
 use anyhow::Result;
+use ash::vk;
 use gltf::animation::util::ReadOutputs;
 use itertools::{izip, Itertools};
 use legion::{any, component, world::Duplicate, Entity, IntoQuery, World};
@@ -297,6 +299,7 @@ pub fn add_model_to_world(
     world: &mut World,
     parent: Option<Entity>,
     vulkan_context: &VulkanContext,
+    descriptor_set_layouts: &DescriptorSetLayouts,
 ) -> Option<Entity> {
     let mut merger = Duplicate::default();
     merger.register_clone::<Transform>();
@@ -344,14 +347,40 @@ pub fn add_model_to_world(
         }
     });
 
-    let new_parent = entity_map.get(&root_entity).cloned().unwrap();
+    let new_entity = entity_map.get(&root_entity).cloned().unwrap();
 
+    // Optionally set a new parent for this entity, if it was passed in as a parameter.
     if let Some(parent) = parent {
-        let mut entity = world.entry(new_parent).unwrap();
+        let mut entity = world.entry(new_entity).unwrap();
         entity.add_component(Parent(parent));
     }
 
-    Some(new_parent)
+    // We'll need to create a new UBO for the mesh:
+    let mut query = <(&Info, &mut Mesh)>::query();
+    let (info, mesh) = query.get_mut(world, new_entity).unwrap();
+
+    // Create new description sets
+    let new_descriptor_sets = vulkan_context
+        .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
+        .unwrap();
+    mesh.descriptor_sets = [new_descriptor_sets[0]];
+
+    // Create a new buffer
+    let new_ubo_buffer = Buffer::new(
+        vulkan_context,
+        &[mesh.ubo_data],
+        vk::BufferUsageFlags::UNIFORM_BUFFER,
+    )
+    .unwrap();
+    vulkan_context.update_buffer_descriptor_set(
+        &new_ubo_buffer,
+        mesh.descriptor_sets[0],
+        0,
+        vk::DescriptorType::UNIFORM_BUFFER,
+    );
+    mesh.ubo_buffer = new_ubo_buffer;
+
+    Some(new_entity)
 }
 
 #[cfg(test)]
@@ -400,20 +429,27 @@ mod tests {
             ),
         ];
         for (name, id, translation, rotation) in &test_data {
-            let model_query = models
+            let model_world = models
                 .get(*name)
                 .expect(&format!("Unable to find model with name {}", name));
             let mut query = <(&Mesh, &Transform, &TransformMatrix, &Info)>::query();
-            let meshes = query.iter(model_query).collect::<Vec<_>>();
+            let meshes = query.iter(model_world).collect::<Vec<_>>();
             assert_eq!(meshes.len(), 1);
 
             let mut world = World::default();
-            let model = add_model_to_world(*name, &models, &mut world, None, &vulkan_context);
+            let model = add_model_to_world(
+                *name,
+                &models,
+                &mut world,
+                None,
+                &vulkan_context,
+                &set_layouts,
+            );
             assert!(model.is_some(), "Model {} could not be added", name);
 
             let mut query = <(&Info, &Transform, &Mesh, &TransformMatrix, &Root)>::query();
             let model = model.unwrap();
-            let (info, transform, ..) = query.get(&mut world, model).unwrap();
+            let (info, transform, mesh, ..) = query.get(&mut world, model).unwrap();
             assert_eq!(
                 transform.translation, *translation,
                 "Model {} has wrong translation",
@@ -427,6 +463,11 @@ mod tests {
             );
             assert_eq!(&info.name, *name);
             assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
+
+            // Get mesh's initial buffer handle
+            let initial_buffer = meshes[0].0.ubo_buffer.handle;
+            let new_buffer = mesh.ubo_buffer.handle;
+            assert_ne!(initial_buffer, new_buffer);
         }
     }
 
@@ -439,7 +480,14 @@ mod tests {
         let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
 
         let mut world = World::default();
-        let _hand = add_model_to_world("Left Hand", &models, &mut world, None, &vulkan_context);
+        let _hand = add_model_to_world(
+            "Left Hand",
+            &models,
+            &mut world,
+            None,
+            &vulkan_context,
+            &set_layouts,
+        );
 
         // Make sure there is only one root
         let mut query = <(&Root, &Info, &Transform)>::query();
