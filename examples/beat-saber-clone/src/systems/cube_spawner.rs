@@ -10,6 +10,7 @@ use hotham::{
 };
 use legion::{
     component, system,
+    systems::CommandBuffer,
     world::{EntryMut, SubWorld},
     Entity, EntityStore, IntoQuery, World,
 };
@@ -27,50 +28,45 @@ const CUBE_STARTING_DISTANCE: f32 = -10.;
 const CUBE_STARTING_HEIGHT: f32 = 1.2;
 
 #[system]
+#[read_component(Entity)]
+#[read_component(Cube)]
+#[read_component(Colour)]
 #[write_component(Mesh)]
 #[write_component(RigidBody)]
+#[write_component(Visible)]
 pub fn cube_spawner(
     world: &mut SubWorld,
-    #[state] frames_since_last_cube: &mut usize,
-    #[resource] mut physics_context: &mut PhysicsContext,
+    command_buffer: &mut CommandBuffer,
+    #[state] probability: &usize,
+    #[resource] physics_context: &mut PhysicsContext,
 ) {
     let mut rng = rand::thread_rng();
-    let r = rng.gen_range(0..100);
+    let r = rng.gen_range(0..*probability);
 
-    if r == 1 {
-        let mut query = <(&Entity, &Cube, &Colour)>::query().filter(!component::<Visible>());
-        let query = query.iter(world);
-        let entity = query
-            .filter(|(_, _, colour)| colour == &&Colour::Red)
-            .map(|(e, _, _)| e)
-            .next()
-            .unwrap();
-        let entity = entity.clone();
-        let mut entry = world.entry_mut(entity).unwrap();
-        activate_cube(&mut entry, &mut physics_context);
+    if r == 0 {
+        activate_cube(Colour::Red, world, physics_context, command_buffer);
     }
 
-    // if r == 2 {
-    //     let entity = blue_cube_pool.pop().unwrap();
-    //     let mut entry = world.entry_mut(entity).unwrap();
-    //     activate_cube(&mut entry, &mut physics_context);
-    // }
-
-    // Reset counter
-    if *frames_since_last_cube >= 2000 {
-        *frames_since_last_cube = 0;
-    } else {
-        *frames_since_last_cube = *frames_since_last_cube + 1;
+    if r == 1 {
+        activate_cube(Colour::Blue, world, physics_context, command_buffer);
     }
 }
 
-fn activate_cube(cube: &mut EntryMut, physics_context: &mut PhysicsContext) {
-    let mut rng = rand::thread_rng();
-    let mut mesh = cube.get_component_mut::<Mesh>().unwrap();
-    let r = cube.get_component::<RigidBody>().unwrap();
+fn activate_cube(
+    colour: Colour,
+    world: &mut SubWorld,
+    physics_context: &mut PhysicsContext,
+    command_buffer: &mut CommandBuffer,
+) {
+    let mut query = <(Entity, &Colour, &RigidBody)>::query()
+        .filter(component::<Cube>() & !component::<Visible>());
+    let query = query.iter(world);
+    let (entity, _, rigid_body) = query.filter(|(_, c, _)| c == &&colour).next().unwrap();
+    let entity = entity.clone();
 
-    println!("Activating cube: {:?}", r.handle);
-    let rigid_body = &mut physics_context.rigid_bodies[r.handle];
+    let mut rng = rand::thread_rng();
+    println!("Activating {:?} cube: {:?}", colour, rigid_body.handle);
+    let rigid_body = &mut physics_context.rigid_bodies[rigid_body.handle];
     let x_offset = rng.gen_range(-1.0..1.0);
 
     rigid_body.set_linvel(CUBE_STARTING_VELOCITY, true);
@@ -78,6 +74,9 @@ fn activate_cube(cube: &mut EntryMut, physics_context: &mut PhysicsContext) {
         vector!(x_offset, CUBE_STARTING_HEIGHT, CUBE_STARTING_DISTANCE),
         true,
     );
+
+    // Give the cube a Visible component
+    command_buffer.add_component(entity, Visible {})
 }
 
 pub fn add_cube_physics(world: &mut World, physics_context: &mut PhysicsContext, cube: Entity) {
@@ -134,10 +133,8 @@ mod tests {
             render_context::create_descriptor_set_layouts, vulkan_context::VulkanContext,
             PhysicsContext,
         },
-        schedule_functions::physics_step,
     };
     use legion::{IntoQuery, Resources, Schedule, World};
-    use nalgebra::vector;
 
     use crate::components::Cube;
 
@@ -166,71 +163,45 @@ mod tests {
         let mut resources = Resources::default();
         resources.insert(physics_context);
         let mut schedule = Schedule::builder()
-            .add_system(cube_spawner_system(50))
-            .add_thread_local_fn(physics_step)
+            .add_system(cube_spawner_system(2))
             .build();
 
-        schedule.execute(&mut world, &mut resources);
+        let mut red_found = 0;
+        let mut blue_found = 0;
+        let mut searches = 0;
 
-        // ASSERTIONS
-        let mut query = <(&RigidBody, &Colour)>::query().filter(
-            component::<Mesh>()
-                & component::<Collider>()
-                & component::<Cube>()
-                & component::<Visible>(),
-        );
-        let mut renderable = query.iter(&world).collect::<Vec<_>>();
-        assert_eq!(renderable.len(), 1);
+        while searches < 10 && (red_found == 0 || blue_found == 0) {
+            let mut query = <(&RigidBody, &Colour)>::query().filter(
+                component::<Mesh>()
+                    & component::<Collider>()
+                    & component::<Cube>()
+                    & component::<Visible>(),
+            );
+            schedule.execute(&mut world, &mut resources);
 
-        {
+            // ASSERTIONS
+            let mut renderable = query.iter(&world).collect::<Vec<_>>();
             let (rigid_body, colour) = renderable.pop().unwrap();
-            // It should be red
-            assert_eq!(*colour, Colour::Red);
 
             let physics = resources.get::<PhysicsContext>().unwrap();
             let rigid_body = &physics.rigid_bodies[rigid_body.handle];
             let translation = rigid_body.translation();
 
             // It should be located -10 metres in the Z direction (eg. in the distance)
-            // assert_eq!(translation.z, CUBE_STARTING_DISTANCE);
-            // assert_eq!(translation.y, CUBE_STARTING_HEIGHT);
+            assert_eq!(translation.z, CUBE_STARTING_DISTANCE);
+            assert_eq!(translation.y, CUBE_STARTING_HEIGHT);
 
             // It should have a linear velocity of 1 in the Z direction (eg. towards the viewer)
             assert_eq!(rigid_body.linvel(), &CUBE_STARTING_VELOCITY);
+
+            match colour {
+                Colour::Red => red_found += 1,
+                Colour::Blue => blue_found += 1,
+            };
+            searches += 1;
         }
 
-        for _ in 0..50 {
-            schedule.execute(&mut world, &mut resources);
-        }
-
-        let mut query = <(&Mesh, &Collider, &RigidBody, &Cube, &Colour)>::query();
-        let mut blue_renderable = query
-            .iter(&world)
-            .filter(|(m, _c, _r, _cube, colour)| colour == &&Colour::Blue)
-            .collect::<Vec<_>>();
-        assert_eq!(blue_renderable.len(), 1);
-
-        {
-            let (_mesh, _collider, rigid_body, _cube, _colour) = blue_renderable.pop().unwrap();
-
-            let physics = resources.get::<PhysicsContext>().unwrap();
-            let rigid_body = &physics.rigid_bodies[rigid_body.handle];
-            let translation = rigid_body.translation();
-
-            // It should be located -10 metres in the Z direction (eg. in the distance)
-            // assert_eq!(translation.z, CUBE_STARTING_DISTANCE);
-            // assert_eq!(translation.y, CUBE_STARTING_HEIGHT);
-
-            // It should have a linear velocity of 1 in the Z direction (eg. towards the viewer)
-            assert_eq!(rigid_body.linvel(), &CUBE_STARTING_VELOCITY);
-        }
-
-        for _ in 0..201 {
-            schedule.execute(&mut world, &mut resources);
-        }
-
-        let mut query = <(&Mesh, &Collider, &RigidBody, &Cube)>::query();
-        let renderable = query.iter(&world).collect::<Vec<_>>();
-        assert_eq!(renderable.len(), 4);
+        assert!(red_found >= 1);
+        assert!(blue_found >= 1);
     }
 }
