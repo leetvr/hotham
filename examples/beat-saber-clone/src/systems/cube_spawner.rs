@@ -1,5 +1,5 @@
 use hotham::{
-    components::{Mesh, RigidBody, Transform},
+    components::{Mesh, RigidBody, Transform, Visible},
     gltf_loader::add_model_to_world,
     resources::{
         physics_context,
@@ -9,16 +9,16 @@ use hotham::{
     },
 };
 use legion::{
-    system,
+    component, system,
     world::{EntryMut, SubWorld},
-    Entity, EntityStore, World,
+    Entity, EntityStore, IntoQuery, World,
 };
 use nalgebra::{vector, Vector3};
 use rand::Rng;
 use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder};
 
 use crate::{
-    components::{cube, Cube},
+    components::{Colour, Cube},
     Models,
 };
 
@@ -31,28 +31,30 @@ const CUBE_STARTING_HEIGHT: f32 = 1.2;
 #[write_component(RigidBody)]
 pub fn cube_spawner(
     world: &mut SubWorld,
-    #[state] red_cube_pool: &mut Vec<Entity>,
-    #[state] blue_cube_pool: &mut Vec<Entity>,
     #[state] frames_since_last_cube: &mut usize,
     #[resource] mut physics_context: &mut PhysicsContext,
 ) {
     let mut rng = rand::thread_rng();
     let r = rng.gen_range(0..100);
-    if red_cube_pool.len() == 0 || blue_cube_pool.len() == 0 {
-        return;
-    }
 
     if r == 1 {
-        let entity = red_cube_pool.pop().unwrap();
+        let mut query = <(&Entity, &Cube, &Colour)>::query().filter(!component::<Visible>());
+        let query = query.iter(world);
+        let entity = query
+            .filter(|(_, _, colour)| colour == &&Colour::Red)
+            .map(|(e, _, _)| e)
+            .next()
+            .unwrap();
+        let entity = entity.clone();
         let mut entry = world.entry_mut(entity).unwrap();
         activate_cube(&mut entry, &mut physics_context);
     }
 
-    if r == 2 {
-        let entity = blue_cube_pool.pop().unwrap();
-        let mut entry = world.entry_mut(entity).unwrap();
-        activate_cube(&mut entry, &mut physics_context);
-    }
+    // if r == 2 {
+    //     let entity = blue_cube_pool.pop().unwrap();
+    //     let mut entry = world.entry_mut(entity).unwrap();
+    //     activate_cube(&mut entry, &mut physics_context);
+    // }
 
     // Reset counter
     if *frames_since_last_cube >= 2000 {
@@ -95,20 +97,15 @@ pub fn add_cube_physics(world: &mut World, physics_context: &mut PhysicsContext,
 
 pub fn create_cubes(
     count: usize,
-    colour: cube::Colour,
     models: &Models,
     mut world: &mut World,
     mut physics_context: &mut PhysicsContext,
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
-) -> Vec<Entity> {
-    let model_name = match colour {
-        cube::Colour::Blue => "Blue Cube",
-        cube::Colour::Red => "Red Cube",
-    };
-    (0..count)
-        .map(|_| {
-            let e = add_model_to_world(
+) {
+    for (colour, model_name) in [(Colour::Blue, "Blue Cube"), (Colour::Red, "Red Cube")] {
+        for _ in 0..count {
+            let entity = add_model_to_world(
                 model_name,
                 &models,
                 &mut world,
@@ -117,14 +114,15 @@ pub fn create_cubes(
                 &descriptor_set_layouts,
             )
             .expect("Unable to add Red Cube");
-            add_cube_physics(&mut world, &mut physics_context, e);
+            add_cube_physics(&mut world, &mut physics_context, entity);
 
             // Make un-renderable
-            let mut entry = world.entry(e).unwrap();
-            entry.add_component(Cube { colour });
-            e
-        })
-        .collect()
+            let mut entry = world.entry(entity).unwrap();
+            entry.add_component(Cube {});
+            entry.add_component(colour);
+            entry.remove_component::<Visible>();
+        }
+    }
 }
 
 #[cfg(test)]
@@ -156,18 +154,8 @@ mod tests {
         let models: Models =
             gltf_loader::load_models_from_glb(&glb_bufs, &vulkan_context, &set_layouts).unwrap();
 
-        let red_cubes = create_cubes(
+        create_cubes(
             10,
-            cube::Colour::Red,
-            &models,
-            &mut world,
-            &mut physics_context,
-            &vulkan_context,
-            &set_layouts,
-        );
-        let blue_cubes = create_cubes(
-            10,
-            cube::Colour::Blue,
             &models,
             &mut world,
             &mut physics_context,
@@ -178,21 +166,26 @@ mod tests {
         let mut resources = Resources::default();
         resources.insert(physics_context);
         let mut schedule = Schedule::builder()
-            .add_system(cube_spawner_system(red_cubes, blue_cubes, 50))
+            .add_system(cube_spawner_system(50))
             .add_thread_local_fn(physics_step)
             .build();
 
         schedule.execute(&mut world, &mut resources);
 
         // ASSERTIONS
-        let mut query = <(&Mesh, &Collider, &RigidBody, &Cube)>::query();
+        let mut query = <(&RigidBody, &Colour)>::query().filter(
+            component::<Mesh>()
+                & component::<Collider>()
+                & component::<Cube>()
+                & component::<Visible>(),
+        );
         let mut renderable = query.iter(&world).collect::<Vec<_>>();
         assert_eq!(renderable.len(), 1);
 
         {
-            let (_mesh, _collider, rigid_body, cube) = renderable.pop().unwrap();
+            let (rigid_body, colour) = renderable.pop().unwrap();
             // It should be red
-            assert_eq!(cube.colour, cube::Colour::Red);
+            assert_eq!(*colour, Colour::Red);
 
             let physics = resources.get::<PhysicsContext>().unwrap();
             let rigid_body = &physics.rigid_bodies[rigid_body.handle];
@@ -210,15 +203,15 @@ mod tests {
             schedule.execute(&mut world, &mut resources);
         }
 
-        let mut query = <(&Mesh, &Collider, &RigidBody, &Cube)>::query();
+        let mut query = <(&Mesh, &Collider, &RigidBody, &Cube, &Colour)>::query();
         let mut blue_renderable = query
             .iter(&world)
-            .filter(|(m, _c, _r, cube)| cube.colour == cube::Colour::Blue)
+            .filter(|(m, _c, _r, _cube, colour)| colour == &&Colour::Blue)
             .collect::<Vec<_>>();
         assert_eq!(blue_renderable.len(), 1);
 
         {
-            let (_mesh, _collider, rigid_body, _cube) = blue_renderable.pop().unwrap();
+            let (_mesh, _collider, rigid_body, _cube, _colour) = blue_renderable.pop().unwrap();
 
             let physics = resources.get::<PhysicsContext>().unwrap();
             let rigid_body = &physics.rigid_bodies[rigid_body.handle];

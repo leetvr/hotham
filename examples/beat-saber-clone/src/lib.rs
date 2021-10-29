@@ -1,14 +1,13 @@
 mod components;
 mod systems;
 
-use crate::components::cube::Colour;
+use crate::components::{Colour, Cube, Saber};
 use crate::systems::cube_spawner::{create_cubes, cube_spawner_system};
-use cube::Cube;
 use legion::IntoQuery;
 use std::collections::HashMap;
 
 use hotham::components::hand::Handedness;
-use hotham::components::{Mesh, RigidBody, Transform, TransformMatrix};
+use hotham::components::{Mesh, RigidBody, TransformMatrix};
 use hotham::gltf_loader::add_model_to_world;
 use hotham::legion::{Resources, Schedule, World};
 use hotham::resources::{PhysicsContext, RenderContext, XrContext};
@@ -21,11 +20,9 @@ use hotham::systems::{
 use hotham::{gltf_loader, App, HothamResult};
 use hotham_debug_server::DebugServer as DebugServerT;
 
-use nalgebra::{Isometry, Matrix4, Vector3};
+use nalgebra::{Matrix4, Vector3};
 use serde::{Deserialize, Serialize};
 use systems::sabers::{add_saber_physics, sabers_system};
-
-use crate::components::{cube, Saber};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -60,13 +57,13 @@ pub fn real_main() -> HothamResult<()> {
     add_environment_models(&models, &mut world, &vulkan_context, &render_context);
 
     // Add cubes
-    let (red_cubes, blue_cubes) = add_cubes(
+    create_cubes(
         10,
         &models,
         &mut world,
         &mut physics_context,
         &vulkan_context,
-        &render_context,
+        &render_context.descriptor_set_layouts,
     );
 
     // Add Red Saber
@@ -105,7 +102,7 @@ pub fn real_main() -> HothamResult<()> {
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
         .add_system(sabers_system())
-        .add_system(cube_spawner_system(red_cubes, blue_cubes, 0))
+        .add_system(cube_spawner_system(0))
         .add_system(update_rigid_body_transforms_system())
         .add_system(update_transform_matrix_system())
         .add_system(update_parent_transform_matrix_system())
@@ -169,35 +166,6 @@ fn add_saber(
         let mut saber_entry = world.entry(saber).unwrap();
         saber_entry.add_component(Saber { handedness });
     }
-}
-
-fn add_cubes(
-    cube_count: usize,
-    models: &HashMap<String, World>,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-    vulkan_context: &hotham::resources::vulkan_context::VulkanContext,
-    render_context: &RenderContext,
-) -> (Vec<legion::Entity>, Vec<legion::Entity>) {
-    let red_cubes = create_cubes(
-        cube_count,
-        cube::Colour::Red,
-        models,
-        world,
-        physics_context,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    );
-    let blue_cubes = create_cubes(
-        cube_count,
-        cube::Colour::Blue,
-        models,
-        world,
-        physics_context,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    );
-    (red_cubes, blue_cubes)
 }
 
 fn add_environment_models(
