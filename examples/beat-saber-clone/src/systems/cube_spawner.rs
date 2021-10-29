@@ -65,7 +65,6 @@ pub fn cube_spawner(
 fn activate_cube(cube: &mut EntryMut, physics_context: &mut PhysicsContext) {
     let mut rng = rand::thread_rng();
     let mut mesh = cube.get_component_mut::<Mesh>().unwrap();
-    mesh.should_render = true;
     let r = cube.get_component::<RigidBody>().unwrap();
 
     println!("Activating cube: {:?}", r.handle);
@@ -123,8 +122,6 @@ pub fn create_cubes(
             // Make un-renderable
             let mut entry = world.entry(e).unwrap();
             entry.add_component(Cube { colour });
-            let mut mesh = entry.get_component_mut::<Mesh>().unwrap();
-            mesh.should_render = false;
             e
         })
         .collect()
@@ -188,12 +185,8 @@ mod tests {
         schedule.execute(&mut world, &mut resources);
 
         // ASSERTIONS
-
         let mut query = <(&Mesh, &Collider, &RigidBody, &Cube)>::query();
-        let mut renderable = query
-            .iter(&world)
-            .filter(|(m, c, r, cube)| m.should_render)
-            .collect::<Vec<_>>();
+        let mut renderable = query.iter(&world).collect::<Vec<_>>();
         assert_eq!(renderable.len(), 1);
 
         {
@@ -220,7 +213,7 @@ mod tests {
         let mut query = <(&Mesh, &Collider, &RigidBody, &Cube)>::query();
         let mut blue_renderable = query
             .iter(&world)
-            .filter(|(m, _c, _r, cube)| m.should_render && cube.colour == cube::Colour::Blue)
+            .filter(|(m, _c, _r, cube)| cube.colour == cube::Colour::Blue)
             .collect::<Vec<_>>();
         assert_eq!(blue_renderable.len(), 1);
 
@@ -244,10 +237,7 @@ mod tests {
         }
 
         let mut query = <(&Mesh, &Collider, &RigidBody, &Cube)>::query();
-        let renderable = query
-            .iter(&world)
-            .filter(|(m, _c, _r, _cube)| m.should_render)
-            .collect::<Vec<_>>();
+        let renderable = query.iter(&world).collect::<Vec<_>>();
         assert_eq!(renderable.len(), 4);
     }
 }

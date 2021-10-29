@@ -13,6 +13,7 @@ pub mod root;
 pub mod skin;
 pub mod transform;
 pub mod transform_matrix;
+pub mod visible;
 
 pub use animation_controller::AnimationController;
 pub use animation_target::AnimationTarget;
@@ -29,3 +30,4 @@ pub use root::Root;
 pub use skin::Skin;
 pub use transform::Transform;
 pub use transform_matrix::TransformMatrix;
+pub use visible::Visible;

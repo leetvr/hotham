@@ -157,7 +157,6 @@ pub fn real_main() -> HothamResult<()> {
             let mut query = <(&Mesh, &RigidBody, &Cube, &TransformMatrix)>::query();
             let renderable_objects = query
                 .iter(world)
-                .filter(|(m, _, _, _)| m.should_render)
                 .map(|(_, r, _, t)| {
                     let rigid_body = &physics_context.rigid_bodies[r.handle];
                     DebugInfo {
