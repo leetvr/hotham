@@ -14,6 +14,7 @@ use legion::{
     Entity, EntityStore, World,
 };
 use nalgebra::{vector, Vector3};
+use rand::Rng;
 use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder};
 
 use crate::{
@@ -21,8 +22,8 @@ use crate::{
     Models,
 };
 
-const CUBE_STARTING_VELOCITY: Vector3<f32> = Vector3::new(0., 0., 0.03);
-const CUBE_STARTING_DISTANCE: f32 = -1.;
+const CUBE_STARTING_VELOCITY: Vector3<f32> = Vector3::new(0., 0., 3.00);
+const CUBE_STARTING_DISTANCE: f32 = -10.;
 const CUBE_STARTING_HEIGHT: f32 = 1.2;
 
 #[system]
@@ -35,17 +36,19 @@ pub fn cube_spawner(
     #[state] frames_since_last_cube: &mut usize,
     #[resource] mut physics_context: &mut PhysicsContext,
 ) {
+    let mut rng = rand::thread_rng();
+    let r = rng.gen_range(0..100);
     if red_cube_pool.len() == 0 || blue_cube_pool.len() == 0 {
         return;
     }
 
-    if *frames_since_last_cube == 50 {
+    if r == 1 {
         let entity = red_cube_pool.pop().unwrap();
         let mut entry = world.entry_mut(entity).unwrap();
         activate_cube(&mut entry, &mut physics_context);
     }
 
-    if *frames_since_last_cube == 100 {
+    if r == 2 {
         let entity = blue_cube_pool.pop().unwrap();
         let mut entry = world.entry_mut(entity).unwrap();
         activate_cube(&mut entry, &mut physics_context);
@@ -60,15 +63,18 @@ pub fn cube_spawner(
 }
 
 fn activate_cube(cube: &mut EntryMut, physics_context: &mut PhysicsContext) {
+    let mut rng = rand::thread_rng();
     let mut mesh = cube.get_component_mut::<Mesh>().unwrap();
     mesh.should_render = true;
     let r = cube.get_component::<RigidBody>().unwrap();
 
     println!("Activating cube: {:?}", r.handle);
     let rigid_body = &mut physics_context.rigid_bodies[r.handle];
+    let x_offset = rng.gen_range(-1.0..1.0);
+
     rigid_body.set_linvel(CUBE_STARTING_VELOCITY, true);
     rigid_body.set_translation(
-        vector!(0., CUBE_STARTING_HEIGHT, CUBE_STARTING_DISTANCE),
+        vector!(x_offset, CUBE_STARTING_HEIGHT, CUBE_STARTING_DISTANCE),
         true,
     );
 }
