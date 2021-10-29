@@ -1,6 +1,7 @@
 mod components;
 mod systems;
 
+use crate::components::cube::Colour;
 use crate::systems::cube_spawner::{create_cubes, cube_spawner_system};
 use cube::Cube;
 use legion::IntoQuery;
@@ -56,80 +57,37 @@ pub fn real_main() -> HothamResult<()> {
     )?;
 
     // Add Environment
-    let _environment = add_model_to_world(
-        "Environment",
-        &models,
-        &mut world,
-        None,
-        &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
-    let _ramp = add_model_to_world(
-        "Ramp",
-        &models,
-        &mut world,
-        None,
-        &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
+    add_environment_models(&models, &mut world, &vulkan_context, &render_context);
 
     // Add cubes
-    let red_cubes = create_cubes(
+    let (red_cubes, blue_cubes) = add_cubes(
         10,
-        cube::Colour::Red,
         &models,
         &mut world,
         &mut physics_context,
         &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    );
-    let blue_cubes = create_cubes(
-        10,
-        cube::Colour::Blue,
-        &models,
-        &mut world,
-        &mut physics_context,
-        &vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context,
     );
 
     // Add Red Saber
-    let red_saber = add_model_to_world(
-        "Red Saber",
+    add_saber(
+        Colour::Red,
         &models,
         &mut world,
-        None,
         &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
-    {
-        add_saber_physics(&mut world, &mut physics_context, red_saber);
-        let mut saber_entry = world.entry(red_saber).unwrap();
-        saber_entry.add_component(Saber {
-            handedness: Handedness::Left,
-        });
-    }
+        &render_context,
+        &mut physics_context,
+    );
 
     // Add Blue Saber
-    let blue_saber = add_model_to_world(
-        "Blue Saber",
+    add_saber(
+        Colour::Blue,
         &models,
         &mut world,
-        None,
         &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
-    {
-        add_saber_physics(&mut world, &mut physics_context, blue_saber);
-        let mut saber_entry = world.entry(blue_saber).unwrap();
-        saber_entry.add_component(Saber {
-            handedness: Handedness::Right,
-        });
-    }
+        &render_context,
+        &mut physics_context,
+    );
 
     let debug_server = DebugServer::new();
 
@@ -183,4 +141,87 @@ pub fn real_main() -> HothamResult<()> {
     let mut app = App::new(world, resources, schedule)?;
     app.run()?;
     Ok(())
+}
+
+fn add_saber(
+    colour: Colour,
+    models: &HashMap<String, World>,
+    world: &mut World,
+    vulkan_context: &hotham::resources::vulkan_context::VulkanContext,
+    render_context: &RenderContext,
+    physics_context: &mut PhysicsContext,
+) {
+    let (model_name, handedness) = match colour {
+        Colour::Red => ("Red Saber", Handedness::Left),
+        Colour::Blue => ("Blue Saber", Handedness::Right),
+    };
+    let saber = add_model_to_world(
+        model_name,
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
+    {
+        add_saber_physics(world, physics_context, saber);
+        let mut saber_entry = world.entry(saber).unwrap();
+        saber_entry.add_component(Saber { handedness });
+    }
+}
+
+fn add_cubes(
+    cube_count: usize,
+    models: &HashMap<String, World>,
+    world: &mut World,
+    physics_context: &mut PhysicsContext,
+    vulkan_context: &hotham::resources::vulkan_context::VulkanContext,
+    render_context: &RenderContext,
+) -> (Vec<legion::Entity>, Vec<legion::Entity>) {
+    let red_cubes = create_cubes(
+        cube_count,
+        cube::Colour::Red,
+        models,
+        world,
+        physics_context,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    );
+    let blue_cubes = create_cubes(
+        cube_count,
+        cube::Colour::Blue,
+        models,
+        world,
+        physics_context,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    );
+    (red_cubes, blue_cubes)
+}
+
+fn add_environment_models(
+    models: &HashMap<String, World>,
+    world: &mut World,
+    vulkan_context: &hotham::resources::vulkan_context::VulkanContext,
+    render_context: &RenderContext,
+) {
+    let _environment = add_model_to_world(
+        "Environment",
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
+    let _ramp = add_model_to_world(
+        "Ramp",
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
 }
