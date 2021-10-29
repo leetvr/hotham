@@ -58,7 +58,7 @@ pub fn real_main() -> HothamResult<()> {
 
     // Add cubes
     create_cubes(
-        10,
+        50,
         &models,
         &mut world,
         &mut physics_context,
@@ -102,7 +102,7 @@ pub fn real_main() -> HothamResult<()> {
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
         .add_system(sabers_system())
-        .add_system(cube_spawner_system(0))
+        .add_system(cube_spawner_system(1000))
         .add_system(update_rigid_body_transforms_system())
         .add_system(update_transform_matrix_system())
         .add_system(update_parent_transform_matrix_system())
