@@ -2,7 +2,7 @@ use crate::{
     buffer::Buffer,
     components::{
         animation_controller::AnimationController, mesh::MeshUBO, AnimationTarget, Info, Joint,
-        Mesh, Parent, Root, Skin, Transform, TransformMatrix,
+        Mesh, Parent, Root, Skin, Transform, TransformMatrix, Visible,
     },
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
@@ -113,6 +113,7 @@ fn load_node(
         )?;
 
         e.add_component(mesh);
+        e.add_component(Visible {})
     }
 
     if is_root {
@@ -313,6 +314,7 @@ pub fn add_model_to_world(
     merger.register_clone::<Info>();
     merger.register_clone::<AnimationController>();
     merger.register_clone::<AnimationTarget>();
+    merger.register_clone::<Visible>();
 
     let source = models.get(name)?;
     let mut query = Entity::query().filter(component::<Root>());
