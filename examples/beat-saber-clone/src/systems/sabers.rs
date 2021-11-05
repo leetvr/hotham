@@ -7,7 +7,7 @@ use hotham::{
 use legion::{system, Entity, World};
 use nalgebra::{vector, Isometry3, Quaternion, Translation3, UnitQuaternion};
 
-use crate::components::Saber;
+use crate::components::{Colour, Saber};
 
 const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
 const ROTATION_OFFSET: Quaternion<f32> = Quaternion::new(
@@ -19,19 +19,20 @@ const ROTATION_OFFSET: Quaternion<f32> = Quaternion::new(
 
 #[system(for_each)]
 pub fn sabers(
-    saber: &mut Saber,
+    _: &Saber,
+    colour: &Colour,
     rigid_body_component: &RigidBody,
     #[resource] xr_context: &XrContext,
     #[resource] physics_context: &mut PhysicsContext,
 ) {
     // Get our the space and path of the hand.
     let time = xr_context.frame_state.predicted_display_time;
-    let (space, _) = match saber.handedness {
-        Handedness::Left => (
+    let (space, _) = match colour {
+        Colour::Red => (
             &xr_context.left_hand_space,
             xr_context.left_hand_subaction_path,
         ),
-        Handedness::Right => (
+        Colour::Blue => (
             &xr_context.right_hand_space,
             xr_context.right_hand_subaction_path,
         ),
@@ -98,9 +99,8 @@ mod tests {
         let (xr_context, _) = XrContext::new_from_path(path).unwrap();
         let mut physics_context = PhysicsContext::default();
         let saber = world.push((
-            Saber {
-                handedness: Handedness::Left,
-            },
+            Colour::Red,
+            Saber {},
             Transform::default(),
             TransformMatrix::default(),
         ));
@@ -120,7 +120,7 @@ mod tests {
         let mut query = <(&Transform, &Saber)>::query();
         let (transform, _) = query.get(&world, saber).unwrap();
 
-        approx::assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
+        approx::assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
     }
 
     #[test]

@@ -164,7 +164,7 @@ fn add_saber(
     {
         add_saber_physics(world, physics_context, saber);
         let mut saber_entry = world.entry(saber).unwrap();
-        saber_entry.add_component(Saber { handedness });
+        saber_entry.add_component(Saber {});
     }
 }
 

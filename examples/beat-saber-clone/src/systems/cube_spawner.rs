@@ -29,9 +29,6 @@ const CUBE_STARTING_HEIGHT: f32 = 1.2;
 
 #[system]
 #[read_component(Entity)]
-#[read_component(Cube)]
-#[read_component(Colour)]
-#[write_component(Mesh)]
 #[write_component(RigidBody)]
 #[write_component(Visible)]
 pub fn cube_spawner(
