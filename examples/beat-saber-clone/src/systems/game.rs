@@ -21,7 +21,7 @@ pub fn game(
     if transform.translation.z > 0.0 {
         game_state.current_score -= 1;
         println!(
-            "Entity {:?} was missed! Score is now {}",
+            "Entity {:?} was missed! Score is now {}. Removing entity",
             entity, game_state.current_score
         );
         command_buffer.remove(*entity);
@@ -32,7 +32,7 @@ pub fn game(
     if let Some(_saber) = collider.collisions_this_frame.pop() {
         game_state.current_score += 1;
         println!(
-            "Entity {:?} was hit! Score is now {}",
+            "Entity {:?} was hit! Score is now {}. Removing entity",
             entity, game_state.current_score
         );
         command_buffer.remove(*entity);
@@ -59,12 +59,14 @@ mod tests {
         let mut physics_context = PhysicsContext::default();
 
         // Set up a red cube that has been hit by the red saber
-        // Assert score is 2
         let red_saber = world.push((Saber {}, Colour::Red));
         add_saber_physics(&mut world, &mut physics_context, red_saber);
 
         let hit_red_cube = world.push((Transform::default(), Visible {}, Cube {}, Colour::Red));
         add_cube_physics(&mut world, &mut physics_context, hit_red_cube);
+
+        // Cube should be present.
+        assert!(world.entry(hit_red_cube).is_some());
 
         let mut resources = Resources::default();
         resources.insert(physics_context);
@@ -77,8 +79,12 @@ mod tests {
         schedule.execute(&mut world, &mut resources);
 
         {
+            // Score should be updated
             let game_state = resources.get::<GameState>().unwrap();
             assert_eq!(game_state.current_score, 2);
+
+            // Cube should be removed.
+            assert!(world.entry(hit_red_cube).is_none());
         }
 
         // Set up a red cube that has been missed

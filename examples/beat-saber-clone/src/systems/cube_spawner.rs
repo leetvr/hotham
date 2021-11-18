@@ -35,11 +35,11 @@ const CUBE_STARTING_HEIGHT: f32 = 1.2;
 pub fn cube_spawner(
     world: &mut SubWorld,
     command_buffer: &mut CommandBuffer,
-    #[state] probability: &usize,
+    #[state] spawn_probability: &usize,
     #[resource] physics_context: &mut PhysicsContext,
 ) {
     let mut rng = rand::thread_rng();
-    let r = rng.gen_range(0..*probability);
+    let r = rng.gen_range(0..*spawn_probability);
 
     if r == 0 {
         activate_cube(Colour::Red, world, physics_context, command_buffer);

@@ -103,9 +103,9 @@ pub fn real_main() -> HothamResult<()> {
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
-        .add_system(collision_system())
         .add_thread_local_fn(physics_step)
         .add_system(sabers_system())
+        .add_system(collision_system())
         .add_system(cube_spawner_system(1000))
         .add_system(update_rigid_body_transforms_system())
         .add_system(update_transform_matrix_system())

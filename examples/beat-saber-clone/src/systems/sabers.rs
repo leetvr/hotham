@@ -134,13 +134,16 @@ mod tests {
         let t = Translation3::new(0.2, 1.4, 2.);
         let mut position = Isometry3::from_parts(t, q1);
         apply_offset(&mut position);
-        let expected_result = Quaternion::new(
+
+        let expected_rotation = Quaternion::new(
             -0.5493369162990798,
             -0.4188107240790279,
             0.6209124327141259,
             -0.3705324286596844,
         );
-        approx::assert_relative_eq!(position.rotation.quaternion(), &expected_result);
-        approx::assert_relative_eq!(position.translation, t);
+        let expected_translation = Translation3::new(0.2, 1.328827, 2.066082);
+
+        approx::assert_relative_eq!(position.rotation.quaternion(), &expected_rotation);
+        approx::assert_relative_eq!(position.translation, &expected_translation);
     }
 }
