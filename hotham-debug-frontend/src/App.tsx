@@ -33,6 +33,12 @@ interface Schema {
   non_editable: JSONSchema7;
 }
 
+type Entities = Record<number, Entity>;
+interface Frame {
+  id: number;
+  entities: Entities;
+}
+
 function update(editable: Record<string, any>) {
   ws.send(JSON.stringify({ Data: { editable } }));
 }
@@ -88,10 +94,52 @@ function App() {
 
   const [frame, setFrame] = useState(0);
   const maxFrames = 10;
-  const entities: Record<number, Entity> = {
-    0: { id: 0, mesh: 'Environment', material: 'Rough', transform: [0, 0, -1] },
-    1: { id: 1 },
-  };
+
+  const frames: Frame[] = [
+    {
+      id: 0,
+      entities: {
+        0: {
+          name: 'Environment',
+          id: 0,
+          mesh: 'Environment',
+          material: 'Rough',
+          transform: {
+            translation: [0, 0, -1],
+            rotation: [0, 0, 0, 1],
+            scale: [1, 1, 1],
+          },
+          collider: {
+            type: 'cube',
+            geometry: [1, 1, 1],
+          },
+        },
+        1: { name: 'Empty', id: 1 },
+      },
+    },
+    {
+      id: 1,
+      entities: {
+        0: {
+          name: 'Environment',
+          id: 0,
+          mesh: 'Environment',
+          material: 'Rough',
+          transform: {
+            translation: [0, 0, -1.1],
+            rotation: [0, 0, 0, 1],
+            scale: [1, 1, 1],
+          },
+          collider: {
+            type: 'cube',
+            geometry: [1, 1, 1],
+          },
+        },
+      },
+    },
+  ];
+
+  const entities = frames[frame].entities;
 
   return (
     <Container>
@@ -99,18 +147,25 @@ function App() {
         entities={entities}
         frame={frame}
         setFrame={setFrame}
-        maxFrames={maxFrames}
+        maxFrames={frames.length}
       />
       <RightPanel entities={entities} />
     </Container>
   );
 }
 
+export interface Transform {
+  translation: [number, number, number];
+  rotation: [number, number, number, number];
+  scale: [number, number, number];
+}
+
 export interface Entity {
   id: number;
+  name: string;
   mesh?: string;
   material?: string;
-  transform?: [number, number, number];
+  transform?: Transform;
   rotation?: [number, number, number, number];
   collider?: {
     type: 'cube' | 'cylinder';

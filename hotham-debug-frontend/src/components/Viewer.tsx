@@ -11,8 +11,8 @@ import styled from 'styled-components';
 import { ViewOptions } from './ViewOptions';
 import { useGLTF } from '@react-three/drei';
 import { GLTF, GLTF as GLTFThree } from 'three/examples/jsm/loaders/GLTFLoader';
-import { Group, Material, Mesh } from 'three';
-import { Entity } from '../App';
+import THREE, { Euler, Group, Material, Mesh, Quaternion } from 'three';
+import { Entity, Transform } from '../App';
 
 const CanvasContainer = styled.div`
   display: 'flex';
@@ -23,7 +23,7 @@ const CanvasContainer = styled.div`
 
 type GLTFResult = GLTF & {
   nodes: Record<string, Mesh>;
-  materials: Record<string, THREE.MeshStandardMaterial>;
+  materials: Record<string, THREE.MeshPhysicalMaterial>;
 };
 
 export interface DisplayOptions {
@@ -34,11 +34,14 @@ export interface DisplayOptions {
 function Model({
   mesh,
   material,
+  transform,
 }: {
   mesh: Mesh;
   material: Material;
+  transform: Transform;
 }): JSX.Element {
   const group = useRef<THREE.Group>();
+  const rotation = getRotation(transform);
   return (
     <group ref={group} dispose={null}>
       <mesh
@@ -46,15 +49,43 @@ function Model({
         receiveShadow
         geometry={mesh.geometry}
         material={material}
-        position={[0, 0, 0]}
+        position={transform.translation}
+        scale={transform.scale}
+        rotation={rotation}
         userData={{ name: 'Environment' }}
       />
     </group>
   );
 }
 
+function getRotation(t: Transform): Euler {
+  const rotation = new Euler();
+  rotation.setFromQuaternion(
+    new Quaternion(t.rotation[0], t.rotation[1], t.rotation[2], t.rotation[3])
+  );
+
+  return rotation;
+}
+
 interface Props {
   entities: Record<number, Entity>;
+}
+
+function getModels(
+  entities: Record<number, Entity>,
+  nodes: Record<string, Mesh>,
+  materials: Record<string, THREE.MeshPhysicalMaterial>
+): JSX.Element[] {
+  return Object.values(entities)
+    .filter((e) => e.mesh && e.material && e.transform)
+    .map((e) => (
+      <Model
+        key={e.id}
+        mesh={nodes[e.mesh!]}
+        material={materials[e.material!]}
+        transform={e.transform!}
+      />
+    ));
 }
 
 export function Viewer({ entities }: Props): JSX.Element {
@@ -67,18 +98,33 @@ export function Viewer({ entities }: Props): JSX.Element {
       <ViewOptions displays={displays} setDisplays={setDisplays} />
       <CanvasContainer>
         <Canvas shadows={true}>
-          {displays.models && (
-            <Model mesh={nodes.Environment} material={materials.Rough} />
-          )}
-          {displays.physics && (
-            <Box args={[1, 1, 1]}>
-              <meshBasicMaterial attach="material" color="#f3f3f3" wireframe />
-            </Box>
-          )}
+          {displays.models && getModels(entities, nodes, materials)}
+          {displays.physics && getPhsicsObjects(entities)}
           <Environment preset="studio" />
           <ArcballControls />
         </Canvas>
       </CanvasContainer>
     </>
   );
+}
+function getPhsicsObjects(
+  entities: Record<number, Entity>
+): JSX.Element[] | [] {
+  const elements: JSX.Element[] = [];
+  Object.values(entities).forEach((e) => {
+    if (e.collider?.type === 'cube') {
+      elements.push(
+        <Box
+          args={[
+            e.collider.geometry[0],
+            e.collider.geometry[1],
+            e.collider.geometry[2],
+          ]}
+        >
+          <meshPhongMaterial attach="material" color="#bbb" wireframe />
+        </Box>
+      );
+    }
+  });
+  return elements;
 }

@@ -14,26 +14,23 @@ interface Props {
 }
 
 export function Explorer(props: Props): JSX.Element {
-  const nodes = [
-    {
-      id: 0,
-      parentId: null,
-      label: 'Test',
-    },
-    {
-      id: 1,
-      parentId: 0,
-      label: 'Test Child',
-    },
-  ];
+  const nodes = getNodes(props.entities);
   return (
     <Container>
       <Tree
         nodes={nodes}
-        onSelect={(n) =>
-          setTimeout(() => props.selectEntityId(n[0] as number | undefined), 0)
-        }
+        onSelect={(n) => {
+          if (!n.length) return;
+          setTimeout(() => props.selectEntityId(n[0] as number | undefined), 0);
+        }}
       />
     </Container>
   );
+}
+function getNodes(entities: Record<number, Entity>) {
+  return Object.values(entities).map((e) => ({
+    id: e.id,
+    parentId: null,
+    label: e.name,
+  }));
 }
