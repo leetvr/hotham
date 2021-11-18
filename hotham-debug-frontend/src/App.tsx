@@ -41,11 +41,19 @@ function update(editable: Record<string, any>) {
   ws.send(JSON.stringify({ Data: { editable } }));
 }
 
-function Container(props: { children: JSX.Element }): JSX.Element {
-  return <div className="App">{props.children}</div>;
+function Container(props: {
+  children: JSX.Element | JSX.Element[];
+}): JSX.Element {
+  return <div>{props.children}</div>;
 }
 
-let lastUpdate = new Date().getTime();
+function LeftPanel(): JSX.Element {
+  return <div>Hello!</div>;
+}
+
+function RightPanel(): JSX.Element {
+  return <div>Hello!</div>;
+}
 
 function App() {
   const [editableData, setEditableData] = useState<
@@ -63,28 +71,28 @@ function App() {
   });
   useEffect(() => {
     ws.onmessage = (m) => {
-      const message: Message = JSON.parse(m.data);
-      if (message.Data) {
-        if (message.Data.editable) {
-          console.log('Received  data!');
-          setEditableData(message.Data.editable);
-        }
-        if (message.Data.non_editable) {
-          const deltaTime = lastUpdate - new Date().getTime();
-          if (deltaTime > 500) {
-            setNonEditableData(message.Data.non_editable);
-            lastUpdate = new Date().getTime();
-          }
-        }
-      }
-      if (message.Init) {
-        setSchema(message.Init.schema);
-        setEditableData(message.Init.data.editable);
-        setNonEditableData(message.Init.data.non_editable);
-      }
-      if (message.Error) {
-        setError(error);
-      }
+      // const message: Message = JSON.parse(m.data);
+      // if (messagej.Data) {
+      //   if (message.Data.editable) {
+      //     console.log('Received  data!');
+      //     setEditableData(message.Data.editable);
+      //   }
+      //   if (message.Data.non_editable) {
+      //     const deltaTime = lastUpdate - new Date().getTime();
+      //     if (deltaTime > 500) {
+      //       setNonEditableData(message.Data.non_editable);
+      //       lastUpdate = new Date().getTime();
+      //     }
+      //   }
+      // }
+      // if (message.Init) {
+      //   setSchema(message.Init.schema);
+      //   setEditableData(message.Init.data.editable);
+      //   setNonEditableData(message.Init.data.non_editable);
+      // }
+      // if (message.Error) {
+      //   setError(error);
+      // }
     };
   });
 
@@ -98,23 +106,8 @@ function App() {
 
   return (
     <Container>
-      <>
-        <h1>{error}</h1>
-        <Form formData={noneditableData} schema={schema.non_editable} readonly>
-          <></>
-        </Form>
-        <Form
-          noHtml5Validate
-          formData={editableData}
-          schema={schema.editable}
-          onChange={(e, _) => {
-            setEditableData(e.formData);
-            if (e.errors.length === 0) update(e.formData);
-          }}
-        >
-          {null}
-        </Form>
-      </>
+      <LeftPanel />
+      <RightPanel />
     </Container>
   );
 }
