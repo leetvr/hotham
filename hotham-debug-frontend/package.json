@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@naisutech/react-tree": "^2.0.11",
     "@react-three/drei": "^7.18.0",
     "@react-three/fiber": "^7.0.19",
     "@testing-library/jest-dom": "^5.11.4",

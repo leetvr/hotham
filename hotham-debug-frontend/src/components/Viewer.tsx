@@ -1,4 +1,10 @@
-import { Box, Environment } from '@react-three/drei';
+import {
+  ArcballControls,
+  Box,
+  Environment,
+  OrbitControls,
+  PerspectiveCamera,
+} from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import React, { Suspense, useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -15,36 +21,22 @@ const CanvasContainer = styled.div`
 `;
 
 type GLTFResult = GLTF & {
-  nodes: {
-    Environment: THREE.Mesh;
-    Cylinder: THREE.Mesh;
-    Cylinder_1: THREE.Mesh;
-    Cylinder001: THREE.Mesh;
-    Cylinder001_1: THREE.Mesh;
-    Cube001: THREE.Mesh;
-    Cube001_1: THREE.Mesh;
-    Cube003: THREE.Mesh;
-    Cube003_1: THREE.Mesh;
-    Cylinder004: THREE.Mesh;
-    Cylinder004_1: THREE.Mesh;
-  };
-  materials: {
-    Rough: THREE.MeshStandardMaterial;
-    Glow: THREE.MeshStandardMaterial;
-  };
+  nodes: Record<string, Mesh>;
+  materials: Record<string, THREE.MeshStandardMaterial>;
 };
-
-interface IModel {
-  mesh: THREE.Mesh;
-  material: THREE.MeshStandardMaterial;
-}
 
 export interface DisplayOptions {
   models?: boolean;
   physics?: boolean;
 }
 
-function Model({ mesh, material }: IModel): JSX.Element {
+function Model({
+  mesh,
+  material,
+}: {
+  mesh: Mesh;
+  material: Material;
+}): JSX.Element {
   const group = useRef<THREE.Group>();
   return (
     <group ref={group} dispose={null}>
@@ -61,7 +53,7 @@ function Model({ mesh, material }: IModel): JSX.Element {
 }
 
 export function Viewer(): JSX.Element {
-  const [displays, setDisplays] = useState<DisplayOptions>({});
+  const [displays, setDisplays] = useState<DisplayOptions>({ models: true });
   const gltf = useGLTF('/beat_saber.glb') as unknown as GLTFResult;
   console.log(gltf);
   const { nodes, materials } = gltf;
@@ -70,8 +62,16 @@ export function Viewer(): JSX.Element {
       <ViewOptions displays={displays} setDisplays={setDisplays} />
       <CanvasContainer>
         <Canvas shadows={true}>
-          <Model mesh={nodes.Environment} material={materials.Rough} />
+          {displays.models && (
+            <Model mesh={nodes.Environment} material={materials.Rough} />
+          )}
+          {displays.physics && (
+            <Box args={[1, 1, 1]}>
+              <meshBasicMaterial attach="material" color="#f3f3f3" wireframe />
+            </Box>
+          )}
           <Environment preset="studio" />
+          <ArcballControls />
         </Canvas>
       </CanvasContainer>
     </>
