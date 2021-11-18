@@ -1,8 +1,11 @@
 mod components;
+pub mod resources;
 mod systems;
 
 use crate::components::{Colour, Cube, Saber};
+use crate::resources::GameState;
 use crate::systems::cube_spawner::{create_cubes, cube_spawner_system};
+use crate::systems::game_system;
 use legion::IntoQuery;
 use std::collections::HashMap;
 
@@ -96,6 +99,7 @@ pub fn real_main() -> HothamResult<()> {
     resources.insert(render_context);
     resources.insert(models);
     resources.insert(0 as usize);
+    resources.insert(GameState::default());
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
@@ -131,6 +135,7 @@ pub fn real_main() -> HothamResult<()> {
                 //     .expect("Unable to update data");
             };
         })
+        .add_system(game_system())
         .add_system(rendering_system())
         .add_thread_local_fn(end_frame)
         .build();
@@ -148,9 +153,9 @@ fn add_saber(
     render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
-    let (model_name, handedness) = match colour {
-        Colour::Red => ("Red Saber", Handedness::Left),
-        Colour::Blue => ("Blue Saber", Handedness::Right),
+    let model_name = match colour {
+        Colour::Red => "Red Saber",
+        Colour::Blue => "Blue Saber",
     };
     let saber = add_model_to_world(
         model_name,
@@ -165,6 +170,7 @@ fn add_saber(
         add_saber_physics(world, physics_context, saber);
         let mut saber_entry = world.entry(saber).unwrap();
         saber_entry.add_component(Saber {});
+        saber_entry.add_component(colour);
     }
 }
 

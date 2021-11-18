@@ -13,7 +13,7 @@ impl Default for Transform {
     fn default() -> Self {
         Self {
             translation: Vector3::zeros(),
-            rotation: UnitQuaternion::new_normalize(Quaternion::identity()),
+            rotation: UnitQuaternion::identity(),
             scale: vector![1.0, 1.0, 1.0],
         }
     }

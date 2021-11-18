@@ -29,6 +29,7 @@ const CUBE_STARTING_HEIGHT: f32 = 1.2;
 
 #[system]
 #[read_component(Entity)]
+#[read_component(Colour)]
 #[write_component(RigidBody)]
 #[write_component(Visible)]
 pub fn cube_spawner(
@@ -98,7 +99,8 @@ pub fn create_cubes(
     mut physics_context: &mut PhysicsContext,
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
-) {
+) -> Vec<Entity> {
+    let mut entities = Vec::new();
     for (colour, model_name) in [(Colour::Blue, "Blue Cube"), (Colour::Red, "Red Cube")] {
         for _ in 0..count {
             let entity = add_model_to_world(
@@ -117,8 +119,13 @@ pub fn create_cubes(
             entry.add_component(Cube {});
             entry.add_component(colour);
             entry.remove_component::<Visible>();
+
+            drop(entry);
+            entities.push(entity);
         }
     }
+
+    entities
 }
 
 #[cfg(test)]
