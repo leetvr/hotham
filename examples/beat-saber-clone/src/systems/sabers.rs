@@ -60,7 +60,7 @@ pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext
 
     // Give it a collider and rigid-body
     let collider = ColliderBuilder::capsule_y(0.10, 0.01)
-        .sensor(true)
+        .sensor(false)
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::INTERSECTION_EVENTS)
         .build();
