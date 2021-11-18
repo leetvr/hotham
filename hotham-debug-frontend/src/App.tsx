@@ -1,14 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { withTheme } from '@rjsf/core';
-import { Theme as MaterialUITheme } from '@rjsf/material-ui';
-import './App.css';
 import { JSONSchema7 } from 'json-schema';
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
+import styled from 'styled-components';
+import { LeftPanel } from './components/LeftPanel';
+import { RightPanel } from './components/RightPanel';
 const SERVER_IP = 'localhost';
 const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
-
-const Form = withTheme<Record<any, string>>(MaterialUITheme);
 
 enum Command {
   Reset,
@@ -41,19 +37,13 @@ function update(editable: Record<string, any>) {
   ws.send(JSON.stringify({ Data: { editable } }));
 }
 
-function Container(props: {
-  children: JSX.Element | JSX.Element[];
-}): JSX.Element {
-  return <div>{props.children}</div>;
-}
-
-function LeftPanel(): JSX.Element {
-  return <div>Hello!</div>;
-}
-
-function RightPanel(): JSX.Element {
-  return <div>Hello!</div>;
-}
+const Container = styled.div`
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  height: 100vh;
+  width: 100vw;
+`;
 
 function App() {
   const [editableData, setEditableData] = useState<
@@ -95,14 +85,6 @@ function App() {
       // }
     };
   });
-
-  if (!schema || !editableData) {
-    return (
-      <Container>
-        <h1>Loading..</h1>
-      </Container>
-    );
-  }
 
   return (
     <Container>

@@ -3,13 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@material-ui/core": "^4.12.3",
-    "@material-ui/icons": "^4.11.2",
-    "@mui/material": "^5.0.4",
     "@react-three/drei": "^7.18.0",
-    "@react-three/fiber": "^7.0.17",
-    "@rjsf/core": "^3.2.0",
-    "@rjsf/material-ui": "^3.2.0",
+    "@react-three/fiber": "^7.0.19",
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
     "@testing-library/user-event": "^12.1.10",
@@ -20,6 +15,8 @@
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-scripts": "4.0.3",
+    "styled-components": "^5.3.3",
+    "three": "^0.134.0",
     "typescript": "^4.1.2",
     "web-vitals": "^1.0.1"
   },
@@ -49,7 +46,11 @@
   },
   "devDependencies": {
     "@types/json-schema": "^7.0.9",
+    "@types/styled-components": "^5.1.15",
     "@types/three": "^0.133.1",
     "typescript-plugin-styled-components": "^2.0.0"
+  },
+  "resolutions": {
+    "styled-components": "^5"
   }
 }
