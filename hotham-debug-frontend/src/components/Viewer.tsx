@@ -1,17 +1,11 @@
-import {
-  ArcballControls,
-  Box,
-  Environment,
-  OrbitControls,
-  PerspectiveCamera,
-} from '@react-three/drei';
+import { ArcballControls, Box, Environment } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import React, { Suspense, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import styled from 'styled-components';
 import { ViewOptions } from './ViewOptions';
 import { useGLTF } from '@react-three/drei';
-import { GLTF, GLTF as GLTFThree } from 'three/examples/jsm/loaders/GLTFLoader';
-import THREE, { Euler, Group, Material, Mesh, Quaternion } from 'three';
+import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
+import THREE, { Euler, Material, Mesh } from 'three';
 import { Entity, Transform } from '../App';
 
 const CanvasContainer = styled.div`
@@ -59,12 +53,8 @@ function Model({
 }
 
 function getRotation(t: Transform): Euler {
-  const rotation = new Euler();
-  rotation.setFromQuaternion(
-    new Quaternion(t.rotation[0], t.rotation[1], t.rotation[2], t.rotation[3])
-  );
-
-  return rotation;
+  const r = t.rotation;
+  return new Euler(r[0], r[1], r[2]);
 }
 
 interface Props {

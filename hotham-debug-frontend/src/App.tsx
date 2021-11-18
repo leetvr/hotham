@@ -106,7 +106,7 @@ function App() {
           material: 'Rough',
           transform: {
             translation: [0, 0, -1],
-            rotation: [0, 0, 0, 1],
+            rotation: [0, 0, 0],
             scale: [1, 1, 1],
           },
           collider: {
@@ -127,7 +127,7 @@ function App() {
           material: 'Rough',
           transform: {
             translation: [0, 0, -1.1],
-            rotation: [0, 0, 0, 1],
+            rotation: [0, 0, 0],
             scale: [1, 1, 1],
           },
           collider: {
@@ -156,7 +156,7 @@ function App() {
 
 export interface Transform {
   translation: [number, number, number];
-  rotation: [number, number, number, number];
+  rotation: [number, number, number];
   scale: [number, number, number];
 }
 
@@ -166,7 +166,6 @@ export interface Entity {
   mesh?: string;
   material?: string;
   transform?: Transform;
-  rotation?: [number, number, number, number];
   collider?: {
     type: 'cube' | 'cylinder';
     geometry: number[];

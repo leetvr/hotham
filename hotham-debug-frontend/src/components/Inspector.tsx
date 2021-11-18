@@ -22,11 +22,20 @@ function TransformInspector({ t }: { t?: Transform }): JSX.Element | null {
   if (!t) return null;
   return (
     <Indent>
-      <strong>translation: </strong>
-      <br />
+      <strong>transform: </strong>
       <Indent>
-        <strong>x:</strong> {t.translation[0]} <strong>y:</strong>{' '}
-        {t.translation[1]} <strong>z:</strong> {t.translation[2]}
+        <strong>translation: </strong>
+        <br />
+        <Indent>
+          <strong>x:</strong> {t.translation[0]} <strong>y:</strong>{' '}
+          {t.translation[1]} <strong>z:</strong> {t.translation[2]}
+        </Indent>
+        <strong>rotation: </strong>
+        <br />
+        <Indent>
+          <strong>x:</strong> {t.translation[0]} <strong>y:</strong>{' '}
+          {t.translation[1]} <strong>z:</strong> {t.translation[2]}
+        </Indent>
       </Indent>
     </Indent>
   );
