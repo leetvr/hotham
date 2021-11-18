@@ -10,13 +10,19 @@ const Container = styled.div`
   position: relative;
 `;
 
-export function LeftPanel(): JSX.Element {
+interface Props {
+  setFrame: (n: number) => void;
+  frame: number;
+  maxFrames: number;
+}
+
+export function LeftPanel(props: Props): JSX.Element {
   return (
     <Container>
       <Suspense fallback={null}>
         <Viewer />
       </Suspense>
-      <Timeline />
+      <Timeline {...props} />
     </Container>
   );
 }

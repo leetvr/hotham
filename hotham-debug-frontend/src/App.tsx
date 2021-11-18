@@ -3,6 +3,7 @@ import { JSONSchema7 } from 'json-schema';
 import styled from 'styled-components';
 import { LeftPanel } from './components/LeftPanel';
 import { RightPanel } from './components/RightPanel';
+import { Timeline } from './components/Timeline';
 const SERVER_IP = 'localhost';
 const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
 
@@ -86,9 +87,12 @@ function App() {
     };
   });
 
+  const [frame, setFrame] = useState(0);
+  const maxFrames = 10;
+
   return (
     <Container>
-      <LeftPanel />
+      <LeftPanel frame={frame} setFrame={setFrame} maxFrames={maxFrames} />
       <RightPanel />
     </Container>
   );

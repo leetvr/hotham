@@ -15,7 +15,7 @@ import { Group, Material, Mesh } from 'three';
 
 const CanvasContainer = styled.div`
   display: 'flex';
-  flex: 5;
+  flex: 4;
   overflow: 'hidden';
   width: '70vw';
 `;
