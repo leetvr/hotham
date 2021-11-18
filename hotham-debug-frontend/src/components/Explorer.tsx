@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import Tree from '@naisutech/react-tree';
-import { Entity } from './RightPanel';
+import { Entity } from '../App';
 
 const Container = styled.div`
   display: flex;
@@ -9,6 +9,7 @@ const Container = styled.div`
 `;
 
 interface Props {
+  entities: Record<number, Entity>;
   selectEntityId: React.Dispatch<React.SetStateAction<number | undefined>>;
 }
 

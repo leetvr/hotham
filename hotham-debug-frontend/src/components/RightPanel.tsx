@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
+import { Entity } from '../App';
 import { Explorer } from './Explorer';
 import { Inspector } from './Inspector';
 
@@ -9,21 +10,17 @@ const Container = styled.div`
   flex-direction: column;
 `;
 
-export interface Entity {
-  id: number;
+interface Props {
+  entities: Record<number, Entity>;
 }
 
-export function RightPanel(): JSX.Element {
-  const entities: Record<number, Entity> = {
-    0: { id: 0 },
-    1: { id: 1 },
-  };
+export function RightPanel({ entities }: Props): JSX.Element {
   const [selectedEntityId, selectEntityId] = useState<number | undefined>();
   const selectedEntity =
     selectedEntityId !== undefined ? entities[selectedEntityId] : null;
   return (
     <Container>
-      <Explorer selectEntityId={selectEntityId} />
+      <Explorer entities={entities} selectEntityId={selectEntityId} />
       <Inspector entity={selectedEntity} />
     </Container>
   );

@@ -1,4 +1,3 @@
-import React, { VoidFunctionComponent } from 'react';
 import styled from 'styled-components';
 
 const OuterContainer = styled.div`

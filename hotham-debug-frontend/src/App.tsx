@@ -3,7 +3,6 @@ import { JSONSchema7 } from 'json-schema';
 import styled from 'styled-components';
 import { LeftPanel } from './components/LeftPanel';
 import { RightPanel } from './components/RightPanel';
-import { Timeline } from './components/Timeline';
 const SERVER_IP = 'localhost';
 const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
 
@@ -89,13 +88,34 @@ function App() {
 
   const [frame, setFrame] = useState(0);
   const maxFrames = 10;
+  const entities: Record<number, Entity> = {
+    0: { id: 0, mesh: 'Environment', material: 'Rough', transform: [0, 0, -1] },
+    1: { id: 1 },
+  };
 
   return (
     <Container>
-      <LeftPanel frame={frame} setFrame={setFrame} maxFrames={maxFrames} />
-      <RightPanel />
+      <LeftPanel
+        entities={entities}
+        frame={frame}
+        setFrame={setFrame}
+        maxFrames={maxFrames}
+      />
+      <RightPanel entities={entities} />
     </Container>
   );
+}
+
+export interface Entity {
+  id: number;
+  mesh?: string;
+  material?: string;
+  transform?: [number, number, number];
+  rotation?: [number, number, number, number];
+  collider?: {
+    type: 'cube' | 'cylinder';
+    geometry: number[];
+  };
 }
 
 export default App;

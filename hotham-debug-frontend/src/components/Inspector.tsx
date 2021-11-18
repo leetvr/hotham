@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { Entity } from './RightPanel';
+import { Entity } from '../App';
 
 const Container = styled.div`
   display: flex;

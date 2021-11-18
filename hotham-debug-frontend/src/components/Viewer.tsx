@@ -12,6 +12,7 @@ import { ViewOptions } from './ViewOptions';
 import { useGLTF } from '@react-three/drei';
 import { GLTF, GLTF as GLTFThree } from 'three/examples/jsm/loaders/GLTFLoader';
 import { Group, Material, Mesh } from 'three';
+import { Entity } from '../App';
 
 const CanvasContainer = styled.div`
   display: 'flex';
@@ -52,7 +53,11 @@ function Model({
   );
 }
 
-export function Viewer(): JSX.Element {
+interface Props {
+  entities: Record<number, Entity>;
+}
+
+export function Viewer({ entities }: Props): JSX.Element {
   const [displays, setDisplays] = useState<DisplayOptions>({ models: true });
   const gltf = useGLTF('/beat_saber.glb') as unknown as GLTFResult;
   console.log(gltf);
