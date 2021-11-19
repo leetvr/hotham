@@ -110,7 +110,7 @@ function App() {
             scale: [1, 1, 1],
           },
           collider: {
-            type: 'cube',
+            colliderType: 'cube',
             geometry: [1, 1, 1],
           },
         },
@@ -131,7 +131,7 @@ function App() {
             scale: [1, 1, 1],
           },
           collider: {
-            type: 'cube',
+            colliderType: 'cube',
             geometry: [1, 1, 1],
           },
         },
@@ -167,7 +167,7 @@ export interface Entity {
   material?: string;
   transform?: Transform;
   collider?: {
-    type: 'cube' | 'cylinder';
+    colliderType: 'cube' | 'cylinder';
     geometry: number[];
   };
 }

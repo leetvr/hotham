@@ -52,8 +52,8 @@ pub enum Message<E, N> {
 }
 
 pub struct DebugServer<E, N> {
-    pub sender: Sender<Message<E, N>>,
-    pub receiver: Receiver<Message<E, N>>,
+    pub to_client: Sender<Message<E, N>>,
+    pub from_client: Receiver<Message<E, N>>,
     _handle: JoinHandle<()>,
 }
 
@@ -128,8 +128,12 @@ where
         E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
         N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
     {
-        let (sender, receiver) = broadcast_channel(16);
-        let s1 = sender.clone();
+        // These names are kind of confusing, so here's a little explanation:
+        //
+        // - to_client - use this to send a message from hotham to the websocket client
+        // - from_client - use this to receive a message from the websocket client to hotham
+        let (to_client, from_client) = broadcast_channel(16);
+        let to_client_clone = to_client.clone();
 
         let handle = thread::spawn(move || {
             let rt = Builder::new_current_thread().enable_all().build().unwrap();
@@ -139,21 +143,26 @@ where
                 let try_socket = TcpListener::bind(&addr).await;
                 let listener = try_socket.expect("Failed to bind");
                 while let Ok((stream, _)) = listener.accept().await {
-                    tokio::spawn(accept_connection(stream, s1.clone(), s1.subscribe()));
+                    // - to_hotham - use this to send a message from the websocket client back to hotham
+                    // - from_hotham - use this to receive a message from hotham back to the websocket client
+                    let to_hotham = to_client_clone.clone();
+                    let from_hotham = to_hotham.subscribe();
+
+                    tokio::spawn(accept_connection(stream, to_hotham, from_hotham));
                 }
             })
         });
 
         DebugServer {
-            sender,
-            receiver,
+            to_client,
+            from_client,
             _handle: handle,
         }
     }
 
     pub fn sync(&mut self, non_editable_data: &N) -> Option<E> {
         let mut editable_data = None;
-        let response: Option<Message<E, N>> = match self.receiver.try_recv() {
+        let response: Option<Message<E, N>> = match self.from_client.try_recv() {
             Ok(Message::Data(Data {
                 editable: Some(editible),
                 ..
@@ -197,8 +206,10 @@ where
         };
 
         if let Some(response) = response {
-            self.sender.send(response).expect("Unable to update value");
-            let _ = self.receiver.try_recv();
+            self.to_client
+                .send(response)
+                .expect("Unable to update value");
+            let _ = self.from_client.try_recv();
         }
 
         editable_data

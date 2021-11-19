@@ -102,7 +102,7 @@ function getPhsicsObjects(
 ): JSX.Element[] | [] {
   const elements: JSX.Element[] = [];
   Object.values(entities).forEach((e) => {
-    if (e.collider?.type === 'cube') {
+    if (e.collider?.colliderType === 'cube') {
       elements.push(
         <Box
           args={[
