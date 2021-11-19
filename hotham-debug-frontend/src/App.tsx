@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { JSONSchema7 } from 'json-schema';
 import styled from 'styled-components';
 import { LeftPanel } from './components/LeftPanel';
 import { RightPanel } from './components/RightPanel';
@@ -27,10 +26,6 @@ type Entities = Record<number, Entity>;
 interface Frame {
   id: number;
   entities: Entities;
-}
-
-function update(editable: Record<string, any>) {
-  ws.send(JSON.stringify({ Data: { editable } }));
 }
 
 const Container = styled.div`
@@ -137,8 +132,6 @@ export interface Transform {
 export interface Entity {
   id: number;
   name: string;
-  mesh?: string;
-  material?: string;
   transform?: Transform;
   collider?: {
     colliderType: 'cube' | 'cylinder';

@@ -15,8 +15,6 @@ pub struct DebugData {
 pub struct DebugEntity {
     pub name: String,
     pub id: u64,
-    pub mesh: Option<String>,
-    pub material: Option<String>,
     pub transform: Option<DebugTransform>,
     pub collider: Option<DebugCollider>,
 }
@@ -24,14 +22,14 @@ pub struct DebugEntity {
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DebugTransform {
-    pub translation: [f64; 3],
-    pub rotation: [f64; 3],
-    pub scale: [f64; 3],
+    pub translation: [f32; 3],
+    pub rotation: [f32; 3],
+    pub scale: [f32; 3],
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DebugCollider {
     pub collider_type: String,
-    pub geometry: Vec<u64>,
+    pub geometry: Vec<f32>,
 }

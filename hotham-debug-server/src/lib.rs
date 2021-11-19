@@ -191,10 +191,8 @@ mod tests {
         let mut server: DebugServer = DebugServer::new();
         let mut frame = 0;
         let test_entity = DebugEntity {
-            name: "Test".to_string(),
+            name: "Red Saber".to_string(),
             id: 0,
-            mesh: Some("Environment".to_string()),
-            material: Some("Rough".to_string()),
             transform: Some(DebugTransform {
                 translation: [0., 0., 0.],
                 rotation: [0., 0., 0.],
@@ -207,7 +205,7 @@ mod tests {
             std::thread::sleep(Duration::from_secs(1));
             let mut e = test_entity.clone();
             let t = e.transform.as_mut().unwrap();
-            t.translation[2] = t.translation[2] + (frame as f64 * 0.1);
+            t.translation[2] = t.translation[2] + (frame as f32 * 0.1);
             let mut entities = HashMap::new();
             entities.insert(0, e);
 

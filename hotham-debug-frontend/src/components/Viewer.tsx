@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { ViewOptions } from './ViewOptions';
 import { useGLTF } from '@react-three/drei';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
-import THREE, { Euler, Material, Mesh } from 'three';
+import THREE, { Euler, Mesh } from 'three';
 import { Entity, Transform } from '../App';
 
 const CanvasContainer = styled.div`
@@ -17,7 +17,6 @@ const CanvasContainer = styled.div`
 
 type GLTFResult = GLTF & {
   nodes: Record<string, Mesh>;
-  materials: Record<string, THREE.MeshPhysicalMaterial>;
 };
 
 export interface DisplayOptions {
@@ -27,11 +26,9 @@ export interface DisplayOptions {
 
 function Model({
   mesh,
-  material,
   transform,
 }: {
   mesh: Mesh;
-  material: Material;
   transform: Transform;
 }): JSX.Element {
   const group = useRef<THREE.Group>();
@@ -42,7 +39,7 @@ function Model({
         castShadow
         receiveShadow
         geometry={mesh.geometry}
-        material={material}
+        material={mesh.material}
         position={transform.translation}
         scale={transform.scale}
         rotation={rotation}
@@ -63,34 +60,45 @@ interface Props {
 
 function getModels(
   entities: Record<number, Entity>,
-  nodes: Record<string, Mesh>,
-  materials: Record<string, THREE.MeshPhysicalMaterial>
-): JSX.Element[] {
-  return Object.values(entities)
-    .filter((e) => e.mesh && e.material && e.transform)
-    .map((e) => (
-      <Model
-        key={e.id}
-        mesh={nodes[e.mesh!]}
-        material={materials[e.material!]}
-        transform={e.transform!}
-      />
-    ));
+  nodes: Record<string, Mesh>
+): JSX.Element[] | [] {
+  const elements: JSX.Element[] = [];
+  for (let e of Object.values(entities)) {
+    const key = e.name.replaceAll(' ', '_');
+    console.log('Searching for', key, 'in', Object.keys(nodes));
+    const node = nodes[key];
+    if (!node) continue;
+
+    if (node.children) {
+      for (let child of node.children) {
+        const m = child as Mesh;
+        elements.push(
+          <Model key={child.id} mesh={m} transform={e.transform!} />
+        );
+      }
+    } else {
+      elements.push(
+        <Model key={node.id} mesh={node} transform={e.transform!} />
+      );
+    }
+  }
+
+  return elements;
 }
 
 export function Viewer({ entities }: Props): JSX.Element {
   const [displays, setDisplays] = useState<DisplayOptions>({ models: true });
   const gltf = useGLTF('/beat_saber.glb') as unknown as GLTFResult;
   console.log(gltf);
-  const { nodes, materials } = gltf;
+  const { nodes } = gltf;
   return (
     <>
       <ViewOptions displays={displays} setDisplays={setDisplays} />
       <CanvasContainer>
         <Canvas shadows={true}>
-          {displays.models && getModels(entities, nodes, materials)}
+          {displays.models && getModels(entities, nodes)}
           {displays.physics && getPhsicsObjects(entities)}
-          <Environment preset="studio" />
+          <Environment preset="dawn" />
           <ArcballControls />
         </Canvas>
       </CanvasContainer>
