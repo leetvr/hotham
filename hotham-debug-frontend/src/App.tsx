@@ -11,26 +11,16 @@ enum Command {
   Init,
 }
 
-interface Data {
-  editable?: Record<string, any>;
-  non_editable?: Record<string, any>;
-}
-
 interface InitData {
-  data: Data;
-  schema: Schema;
+  data: Frame;
+  session_id: number;
 }
 
 interface Message {
-  Data: Data;
+  Data: Frame;
   Command: Command;
   Init: InitData;
   Error: string;
-}
-
-interface Schema {
-  editable: JSONSchema7;
-  non_editable: JSONSchema7;
 }
 
 type Entities = Record<number, Entity>;
@@ -52,14 +42,8 @@ const Container = styled.div`
 `;
 
 function App() {
-  const [editableData, setEditableData] = useState<
-    Record<string, any> | undefined
-  >();
-  const [noneditableData, setNonEditableData] = useState<
-    Record<string, any> | undefined
-  >();
+  const [frames, setFrames] = useState<Frame[]>([]);
   const [error, setError] = useState<string | undefined>();
-  const [schema, setSchema] = useState<Schema | undefined>();
   useEffect(() => {
     ws.onopen = () => {
       ws.send(JSON.stringify({ Command: Command.Init }));
@@ -67,86 +51,76 @@ function App() {
   });
   useEffect(() => {
     ws.onmessage = (m) => {
-      // const message: Message = JSON.parse(m.data);
-      // if (messagej.Data) {
-      //   if (message.Data.editable) {
-      //     console.log('Received  data!');
-      //     setEditableData(message.Data.editable);
-      //   }
-      //   if (message.Data.non_editable) {
-      //     const deltaTime = lastUpdate - new Date().getTime();
-      //     if (deltaTime > 500) {
-      //       setNonEditableData(message.Data.non_editable);
-      //       lastUpdate = new Date().getTime();
-      //     }
-      //   }
-      // }
-      // if (message.Init) {
-      //   setSchema(message.Init.schema);
-      //   setEditableData(message.Init.data.editable);
-      //   setNonEditableData(message.Init.data.non_editable);
-      // }
-      // if (message.Error) {
-      //   setError(error);
-      // }
+      const message: Message = JSON.parse(m.data);
+      if (message.Data) {
+        if (message.Data) {
+          console.log('Received  data!');
+          setFrames((f) => [...f, message.Data]);
+        }
+      }
+      if (message.Init) {
+        setFrames((f) => [...f, message.Init.data]);
+      }
+      if (message.Error) {
+        setError(error);
+      }
     };
   });
 
-  const [frame, setFrame] = useState(0);
-  const maxFrames = 10;
+  const [currentFrame, setCurrentFrame] = useState(0);
 
-  const frames: Frame[] = [
-    {
-      id: 0,
-      entities: {
-        0: {
-          name: 'Environment',
-          id: 0,
-          mesh: 'Environment',
-          material: 'Rough',
-          transform: {
-            translation: [0, 0, -1],
-            rotation: [0, 0, 0],
-            scale: [1, 1, 1],
-          },
-          collider: {
-            colliderType: 'cube',
-            geometry: [1, 1, 1],
-          },
-        },
-        1: { name: 'Empty', id: 1 },
-      },
-    },
-    {
-      id: 1,
-      entities: {
-        0: {
-          name: 'Environment',
-          id: 0,
-          mesh: 'Environment',
-          material: 'Rough',
-          transform: {
-            translation: [0, 0, -1.1],
-            rotation: [0, 0, 0],
-            scale: [1, 1, 1],
-          },
-          collider: {
-            colliderType: 'cube',
-            geometry: [1, 1, 1],
-          },
-        },
-      },
-    },
-  ];
+  // const frames: Frame[] = [
+  //   {
+  //     id: 0,
+  //     entities: {
+  //       0: {
+  //         name: 'Environment',
+  //         id: 0,
+  //         mesh: 'Environment',
+  //         material: 'Rough',
+  //         transform: {
+  //           translation: [0, 0, -1],
+  //           rotation: [0, 0, 0],
+  //           scale: [1, 1, 1],
+  //         },
+  //         collider: {
+  //           colliderType: 'cube',
+  //           geometry: [1, 1, 1],
+  //         },
+  //       },
+  //       1: { name: 'Empty', id: 1 },
+  //     },
+  //   },
+  //   {
+  //     id: 1,
+  //     entities: {
+  //       0: {
+  //         name: 'Environment',
+  //         id: 0,
+  //         mesh: 'Environment',
+  //         material: 'Rough',
+  //         transform: {
+  //           translation: [0, 0, -1.1],
+  //           rotation: [0, 0, 0],
+  //           scale: [1, 1, 1],
+  //         },
+  //         collider: {
+  //           colliderType: 'cube',
+  //           geometry: [1, 1, 1],
+  //         },
+  //       },
+  //     },
+  //   },
+  // ];
 
-  const entities = frames[frame].entities;
+  const entities = frames[currentFrame] ? frames[currentFrame].entities : [];
 
   return (
     <Container>
       <LeftPanel
         entities={entities}
-        frame={frame}
-        setFrame={setFrame}
+        frame={currentFrame}
+        setFrame={setCurrentFrame}
         maxFrames={frames.length}
       />
       <RightPanel entities={entities} />

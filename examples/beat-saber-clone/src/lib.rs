@@ -1,8 +1,6 @@
 use hotham::gltf_loader::add_model_to_world;
 use hotham::legion::{Resources, Schedule, World};
-use hotham::resources::vulkan_context::VulkanContext;
 use hotham::resources::{PhysicsContext, RenderContext, XrContext};
-use hotham::scene_data::{SceneData, SceneParams};
 use hotham::schedule_functions::{begin_frame, end_frame, physics_step};
 use hotham::systems::rendering::rendering_system;
 use hotham::systems::{
@@ -49,17 +47,17 @@ pub fn real_main() -> HothamResult<()> {
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
-        .add_thread_local_fn(|_, resources| {
-            let render_context = resources.get::<RenderContext>().unwrap();
-            let vulkan_context = resources.get::<VulkanContext>().unwrap();
-            let mut debug_server = resources.get_mut::<DebugServer>().unwrap();
-            // if let Some(updated) = debug_server.sync(&render_context.scene_data) {
-            //     render_context
-            //         .scene_params_buffer
-            //         .update(&vulkan_context, &[updated])
-            //         .expect("Unable to update data");
-            // };
-        })
+        // .add_thread_local_fn(|_, resources| {
+        //     let render_context = resources.get::<RenderContext>().unwrap();
+        //     let vulkan_context = resources.get::<VulkanContext>().unwrap();
+        //     let mut debug_server = resources.get_mut::<DebugServer>().unwrap();
+        //     // if let Some(updated) = debug_server.sync(&render_context.scene_data) {
+        //     //     render_context
+        //     //         .scene_params_buffer
+        //     //         .update(&vulkan_context, &[updated])
+        //     //         .expect("Unable to update data");
+        //     // };
+        // })
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
         .add_system(update_rigid_body_transforms_system())

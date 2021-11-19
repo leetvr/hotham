@@ -1,6 +1,6 @@
 pub mod debug_data;
 use debug_data::DebugData;
-use rand::random;
+use std::collections::HashMap;
 use std::io::{Error as IOError, ErrorKind};
 use std::thread::{self, JoinHandle};
 use tokio::net::{TcpListener, TcpStream};
@@ -171,7 +171,7 @@ impl DebugServer {
 #[cfg(test)]
 #[allow(unused_assignments)]
 mod tests {
-    use std::time::Duration;
+    use std::{collections::HashMap, time::Duration};
     #[derive(Deserialize, Serialize, Clone, Debug, Default)]
     struct Test {
         name: String,
@@ -182,21 +182,41 @@ mod tests {
         count: usize,
     }
 
+    use crate::debug_data::{DebugEntity, DebugTransform};
+
     use super::*;
     #[test]
     fn it_works() {
         // This is simulating the inside of Hotham.
         let mut server: DebugServer = DebugServer::new();
-
-        let mut data = todo!();
+        let mut frame = 0;
+        let test_entity = DebugEntity {
+            name: "Test".to_string(),
+            id: 0,
+            mesh: Some("Environment".to_string()),
+            material: Some("Rough".to_string()),
+            transform: Some(DebugTransform {
+                translation: [0., 0., 0.],
+                rotation: [0., 0., 0.],
+                scale: [1., 1., 1.],
+            }),
+            collider: None,
+        };
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            let changed = server.sync(&data);
-            if let Some(changed) = changed {
-                data = changed;
-                println!("Changed! Data is now {:?}", data);
-            }
+            let mut e = test_entity.clone();
+            let t = e.transform.as_mut().unwrap();
+            t.translation[2] = t.translation[2] + (frame as f64 * 0.1);
+            let mut entities = HashMap::new();
+            entities.insert(0, e);
+
+            let data = DebugData {
+                id: frame,
+                entities,
+            };
+            let _ = server.sync(&data);
+            frame += 1;
         }
     }
 }

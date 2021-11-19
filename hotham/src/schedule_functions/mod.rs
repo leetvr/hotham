@@ -1,4 +1,5 @@
 pub mod begin_frame;
+pub mod debug_server;
 pub mod end_frame;
 pub mod physics_step;
 

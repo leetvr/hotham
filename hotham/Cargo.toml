@@ -16,6 +16,7 @@ console = "0.14"
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 gltf = {version = "0.16", features = ["KHR_materials_pbrSpecularGlossiness"]}
+hotham-debug-server = {path = "../hotham-debug-server"}
 image = "0.23"
 itertools = "0.10.0"
 legion = "0.4"
