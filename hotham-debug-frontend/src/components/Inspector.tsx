@@ -8,6 +8,7 @@ const Container = styled.div`
   padding: 10px;
   background-color: #2d3439;
   flex-direction: column;
+  color: #fff;
 `;
 
 const Indent = styled.div`
@@ -33,8 +34,14 @@ function TransformInspector({ t }: { t?: Transform }): JSX.Element | null {
         <strong>rotation: </strong>
         <br />
         <Indent>
-          <strong>x:</strong> {t.translation[0]} <strong>y:</strong>{' '}
-          {t.translation[1]} <strong>z:</strong> {t.translation[2]}
+          <strong>x:</strong> {t.rotation[0]} <strong>y:</strong>{' '}
+          {t.rotation[1]} <strong>z:</strong> {t.rotation[2]}
+        </Indent>
+        <strong>scale: </strong>
+        <br />
+        <Indent>
+          <strong>x:</strong> {t.scale[0]} <strong>y:</strong> {t.scale[1]}{' '}
+          <strong>z:</strong> {t.scale[2]}
         </Indent>
       </Indent>
     </Indent>

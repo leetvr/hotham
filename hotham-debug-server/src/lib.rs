@@ -191,7 +191,7 @@ mod tests {
         let mut server: DebugServer = DebugServer::new();
         let mut frame = 0;
         let test_entity = DebugEntity {
-            name: "Red Saber".to_string(),
+            name: "Environment".to_string(),
             id: 0,
             transform: Some(DebugTransform {
                 translation: [0., 0., 0.],

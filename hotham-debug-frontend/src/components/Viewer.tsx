@@ -65,11 +65,16 @@ function getModels(
   const elements: JSX.Element[] = [];
   for (let e of Object.values(entities)) {
     const key = e.name.replaceAll(' ', '_');
-    console.log('Searching for', key, 'in', Object.keys(nodes));
     const node = nodes[key];
-    if (!node) continue;
+    if (!node) {
+      console.warn('No node found for', key);
+      continue;
+    }
 
-    if (node.children) {
+    console.log(key, 'is', node);
+
+    if (node.children.length) {
+      console.log(key, 'has children, adding');
       for (let child of node.children) {
         const m = child as Mesh;
         elements.push(
@@ -77,6 +82,7 @@ function getModels(
         );
       }
     } else {
+      console.log(key, 'has has no children, adding self');
       elements.push(
         <Model key={node.id} mesh={node} transform={e.transform!} />
       );
@@ -89,7 +95,6 @@ function getModels(
 export function Viewer({ entities }: Props): JSX.Element {
   const [displays, setDisplays] = useState<DisplayOptions>({ models: true });
   const gltf = useGLTF('/beat_saber.glb') as unknown as GLTFResult;
-  console.log(gltf);
   const { nodes } = gltf;
   return (
     <>
@@ -98,7 +103,7 @@ export function Viewer({ entities }: Props): JSX.Element {
         <Canvas shadows={true}>
           {displays.models && getModels(entities, nodes)}
           {displays.physics && getPhsicsObjects(entities)}
-          <Environment preset="dawn" />
+          <Environment preset="studio" />
           <ArcballControls />
         </Canvas>
       </CanvasContainer>

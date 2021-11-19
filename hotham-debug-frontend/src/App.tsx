@@ -34,9 +34,11 @@ const Container = styled.div`
   flex-direction: row;
   height: 100vh;
   width: 100vw;
+  background-color: #2d3439;
 `;
 
 function App() {
+  const [sessionId, setSessionId] = useState<number>();
   const [frames, setFrames] = useState<Frame[]>([]);
   const [error, setError] = useState<string | undefined>();
   useEffect(() => {
@@ -50,11 +52,16 @@ function App() {
       if (message.Data) {
         if (message.Data) {
           console.log('Received  data!');
-          setFrames((f) => [...f, message.Data]);
+          setFrames((f) => {
+            const updated = [...f, message.Data];
+            localStorage.setItem('session_id', JSON.stringify(updated));
+            return updated;
+          });
         }
       }
       if (message.Init) {
         setFrames((f) => [...f, message.Init.data]);
+        setSessionId(message.Init.session_id);
       }
       if (message.Error) {
         setError(error);

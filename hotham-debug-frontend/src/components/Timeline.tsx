@@ -1,9 +1,13 @@
 import styled from 'styled-components';
+import { Scrubber } from 'react-scrubber';
+import 'react-scrubber/lib/scrubber.css';
 
 const OuterContainer = styled.div`
   display: flex;
-  flex: 1;
   flex-direction: column;
+  padding: 10px;
+  color: #fff;
+  min-height: 100px;
 `;
 
 const Container = styled.div`
@@ -11,7 +15,6 @@ const Container = styled.div`
   flex: 1;
   align-items: center;
   flex-direction: row;
-  padding: 10px;
 `;
 
 const TimelineItem = styled.div<TimelineItemProps>`
@@ -69,7 +72,15 @@ function getFrames(
 export function Timeline({ frame, setFrame, maxFrames }: Props): JSX.Element {
   return (
     <OuterContainer>
-      <Container>{getFrames(frame, setFrame, maxFrames)}</Container>
+      <h2>
+        Frame {frame} / {maxFrames}
+      </h2>
+      <Scrubber
+        min={0}
+        max={maxFrames}
+        value={frame}
+        onScrubChange={(c) => setFrame(Math.round(c))}
+      />
     </OuterContainer>
   );
 }
