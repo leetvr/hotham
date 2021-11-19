@@ -1,5 +1,6 @@
-use schemars::schema::RootSchema;
-use serde::de::DeserializeOwned;
+pub mod debug_data;
+use debug_data::DebugData;
+use rand::random;
 use std::io::{Error as IOError, ErrorKind};
 use std::thread::{self, JoinHandle};
 use tokio::net::{TcpListener, TcpStream};
@@ -16,14 +17,6 @@ use serde::{Deserialize, Serialize};
 use serde_repr::*;
 use std::fmt::Debug;
 
-use schemars::schema_for_value;
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Data<E, N> {
-    editable: Option<E>,
-    non_editable: Option<N>,
-}
-
 #[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 pub enum Command {
@@ -32,39 +25,31 @@ pub enum Command {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct Schema {
-    editable: RootSchema,
-    non_editable: RootSchema,
+pub struct InitData {
+    data: DebugData,
+    session_id: u64,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
-pub struct InitData<E, N> {
-    data: Data<E, N>,
-    schema: Schema,
-}
-
-#[derive(Deserialize, Serialize, Clone, Debug)]
-pub enum Message<E, N> {
-    Data(Data<E, N>),
+pub enum Message {
+    Data(DebugData),
     Command(Command),
-    Init(InitData<E, N>),
+    Init(InitData),
     Error(String),
 }
 
-pub struct DebugServer<E, N> {
-    pub to_client: Sender<Message<E, N>>,
-    pub from_client: Receiver<Message<E, N>>,
+pub struct DebugServer {
+    pub to_client: Sender<Message>,
+    pub from_client: Receiver<Message>,
+    session_id: u64,
     _handle: JoinHandle<()>,
 }
 
-async fn accept_connection<E, N>(
+async fn accept_connection(
     stream: TcpStream,
-    to_hotham: Sender<Message<E, N>>,
-    from_hotham: Receiver<Message<E, N>>,
-) where
-    E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
-    N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
-{
+    to_hotham: Sender<Message>,
+    from_hotham: Receiver<Message>,
+) {
     let addr = stream
         .peer_addr()
         .expect("connected streams should have a peer address");
@@ -83,7 +68,7 @@ async fn accept_connection<E, N>(
             match msg {
                 Ok(tungstenite::Message::Text(m)) => {
                     println!("Received message from client: {:?}", m);
-                    match serde_json::from_str::<Message<E, N>>(&m) {
+                    match serde_json::from_str::<Message>(&m) {
                         Ok(message) => {
                             println!("Deserialised: {:?}", message);
                             Some(Ok(message))
@@ -118,16 +103,8 @@ async fn accept_connection<E, N>(
     r2.expect("Problem 2!");
 }
 
-impl<E, N> DebugServer<E, N>
-where
-    E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug + Default,
-    N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
-{
-    pub fn new() -> DebugServer<E, N>
-    where
-        E: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
-        N: Serialize + DeserializeOwned + Send + Sync + Clone + Unpin + 'static + Debug,
-    {
+impl DebugServer {
+    pub fn new() -> DebugServer {
         // These names are kind of confusing, so here's a little explanation:
         //
         // - to_client - use this to send a message from hotham to the websocket client
@@ -157,52 +134,27 @@ where
             to_client,
             from_client,
             _handle: handle,
+            session_id: rand::random(),
         }
     }
 
-    pub fn sync(&mut self, non_editable_data: &N) -> Option<E> {
+    pub fn sync(&mut self, debug_data_from_hotham: &DebugData) -> Option<DebugData> {
         let mut editable_data = None;
-        let response: Option<Message<E, N>> = match self.from_client.try_recv() {
-            Ok(Message::Data(Data {
-                editable: Some(editible),
-                ..
-            })) => {
-                editable_data = Some(editible);
-                Some(Message::Data(Data {
-                    editable: None,
-                    non_editable: Some(non_editable_data.clone()),
-                }))
+        let response: Option<Message> = match self.from_client.try_recv() {
+            Ok(Message::Data(debug_data_from_client)) => {
+                editable_data = Some(debug_data_from_client);
+                Some(Message::Data(debug_data_from_hotham.clone()))
             }
             Ok(Message::Command(Command::Reset)) => {
-                editable_data = Some(E::default());
-                Some(Message::Data(Data {
-                    editable: None,
-                    non_editable: Some(non_editable_data.clone()),
-                }))
+                Some(Message::Data(debug_data_from_hotham.clone()))
             }
-            Ok(Message::Command(Command::Init)) => {
-                let editable = E::default();
-                let non_editable = non_editable_data.clone();
-
-                let editable_schema = schema_for_value!(editable);
-                let non_editable_schema = schema_for_value!(non_editable_data);
-                Some(Message::Init(InitData {
-                    schema: Schema {
-                        editable: editable_schema,
-                        non_editable: non_editable_schema,
-                    },
-                    data: Data {
-                        editable: Some(editable),
-                        non_editable: Some(non_editable),
-                    },
-                }))
-            }
+            Ok(Message::Command(Command::Init)) => Some(Message::Init(InitData {
+                session_id: self.session_id,
+                data: debug_data_from_hotham.clone(),
+            })),
             Ok(error_message @ Message::Error(_)) => Some(error_message),
             Ok(_) => None,
-            Err(_) => Some(Message::Data(Data {
-                editable: None,
-                non_editable: Some(non_editable_data.clone()),
-            })),
+            Err(_) => Some(Message::Data(debug_data_from_hotham.clone())),
         };
 
         if let Some(response) = response {
@@ -234,21 +186,17 @@ mod tests {
     #[test]
     fn it_works() {
         // This is simulating the inside of Hotham.
-        let mut server: DebugServer<Test, Info> = DebugServer::new();
+        let mut server: DebugServer = DebugServer::new();
 
-        let mut data = Test {
-            name: "Железного́рск".to_string(),
-        };
-        let mut info = Info { count: 0 };
+        let mut data = todo!();
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            let changed = server.sync(&info);
+            let changed = server.sync(&data);
             if let Some(changed) = changed {
                 data = changed;
                 println!("Changed! Data is now {:?}", data);
             }
-            info.count += 1;
         }
     }
 }

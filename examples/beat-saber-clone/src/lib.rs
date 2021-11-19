@@ -29,7 +29,7 @@ pub fn real_main() -> HothamResult<()> {
         &vulkan_context,
         &render_context.descriptor_set_layouts,
     )?;
-    let debug_server: DebugServer<SceneParams, SceneData> = DebugServer::new();
+    let debug_server: DebugServer = DebugServer::new();
 
     add_model_to_world("Blue Cube", &models, &mut world, None).expect("Unable to add Blue Cube");
     add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
@@ -52,15 +52,13 @@ pub fn real_main() -> HothamResult<()> {
         .add_thread_local_fn(|_, resources| {
             let render_context = resources.get::<RenderContext>().unwrap();
             let vulkan_context = resources.get::<VulkanContext>().unwrap();
-            let mut debug_server = resources
-                .get_mut::<DebugServer<SceneParams, SceneData>>()
-                .unwrap();
-            if let Some(updated) = debug_server.sync(&render_context.scene_data) {
-                render_context
-                    .scene_params_buffer
-                    .update(&vulkan_context, &[updated])
-                    .expect("Unable to update data");
-            };
+            let mut debug_server = resources.get_mut::<DebugServer>().unwrap();
+            // if let Some(updated) = debug_server.sync(&render_context.scene_data) {
+            //     render_context
+            //         .scene_params_buffer
+            //         .update(&vulkan_context, &[updated])
+            //         .expect("Unable to update data");
+            // };
         })
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
