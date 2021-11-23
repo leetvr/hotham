@@ -1,6 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
-import { Entity, Transform } from '../App';
+import { Collider, Entity, Transform } from '../App';
 
 const Container = styled.div`
   display: flex;
@@ -48,6 +48,20 @@ function TransformInspector({ t }: { t?: Transform }): JSX.Element | null {
   );
 }
 
+function ColliderInspector({ c }: { c?: Collider }): JSX.Element | null {
+  if (!c) return <strong>No collider</strong>;
+  return (
+    <Indent>
+      <strong>collider: </strong>
+      <Indent>
+        <strong>type: {c.colliderType}</strong>
+        <br />
+        <strong>geometry: {c.geometry}</strong>
+      </Indent>
+    </Indent>
+  );
+}
+
 export function Inspector({ entity }: Props): JSX.Element {
   if (!entity)
     return (
@@ -67,6 +81,7 @@ export function Inspector({ entity }: Props): JSX.Element {
         <strong>name: </strong> {entity.name} <br />
       </span>
       <TransformInspector t={entity.transform} />
+      <ColliderInspector c={entity.collider} />
     </Container>
   );
 }

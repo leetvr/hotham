@@ -71,10 +71,7 @@ function getModels(
       continue;
     }
 
-    console.log(key, 'is', node);
-
     if (node.children.length) {
-      console.log(key, 'has children, adding');
       for (let child of node.children) {
         const m = child as Mesh;
         elements.push(
@@ -82,7 +79,6 @@ function getModels(
         );
       }
     } else {
-      console.log(key, 'has has no children, adding self');
       elements.push(
         <Model key={node.id} mesh={node} transform={e.transform!} />
       );

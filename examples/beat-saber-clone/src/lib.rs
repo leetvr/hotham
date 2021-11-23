@@ -1,5 +1,6 @@
 use hotham::gltf_loader::add_model_to_world;
 use hotham::legion::{Resources, Schedule, World};
+use hotham::rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder};
 use hotham::resources::{PhysicsContext, RenderContext, XrContext};
 use hotham::schedule_functions::{begin_frame, end_frame, physics_step, sync_debug_server};
 use hotham::systems::rendering::rendering_system;
@@ -19,7 +20,7 @@ pub fn main() {
 pub fn real_main() -> HothamResult<()> {
     let (xr_context, vulkan_context) = XrContext::new()?;
     let render_context = RenderContext::new(&vulkan_context, &xr_context)?;
-    let physics_context = PhysicsContext::default();
+    let mut physics_context = PhysicsContext::default();
     let mut world = World::default();
     let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../assets/beat_saber.glb")];
     let models = gltf_loader::load_models_from_glb(
@@ -29,13 +30,19 @@ pub fn real_main() -> HothamResult<()> {
     )?;
     let debug_server: DebugServer = DebugServer::new();
 
-    add_model_to_world("Blue Cube", &models, &mut world, None).expect("Unable to add Blue Cube");
+    let blue_cube = add_model_to_world("Blue Cube", &models, &mut world, None)
+        .expect("Unable to add Blue Cube");
     add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
     add_model_to_world("Blue Saber", &models, &mut world, None).expect("Unable to add Blue Saber");
     add_model_to_world("Red Saber", &models, &mut world, None).expect("Unable to add Red Saber");
     add_model_to_world("Environment", &models, &mut world, None)
         .expect("Unable to add Environment");
     add_model_to_world("Ramp", &models, &mut world, None).expect("Unable to add Ramp");
+
+    // Add test physics objects
+    let rigid_body = RigidBodyBuilder::new_dynamic().build();
+    let collider = ColliderBuilder::cuboid(0.5, 0.2, 0.1).build();
+    physics_context.add_rigid_body_and_collider(blue_cube, rigid_body, collider);
 
     let mut resources = Resources::default();
     resources.insert(xr_context);

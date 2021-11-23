@@ -156,14 +156,16 @@ export interface Transform {
   scale: [number, number, number];
 }
 
+export interface Collider {
+  colliderType: 'cube' | 'cylinder';
+  geometry: number[];
+}
+
 export interface Entity {
   id: number;
   name: string;
   transform?: Transform;
-  collider?: {
-    colliderType: 'cube' | 'cylinder';
-    geometry: number[];
-  };
+  collider?: Collider;
 }
 
 export default App;
