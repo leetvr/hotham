@@ -49,10 +49,17 @@ function TransformInspector({ t }: { t?: Transform }): JSX.Element | null {
 }
 
 export function Inspector({ entity }: Props): JSX.Element {
-  if (!entity) return <Container>No entity selected.</Container>;
+  if (!entity)
+    return (
+      <Container>
+        <h2>Inspector</h2>
+        No entity selected .
+      </Container>
+    );
 
   return (
     <Container>
+      <h2>Inspector</h2>
       <span>
         <strong>id: </strong> {entity.id}
       </span>

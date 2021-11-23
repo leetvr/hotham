@@ -22,8 +22,8 @@ interface Message {
   Error: string;
 }
 
-type Entities = Record<number, Entity>;
-interface Frame {
+export type Entities = Record<number, Entity>;
+export interface Frame {
   id: number;
   entities: Entities;
 }
@@ -38,12 +38,17 @@ const Container = styled.div`
 `;
 
 function App() {
-  const [sessionId, setSessionId] = useState<number>();
+  const [connected, setConnected] = useState(false);
+  const [sessionId, setSessionId] = useState<number>(0);
   const [frames, setFrames] = useState<Frame[]>([]);
   const [error, setError] = useState<string | undefined>();
   useEffect(() => {
     ws.onopen = () => {
+      setConnected(true);
       ws.send(JSON.stringify({ Command: Command.Init }));
+    };
+    ws.onclose = () => {
+      setConnected(false);
     };
   });
   useEffect(() => {
@@ -54,20 +59,30 @@ function App() {
           console.log('Received  data!');
           setFrames((f) => {
             const updated = [...f, message.Data];
-            localStorage.setItem('session_id', JSON.stringify(updated));
+            localStorage.setItem(sessionId.toString(), JSON.stringify(updated));
             return updated;
           });
         }
       }
       if (message.Init) {
         setFrames((f) => [...f, message.Init.data]);
-        setSessionId(message.Init.session_id);
+        const { session_id } = message.Init;
+        setSessionId(session_id);
+        const sessionsRaw = localStorage.getItem('sessions');
+        const sessions = sessionsRaw ? JSON.parse(sessionsRaw) : [];
+        const updated = [...sessions, session_id];
+        localStorage.setItem('sessions', JSON.stringify(updated));
       }
       if (message.Error) {
         setError(error);
       }
     };
   });
+  useEffect(() => {
+    const framesFromStorage = localStorage.getItem(sessionId.toString());
+    if (!framesFromStorage) return;
+    setFrames(JSON.parse(framesFromStorage));
+  }, [connected, sessionId]);
 
   const [currentFrame, setCurrentFrame] = useState(0);
 
@@ -123,9 +138,14 @@ function App() {
         entities={entities}
         frame={currentFrame}
         setFrame={setCurrentFrame}
-        maxFrames={frames.length}
+        maxFrames={frames.length !== 0 ? frames.length - 1 : 0}
       />
-      <RightPanel entities={entities} />
+      <RightPanel
+        entities={entities}
+        connected={connected}
+        sessionId={sessionId}
+        setSessionId={setSessionId}
+      />
     </Container>
   );
 }

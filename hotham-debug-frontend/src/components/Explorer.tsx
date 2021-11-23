@@ -6,6 +6,9 @@ import { Entity } from '../App';
 const Container = styled.div`
   display: flex;
   flex: 1;
+  color: #fff;
+  overflow: hidden;
+  flex-direction: column;
 `;
 
 interface Props {
@@ -17,6 +20,7 @@ export function Explorer(props: Props): JSX.Element {
   const nodes = getNodes(props.entities);
   return (
     <Container>
+      <h2>Entities</h2>
       <Tree
         nodes={nodes}
         onSelect={(n) => {
