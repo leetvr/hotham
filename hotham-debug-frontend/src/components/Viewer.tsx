@@ -1,4 +1,4 @@
-import { ArcballControls, Box, Environment } from '@react-three/drei';
+import { ArcballControls, Box, Cylinder, Environment } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import { useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -115,13 +115,22 @@ function getPhsicsObjects(
       elements.push(
         <Box
           args={[
-            e.collider.geometry[0],
-            e.collider.geometry[1],
-            e.collider.geometry[2],
+            e.collider.geometry[0] * 2,
+            e.collider.geometry[1] * 2,
+            e.collider.geometry[2] * 2,
           ]}
         >
           <meshPhongMaterial attach="material" color="#bbb" wireframe />
         </Box>
+      );
+    }
+    if (e.collider?.colliderType === 'cylinder') {
+      const height = e.collider.geometry[0] * 2;
+      const radius = e.collider.geometry[1];
+      elements.push(
+        <Cylinder args={[radius, radius, height]}>
+          <meshPhongMaterial attach="material" color="#bbb" wireframe />
+        </Cylinder>
       );
     }
   });

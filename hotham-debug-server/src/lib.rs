@@ -1,6 +1,6 @@
 pub mod debug_data;
 use debug_data::DebugData;
-use std::collections::HashMap;
+
 use std::io::{Error as IOError, ErrorKind};
 use std::thread::{self, JoinHandle};
 use tokio::net::{TcpListener, TcpStream};
@@ -53,33 +53,24 @@ async fn accept_connection(
     let addr = stream
         .peer_addr()
         .expect("connected streams should have a peer address");
-    println!("Peer address: {}", addr);
 
     let ws_stream = tokio_tungstenite::accept_async(stream)
         .await
         .expect("Error during the websocket handshake occurred");
-
-    println!("New WebSocket connection: {}", addr);
 
     let (to_client, from_client) = ws_stream.split();
 
     let client_to_hotham = from_client
         .filter_map(|msg| async move {
             match msg {
-                Ok(tungstenite::Message::Text(m)) => {
-                    println!("Received message from client: {:?}", m);
-                    match serde_json::from_str::<Message>(&m) {
-                        Ok(message) => {
-                            println!("Deserialised: {:?}", message);
-                            Some(Ok(message))
-                        }
-                        Err(e) => {
-                            let error_message = format!("Error deserialising: {:?}", e);
-                            eprintln!("{:?}", error_message);
-                            Some(Ok(Message::Error(error_message)))
-                        }
+                Ok(tungstenite::Message::Text(m)) => match serde_json::from_str::<Message>(&m) {
+                    Ok(message) => Some(Ok(message)),
+                    Err(e) => {
+                        let error_message = format!("Error deserialising: {:?}", e);
+                        eprintln!("{:?}", error_message);
+                        Some(Ok(Message::Error(error_message)))
                     }
-                }
+                },
                 _ => None,
             }
         })
@@ -115,7 +106,7 @@ impl DebugServer {
         let handle = thread::spawn(move || {
             let rt = Builder::new_current_thread().enable_all().build().unwrap();
             rt.block_on(async {
-                let addr = "127.0.0.1:8080".to_string();
+                let addr = "127.0.0.1:8000".to_string();
                 // Create the event loop and TCP listener we'll accept connections on.
                 let try_socket = TcpListener::bind(&addr).await;
                 let listener = try_socket.expect("Failed to bind");
@@ -171,7 +162,6 @@ impl DebugServer {
 #[cfg(test)]
 #[allow(unused_assignments)]
 mod tests {
-    use std::{collections::HashMap, time::Duration};
     #[derive(Deserialize, Serialize, Clone, Debug, Default)]
     struct Test {
         name: String,
@@ -182,14 +172,18 @@ mod tests {
         count: usize,
     }
 
+    use std::collections::HashMap;
+
+    use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as TungsteniteMessage};
+
     use crate::debug_data::{DebugEntity, DebugTransform};
+    use futures_util::sink::SinkExt;
 
     use super::*;
     #[test]
     fn it_works() {
         // This is simulating the inside of Hotham.
         let mut server: DebugServer = DebugServer::new();
-        let mut frame = 0;
         let test_entity = DebugEntity {
             name: "Environment".to_string(),
             id: 0,
@@ -200,21 +194,40 @@ mod tests {
             }),
             collider: None,
         };
+        let mut entities = HashMap::new();
+        entities.insert(0, test_entity.clone());
 
-        loop {
-            std::thread::sleep(Duration::from_secs(1));
-            let mut e = test_entity.clone();
-            let t = e.transform.as_mut().unwrap();
-            t.translation[2] = t.translation[2] + (frame as f32 * 0.1);
-            let mut entities = HashMap::new();
-            entities.insert(0, e);
+        let debug_data = DebugData { frame: 0, entities };
 
-            let data = DebugData {
-                id: frame,
-                entities,
-            };
-            let _ = server.sync(&data);
-            frame += 1;
-        }
+        let tokio_rt = Builder::new_current_thread().enable_all().build().unwrap();
+        // Send an init message to the server..
+        let mut stream = tokio_rt.block_on(async {
+            let (socket, _) = connect_async("ws://127.0.0.1:8000").await.unwrap();
+            let (mut write, read) = socket.split();
+            let _ = write
+                .send(TungsteniteMessage::Text(r#"{ "Command": 1 }"#.to_string()))
+                .await;
+
+            read
+        });
+
+        server.sync(&debug_data);
+
+        let data = tokio_rt.block_on(async {
+            let message = stream.next().await.unwrap().unwrap();
+
+            // Note that we may not get an "init" here as the server might not have processed our message yet.
+            // We cover both bases just to be sure.
+            match message {
+                TungsteniteMessage::Text(s) => match serde_json::from_str::<Message>(&s) {
+                    Ok(Message::Data(d)) => d,
+                    Ok(Message::Init(i)) => i.data,
+                    _ => panic!("Unexpected message: {}", s),
+                },
+                _ => panic!("Unexpected message {:?}", message),
+            }
+        });
+
+        assert_eq!(data.entities.get(&0).unwrap(), &test_entity);
     }
 }

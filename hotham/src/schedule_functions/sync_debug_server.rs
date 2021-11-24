@@ -7,7 +7,7 @@ use hotham_debug_server::{
 use legion::{EntityStore, IntoQuery, Resources, World};
 
 use crate::{
-    components::{transform, Collider, Info, Material, Mesh, Transform},
+    components::{Collider, Info, Transform},
     resources::PhysicsContext,
     util::entity_to_u64,
 };
@@ -49,7 +49,7 @@ pub fn world_to_debug_data(
         }
     });
     return DebugData {
-        id: frame as _,
+        frame: frame as _,
         entities,
     };
 }
@@ -86,5 +86,98 @@ fn parse_collider(collider: &rapier3d::geometry::Collider) -> DebugCollider {
     DebugCollider {
         collider_type: collider_type.to_string(),
         geometry,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use legion::World;
+    use nalgebra::{vector, UnitQuaternion};
+    use rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder};
+
+    use crate::{
+        components::{Info, Transform},
+        resources::PhysicsContext,
+    };
+
+    #[test]
+    fn test_world_to_debug() {
+        let mut world = World::default();
+        let mut physics_context = PhysicsContext::default();
+
+        let e1 = world.push((
+            Info {
+                name: "Test".to_string(),
+                node_id: 2,
+            },
+            Transform {
+                translation: vector![1., 2., 3.],
+                scale: vector![3., 2., 1.],
+                rotation: UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3),
+            },
+        ));
+
+        let rigid_body = RigidBodyBuilder::new_dynamic().build();
+        let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0).build();
+        let (rigid_body, collider) =
+            physics_context.add_rigid_body_and_collider(e1, rigid_body, collider);
+        {
+            let mut entry = world.entry(e1).unwrap();
+            entry.add_component(rigid_body);
+            entry.add_component(collider);
+        }
+
+        let e2 = world.push((
+            Info {
+                name: "Test 2".to_string(),
+                node_id: 3,
+            },
+            Transform {
+                translation: vector![4., 5., 6.],
+                scale: vector![6., 5., 4.],
+                rotation: UnitQuaternion::from_euler_angles(0.4, 0.5, 0.6),
+            },
+        ));
+
+        let rigid_body = RigidBodyBuilder::new_dynamic().build();
+        let collider = ColliderBuilder::cylinder(1.0, 0.2).build();
+        let (rigid_body, collider) =
+            physics_context.add_rigid_body_and_collider(e2, rigid_body, collider);
+        {
+            let mut entry = world.entry(e2).unwrap();
+            entry.add_component(rigid_body);
+            entry.add_component(collider);
+        }
+
+        let debug_data = world_to_debug_data(&world, &physics_context, 666);
+        assert_eq!(debug_data.frame, 666);
+
+        let e1 = entity_to_u64(e1);
+        let e2 = entity_to_u64(e2);
+
+        let debug_entity1 = debug_data.entities.get(&e1).unwrap();
+        assert_eq!(debug_entity1.name, "Test".to_string());
+        assert_eq!(debug_entity1.id, e1);
+        assert_eq!(
+            debug_entity1.transform,
+            Some(DebugTransform {
+                translation: [1., 2., 3.],
+                rotation: [0.1, 0.2, 0.3],
+                scale: [3., 2., 1.]
+            })
+        );
+
+        let debug_entity2 = debug_data.entities.get(&e2).unwrap();
+        assert_eq!(debug_entity2.name, "Test 2".to_string());
+        assert_eq!(debug_entity2.id, e2);
+        assert_eq!(
+            debug_entity2.transform,
+            Some(DebugTransform {
+                translation: [4., 5., 6.],
+                rotation: [0.4, 0.5, 0.6],
+                scale: [6., 5., 4.]
+            })
+        );
     }
 }

@@ -3,7 +3,7 @@ import styled from 'styled-components';
 import { LeftPanel } from './components/LeftPanel';
 import { RightPanel } from './components/RightPanel';
 const SERVER_IP = 'localhost';
-const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
+const ws = new WebSocket(`ws://${SERVER_IP}:8000`);
 
 enum Command {
   Reset,
@@ -24,7 +24,7 @@ interface Message {
 
 export type Entities = Record<number, Entity>;
 export interface Frame {
-  id: number;
+  frame: number;
   entities: Entities;
 }
 
@@ -56,7 +56,6 @@ function App() {
       const message: Message = JSON.parse(m.data);
       if (message.Data) {
         if (message.Data) {
-          console.log('Received  data!');
           setFrames((f) => {
             const updated = [...f, message.Data];
             localStorage.setItem(sessionId.toString(), JSON.stringify(updated));

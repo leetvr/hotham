@@ -54,9 +54,9 @@ function ColliderInspector({ c }: { c?: Collider }): JSX.Element | null {
     <Indent>
       <strong>collider: </strong>
       <Indent>
-        <strong>type: {c.colliderType}</strong>
+        <strong>type:</strong> {c.colliderType}
         <br />
-        <strong>geometry: {c.geometry}</strong>
+        <strong>geometry:</strong> {c.geometry}
       </Indent>
     </Indent>
   );

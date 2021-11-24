@@ -32,7 +32,8 @@ pub fn real_main() -> HothamResult<()> {
 
     let blue_cube = add_model_to_world("Blue Cube", &models, &mut world, None)
         .expect("Unable to add Blue Cube");
-    add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
+    let red_cube =
+        add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
     add_model_to_world("Blue Saber", &models, &mut world, None).expect("Unable to add Blue Saber");
     add_model_to_world("Red Saber", &models, &mut world, None).expect("Unable to add Red Saber");
     add_model_to_world("Environment", &models, &mut world, None)
@@ -41,8 +42,24 @@ pub fn real_main() -> HothamResult<()> {
 
     // Add test physics objects
     let rigid_body = RigidBodyBuilder::new_dynamic().build();
-    let collider = ColliderBuilder::cuboid(0.5, 0.2, 0.1).build();
-    physics_context.add_rigid_body_and_collider(blue_cube, rigid_body, collider);
+    let collider = ColliderBuilder::cylinder(1.0, 0.2).build();
+    let (rigid_body, collider) =
+        physics_context.add_rigid_body_and_collider(blue_cube, rigid_body, collider);
+    {
+        let mut entry = world.entry(blue_cube).unwrap();
+        entry.add_component(rigid_body);
+        entry.add_component(collider);
+    }
+
+    let rigid_body = RigidBodyBuilder::new_dynamic().build();
+    let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0).build();
+    let (rigid_body, collider) =
+        physics_context.add_rigid_body_and_collider(red_cube, rigid_body, collider);
+    {
+        let mut entry = world.entry(blue_cube).unwrap();
+        entry.add_component(rigid_body);
+        entry.add_component(collider);
+    }
 
     let mut resources = Resources::default();
     resources.insert(xr_context);
@@ -54,13 +71,13 @@ pub fn real_main() -> HothamResult<()> {
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
-        .add_thread_local_fn(sync_debug_server)
         .add_system(collision_system())
         .add_thread_local_fn(physics_step)
         .add_system(update_rigid_body_transforms_system())
         .add_system(update_transform_matrix_system())
         .add_system(update_parent_transform_matrix_system())
         .add_system(rendering_system())
+        .add_thread_local_fn(sync_debug_server)
         .add_thread_local_fn(end_frame)
         .build();
 
