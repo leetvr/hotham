@@ -1,8 +1,8 @@
 use crate::{
     buffer::Buffer,
     components::{
-        animation_controller::AnimationController, mesh::MeshUBO, AnimationTarget, Info, Joint,
-        Mesh, Parent, Root, Skin, Transform, TransformMatrix, Visible,
+        animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
+        Root, Skin, Transform, TransformMatrix, Visible,
     },
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };

@@ -1,27 +1,20 @@
+use std::collections::HashMap;
+
 use hotham::{
-    components::{Mesh, RigidBody, Transform, Visible},
+    components::{RigidBody, Visible},
     gltf_loader::add_model_to_world,
     resources::{
-        physics_context,
-        render_context::DescriptorSetLayouts,
-        vulkan_context::{self, VulkanContext},
-        PhysicsContext,
+        render_context::DescriptorSetLayouts, vulkan_context::VulkanContext, PhysicsContext,
     },
 };
 use legion::{
-    component, system,
-    systems::CommandBuffer,
-    world::{EntryMut, SubWorld},
-    Entity, EntityStore, IntoQuery, World,
+    component, system, systems::CommandBuffer, world::SubWorld, Entity, IntoQuery, World,
 };
 use nalgebra::{vector, Vector3};
 use rand::Rng;
 use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder};
 
-use crate::{
-    components::{Colour, Cube},
-    Models,
-};
+use crate::components::{Colour, Cube};
 
 const CUBE_STARTING_VELOCITY: Vector3<f32> = Vector3::new(0., 0., 3.00);
 const CUBE_STARTING_DISTANCE: f32 = -10.;
@@ -94,7 +87,7 @@ pub fn add_cube_physics(world: &mut World, physics_context: &mut PhysicsContext,
 
 pub fn create_cubes(
     count: usize,
-    models: &Models,
+    models: &HashMap<String, World>,
     mut world: &mut World,
     mut physics_context: &mut PhysicsContext,
     vulkan_context: &VulkanContext,
@@ -152,7 +145,7 @@ mod tests {
         let vulkan_context = VulkanContext::testing().unwrap();
         let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
         let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../../assets/beat_saber.glb")];
-        let models: Models =
+        let models =
             gltf_loader::load_models_from_glb(&glb_bufs, &vulkan_context, &set_layouts).unwrap();
 
         create_cubes(

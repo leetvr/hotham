@@ -45,7 +45,7 @@ mod tests {
     use hotham::resources::PhysicsContext;
     use hotham::schedule_functions::physics_step;
     use hotham::systems::collision_system;
-    use legion::{component, IntoQuery, Schedule};
+    use legion::Schedule;
     use legion::{Resources, World};
     use nalgebra::{vector, UnitQuaternion};
 

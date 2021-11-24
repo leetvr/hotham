@@ -1,5 +1,5 @@
 use hotham::{
-    components::{hand::Handedness, RigidBody},
+    components::RigidBody,
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::{PhysicsContext, XrContext},
     util::posef_to_isometry,

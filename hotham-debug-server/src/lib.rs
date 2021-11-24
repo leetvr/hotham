@@ -50,10 +50,6 @@ async fn accept_connection(
     to_hotham: Sender<Message>,
     from_hotham: Receiver<Message>,
 ) {
-    let addr = stream
-        .peer_addr()
-        .expect("connected streams should have a peer address");
-
     let ws_stream = tokio_tungstenite::accept_async(stream)
         .await
         .expect("Error during the websocket handshake occurred");

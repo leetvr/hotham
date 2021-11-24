@@ -14,7 +14,6 @@ use crate::{
     resources::{render_context::create_descriptor_set_layouts, VulkanContext},
 };
 
-use crate::components::Mesh;
 use ash::vk;
 use std::marker::PhantomData;
 
