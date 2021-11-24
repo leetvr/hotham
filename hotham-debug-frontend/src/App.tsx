@@ -1,122 +1,170 @@
 import React, { useEffect, useState } from 'react';
-import { withTheme } from '@rjsf/core';
-import { Theme as MaterialUITheme } from '@rjsf/material-ui';
-import './App.css';
-import { JSONSchema7 } from 'json-schema';
-import Box from '@material-ui/core/Box';
-import Button from '@material-ui/core/Button';
+import styled from 'styled-components';
+import { LeftPanel } from './components/LeftPanel';
+import { RightPanel } from './components/RightPanel';
 const SERVER_IP = 'localhost';
-const ws = new WebSocket(`ws://${SERVER_IP}:8080`);
-
-const Form = withTheme<Record<any, string>>(MaterialUITheme);
+const ws = new WebSocket(`ws://${SERVER_IP}:8000`);
 
 enum Command {
   Reset,
   Init,
 }
 
-interface Data {
-  editable?: Record<string, any>;
-  non_editable?: Record<string, any>;
-}
-
 interface InitData {
-  data: Data;
-  schema: Schema;
+  data: Frame;
+  session_id: number;
 }
 
 interface Message {
-  Data: Data;
+  Data: Frame;
   Command: Command;
   Init: InitData;
   Error: string;
 }
 
-interface Schema {
-  editable: JSONSchema7;
-  non_editable: JSONSchema7;
+export type Entities = Record<number, Entity>;
+export interface Frame {
+  frame: number;
+  entities: Entities;
 }
 
-function update(editable: Record<string, any>) {
-  ws.send(JSON.stringify({ Data: { editable } }));
-}
-
-function Container(props: { children: JSX.Element }): JSX.Element {
-  return <div className="App">{props.children}</div>;
-}
-
-let lastUpdate = new Date().getTime();
+const Container = styled.div`
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  height: 100vh;
+  width: 100vw;
+  background-color: #2d3439;
+`;
 
 function App() {
-  const [editableData, setEditableData] = useState<
-    Record<string, any> | undefined
-  >();
-  const [noneditableData, setNonEditableData] = useState<
-    Record<string, any> | undefined
-  >();
+  const [connected, setConnected] = useState(false);
+  const [sessionId, setSessionId] = useState<number>(0);
+  const [frames, setFrames] = useState<Frame[]>([]);
   const [error, setError] = useState<string | undefined>();
-  const [schema, setSchema] = useState<Schema | undefined>();
   useEffect(() => {
     ws.onopen = () => {
+      setConnected(true);
       ws.send(JSON.stringify({ Command: Command.Init }));
+    };
+    ws.onclose = () => {
+      setConnected(false);
     };
   });
   useEffect(() => {
     ws.onmessage = (m) => {
       const message: Message = JSON.parse(m.data);
       if (message.Data) {
-        if (message.Data.editable) {
-          console.log('Received  data!');
-          setEditableData(message.Data.editable);
-        }
-        if (message.Data.non_editable) {
-          const deltaTime = lastUpdate - new Date().getTime();
-          if (deltaTime > 500) {
-            setNonEditableData(message.Data.non_editable);
-            lastUpdate = new Date().getTime();
-          }
+        if (message.Data) {
+          setFrames((f) => {
+            const updated = [...f, message.Data];
+            localStorage.setItem(sessionId.toString(), JSON.stringify(updated));
+            return updated;
+          });
         }
       }
       if (message.Init) {
-        setSchema(message.Init.schema);
-        setEditableData(message.Init.data.editable);
-        setNonEditableData(message.Init.data.non_editable);
+        setFrames((f) => [...f, message.Init.data]);
+        const { session_id } = message.Init;
+        setSessionId(session_id);
+        const sessionsRaw = localStorage.getItem('sessions');
+        const sessions = sessionsRaw ? JSON.parse(sessionsRaw) : [];
+        const updated = [...sessions, session_id];
+        localStorage.setItem('sessions', JSON.stringify(updated));
       }
       if (message.Error) {
         setError(error);
       }
     };
   });
+  useEffect(() => {
+    const framesFromStorage = localStorage.getItem(sessionId.toString());
+    if (!framesFromStorage) return;
+    setFrames(JSON.parse(framesFromStorage));
+  }, [connected, sessionId]);
 
-  if (!schema || !editableData) {
-    return (
-      <Container>
-        <h1>Loading..</h1>
-      </Container>
-    );
-  }
+  const [currentFrame, setCurrentFrame] = useState(0);
+
+  // const frames: Frame[] = [
+  //   {
+  //     id: 0,
+  //     entities: {
+  //       0: {
+  //         name: 'Environment',
+  //         id: 0,
+  //         mesh: 'Environment',
+  //         material: 'Rough',
+  //         transform: {
+  //           translation: [0, 0, -1],
+  //           rotation: [0, 0, 0],
+  //           scale: [1, 1, 1],
+  //         },
+  //         collider: {
+  //           colliderType: 'cube',
+  //           geometry: [1, 1, 1],
+  //         },
+  //       },
+  //       1: { name: 'Empty', id: 1 },
+  //     },
+  //   },
+  //   {
+  //     id: 1,
+  //     entities: {
+  //       0: {
+  //         name: 'Environment',
+  //         id: 0,
+  //         mesh: 'Environment',
+  //         material: 'Rough',
+  //         transform: {
+  //           translation: [0, 0, -1.1],
+  //           rotation: [0, 0, 0],
+  //           scale: [1, 1, 1],
+  //         },
+  //         collider: {
+  //           colliderType: 'cube',
+  //           geometry: [1, 1, 1],
+  //         },
+  //       },
+  //     },
+  //   },
+  // ];
+
+  const entities = frames[currentFrame] ? frames[currentFrame].entities : [];
 
   return (
     <Container>
-      <>
-        <h1>{error}</h1>
-        <Form formData={noneditableData} schema={schema.non_editable} readonly>
-          <></>
-        </Form>
-        <Form
-          noHtml5Validate
-          formData={editableData}
-          schema={schema.editable}
-          onChange={(e, _) => {
-            setEditableData(e.formData);
-            if (e.errors.length === 0) update(e.formData);
-          }}
-        >
-          {null}
-        </Form>
-      </>
+      <LeftPanel
+        entities={entities}
+        frame={currentFrame}
+        setFrame={setCurrentFrame}
+        maxFrames={frames.length !== 0 ? frames.length - 1 : 0}
+      />
+      <RightPanel
+        entities={entities}
+        connected={connected}
+        sessionId={sessionId}
+        setSessionId={setSessionId}
+      />
     </Container>
   );
+}
+
+export interface Transform {
+  translation: [number, number, number];
+  rotation: [number, number, number];
+  scale: [number, number, number];
+}
+
+export interface Collider {
+  colliderType: 'cube' | 'cylinder';
+  geometry: number[];
+}
+
+export interface Entity {
+  id: number;
+  name: string;
+  transform?: Transform;
+  collider?: Collider;
 }
 
 export default App;
