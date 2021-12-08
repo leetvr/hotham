@@ -214,7 +214,7 @@ impl XrContext {
     }
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub(crate) fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
