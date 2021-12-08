@@ -59,7 +59,7 @@ pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext
     let mut saber_entry = world.entry(saber).unwrap();
 
     // Give it a collider and rigid-body
-    let collider = ColliderBuilder::capsule_y(0.10, 0.01)
+    let collider = ColliderBuilder::cylinder(0.10, 0.01)
         .sensor(false)
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::INTERSECTION_EVENTS)
