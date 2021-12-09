@@ -2,7 +2,7 @@ use std::{fs, path::Path, str};
 
 use shaderc::{Compiler, ShaderKind};
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn main() {
     println!("cargo:rerun-if-changed=build_input");
     // The bindgen::Builder is the main entry point

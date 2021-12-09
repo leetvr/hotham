@@ -139,7 +139,7 @@ impl Texture {
     }
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn parse_image(path: &str) -> Result<(Vec<u8>, u32, u32)> {
     let path = format!(r#"..\test_assets\\{}"#, path);
     let img = ImageReader::open(path)?.decode()?;
