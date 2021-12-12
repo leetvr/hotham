@@ -1,9 +1,12 @@
+import { useLiveQuery } from 'dexie-react-hooks';
 import React, { useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { LeftPanel } from './components/LeftPanel';
-import { RightPanel } from './components/RightPanel';
-const SERVER_IP = 'localhost';
-const ws = new WebSocket(`ws://${SERVER_IP}:8000`);
+import { EntityList } from './components/EntityList';
+import { Inspector } from './components/Inspector';
+import { SessionSelector } from './components/SessionSelector';
+import { Timeline } from './components/Timeline';
+import { db } from './db';
+export const SERVER_ADDRESS = `ws://localhost:8000`;
 
 enum Command {
   Reset,
@@ -24,8 +27,14 @@ interface Message {
 
 export type Entities = Record<number, Entity>;
 export interface Frame {
-  frame: number;
+  id: number;
   entities: Entities;
+  sessionId: number;
+}
+
+export interface Session {
+  id: number;
+  timestamp: Date;
 }
 
 const Container = styled.div`
@@ -38,11 +47,17 @@ const Container = styled.div`
 `;
 
 function App() {
+  // State
+  const [selectedSessionId, setSelectedSessionId] = useState<
+    number | undefined
+  >();
+  const [selectedFrameId, setSelectedFrameId] = useState(0);
+  const [selectedEntity, setSelectedEntity] = useState<Entity | undefined>();
   const [connected, setConnected] = useState(false);
-  const [sessionId, setSessionId] = useState<number>(0);
-  const [frames, setFrames] = useState<Frame[]>([]);
-  const [error, setError] = useState<string | undefined>();
+
+  // Websocket
   useEffect(() => {
+    const ws = new WebSocket(SERVER_ADDRESS);
     ws.onopen = () => {
       setConnected(true);
       ws.send(JSON.stringify({ Command: Command.Init }));
@@ -51,99 +66,34 @@ function App() {
       setConnected(false);
     };
   });
-  useEffect(() => {
-    ws.onmessage = (m) => {
-      const message: Message = JSON.parse(m.data);
-      if (message.Data) {
-        if (message.Data) {
-          setFrames((f) => {
-            const updated = [...f, message.Data];
-            localStorage.setItem(sessionId.toString(), JSON.stringify(updated));
-            return updated;
-          });
-        }
-      }
-      if (message.Init) {
-        setFrames((f) => [...f, message.Init.data]);
-        const { session_id } = message.Init;
-        setSessionId(session_id);
-        const sessionsRaw = localStorage.getItem('sessions');
-        const sessions = sessionsRaw ? JSON.parse(sessionsRaw) : [];
-        const updated = [...sessions, session_id];
-        localStorage.setItem('sessions', JSON.stringify(updated));
-      }
-      if (message.Error) {
-        setError(error);
-      }
-    };
-  });
-  useEffect(() => {
-    const framesFromStorage = localStorage.getItem(sessionId.toString());
-    if (!framesFromStorage) return;
-    setFrames(JSON.parse(framesFromStorage));
-  }, [connected, sessionId]);
 
-  const [currentFrame, setCurrentFrame] = useState(0);
+  // Database
+  const sessions = useLiveQuery(() => db.sessions.toArray()) ?? [];
+  const frames =
+    useLiveQuery(
+      () =>
+        db.frames
+          .where('sessionId')
+          .equals(selectedSessionId ?? -1)
+          .toArray(),
+      [selectedSessionId]
+    ) ?? [];
 
-  // const frames: Frame[] = [
-  //   {
-  //     id: 0,
-  //     entities: {
-  //       0: {
-  //         name: 'Environment',
-  //         id: 0,
-  //         mesh: 'Environment',
-  //         material: 'Rough',
-  //         transform: {
-  //           translation: [0, 0, -1],
-  //           rotation: [0, 0, 0],
-  //           scale: [1, 1, 1],
-  //         },
-  //         collider: {
-  //           colliderType: 'cube',
-  //           geometry: [1, 1, 1],
-  //         },
-  //       },
-  //       1: { name: 'Empty', id: 1 },
-  //     },
-  //   },
-  //   {
-  //     id: 1,
-  //     entities: {
-  //       0: {
-  //         name: 'Environment',
-  //         id: 0,
-  //         mesh: 'Environment',
-  //         material: 'Rough',
-  //         transform: {
-  //           translation: [0, 0, -1.1],
-  //           rotation: [0, 0, 0],
-  //           scale: [1, 1, 1],
-  //         },
-  //         collider: {
-  //           colliderType: 'cube',
-  //           geometry: [1, 1, 1],
-  //         },
-  //       },
-  //     },
-  //   },
-  // ];
-
-  const entities = frames[currentFrame] ? frames[currentFrame].entities : [];
+  const entities = frames[selectedFrameId]?.entities ?? [];
 
   return (
     <Container>
-      <LeftPanel
-        entities={entities}
-        frame={currentFrame}
-        setFrame={setCurrentFrame}
-        maxFrames={frames.length !== 0 ? frames.length - 1 : 0}
-      />
-      <RightPanel
-        entities={entities}
+      <SessionSelector
+        sessions={sessions}
+        setSelectedSessionId={setSelectedSessionId}
         connected={connected}
-        sessionId={sessionId}
-        setSessionId={setSessionId}
+      />
+      <EntityList entities={entities} setSelectedEntity={setSelectedEntity} />
+      <Inspector entity={selectedEntity} />
+      <Timeline
+        maxFrames={frames.length}
+        setSelectedFrameId={setSelectedFrameId}
+        selectedFrameId={selectedFrameId}
       />
     </Container>
   );
@@ -168,3 +118,30 @@ export interface Entity {
 }
 
 export default App;
+
+// useEffect(() => {
+//   ws.onmessage = (m) => {
+//     const message: Message = JSON.parse(m.data);
+//     if (message.Data) {
+//       if (message.Data) {
+//         setFrames((f) => {
+//           const updated = [...f, message.Data];
+//           localStorage.setItem(sessionId.toString(), JSON.stringify(updated));
+//           return updated;
+//         });
+//       }
+//     }
+//     if (message.Init) {
+//       setFrames((f) => [...f, message.Init.data]);
+//       const { session_id } = message.Init;
+//       setSessionId(session_id);
+//       const sessionsRaw = localStorage.getItem('sessions');
+//       const sessions = sessionsRaw ? JSON.parse(sessionsRaw) : [];
+//       const updated = [...sessions, session_id];
+//       localStorage.setItem('sessions', JSON.stringify(updated));
+//     }
+//     if (message.Error) {
+//       setError(error);
+//     }
+//   };
+// });

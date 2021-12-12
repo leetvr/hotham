@@ -8,11 +8,13 @@
     "@react-three/fiber": "^7.0.19",
     "@testing-library/jest-dom": "^5.11.4",
     "@testing-library/react": "^11.1.0",
-    "@testing-library/user-event": "^12.1.10",
+    "@testing-library/user-event": "^13.5.0",
     "@types/jest": "^26.0.15",
     "@types/node": "^12.0.0",
     "@types/react": "^17.0.0",
     "@types/react-dom": "^17.0.0",
+    "dexie": "^3.2.0",
+    "dexie-react-hooks": "^1.0.7",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
     "react-scripts": "4.0.3",
@@ -47,9 +49,13 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/dom": "^8.11.1",
     "@types/json-schema": "^7.0.9",
     "@types/styled-components": "^5.1.15",
     "@types/three": "^0.133.1",
+    "fake-indexeddb": "^3.1.7",
+    "jest-websocket-mock": "^2.2.1",
+    "mock-socket": "^9.0.8",
     "typescript-plugin-styled-components": "^2.0.0"
   },
   "resolutions": {

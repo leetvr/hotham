@@ -1,7 +1,13 @@
 {
 	"folders": [
 		{
-			"path": "."
+			"path": "hotham"
+		},
+		{
+			"path": "hotham-debug-frontend"
+		},
+		{
+			"path": "hotham-simulator"
 		}
 	],
 	"settings": {

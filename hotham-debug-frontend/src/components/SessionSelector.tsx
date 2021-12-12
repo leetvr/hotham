@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import * as React from 'react';
 import styled from 'styled-components';
 import Tree from '@naisutech/react-tree';
-import { Entity } from '../App';
+import { Session } from '../App';
 
 const Container = styled.div`
   display: flex;
@@ -13,31 +13,25 @@ const Container = styled.div`
 `;
 
 interface Props {
+  sessions: Session[];
+  setSelectedSessionId: (id: number) => void;
   connected: boolean;
-  sessionId: number;
-  setSessionId: (n: number) => void;
 }
 
 export function SessionSelector(props: Props): JSX.Element {
-  const { connected, sessionId, setSessionId } = props;
-
+  const { sessions, connected, setSelectedSessionId } = props;
   if (connected) {
-    <Container>
-      <h2>Session in progress..</h2>
-    </Container>;
+    return (
+      <Container>
+        <h2>Connected to device</h2>
+      </Container>
+    );
   }
 
-  const [sessions, setSessions] = useState<number[]>([]);
-  useEffect(() => {
-    const s = localStorage.getItem('sessions');
-    if (!s) return;
-    setSessions(JSON.parse(s));
-  }, [connected]);
-
   const nodes = sessions.map((s) => ({
-    id: s,
+    id: s.id,
     parentId: null,
-    label: s.toString(),
+    label: s.timestamp.toLocaleString(),
   }));
 
   return (
@@ -47,7 +41,7 @@ export function SessionSelector(props: Props): JSX.Element {
         nodes={nodes}
         onSelect={(n) => {
           if (!n.length) return;
-          setTimeout(() => props.setSessionId(n[0] as number), 0);
+          setTimeout(() => setSelectedSessionId(Number(n[0])), 0);
         }}
       />
     </Container>

@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import Tree from '@naisutech/react-tree';
-import { Entity } from '../App';
+import { Entities, Entity } from '../App';
 
 const Container = styled.div`
   display: flex;
@@ -12,12 +12,13 @@ const Container = styled.div`
 `;
 
 interface Props {
-  entities: Record<number, Entity>;
-  selectEntityId: React.Dispatch<React.SetStateAction<number | undefined>>;
+  entities: Entities;
+  setSelectedEntity: (e: Entity) => void;
 }
 
-export function Explorer(props: Props): JSX.Element {
-  const nodes = getNodes(props.entities);
+export function EntityList(props: Props): JSX.Element {
+  const { entities, setSelectedEntity } = props;
+  const nodes = getNodes(entities);
   return (
     <Container>
       <h2>Entities</h2>
@@ -25,13 +26,15 @@ export function Explorer(props: Props): JSX.Element {
         nodes={nodes}
         onSelect={(n) => {
           if (!n.length) return;
-          setTimeout(() => props.selectEntityId(n[0] as number | undefined), 0);
+          const index = Number(n[0]);
+          const selectedEntity = entities[index];
+          setTimeout(() => setSelectedEntity(selectedEntity), 0);
         }}
       />
     </Container>
   );
 }
-function getNodes(entities: Record<number, Entity>) {
+function getNodes(entities: Entities) {
   return Object.values(entities).map((e) => ({
     id: e.id,
     parentId: null,

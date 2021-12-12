@@ -44,8 +44,8 @@ interface TimelineItemProps {
 }
 
 interface Props {
-  setFrame: (n: number) => void;
-  frame: number;
+  setSelectedFrameId: (n: number) => void;
+  selectedFrameId: number;
   maxFrames: number;
 }
 
@@ -69,17 +69,21 @@ function getFrames(
   return elements;
 }
 
-export function Timeline({ frame, setFrame, maxFrames }: Props): JSX.Element {
+export function Timeline({
+  selectedFrameId,
+  setSelectedFrameId,
+  maxFrames,
+}: Props): JSX.Element {
   return (
     <OuterContainer>
       <h2>
-        Frame {frame} / {maxFrames}
+        Frame {selectedFrameId} / {maxFrames}
       </h2>
       <Scrubber
         min={0}
         max={maxFrames}
-        value={frame}
-        onScrubChange={(c) => setFrame(Math.round(c))}
+        value={selectedFrameId}
+        onScrubChange={(c) => setSelectedFrameId(Math.round(c))}
       />
     </OuterContainer>
   );

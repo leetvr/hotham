@@ -1,6 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import { Collider, Entity, Transform } from '../App';
+import { Timeline } from './Timeline';
 
 const Container = styled.div`
   display: flex;
@@ -16,7 +17,7 @@ const Indent = styled.div`
 `;
 
 interface Props {
-  entity: Entity | null;
+  entity?: Entity;
 }
 
 function TransformInspector({ t }: { t?: Transform }): JSX.Element | null {
@@ -67,7 +68,7 @@ export function Inspector({ entity }: Props): JSX.Element {
     return (
       <Container>
         <h2>Inspector</h2>
-        No entity selected .
+        No entity selected.
       </Container>
     );
 
