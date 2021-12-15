@@ -8,19 +8,33 @@ export function createOnMessage(
   setFramesReceived: React.Dispatch<React.SetStateAction<number>>
 ): (e: MessageEvent) => Promise<void> {
   return async (e: MessageEvent) => {
-    const { init, data }: Message = JSON.parse(e.data);
-    if (data) {
-      await db.frames.add(data);
-      console.log('About to add frame', data);
-      setFramesReceived((f) => f + 1);
+    const { init, frame }: Message = JSON.parse(e.data);
+    if (frame) {
+      try {
+        await db.frames.add(frame);
+        setFramesReceived((f) => f + 1);
+      } catch (e) {
+        console.error('Error adding frame', frame, e);
+      }
+      return;
     }
 
     if (init) {
-      await db.sessions.add({ id: init.sessionId, timestamp: new Date() });
-      console.log('About to add frame', init.data);
-      await db.frames.add(init.data);
-      setSelectedSessionId(init.sessionId);
-      setFramesReceived((f) => f + 1);
+      try {
+        await db.sessions.add({ id: init.sessionId, timestamp: new Date() });
+        setSelectedSessionId(init.sessionId);
+      } catch (e) {
+        console.error('Unable to add session', init.sessionId, e);
+        return;
+      }
+
+      try {
+        await db.frames.add(init.firstFrame);
+        setFramesReceived((f) => f + 1);
+      } catch (e) {
+        console.error('Unable to add initial frame', init.firstFrame, e);
+      }
+      return;
     }
   };
 }

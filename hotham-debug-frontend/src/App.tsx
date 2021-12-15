@@ -15,12 +15,12 @@ enum Command {
 }
 
 export interface InitData {
-  data: Frame;
+  firstFrame: Frame;
   sessionId: string;
 }
 
 export interface Message {
-  data?: Frame;
+  frame?: Frame;
   command?: Command;
   init?: InitData;
   error?: string;
@@ -95,15 +95,6 @@ function App() {
     ) ?? [];
 
   const entities = frames[selectedFrameId]?.entities ?? [];
-  console.log(
-    'Frames',
-    JSON.stringify(frames, null, 2),
-    'received',
-    framesReceived,
-    'selectedFrameId',
-    selectedFrameId
-  );
-
   return (
     <OuterContainer>
       <TopContainer>

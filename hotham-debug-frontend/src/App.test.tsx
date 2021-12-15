@@ -138,7 +138,7 @@ test('the entity window gets populated with the first frame', async () => {
   const message: Message = {
     init: {
       sessionId: '5',
-      data: {
+      firstFrame: {
         id: 'f0f0f0',
         frameNumber: 0,
         sessionId: '5',
@@ -170,7 +170,7 @@ test('when multiple frames have been received, on the scrubber changes the frame
   const message: Message = {
     init: {
       sessionId: '5',
-      data: {
+      firstFrame: {
         id: 'f0f0f0',
         frameNumber: 0,
         sessionId: '5',
@@ -194,7 +194,7 @@ test('when multiple frames have been received, on the scrubber changes the frame
   ).toBeInTheDocument();
 
   const message2: Message = {
-    data: {
+    frame: {
       id: 'fafafa',
       frameNumber: 1,
       sessionId: '5',
@@ -206,6 +206,9 @@ test('when multiple frames have been received, on the scrubber changes the frame
       },
     },
   };
+  // const message2 = JSON.parse(
+  //   `{"frame":{"id":"c9315b5a-bcf6-470d-aee0-7d2707ca41e5","frameNumber":0,"sessionId":"5","entities":{"160":{"name":"Red Saber","id":160,"transform":{"translation":[0.0,0.0,0.0],"rotation":[0.0,-0.0,0.0],"scale":[1.0,1.0,1.0]},"collider":null},"176":{"name":"Environment","id":176,"transform":{"translation":[0.0,12.998371,0.0],"rotation":[0.0,-0.0,0.0],"scale":[1.0,1.0,1.0]},"collider":null},"112":{"name":"Blue Cube","id":112,"transform":{"translation":[0.000007787097,-0.00039562775,-0.03639865],"rotation":[0.0006904579,0.0000069336797,2.088354e-7],"scale":[1.0,1.0,1.0]},"collider":{"colliderType":"cube","geometry":[1.0,1.0,1.0]}},"144":{"name":"Blue Saber","id":144,"transform":{"translation":[0.0,0.0,0.0],"rotation":[0.0,-0.0,0.0],"scale":[1.0,1.0,1.0]},"collider":null},"192":{"name":"Ramp","id":192,"transform":{"translation":[0.0,0.0,-32.697006],"rotation":[0.0,-0.0,0.0],"scale":[0.70659745,1.0,1.0]},"collider":null},"128":{"name":"Red Cube","id":128,"transform":{"translation":[0.0,0.0,0.0],"rotation":[0.0,-0.0,0.0],"scale":[1.0,1.0,1.0]},"collider":null}}}}`
+  // );
 
   act(() => {
     server.send(message2);

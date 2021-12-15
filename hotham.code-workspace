@@ -8,6 +8,12 @@
 		},
 		{
 			"path": "hotham-simulator"
+		},
+		{
+			"path": "examples\\beat-saber-clone"
+		},
+		{
+			"path": "hotham-debug-server"
 		}
 	],
 	"settings": {

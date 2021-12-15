@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 
 use hotham_debug_server::{
-    debug_data::{DebugCollider, DebugData, DebugEntity, DebugTransform},
+    debug_frame::{DebugCollider, DebugEntity, DebugFrame, DebugTransform},
     DebugServer,
 };
 use legion::{EntityStore, IntoQuery, Resources, World};
+use uuid::Uuid;
 
 use crate::{
     components::{Collider, Info, Transform},
@@ -16,7 +17,7 @@ pub fn sync_debug_server(world: &mut World, resources: &mut Resources) {
     let mut debug_server = resources.get_mut::<DebugServer>().unwrap();
     let frame = resources.get::<usize>().unwrap();
     let physics_context = resources.get::<PhysicsContext>().unwrap();
-    let debug_data = world_to_debug_data(&world, &physics_context, *frame);
+    let debug_data = world_to_debug_data(&world, &physics_context, *frame, debug_server.session_id);
 
     let _ = debug_server.sync(&debug_data);
 }
@@ -26,7 +27,8 @@ pub fn world_to_debug_data(
     world: &World,
     physics_context: &PhysicsContext,
     frame: usize,
-) -> DebugData {
+    session_id: Uuid,
+) -> DebugFrame {
     let mut entities = HashMap::new();
     let mut query = <&Info>::query();
     query.for_each_chunk(world, |c| {
@@ -48,9 +50,11 @@ pub fn world_to_debug_data(
             entities.insert(e.id, e);
         }
     });
-    return DebugData {
-        frame: frame as _,
+    return DebugFrame {
+        id: Uuid::new_v4(),
+        frame_number: frame as _,
         entities,
+        session_id,
     };
 }
 
@@ -150,8 +154,9 @@ mod tests {
             entry.add_component(collider);
         }
 
-        let debug_data = world_to_debug_data(&world, &physics_context, 666);
-        assert_eq!(debug_data.frame, 666);
+        let session_id = Uuid::new_v4();
+        let debug_data = world_to_debug_data(&world, &physics_context, 666, session_id);
+        assert_eq!(debug_data.frame_number, 666);
 
         let e1 = entity_to_u64(e1);
         let e2 = entity_to_u64(e2);
