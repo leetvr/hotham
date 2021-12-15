@@ -1,6 +1,6 @@
 import { ArcballControls, Box, Cylinder, Environment } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { Suspense, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import styled from 'styled-components';
 import { ViewOptions } from './ViewOptions';
 import { useGLTF } from '@react-three/drei';
@@ -12,6 +12,8 @@ const CanvasContainer = styled.div`
   display: flex;
   overflow: hidden;
   width: 80vw;
+  height: 80vh;
+  flex: 1;
 `;
 
 const OuterContainer = styled.div`
@@ -118,6 +120,7 @@ function getPhsicsObjects(
     if (e.collider?.colliderType === 'cube') {
       elements.push(
         <Box
+          position={e.transform!.translation}
           args={[
             e.collider.geometry[0] * 2,
             e.collider.geometry[1] * 2,
