@@ -1,6 +1,6 @@
 import { ArcballControls, Box, Cylinder, Environment } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { useRef, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { ViewOptions } from './ViewOptions';
 import { useGLTF } from '@react-three/drei';
@@ -9,10 +9,14 @@ import THREE, { Euler, Mesh } from 'three';
 import { Entity, Transform } from '../App';
 
 const CanvasContainer = styled.div`
+  display: flex;
+  overflow: hidden;
+  width: 80vw;
+`;
+
+const OuterContainer = styled.div`
   display: 'flex';
-  flex: 4;
-  overflow: 'hidden';
-  width: '70vw';
+  flex-direction: 'column';
 `;
 
 type GLTFResult = GLTF & {
@@ -93,7 +97,7 @@ export function Viewer({ entities }: Props): JSX.Element {
   const gltf = useGLTF('/beat_saber.glb') as unknown as GLTFResult;
   const { nodes } = gltf;
   return (
-    <>
+    <OuterContainer>
       <ViewOptions displays={displays} setDisplays={setDisplays} />
       <CanvasContainer>
         <Canvas shadows={true}>
@@ -103,7 +107,7 @@ export function Viewer({ entities }: Props): JSX.Element {
           <ArcballControls />
         </Canvas>
       </CanvasContainer>
-    </>
+    </OuterContainer>
   );
 }
 function getPhsicsObjects(

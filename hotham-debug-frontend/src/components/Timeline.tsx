@@ -10,39 +10,6 @@ const OuterContainer = styled.div`
   min-height: 100px;
 `;
 
-const Container = styled.div`
-  display: flex;
-  flex: 1;
-  align-items: center;
-  flex-direction: row;
-`;
-
-const TimelineItem = styled.div<TimelineItemProps>`
-  display: flex;
-  height: 50px;
-  width: 50px;
-  background-color: #bbb;
-  border-color: ${(p) => (p.selected ? '#eee' : '#bbb')};
-  border-width: 5px;
-  border-style: solid;
-  border-radius: 50%;
-  align-items: center;
-  justify-content: center;
-  font-weight: ${(p) => (p.selected ? 'bold' : '')};
-`;
-
-const Spacer = styled.div`
-  display: flex;
-  height: 10px;
-  width: 10px;
-  background-color: #bbb;
-  zindex: -1;
-`;
-
-interface TimelineItemProps {
-  selected?: boolean;
-}
-
 interface Props {
   setSelectedFrameId: (n: number) => void;
   selectedFrameId: number;
@@ -54,6 +21,15 @@ export function Timeline({
   setSelectedFrameId,
   maxFrames,
 }: Props): JSX.Element {
+  if (maxFrames === 0) {
+    return (
+      <OuterContainer>
+        <h2>No frames available</h2>
+        <Scrubber value={0} min={0} max={0} />
+      </OuterContainer>
+    );
+  }
+
   return (
     <OuterContainer>
       <h2>

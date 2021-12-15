@@ -1,10 +1,11 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import styled from 'styled-components';
 import { EntityList } from './components/EntityList';
 import { Inspector } from './components/Inspector';
 import { SessionSelector } from './components/SessionSelector';
 import { Timeline } from './components/Timeline';
+import { Viewer } from './components/Viewer';
 import { db } from './db';
 import { createOnMessage, SERVER_ADDRESS } from './ws';
 
@@ -38,13 +39,25 @@ export interface Session {
   timestamp: Date;
 }
 
-const Container = styled.div`
+const OuterContainer = styled.div`
+  display: flex;
+  flex: 1;
+  height: 100vh;
+  width: 100vw;
+  flex-direction: column;
+  background-color: #2d3439;
+`;
+
+const TopContainer = styled.div`
   display: flex;
   flex: 1;
   flex-direction: row;
-  height: 100vh;
-  width: 100vw;
-  background-color: #2d3439;
+`;
+
+const RightPanel = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
 `;
 
 function App() {
@@ -92,22 +105,48 @@ function App() {
   );
 
   return (
-    <Container>
-      <SessionSelector
-        sessions={sessions}
-        setSelectedSessionId={setSelectedSessionId}
-        connected={connected}
-      />
-      <EntityList entities={entities} setSelectedEntity={setSelectedEntity} />
-      <Inspector entity={selectedEntity} />
+    <OuterContainer>
+      <TopContainer>
+        <Suspense fallback={<LoadingScreen />}>
+          <Viewer entities={entities} />
+        </Suspense>
+        <RightPanel>
+          <SessionSelector
+            sessions={sessions}
+            setSelectedSessionId={setSelectedSessionId}
+            connected={connected}
+          />
+          <EntityList
+            entities={entities}
+            setSelectedEntity={setSelectedEntity}
+          />
+          <Inspector entity={selectedEntity} />
+        </RightPanel>
+      </TopContainer>
       <Timeline
         maxFrames={frames.length}
         setSelectedFrameId={setSelectedFrameId}
         selectedFrameId={selectedFrameId}
       />
-    </Container>
+    </OuterContainer>
   );
 }
+
+function LoadingScreen(): React.ReactElement {
+  return (
+    <LoadingContainer>
+      <h2>Loading..</h2>
+    </LoadingContainer>
+  );
+}
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+`;
 
 export interface Transform {
   translation: [number, number, number];
@@ -128,30 +167,3 @@ export interface Entity {
 }
 
 export default App;
-
-// useEffect(() => {
-//   ws.onmessage = (m) => {
-//     const message: Message = JSON.parse(m.data);
-//     if (message.Data) {
-//       if (message.Data) {
-//         setFrames((f) => {
-//           const updated = [...f, message.Data];
-//           localStorage.setItem(sessionId.toString(), JSON.stringify(updated));
-//           return updated;
-//         });
-//       }
-//     }
-//     if (message.Init) {
-//       setFrames((f) => [...f, message.Init.data]);
-//       const { session_id } = message.Init;
-//       setSessionId(session_id);
-//       const sessionsRaw = localStorage.getItem('sessions');
-//       const sessions = sessionsRaw ? JSON.parse(sessionsRaw) : [];
-//       const updated = [...sessions, session_id];
-//       localStorage.setItem('sessions', JSON.stringify(updated));
-//     }
-//     if (message.Error) {
-//       setError(error);
-//     }
-//   };
-// });

@@ -24,6 +24,10 @@ function MockScrubber(props: {
   );
 }
 
+jest.mock('./components/Viewer.tsx', () => ({
+  Viewer: () => null,
+}));
+
 jest.mock('react-scrubber', () => ({
   Scrubber: MockScrubber,
 }));
