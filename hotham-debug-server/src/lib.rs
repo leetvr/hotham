@@ -1,5 +1,6 @@
-pub mod debug_data;
-use debug_data::DebugData;
+pub mod debug_frame;
+use debug_frame::DebugFrame;
+use uuid::Uuid;
 
 use std::io::{Error as IOError, ErrorKind};
 use std::thread::{self, JoinHandle};
@@ -18,6 +19,7 @@ use serde_repr::*;
 use std::fmt::Debug;
 
 #[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 #[repr(u8)]
 pub enum Command {
     Reset,
@@ -25,14 +27,16 @@ pub enum Command {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct InitData {
-    data: DebugData,
-    session_id: u64,
+    first_frame: DebugFrame,
+    session_id: Uuid,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub enum Message {
-    Data(DebugData),
+    Frame(DebugFrame),
     Command(Command),
     Init(InitData),
     Error(String),
@@ -41,7 +45,8 @@ pub enum Message {
 pub struct DebugServer {
     pub to_client: Sender<Message>,
     pub from_client: Receiver<Message>,
-    session_id: u64,
+    pub session_id: Uuid,
+    pub current_frame: usize,
     _handle: JoinHandle<()>,
 }
 
@@ -121,27 +126,28 @@ impl DebugServer {
             to_client,
             from_client,
             _handle: handle,
-            session_id: rand::random(),
+            session_id: Uuid::new_v4(),
+            current_frame: 0,
         }
     }
 
-    pub fn sync(&mut self, debug_data_from_hotham: &DebugData) -> Option<DebugData> {
+    pub fn sync(&mut self, debug_data_from_hotham: &DebugFrame) -> Option<DebugFrame> {
         let mut editable_data = None;
         let response: Option<Message> = match self.from_client.try_recv() {
-            Ok(Message::Data(debug_data_from_client)) => {
+            Ok(Message::Frame(debug_data_from_client)) => {
                 editable_data = Some(debug_data_from_client);
-                Some(Message::Data(debug_data_from_hotham.clone()))
+                Some(Message::Frame(debug_data_from_hotham.clone()))
             }
             Ok(Message::Command(Command::Reset)) => {
-                Some(Message::Data(debug_data_from_hotham.clone()))
+                Some(Message::Frame(debug_data_from_hotham.clone()))
             }
             Ok(Message::Command(Command::Init)) => Some(Message::Init(InitData {
                 session_id: self.session_id,
-                data: debug_data_from_hotham.clone(),
+                first_frame: debug_data_from_hotham.clone(),
             })),
             Ok(error_message @ Message::Error(_)) => Some(error_message),
             Ok(_) => None,
-            Err(_) => Some(Message::Data(debug_data_from_hotham.clone())),
+            Err(_) => Some(Message::Frame(debug_data_from_hotham.clone())),
         };
 
         if let Some(response) = response {
@@ -172,7 +178,7 @@ mod tests {
 
     use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as TungsteniteMessage};
 
-    use crate::debug_data::{DebugEntity, DebugTransform};
+    use crate::debug_frame::{DebugEntity, DebugTransform};
     use futures_util::sink::SinkExt;
 
     use super::*;
@@ -193,7 +199,12 @@ mod tests {
         let mut entities = HashMap::new();
         entities.insert(0, test_entity.clone());
 
-        let debug_data = DebugData { frame: 0, entities };
+        let debug_data = DebugFrame {
+            id: Uuid::new_v4(),
+            frame_number: 0,
+            entities,
+            session_id: Uuid::new_v4(),
+        };
 
         let tokio_rt = Builder::new_current_thread().enable_all().build().unwrap();
         // Send an init message to the server..
@@ -201,7 +212,7 @@ mod tests {
             let (socket, _) = connect_async("ws://127.0.0.1:8000").await.unwrap();
             let (mut write, read) = socket.split();
             let _ = write
-                .send(TungsteniteMessage::Text(r#"{ "Command": 1 }"#.to_string()))
+                .send(TungsteniteMessage::Text(r#"{ "command": 1 }"#.to_string()))
                 .await;
 
             read
@@ -216,8 +227,8 @@ mod tests {
             // We cover both bases just to be sure.
             match message {
                 TungsteniteMessage::Text(s) => match serde_json::from_str::<Message>(&s) {
-                    Ok(Message::Data(d)) => d,
-                    Ok(Message::Init(i)) => i.data,
+                    Ok(Message::Frame(d)) => d,
+                    Ok(Message::Init(i)) => i.first_frame,
                     _ => panic!("Unexpected message: {}", s),
                 },
                 _ => panic!("Unexpected message {:?}", message),

@@ -1,13 +1,16 @@
 use approx::relative_eq;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 type Entities = HashMap<u64, DebugEntity>;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct DebugData {
-    pub frame: u64,
+pub struct DebugFrame {
+    pub id: Uuid,
+    pub frame_number: u64,
+    pub session_id: Uuid,
     pub entities: Entities,
 }
 
