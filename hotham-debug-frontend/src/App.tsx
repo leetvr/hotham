@@ -6,34 +6,35 @@ import { Inspector } from './components/Inspector';
 import { SessionSelector } from './components/SessionSelector';
 import { Timeline } from './components/Timeline';
 import { db } from './db';
-export const SERVER_ADDRESS = `ws://localhost:8000`;
+import { createOnMessage, SERVER_ADDRESS } from './ws';
 
 enum Command {
   Reset,
   Init,
 }
 
-interface InitData {
+export interface InitData {
   data: Frame;
-  session_id: number;
+  sessionId: string;
 }
 
-interface Message {
-  Data: Frame;
-  Command: Command;
-  Init: InitData;
-  Error: string;
+export interface Message {
+  data?: Frame;
+  command?: Command;
+  init?: InitData;
+  error?: string;
 }
 
 export type Entities = Record<number, Entity>;
 export interface Frame {
-  id: number;
+  id: string;
+  frameNumber: number;
   entities: Entities;
-  sessionId: number;
+  sessionId: string;
 }
 
 export interface Session {
-  id: number;
+  id: string;
   timestamp: Date;
 }
 
@@ -48,24 +49,25 @@ const Container = styled.div`
 
 function App() {
   // State
-  const [selectedSessionId, setSelectedSessionId] = useState<
-    number | undefined
-  >();
+  const [selectedSessionId, setSelectedSessionId] = useState('');
   const [selectedFrameId, setSelectedFrameId] = useState(0);
   const [selectedEntity, setSelectedEntity] = useState<Entity | undefined>();
   const [connected, setConnected] = useState(false);
+  const [framesReceived, setFramesReceived] = useState(0);
 
   // Websocket
   useEffect(() => {
     const ws = new WebSocket(SERVER_ADDRESS);
     ws.onopen = () => {
       setConnected(true);
-      ws.send(JSON.stringify({ Command: Command.Init }));
+      ws.send(JSON.stringify({ command: Command.Init }));
     };
     ws.onclose = () => {
       setConnected(false);
+      setFramesReceived(0);
     };
-  });
+    ws.onmessage = createOnMessage(setSelectedSessionId, setFramesReceived);
+  }, [setSelectedSessionId, setFramesReceived]);
 
   // Database
   const sessions = useLiveQuery(() => db.sessions.toArray()) ?? [];
@@ -74,12 +76,20 @@ function App() {
       () =>
         db.frames
           .where('sessionId')
-          .equals(selectedSessionId ?? -1)
-          .toArray(),
-      [selectedSessionId]
+          .equals(selectedSessionId)
+          .sortBy('frameNumber'),
+      [selectedSessionId, framesReceived]
     ) ?? [];
 
   const entities = frames[selectedFrameId]?.entities ?? [];
+  console.log(
+    'Frames',
+    JSON.stringify(frames, null, 2),
+    'received',
+    framesReceived,
+    'selectedFrameId',
+    selectedFrameId
+  );
 
   return (
     <Container>

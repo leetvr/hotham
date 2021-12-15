@@ -14,7 +14,7 @@ const Container = styled.div`
 
 interface Props {
   sessions: Session[];
-  setSelectedSessionId: (id: number) => void;
+  setSelectedSessionId: (id: string) => void;
   connected: boolean;
 }
 
@@ -41,7 +41,7 @@ export function SessionSelector(props: Props): JSX.Element {
         nodes={nodes}
         onSelect={(n) => {
           if (!n.length) return;
-          setTimeout(() => setSelectedSessionId(Number(n[0])), 0);
+          setTimeout(() => setSelectedSessionId(String(n[0])), 0);
         }}
       />
     </Container>

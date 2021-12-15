@@ -49,26 +49,6 @@ interface Props {
   maxFrames: number;
 }
 
-function getFrames(
-  frame: number,
-  setFrame: (n: number) => void,
-  maxFrames: number
-): JSX.Element[] {
-  const elements = [];
-  for (let i = 0; i < maxFrames; i++) {
-    elements.push(
-      <TimelineItem selected={i === frame} onClick={() => setFrame(i)} key={i}>
-        {i}
-      </TimelineItem>
-    );
-    if (i < maxFrames - 1) {
-      elements.push(<Spacer />);
-    }
-  }
-
-  return elements;
-}
-
 export function Timeline({
   selectedFrameId,
   setSelectedFrameId,
@@ -77,13 +57,13 @@ export function Timeline({
   return (
     <OuterContainer>
       <h2>
-        Frame {selectedFrameId} / {maxFrames}
+        Frame {selectedFrameId + 1} / {maxFrames}
       </h2>
       <Scrubber
-        min={0}
+        min={1}
         max={maxFrames}
         value={selectedFrameId}
-        onScrubChange={(c) => setSelectedFrameId(Math.round(c))}
+        onScrubChange={(c) => setSelectedFrameId(Math.round(c - 1))}
       />
     </OuterContainer>
   );

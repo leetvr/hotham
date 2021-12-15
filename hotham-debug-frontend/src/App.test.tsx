@@ -1,9 +1,10 @@
 import 'fake-indexeddb/auto';
 import { act, render, waitFor, within } from '@testing-library/react';
-import App, { Frame, SERVER_ADDRESS } from './App';
+import App, { Frame, Message } from './App';
 import userEvent from '@testing-library/user-event';
 import { db } from './db';
 import WS from 'jest-websocket-mock';
+import { SERVER_ADDRESS } from './ws';
 
 function MockScrubber(props: {
   min: number;
@@ -16,7 +17,8 @@ function MockScrubber(props: {
     <div
       data-testid="scrubber"
       onClick={() => {
-        onScrubChange(max - 1);
+        console.log('onScrubChange', max);
+        onScrubChange(max);
       }}
     />
   );
@@ -30,8 +32,9 @@ jest.mock('ws', () => {});
 
 const stubFrames: Frame[] = [
   {
-    sessionId: 0,
-    id: 0,
+    sessionId: '0',
+    id: 'abc123',
+    frameNumber: 0,
     entities: {
       0: {
         id: 0,
@@ -53,8 +56,9 @@ const stubFrames: Frame[] = [
     },
   },
   {
-    sessionId: 0,
-    id: 1,
+    sessionId: '0',
+    id: 'abc456',
+    frameNumber: 1,
     entities: {
       0: {
         id: 0,
@@ -62,50 +66,164 @@ const stubFrames: Frame[] = [
       },
     },
   },
+  {
+    sessionId: '1',
+    id: 'fafa123',
+    frameNumber: 0,
+    entities: {},
+  },
 ];
 
-beforeAll(async () => {
+async function clean() {
+  WS.clean();
+  await db.sessions.clear();
+  await db.frames.clear();
+}
+
+async function setup() {
+  await clean();
   await db.sessions.bulkAdd([
-    { id: 0, timestamp: new Date() },
-    { id: 1, timestamp: new Date() },
+    { id: '0', timestamp: new Date() },
+    { id: '1', timestamp: new Date() },
   ]);
 
   await db.frames.bulkAdd(stubFrames);
-});
+}
+
+async function setupAndRender() {
+  await setup();
+  return render(<App />);
+}
+
+async function setupWithWebSocket() {
+  await clean();
+  return new WS(SERVER_ADDRESS, { jsonProtocol: true });
+}
 
 const DATE_REGEX = new RegExp(/\d{1,2}\/\d{1,2}\/\d{4}/);
 
 test('renders a list of sessions when not connected', async () => {
-  const { getByText } = render(<App />);
+  const { getByText } = await setupAndRender();
   const sessionContainer = getByText(/Previous sessions/i).parentElement;
   const sessionDate = await within(sessionContainer!).findAllByText(DATE_REGEX);
   expect(sessionDate).toHaveLength(2);
 });
 
 test('does not show sessions when connected', async () => {
+  await setup();
   const server = new WS(SERVER_ADDRESS);
   const { getByText } = render(<App />);
   await server.connected;
 
   expect(getByText(/Connected to device/i)).toBeInTheDocument();
-
-  WS.clean();
 });
 
 test('sends an INIT message when first connected', async () => {
-  const server = new WS(SERVER_ADDRESS, { jsonProtocol: true });
+  const server = await setupWithWebSocket();
   render(<App />);
   await server.connected;
 
-  await expect(server).toReceiveMessage({ Command: 1 });
-
-  WS.clean();
+  await expect(server).toReceiveMessage({ command: 1 });
 });
 
-test('the entity window gets populated with the first frame', async () => {});
+test('the entity window gets populated with the first frame', async () => {
+  const server = await setupWithWebSocket();
+  const { getByText } = render(<App />);
+  await server.connected;
+  await server.nextMessage;
+  const message: Message = {
+    init: {
+      sessionId: '5',
+      data: {
+        id: 'f0f0f0',
+        frameNumber: 0,
+        sessionId: '5',
+        entities: {
+          0: {
+            id: 0,
+            name: 'Test Entity 4',
+          },
+        },
+      },
+    },
+  };
+
+  act(() => {
+    server.send(message);
+  });
+
+  const entitiesContainer = getByText(/Entities/i).parentElement;
+  expect(
+    await within(entitiesContainer!).findByText('Test Entity 4')
+  ).toBeInTheDocument();
+});
+
+test('when multiple frames have been received, on the scrubber changes the frame', async () => {
+  const server = await setupWithWebSocket();
+  const { getByText, getByTestId } = render(<App />);
+  await server.connected;
+  await server.nextMessage;
+  const message: Message = {
+    init: {
+      sessionId: '5',
+      data: {
+        id: 'f0f0f0',
+        frameNumber: 0,
+        sessionId: '5',
+        entities: {
+          0: {
+            id: 0,
+            name: 'Test Entity 4',
+          },
+        },
+      },
+    },
+  };
+
+  act(() => {
+    server.send(message);
+  });
+
+  const entitiesContainer = getByText(/Entities/i).parentElement;
+  expect(
+    await within(entitiesContainer!).findByText('Test Entity 4')
+  ).toBeInTheDocument();
+
+  const message2: Message = {
+    data: {
+      id: 'fafafa',
+      frameNumber: 1,
+      sessionId: '5',
+      entities: {
+        0: {
+          id: 0,
+          name: 'Test Entity 5',
+        },
+      },
+    },
+  };
+
+  act(() => {
+    server.send(message2);
+  });
+
+  const timeline = getByTestId('scrubber');
+
+  await waitFor(async () =>
+    expect(getByText('Frame 1 / 2')).toBeInTheDocument()
+  );
+
+  act(() => {
+    userEvent.click(timeline);
+  });
+
+  expect(
+    await within(entitiesContainer!).findByText('Test Entity 5')
+  ).toBeInTheDocument();
+});
 
 test('clicking on a session changes the selected session', async () => {
-  const { getByText } = render(<App />);
+  const { getByText } = await setupAndRender();
   const sessionContainer = getByText(/Previous sessions/i).parentElement;
   const session = (
     await within(sessionContainer!).findAllByText(DATE_REGEX)
@@ -126,7 +244,7 @@ test('clicking on a session changes the selected session', async () => {
 });
 
 test('clicking on an entity shows details about that entity', async () => {
-  const { getByText, getByRole } = render(<App />);
+  const { getByText, getByRole } = await setupAndRender();
   const sessionContainer = getByText(/Previous sessions/i).parentElement;
   const session = (
     await within(sessionContainer!).findAllByText(DATE_REGEX)
@@ -158,7 +276,7 @@ test('clicking on an entity shows details about that entity', async () => {
 });
 
 test('clicking on the frame slider changes the current frame', async () => {
-  const { getByText, getByTestId } = render(<App />);
+  const { getByText, getByTestId } = await setupAndRender();
   const sessionContainer = getByText(/Previous sessions/i).parentElement;
   const session = (
     await within(sessionContainer!).findAllByText(DATE_REGEX)

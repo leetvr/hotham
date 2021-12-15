@@ -3,7 +3,7 @@ import { Frame, Session } from './App';
 
 const DATABASE_NAME = 'hotham-debug-frontend';
 const schema = {
-  frames: 'id, sessionId',
+  frames: 'id, sessionId, frameNumber',
   sessions: 'id',
 };
 
