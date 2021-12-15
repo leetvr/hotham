@@ -9,10 +9,16 @@ import THREE, { Euler, Mesh } from 'three';
 import { Entity, Transform } from '../App';
 
 const CanvasContainer = styled.div`
+  display: flex;
+  overflow: hidden;
+  width: 80vw;
+  height: 80vh;
+  flex: 1;
+`;
+
+const OuterContainer = styled.div`
   display: 'flex';
-  flex: 4;
-  overflow: 'hidden';
-  width: '70vw';
+  flex-direction: 'column';
 `;
 
 type GLTFResult = GLTF & {
@@ -93,7 +99,7 @@ export function Viewer({ entities }: Props): JSX.Element {
   const gltf = useGLTF('/beat_saber.glb') as unknown as GLTFResult;
   const { nodes } = gltf;
   return (
-    <>
+    <OuterContainer>
       <ViewOptions displays={displays} setDisplays={setDisplays} />
       <CanvasContainer>
         <Canvas shadows={true}>
@@ -103,7 +109,7 @@ export function Viewer({ entities }: Props): JSX.Element {
           <ArcballControls />
         </Canvas>
       </CanvasContainer>
-    </>
+    </OuterContainer>
   );
 }
 function getPhsicsObjects(
@@ -114,6 +120,7 @@ function getPhsicsObjects(
     if (e.collider?.colliderType === 'cube') {
       elements.push(
         <Box
+          position={e.transform!.translation}
           args={[
             e.collider.geometry[0] * 2,
             e.collider.geometry[1] * 2,

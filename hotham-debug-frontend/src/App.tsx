@@ -1,153 +1,143 @@
-import React, { useEffect, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import React, { Suspense, useEffect, useState } from 'react';
 import styled from 'styled-components';
-import { LeftPanel } from './components/LeftPanel';
-import { RightPanel } from './components/RightPanel';
-const SERVER_IP = 'localhost';
-const ws = new WebSocket(`ws://${SERVER_IP}:8000`);
+import { EntityList } from './components/EntityList';
+import { Inspector } from './components/Inspector';
+import { SessionSelector } from './components/SessionSelector';
+import { Timeline } from './components/Timeline';
+import { Viewer } from './components/Viewer';
+import { db } from './db';
+import { createOnMessage, SERVER_ADDRESS } from './ws';
 
 enum Command {
   Reset,
   Init,
 }
 
-interface InitData {
-  data: Frame;
-  session_id: number;
+export interface InitData {
+  firstFrame: Frame;
+  sessionId: string;
 }
 
-interface Message {
-  Data: Frame;
-  Command: Command;
-  Init: InitData;
-  Error: string;
+export interface Message {
+  frame?: Frame;
+  command?: Command;
+  init?: InitData;
+  error?: string;
 }
 
 export type Entities = Record<number, Entity>;
 export interface Frame {
-  frame: number;
+  id: string;
+  frameNumber: number;
   entities: Entities;
+  sessionId: string;
 }
 
-const Container = styled.div`
+export interface Session {
+  id: string;
+  timestamp: Date;
+}
+
+const OuterContainer = styled.div`
   display: flex;
   flex: 1;
-  flex-direction: row;
   height: 100vh;
   width: 100vw;
+  flex-direction: column;
   background-color: #2d3439;
 `;
 
+const TopContainer = styled.div`
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+`;
+
+const RightPanel = styled.div`
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+`;
+
 function App() {
+  // State
+  const [selectedSessionId, setSelectedSessionId] = useState('');
+  const [selectedFrameId, setSelectedFrameId] = useState(0);
+  const [selectedEntity, setSelectedEntity] = useState<Entity | undefined>();
   const [connected, setConnected] = useState(false);
-  const [sessionId, setSessionId] = useState<number>(0);
-  const [frames, setFrames] = useState<Frame[]>([]);
-  const [error, setError] = useState<string | undefined>();
+  const [framesReceived, setFramesReceived] = useState(0);
+
+  // Websocket
   useEffect(() => {
+    const ws = new WebSocket(SERVER_ADDRESS);
     ws.onopen = () => {
       setConnected(true);
-      ws.send(JSON.stringify({ Command: Command.Init }));
+      ws.send(JSON.stringify({ command: Command.Init }));
     };
     ws.onclose = () => {
       setConnected(false);
+      setFramesReceived(0);
     };
-  });
-  useEffect(() => {
-    ws.onmessage = (m) => {
-      const message: Message = JSON.parse(m.data);
-      if (message.Data) {
-        if (message.Data) {
-          setFrames((f) => {
-            const updated = [...f, message.Data];
-            localStorage.setItem(sessionId.toString(), JSON.stringify(updated));
-            return updated;
-          });
-        }
-      }
-      if (message.Init) {
-        setFrames((f) => [...f, message.Init.data]);
-        const { session_id } = message.Init;
-        setSessionId(session_id);
-        const sessionsRaw = localStorage.getItem('sessions');
-        const sessions = sessionsRaw ? JSON.parse(sessionsRaw) : [];
-        const updated = [...sessions, session_id];
-        localStorage.setItem('sessions', JSON.stringify(updated));
-      }
-      if (message.Error) {
-        setError(error);
-      }
-    };
-  });
-  useEffect(() => {
-    const framesFromStorage = localStorage.getItem(sessionId.toString());
-    if (!framesFromStorage) return;
-    setFrames(JSON.parse(framesFromStorage));
-  }, [connected, sessionId]);
+    ws.onmessage = createOnMessage(setSelectedSessionId, setFramesReceived);
+  }, [setSelectedSessionId, setFramesReceived]);
 
-  const [currentFrame, setCurrentFrame] = useState(0);
+  // Database
+  const sessions = useLiveQuery(() => db.sessions.toArray()) ?? [];
+  const frames =
+    useLiveQuery(
+      () =>
+        db.frames
+          .where('sessionId')
+          .equals(selectedSessionId)
+          .sortBy('frameNumber'),
+      [selectedSessionId, framesReceived]
+    ) ?? [];
 
-  // const frames: Frame[] = [
-  //   {
-  //     id: 0,
-  //     entities: {
-  //       0: {
-  //         name: 'Environment',
-  //         id: 0,
-  //         mesh: 'Environment',
-  //         material: 'Rough',
-  //         transform: {
-  //           translation: [0, 0, -1],
-  //           rotation: [0, 0, 0],
-  //           scale: [1, 1, 1],
-  //         },
-  //         collider: {
-  //           colliderType: 'cube',
-  //           geometry: [1, 1, 1],
-  //         },
-  //       },
-  //       1: { name: 'Empty', id: 1 },
-  //     },
-  //   },
-  //   {
-  //     id: 1,
-  //     entities: {
-  //       0: {
-  //         name: 'Environment',
-  //         id: 0,
-  //         mesh: 'Environment',
-  //         material: 'Rough',
-  //         transform: {
-  //           translation: [0, 0, -1.1],
-  //           rotation: [0, 0, 0],
-  //           scale: [1, 1, 1],
-  //         },
-  //         collider: {
-  //           colliderType: 'cube',
-  //           geometry: [1, 1, 1],
-  //         },
-  //       },
-  //     },
-  //   },
-  // ];
-
-  const entities = frames[currentFrame] ? frames[currentFrame].entities : [];
-
+  const entities = frames[selectedFrameId]?.entities ?? [];
   return (
-    <Container>
-      <LeftPanel
-        entities={entities}
-        frame={currentFrame}
-        setFrame={setCurrentFrame}
-        maxFrames={frames.length !== 0 ? frames.length - 1 : 0}
+    <OuterContainer>
+      <TopContainer>
+        <Suspense fallback={<LoadingScreen />}>
+          <Viewer entities={entities} />
+        </Suspense>
+        <RightPanel>
+          <SessionSelector
+            sessions={sessions}
+            setSelectedSessionId={setSelectedSessionId}
+            connected={connected}
+          />
+          <EntityList
+            entities={entities}
+            setSelectedEntity={setSelectedEntity}
+          />
+          <Inspector entity={selectedEntity} />
+        </RightPanel>
+      </TopContainer>
+      <Timeline
+        maxFrames={frames.length}
+        setSelectedFrameId={setSelectedFrameId}
+        selectedFrameId={selectedFrameId}
       />
-      <RightPanel
-        entities={entities}
-        connected={connected}
-        sessionId={sessionId}
-        setSessionId={setSessionId}
-      />
-    </Container>
+    </OuterContainer>
   );
 }
+
+function LoadingScreen(): React.ReactElement {
+  return (
+    <LoadingContainer>
+      <h2>Loading..</h2>
+    </LoadingContainer>
+  );
+}
+
+const LoadingContainer = styled.div`
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+`;
 
 export interface Transform {
   translation: [number, number, number];

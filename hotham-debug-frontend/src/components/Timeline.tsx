@@ -10,76 +10,36 @@ const OuterContainer = styled.div`
   min-height: 100px;
 `;
 
-const Container = styled.div`
-  display: flex;
-  flex: 1;
-  align-items: center;
-  flex-direction: row;
-`;
-
-const TimelineItem = styled.div<TimelineItemProps>`
-  display: flex;
-  height: 50px;
-  width: 50px;
-  background-color: #bbb;
-  border-color: ${(p) => (p.selected ? '#eee' : '#bbb')};
-  border-width: 5px;
-  border-style: solid;
-  border-radius: 50%;
-  align-items: center;
-  justify-content: center;
-  font-weight: ${(p) => (p.selected ? 'bold' : '')};
-`;
-
-const Spacer = styled.div`
-  display: flex;
-  height: 10px;
-  width: 10px;
-  background-color: #bbb;
-  zindex: -1;
-`;
-
-interface TimelineItemProps {
-  selected?: boolean;
-}
-
 interface Props {
-  setFrame: (n: number) => void;
-  frame: number;
+  setSelectedFrameId: (n: number) => void;
+  selectedFrameId: number;
   maxFrames: number;
 }
 
-function getFrames(
-  frame: number,
-  setFrame: (n: number) => void,
-  maxFrames: number
-): JSX.Element[] {
-  const elements = [];
-  for (let i = 0; i < maxFrames; i++) {
-    elements.push(
-      <TimelineItem selected={i === frame} onClick={() => setFrame(i)} key={i}>
-        {i}
-      </TimelineItem>
+export function Timeline({
+  selectedFrameId,
+  setSelectedFrameId,
+  maxFrames,
+}: Props): JSX.Element {
+  if (maxFrames === 0) {
+    return (
+      <OuterContainer>
+        <h2>No frames available</h2>
+        <Scrubber value={0} min={0} max={0} />
+      </OuterContainer>
     );
-    if (i < maxFrames - 1) {
-      elements.push(<Spacer />);
-    }
   }
 
-  return elements;
-}
-
-export function Timeline({ frame, setFrame, maxFrames }: Props): JSX.Element {
   return (
     <OuterContainer>
       <h2>
-        Frame {frame} / {maxFrames}
+        Frame {selectedFrameId + 1} / {maxFrames}
       </h2>
       <Scrubber
-        min={0}
+        min={1}
         max={maxFrames}
-        value={frame}
-        onScrubChange={(c) => setFrame(Math.round(c))}
+        value={selectedFrameId}
+        onScrubChange={(c) => setSelectedFrameId(Math.round(c - 1))}
       />
     </OuterContainer>
   );
