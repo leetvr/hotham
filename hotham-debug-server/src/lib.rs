@@ -46,6 +46,7 @@ pub struct DebugServer {
     pub to_client: Sender<Message>,
     pub from_client: Receiver<Message>,
     pub session_id: Uuid,
+    pub current_frame: usize,
     _handle: JoinHandle<()>,
 }
 
@@ -126,6 +127,7 @@ impl DebugServer {
             from_client,
             _handle: handle,
             session_id: Uuid::new_v4(),
+            current_frame: 0,
         }
     }
 

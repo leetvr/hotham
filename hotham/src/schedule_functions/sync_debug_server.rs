@@ -15,11 +15,16 @@ use crate::{
 
 pub fn sync_debug_server(world: &mut World, resources: &mut Resources) {
     let mut debug_server = resources.get_mut::<DebugServer>().unwrap();
-    let frame = resources.get::<usize>().unwrap();
     let physics_context = resources.get::<PhysicsContext>().unwrap();
-    let debug_data = world_to_debug_data(&world, &physics_context, *frame, debug_server.session_id);
+    let debug_data = world_to_debug_data(
+        &world,
+        &physics_context,
+        debug_server.current_frame,
+        debug_server.session_id,
+    );
 
     let _ = debug_server.sync(&debug_data);
+    debug_server.current_frame += 1; // TODO: We should really have a frame counter elsewhere..
 }
 
 // TODO: We should really just be serializing the whole world here, but whatever.
