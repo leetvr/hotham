@@ -1,5 +1,6 @@
 use hotham::gltf_loader::add_model_to_world;
 use hotham::legion::{Resources, Schedule, World};
+use hotham::rapier3d::na::vector;
 use hotham::rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder};
 use hotham::resources::{PhysicsContext, RenderContext, XrContext};
 use hotham::schedule_functions::{begin_frame, end_frame, physics_step, sync_debug_server};
@@ -34,15 +35,30 @@ pub fn real_main() -> HothamResult<()> {
         .expect("Unable to add Blue Cube");
     let red_cube =
         add_model_to_world("Red Cube", &models, &mut world, None).expect("Unable to add Red Cube");
-    add_model_to_world("Blue Saber", &models, &mut world, None).expect("Unable to add Blue Saber");
+    let blue_saber = add_model_to_world("Blue Saber", &models, &mut world, None)
+        .expect("Unable to add Blue Saber");
     add_model_to_world("Red Saber", &models, &mut world, None).expect("Unable to add Red Saber");
     add_model_to_world("Environment", &models, &mut world, None)
         .expect("Unable to add Environment");
     add_model_to_world("Ramp", &models, &mut world, None).expect("Unable to add Ramp");
 
     // Add test physics objects
-    let rigid_body = RigidBodyBuilder::new_dynamic().build();
+    let rigid_body = RigidBodyBuilder::new_dynamic()
+        .translation(vector![0., 5., 0.])
+        .build();
     let collider = ColliderBuilder::cylinder(1.0, 0.2).build();
+    let (rigid_body, collider) =
+        physics_context.add_rigid_body_and_collider(blue_saber, rigid_body, collider);
+    {
+        let mut entry = world.entry(blue_saber).unwrap();
+        entry.add_component(rigid_body);
+        entry.add_component(collider);
+    }
+
+    let rigid_body = RigidBodyBuilder::new_dynamic().build();
+    let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0)
+        .translation(vector![0., 1.0, 0.])
+        .build();
     let (rigid_body, collider) =
         physics_context.add_rigid_body_and_collider(blue_cube, rigid_body, collider);
     {
@@ -52,11 +68,13 @@ pub fn real_main() -> HothamResult<()> {
     }
 
     let rigid_body = RigidBodyBuilder::new_dynamic().build();
-    let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0).build();
+    let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0)
+        .translation(vector![0., 1., 0.])
+        .build();
     let (rigid_body, collider) =
         physics_context.add_rigid_body_and_collider(red_cube, rigid_body, collider);
     {
-        let mut entry = world.entry(blue_cube).unwrap();
+        let mut entry = world.entry(red_cube).unwrap();
         entry.add_component(rigid_body);
         entry.add_component(collider);
     }

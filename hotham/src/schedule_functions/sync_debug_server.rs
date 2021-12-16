@@ -92,9 +92,13 @@ fn parse_collider(collider: &rapier3d::geometry::Collider) -> DebugCollider {
         vec![cylinder.half_height, cylinder.radius]
     };
 
+    let t = collider.translation();
+    let translation = [t[0], t[1], t[2]];
+
     DebugCollider {
         collider_type: collider_type.to_string(),
         geometry,
+        translation,
     }
 }
 
@@ -128,7 +132,9 @@ mod tests {
         ));
 
         let rigid_body = RigidBodyBuilder::new_dynamic().build();
-        let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0).build();
+        let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0)
+            .translation(vector![0., 0.5, 0.])
+            .build();
         let (rigid_body, collider) =
             physics_context.add_rigid_body_and_collider(e1, rigid_body, collider);
         {
@@ -175,6 +181,14 @@ mod tests {
                 translation: [1., 2., 3.],
                 rotation: [0.1, 0.2, 0.3],
                 scale: [3., 2., 1.]
+            })
+        );
+        assert_eq!(
+            debug_entity1.collider,
+            Some(DebugCollider {
+                collider_type: "cube".to_string(),
+                geometry: vec![1., 1., 1.,],
+                translation: [0., 0.5, 0.],
             })
         );
 

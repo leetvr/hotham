@@ -51,6 +51,7 @@ const stubFrames: Frame[] = [
         collider: {
           colliderType: 'cube',
           geometry: [1, 2, 3],
+          translation: [0, 0.5, 0],
         },
       },
       1: {
@@ -279,6 +280,9 @@ test('clicking on an entity shows details about that entity', async () => {
     expect(inspectorContainer).toHaveTextContent('translation: x: 0 y: 0 z: 0');
     expect(inspectorContainer).toHaveTextContent('rotation: x: 0 y: 0 z: 0');
     expect(inspectorContainer).toHaveTextContent('scale: x: 1 y: 1 z: 1');
+    expect(inspectorContainer).toHaveTextContent(
+      'translation: x: 0 y: 0.5 z: 0'
+    );
   });
 });
 

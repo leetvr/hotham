@@ -1,7 +1,5 @@
-import React from 'react';
 import styled from 'styled-components';
 import { Collider, Entity, Transform } from '../App';
-import { Timeline } from './Timeline';
 
 const Container = styled.div`
   display: flex;
@@ -58,6 +56,12 @@ function ColliderInspector({ c }: { c?: Collider }): JSX.Element | null {
         <strong>type:</strong> {c.colliderType}
         <br />
         <strong>geometry:</strong> {c.geometry}
+        <br />
+        <strong>translation: </strong>
+        <Indent>
+          <strong>x:</strong> {c.translation[0]} <strong>y:</strong>{' '}
+          {c.translation[1]} <strong>z:</strong> {c.translation[2]}
+        </Indent>
       </Indent>
     </Indent>
   );
