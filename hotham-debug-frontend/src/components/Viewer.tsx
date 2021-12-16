@@ -117,25 +117,33 @@ function getPhsicsObjects(
 ): JSX.Element[] | [] {
   const elements: JSX.Element[] = [];
   Object.values(entities).forEach((e) => {
-    if (e.collider?.colliderType === 'cube') {
+    const { collider, transform } = e;
+    if (!collider) return;
+
+    const { colliderType, geometry, translation } = collider;
+    const rotation = getRotation(transform!); // safe: entity with collider and no transform is non-sensical
+
+    if (colliderType === 'cube') {
       elements.push(
         <Box
-          position={e.transform!.translation}
-          args={[
-            e.collider.geometry[0] * 2,
-            e.collider.geometry[1] * 2,
-            e.collider.geometry[2] * 2,
-          ]}
+          position={translation}
+          rotation={rotation}
+          args={[geometry[0] * 2, geometry[1] * 2, geometry[2] * 2]}
         >
           <meshPhongMaterial attach="material" color="#bbb" wireframe />
         </Box>
       );
     }
-    if (e.collider?.colliderType === 'cylinder') {
-      const height = e.collider.geometry[0] * 2;
-      const radius = e.collider.geometry[1];
+
+    if (colliderType === 'cylinder') {
+      const height = geometry[0] * 2;
+      const radius = geometry[1];
       elements.push(
-        <Cylinder args={[radius, radius, height]}>
+        <Cylinder
+          args={[radius, radius, height]}
+          position={translation}
+          rotation={rotation}
+        >
           <meshPhongMaterial attach="material" color="#bbb" wireframe />
         </Cylinder>
       );

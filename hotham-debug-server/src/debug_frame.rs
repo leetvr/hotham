@@ -45,15 +45,16 @@ impl PartialEq for DebugTransform {
     }
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct DebugCollider {
     pub collider_type: String,
     pub geometry: Vec<f32>,
+    pub translation: [f32; 3],
 }
 
-impl PartialEq for DebugCollider {
-    fn eq(&self, other: &Self) -> bool {
-        self.collider_type == other.collider_type && self.geometry == other.geometry
-    }
-}
+// impl PartialEq for DebugCollider {
+//     fn eq(&self, other: &Self) -> bool {
+//         self.collider_type == other.collider_type && self.geometry == other.geometry
+//     }
+// }

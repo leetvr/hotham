@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 hotham = {path = "../../hotham"}
 hotham-debug-server = {path = "../../hotham-debug-server"}
+nalgebra = {version = "0.29.0"}
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.4.0"

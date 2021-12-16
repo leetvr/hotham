@@ -139,15 +139,18 @@ const LoadingContainer = styled.div`
   color: #fff;
 `;
 
+export type Vector3 = [number, number, number];
+
 export interface Transform {
-  translation: [number, number, number];
-  rotation: [number, number, number];
-  scale: [number, number, number];
+  translation: Vector3;
+  rotation: Vector3;
+  scale: Vector3;
 }
 
 export interface Collider {
   colliderType: 'cube' | 'cylinder';
   geometry: number[];
+  translation: Vector3;
 }
 
 export interface Entity {
