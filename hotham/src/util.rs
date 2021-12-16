@@ -14,6 +14,9 @@ use crate::{
     resources::{render_context::create_descriptor_set_layouts, VulkanContext},
 };
 
+use ash::vk;
+use std::marker::PhantomData;
+
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
     strings
         .iter()
@@ -48,14 +51,30 @@ pub fn get_world_with_hands() -> World {
     let mut world = World::default();
 
     // Add two hands
-    let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
+    let left_hand = add_model_to_world(
+        "Left Hand",
+        &models,
+        &mut world,
+        None,
+        &vulkan_context,
+        &set_layouts,
+    )
+    .unwrap();
     {
         let mut left_hand_entity = world.entry(left_hand).unwrap();
         let transform = left_hand_entity.get_component_mut::<Transform>().unwrap();
         transform.translation = vector![-0.2, 1.4, 0.0];
     }
 
-    let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
+    let right_hand = add_model_to_world(
+        "Right Hand",
+        &models,
+        &mut world,
+        None,
+        &vulkan_context,
+        &set_layouts,
+    )
+    .unwrap();
     {
         let mut right_hand_entity = world.entry(right_hand).unwrap();
         let transform = right_hand_entity.get_component_mut::<Transform>().unwrap();
@@ -75,6 +94,7 @@ pub fn u64_to_entity(entity: u64) -> Entity {
 pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
     let translation: Translation3<f32> = Translation3::from(translation);
+
     let rotation: Quaternion<f32> = mint::Quaternion::from(pose.orientation).into();
     let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
     Isometry {
@@ -83,7 +103,6 @@ pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     }
 }
 
-#[cfg(test)]
 use crate::buffer::Buffer;
 
 #[cfg(test)]
@@ -101,6 +120,17 @@ pub unsafe fn get_from_device_memory<'a, T: Sized>(
         )
         .unwrap();
     std::slice::from_raw_parts(std::mem::transmute(memory), buffer.size as _)
+}
+
+pub fn test_buffer<T>() -> Buffer<T> {
+    Buffer {
+        handle: vk::Buffer::null(),
+        device_memory: vk::DeviceMemory::null(),
+        _phantom: PhantomData,
+        size: 0,
+        device_memory_size: 0,
+        usage: vk::BufferUsageFlags::empty(),
+    }
 }
 
 #[cfg(target_os = "android")]

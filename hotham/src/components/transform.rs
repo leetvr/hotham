@@ -1,7 +1,8 @@
 use gltf::scene::Transform as TransformData;
 use nalgebra::{vector, Isometry3, Quaternion, Unit, UnitQuaternion, Vector3};
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Clone, PartialEq, Debug, Copy, Deserialize, Serialize)]
 pub struct Transform {
     pub translation: Vector3<f32>,
     pub rotation: UnitQuaternion<f32>,
@@ -12,7 +13,7 @@ impl Default for Transform {
     fn default() -> Self {
         Self {
             translation: Vector3::zeros(),
-            rotation: UnitQuaternion::new_normalize(Quaternion::identity()),
+            rotation: UnitQuaternion::identity(),
             scale: vector![1.0, 1.0, 1.0],
         }
     }

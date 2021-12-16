@@ -28,7 +28,7 @@ impl Default for PhysicsContext {
         let (contact_send, contact_recv) = crossbeam::channel::unbounded();
         let (intersection_send, intersection_recv) = crossbeam::channel::unbounded();
         let event_handler = ChannelEventCollector::new(intersection_send, contact_send);
-        let gravity: Matrix3x1<f32> = vector![0.0, 0.0, 0.0]; // no gravity in SPACE baby!
+        let gravity: Matrix3x1<f32> = vector![0.0, 0.0, 0.0]; // TODO: no gravity in SPACE baby! But some games may uh, need this.
         let integration_parameters = IntegrationParameters::default();
         let physics_pipeline = PhysicsPipeline::new();
         let joint_set = JointSet::new();

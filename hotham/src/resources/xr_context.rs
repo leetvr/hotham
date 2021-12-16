@@ -34,6 +34,15 @@ pub struct XrContext {
 impl XrContext {
     pub fn new() -> Result<(XrContext, VulkanContext)> {
         let (instance, system) = create_xr_instance()?;
+        XrContext::_new(instance, system)
+    }
+
+    pub fn new_from_path(path: &std::path::Path) -> Result<(XrContext, VulkanContext)> {
+        let (instance, system) = create_xr_instance_from_path(path)?;
+        XrContext::_new(instance, system)
+    }
+
+    fn _new(instance: xr::Instance, system: xr::SystemId) -> Result<(XrContext, VulkanContext)> {
         let vulkan_context = create_vulkan_context(&instance, system)?;
         let (session, frame_waiter, frame_stream) =
             create_xr_session(&instance, system, &vulkan_context)?;
@@ -291,6 +300,36 @@ pub(crate) fn create_xr_session(
 
 pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = xr::Entry::load()?;
+    let xr_app_info = openxr::ApplicationInfo {
+        application_name: "Hotham Asteroid",
+        application_version: 1,
+        engine_name: "Hotham",
+        engine_version: 1,
+    };
+    let mut required_extensions = xr::ExtensionSet::default();
+    // required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
+    required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
+
+    #[cfg(target_os = "android")]
+    {
+        required_extensions.khr_android_create_instance = true;
+        xr_entry.initialize_android_loader()?;
+    }
+
+    println!(
+        "Available extensions: {:?}",
+        xr_entry.enumerate_extensions()?
+    );
+
+    let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
+    let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
+    Ok((instance, system))
+}
+
+pub(crate) fn create_xr_instance_from_path(
+    path: &std::path::Path,
+) -> anyhow::Result<(xr::Instance, xr::SystemId)> {
+    let xr_entry = xr::Entry::load_from(path)?;
     let xr_app_info = openxr::ApplicationInfo {
         application_name: "Hotham Asteroid",
         application_version: 1,

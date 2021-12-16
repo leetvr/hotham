@@ -42,8 +42,15 @@ pub fn real_main() -> HothamResult<()> {
     let mut world = World::default();
 
     // Add the damaged helmet
-    let helmet = add_model_to_world("Damaged Helmet", &models, &mut world, None)
-        .expect("Could not find Damaged Helmet");
+    let helmet = add_model_to_world(
+        "Damaged Helmet",
+        &models,
+        &mut world,
+        None,
+        &vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .expect("Could not find Damaged Helmet");
 
     // Add the helmet model
     {
@@ -65,7 +72,15 @@ pub fn real_main() -> HothamResult<()> {
     }
 
     // Add the left hand
-    let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
+    let left_hand = add_model_to_world(
+        "Left Hand",
+        &models,
+        &mut world,
+        None,
+        &vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
     {
         let mut left_hand_entry = world.entry(left_hand).unwrap();
 
@@ -93,7 +108,15 @@ pub fn real_main() -> HothamResult<()> {
     }
 
     // Add the right hand
-    let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
+    let right_hand = add_model_to_world(
+        "Right Hand",
+        &models,
+        &mut world,
+        None,
+        &vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
     {
         let mut right_hand_entry = world.entry(right_hand).unwrap();
         right_hand_entry.add_component(Hand::right());

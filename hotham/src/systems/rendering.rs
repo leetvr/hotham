@@ -1,5 +1,5 @@
 use crate::{
-    components::{Mesh, TransformMatrix},
+    components::{Mesh, TransformMatrix, Visible},
     resources::VulkanContext,
     resources::{render_context::create_push_constant, RenderContext},
 };
@@ -10,6 +10,7 @@ use legion::system;
 pub fn rendering(
     mesh: &mut Mesh,
     transform_matrix: &TransformMatrix,
+    _visible: &Visible, // NOTE: An entity mesh must declare that it is visible in order to be rendered.
     #[resource] vulkan_context: &VulkanContext,
     #[resource] swapchain_image_index: &usize,
     #[resource] render_context: &RenderContext,
@@ -92,6 +93,7 @@ mod tests {
         COLOR_FORMAT,
     };
 
+    // TODO: This test is useless.
     #[test]
     pub fn test_rendering_system() {
         let mut world = World::default();
