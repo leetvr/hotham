@@ -125,11 +125,11 @@ function getPhsicsObjects(
 ): JSX.Element[] | [] {
   const elements: JSX.Element[] = [];
   Object.values(entities).forEach((e) => {
-    const { collider, transform } = e;
+    const { collider } = e;
     if (!collider) return;
 
-    const { colliderType, geometry, translation } = collider;
-    const rotation = getRotation(transform!); // safe: entity with collider and no transform is non-sensical
+    const { colliderType, geometry, translation, rotation: r } = collider;
+    const rotation = new Euler(r[0], r[1], r[2]);
 
     if (colliderType === 'cube') {
       elements.push(
