@@ -8,8 +8,8 @@ const Container = styled.div`
   flex: 1;
   flex-direction: column;
   color: white;
-  overflow: none;
   overflow: hidden;
+  padding: 5px;
 `;
 
 interface Props {

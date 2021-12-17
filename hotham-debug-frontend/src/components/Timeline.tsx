@@ -8,6 +8,7 @@ const OuterContainer = styled.div`
   padding: 10px;
   color: #fff;
   min-height: 100px;
+  background-color: #2d3439;
 `;
 
 interface Props {

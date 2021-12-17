@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
 use hotham_debug_server::{
     debug_frame::{DebugCollider, DebugEntity, DebugFrame, DebugTransform},
     DebugServer,
 };
 use legion::{EntityStore, IntoQuery, Resources, World};
+use std::time::Instant;
 use uuid::Uuid;
 
 use crate::{
@@ -22,8 +21,12 @@ pub fn sync_debug_server(world: &mut World, resources: &mut Resources) {
         debug_server.current_frame,
         debug_server.session_id,
     );
+    debug_server.frame_queue.push(debug_data);
 
-    let _ = debug_server.sync(&debug_data);
+    if debug_server.time_since_last_sync() > 1 {
+        debug_server.sync();
+    }
+
     debug_server.current_frame += 1; // TODO: We should really have a frame counter elsewhere..
 }
 
@@ -34,7 +37,7 @@ pub fn world_to_debug_data(
     frame: usize,
     session_id: Uuid,
 ) -> DebugFrame {
-    let mut entities = HashMap::new();
+    let mut entities = Vec::new();
     let mut query = <&Info>::query();
     query.for_each_chunk(world, |c| {
         for (entity, info) in c.into_iter_entities() {
@@ -44,15 +47,17 @@ pub fn world_to_debug_data(
             let collider = collider
                 .map(|c| physics_context.colliders.get(c.handle))
                 .flatten();
+            let entity_id = entity_to_u64(entity);
 
             let e = DebugEntity {
                 name: info.name.clone(),
-                id: entity_to_u64(entity),
+                id: format!("{}_{}", session_id, entity_id),
+                entity_id,
                 transform: transform.map(parse_transform),
                 collider: collider.map(parse_collider),
             };
 
-            entities.insert(e.id, e);
+            entities.push(e);
         }
     });
     return DebugFrame {
@@ -172,9 +177,13 @@ mod tests {
         let e1 = entity_to_u64(e1);
         let e2 = entity_to_u64(e2);
 
-        let debug_entity1 = debug_data.entities.get(&e1).unwrap();
+        let debug_entity1 = debug_data
+            .entities
+            .iter()
+            .find(|&e| e.entity_id == e1)
+            .unwrap();
         assert_eq!(debug_entity1.name, "Test".to_string());
-        assert_eq!(debug_entity1.id, e1);
+        assert_eq!(debug_entity1.entity_id, e1);
         assert_eq!(
             debug_entity1.transform,
             Some(DebugTransform {
@@ -192,9 +201,13 @@ mod tests {
             })
         );
 
-        let debug_entity2 = debug_data.entities.get(&e2).unwrap();
+        let debug_entity2 = debug_data
+            .entities
+            .iter()
+            .find(|&e| e.entity_id == e2)
+            .unwrap();
         assert_eq!(debug_entity2.name, "Test 2".to_string());
-        assert_eq!(debug_entity2.id, e2);
+        assert_eq!(debug_entity2.entity_id, e2);
         assert_eq!(
             debug_entity2.transform,
             Some(DebugTransform {

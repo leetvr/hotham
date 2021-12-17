@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import React, { Suspense, useEffect, useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import styled from 'styled-components';
 import { EntityList } from './components/EntityList';
 import { Inspector } from './components/Inspector';
@@ -7,9 +7,9 @@ import { SessionSelector } from './components/SessionSelector';
 import { Timeline } from './components/Timeline';
 import { Viewer } from './components/Viewer';
 import { db } from './db';
-import { createOnMessage, SERVER_ADDRESS } from './ws';
+import { ServerState, useServerConnector } from './ws';
 
-enum Command {
+export enum Command {
   Reset,
   Init,
 }
@@ -20,17 +20,16 @@ export interface InitData {
 }
 
 export interface Message {
-  frame?: Frame;
+  frames?: Frame[];
   command?: Command;
   init?: InitData;
   error?: string;
 }
 
-export type Entities = Record<number, Entity>;
 export interface Frame {
   id: string;
   frameNumber: number;
-  entities: Entities;
+  entities: Entity[];
   sessionId: string;
 }
 
@@ -44,20 +43,21 @@ const OuterContainer = styled.div`
   flex: 1;
   height: 100vh;
   width: 100vw;
-  flex-direction: column;
+  flex-direction: row;
   background-color: #2d3439;
 `;
 
-const TopContainer = styled.div`
+const LeftContainer = styled.div`
   display: flex;
   flex: 1;
-  flex-direction: row;
+  flex-direction: column;
 `;
 
 const RightPanel = styled.div`
   display: flex;
   flex-direction: column;
-  min-width: 200px;
+  width: 20vw;
+  height: 100vh;
 `;
 
 function App() {
@@ -65,60 +65,50 @@ function App() {
   const [selectedSessionId, setSelectedSessionId] = useState('');
   const [selectedFrameId, setSelectedFrameId] = useState(0);
   const [selectedEntity, setSelectedEntity] = useState<Entity | undefined>();
-  const [connected, setConnected] = useState(false);
-  const [framesReceived, setFramesReceived] = useState(0);
 
   // Websocket
-  useEffect(() => {
-    const ws = new WebSocket(SERVER_ADDRESS);
-    ws.onopen = () => {
-      setConnected(true);
-      ws.send(JSON.stringify({ command: Command.Init }));
-    };
-    ws.onclose = () => {
-      setConnected(false);
-      setFramesReceived(0);
-    };
-    ws.onmessage = createOnMessage(setSelectedSessionId, setFramesReceived);
-  }, [setSelectedSessionId, setFramesReceived]);
+  const { framesReceived, server, state } = useServerConnector();
+  const connected = state === ServerState.CONNECTED;
 
   // Database
-  const sessions = useLiveQuery(() => db.sessions.toArray()) ?? [];
-  const frames =
-    useLiveQuery(
-      () =>
-        db.frames
-          .where('sessionId')
-          .equals(selectedSessionId)
-          .sortBy('frameNumber'),
-      [selectedSessionId, framesReceived]
-    ) ?? [];
+  const sessions =
+    useLiveQuery(() => db.sessions.orderBy('timestamp').reverse().toArray()) ??
+    [];
+  const framesFromDB =
+    useLiveQuery(() => {
+      if (connected) return [];
+      return db.frames
+        .where('sessionId')
+        .equals(selectedSessionId)
+        .sortBy('frameNumber');
+    }, [selectedSessionId, connected]) ?? [];
 
+  // Frames and Entities for UI
+  const frames = connected ? server.frames : framesFromDB;
   const entities = frames[selectedFrameId]?.entities ?? [];
+  const maxFrames = connected ? framesReceived : frames.length;
+
   return (
     <OuterContainer>
-      <TopContainer>
+      <LeftContainer>
         <Suspense fallback={<LoadingScreen />}>
           <Viewer entities={entities} />
         </Suspense>
-        <RightPanel>
-          <SessionSelector
-            sessions={sessions}
-            setSelectedSessionId={setSelectedSessionId}
-            connected={connected}
-          />
-          <EntityList
-            entities={entities}
-            setSelectedEntity={setSelectedEntity}
-          />
-          <Inspector entity={selectedEntity} />
-        </RightPanel>
-      </TopContainer>
-      <Timeline
-        maxFrames={frames.length}
-        setSelectedFrameId={setSelectedFrameId}
-        selectedFrameId={selectedFrameId}
-      />
+        <Timeline
+          maxFrames={maxFrames}
+          setSelectedFrameId={setSelectedFrameId}
+          selectedFrameId={selectedFrameId}
+        />
+      </LeftContainer>
+      <RightPanel>
+        <SessionSelector
+          sessions={sessions}
+          setSelectedSessionId={setSelectedSessionId}
+          connected={connected}
+        />
+        <EntityList entities={entities} setSelectedEntity={setSelectedEntity} />
+        <Inspector entity={selectedEntity} />
+      </RightPanel>
     </OuterContainer>
   );
 }
@@ -154,7 +144,8 @@ export interface Collider {
 }
 
 export interface Entity {
-  id: number;
+  id: string;
+  entityId: number;
   name: string;
   transform?: Transform;
   collider?: Collider;

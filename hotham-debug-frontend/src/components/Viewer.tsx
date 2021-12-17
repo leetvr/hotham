@@ -1,4 +1,4 @@
-import { ArcballControls, Box, Cylinder, Environment } from '@react-three/drei';
+import { Box, Cylinder, Environment, OrbitControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
 import { useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -61,15 +61,15 @@ function getRotation(t: Transform): Euler {
 }
 
 interface Props {
-  entities: Record<number, Entity>;
+  entities: Entity[];
 }
 
 function getModels(
-  entities: Record<number, Entity>,
+  entities: Entity[],
   nodes: Record<string, Mesh>
 ): JSX.Element[] | [] {
   const elements: JSX.Element[] = [];
-  for (let e of Object.values(entities)) {
+  for (let e of entities) {
     const key = e.name.replaceAll(' ', '_');
     const node = nodes[key];
     if (!node) {
@@ -81,12 +81,20 @@ function getModels(
       for (let child of node.children) {
         const m = child as Mesh;
         elements.push(
-          <Model key={child.id} mesh={m} transform={e.transform!} />
+          <Model
+            key={`${e.id}_${child.id}`}
+            mesh={m}
+            transform={e.transform!}
+          />
         );
       }
     } else {
       elements.push(
-        <Model key={node.id} mesh={node} transform={e.transform!} />
+        <Model
+          key={`${e.id}_${node.id}`}
+          mesh={node}
+          transform={e.transform!}
+        />
       );
     }
   }
@@ -106,7 +114,7 @@ export function Viewer({ entities }: Props): JSX.Element {
           {displays.models && getModels(entities, nodes)}
           {displays.physics && getPhsicsObjects(entities)}
           <Environment preset="studio" />
-          <ArcballControls />
+          <OrbitControls />
         </Canvas>
       </CanvasContainer>
     </OuterContainer>
