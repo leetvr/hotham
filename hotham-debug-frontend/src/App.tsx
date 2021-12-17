@@ -9,35 +9,6 @@ import { Viewer } from './components/Viewer';
 import { db } from './db';
 import { ServerState, useServerConnector } from './ws';
 
-export enum Command {
-  Reset,
-  Init,
-}
-
-export interface InitData {
-  firstFrame: Frame;
-  sessionId: string;
-}
-
-export interface Message {
-  frames?: Frame[];
-  command?: Command;
-  init?: InitData;
-  error?: string;
-}
-
-export interface Frame {
-  id: string;
-  frameNumber: number;
-  entities: Entity[];
-  sessionId: string;
-}
-
-export interface Session {
-  id: string;
-  timestamp: Date;
-}
-
 const OuterContainer = styled.div`
   display: flex;
   flex: 1;
@@ -131,6 +102,35 @@ const LoadingContainer = styled.div`
 
 export type Vector3 = [number, number, number];
 
+export enum Command {
+  Reset,
+  Init,
+}
+
+export interface InitData {
+  firstFrame: Frame;
+  sessionId: string;
+}
+
+export interface Message {
+  frames?: Frame[];
+  command?: Command;
+  init?: InitData;
+  error?: string;
+}
+
+export interface Frame {
+  id: string;
+  frameNumber: number;
+  entities: Entity[];
+  sessionId: string;
+}
+
+export interface Session {
+  id: string;
+  timestamp: Date;
+}
+
 export interface Transform {
   translation: Vector3;
   rotation: Vector3;
@@ -141,6 +141,7 @@ export interface Collider {
   colliderType: 'cube' | 'cylinder';
   geometry: number[];
   translation: Vector3;
+  rotation: Vector3;
 }
 
 export interface Entity {

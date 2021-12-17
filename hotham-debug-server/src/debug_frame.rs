@@ -49,6 +49,7 @@ pub struct DebugCollider {
     pub collider_type: String,
     pub geometry: Vec<f32>,
     pub translation: [f32; 3],
+    pub rotation: [f32; 3],
 }
 
 // impl PartialEq for DebugCollider {

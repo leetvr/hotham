@@ -22,6 +22,11 @@
 			"map": "cpp",
 			"xtree": "cpp"
 		},
-		"liveServer.settings.multiRootWorkspaceName": "hotham"
+		"jest.disabledWorkspaceFolders": [
+			"hotham",
+			"hotham-debug-server",
+			"hotham-simulator",
+			"beat-saber-clone"
+		],
 	}
 }
