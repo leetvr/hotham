@@ -3,7 +3,6 @@ use hotham_debug_server::{
     DebugServer,
 };
 use legion::{EntityStore, IntoQuery, Resources, World};
-use std::time::Instant;
 use uuid::Uuid;
 
 use crate::{
