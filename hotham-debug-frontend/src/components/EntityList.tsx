@@ -1,7 +1,7 @@
 import React from 'react';
 import styled from 'styled-components';
 import Tree from '@naisutech/react-tree';
-import { Entities, Entity } from '../App';
+import { Entity } from '../App';
 
 const Container = styled.div`
   display: flex;
@@ -9,10 +9,11 @@ const Container = styled.div`
   color: #fff;
   overflow: hidden;
   flex-direction: column;
+  padding: 5px;
 `;
 
 interface Props {
-  entities: Entities;
+  entities: Entity[];
   setSelectedEntity: (e: Entity) => void;
 }
 
@@ -34,10 +35,10 @@ export function EntityList(props: Props): JSX.Element {
     </Container>
   );
 }
-function getNodes(entities: Entities) {
-  return Object.values(entities).map((e) => ({
-    id: e.id,
+function getNodes(entities: Entity[]) {
+  return entities.map((e, i) => ({
+    id: i,
     parentId: null,
-    label: e.name,
+    label: `${e.name} (${e.entityId})`,
   }));
 }

@@ -4,7 +4,7 @@ import { Frame, Session } from './App';
 const DATABASE_NAME = 'hotham-debug-frontend';
 const schema = {
   frames: 'id, sessionId, frameNumber',
-  sessions: 'id',
+  sessions: 'id,timestamp',
 };
 
 export class Database extends Dexie {
@@ -13,7 +13,7 @@ export class Database extends Dexie {
 
   constructor() {
     super(DATABASE_NAME);
-    this.version(1).stores(schema);
+    this.version(2).stores(schema);
   }
 }
 

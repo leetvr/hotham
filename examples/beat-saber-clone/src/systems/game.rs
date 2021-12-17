@@ -19,7 +19,7 @@ pub fn game(
 ) {
     // Check if moved too far back
     if transform.translation.z > 0.0 {
-        game_state.current_score -= 1;
+        // game_state.current_score -= 1;
         println!(
             "Entity {:?} was missed! Score is now {}. Removing entity",
             entity, game_state.current_score

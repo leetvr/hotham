@@ -80,7 +80,7 @@ export function Inspector({ entity }: Props): JSX.Element {
     <Container>
       <h2>Inspector</h2>
       <span>
-        <strong>id: </strong> {entity.id}
+        <strong>id: </strong> {entity.entityId}
       </span>
       <span>
         <strong>name: </strong> {entity.name} <br />

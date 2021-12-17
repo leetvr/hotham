@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use std::io::{Error as IOError, ErrorKind};
 use std::thread::{self, JoinHandle};
+use std::time::Instant;
 use tokio::net::{TcpListener, TcpStream};
 
 use futures::join;
@@ -36,7 +37,7 @@ pub struct InitData {
 #[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum Message {
-    Frame(DebugFrame),
+    Frames(Vec<DebugFrame>),
     Command(Command),
     Init(InitData),
     Error(String),
@@ -47,6 +48,8 @@ pub struct DebugServer {
     pub from_client: Receiver<Message>,
     pub session_id: Uuid,
     pub current_frame: usize,
+    pub frame_queue: Vec<DebugFrame>,
+    last_sync: Instant,
     _handle: JoinHandle<()>,
 }
 
@@ -128,26 +131,27 @@ impl DebugServer {
             _handle: handle,
             session_id: Uuid::new_v4(),
             current_frame: 0,
+            frame_queue: Vec::new(),
+            last_sync: Instant::now(),
         }
     }
 
-    pub fn sync(&mut self, debug_data_from_hotham: &DebugFrame) -> Option<DebugFrame> {
+    pub fn sync(&mut self) -> Option<Vec<DebugFrame>> {
         let mut editable_data = None;
+        let frames = self.frame_queue.drain(..).collect::<Vec<_>>();
         let response: Option<Message> = match self.from_client.try_recv() {
-            Ok(Message::Frame(debug_data_from_client)) => {
+            Ok(Message::Frames(debug_data_from_client)) => {
                 editable_data = Some(debug_data_from_client);
-                Some(Message::Frame(debug_data_from_hotham.clone()))
+                Some(Message::Frames(frames))
             }
-            Ok(Message::Command(Command::Reset)) => {
-                Some(Message::Frame(debug_data_from_hotham.clone()))
-            }
+            Ok(Message::Command(Command::Reset)) => Some(Message::Frames(frames)),
             Ok(Message::Command(Command::Init)) => Some(Message::Init(InitData {
                 session_id: self.session_id,
-                first_frame: debug_data_from_hotham.clone(),
+                first_frame: frames[0].clone(),
             })),
             Ok(error_message @ Message::Error(_)) => Some(error_message),
             Ok(_) => None,
-            Err(_) => Some(Message::Frame(debug_data_from_hotham.clone())),
+            Err(_) => Some(Message::Frames(frames)),
         };
 
         if let Some(response) = response {
@@ -157,7 +161,13 @@ impl DebugServer {
             let _ = self.from_client.try_recv();
         }
 
+        self.last_sync = Instant::now();
+
         editable_data
+    }
+
+    pub fn time_since_last_sync(&self) -> u64 {
+        self.last_sync.elapsed().as_secs()
     }
 }
 
@@ -174,8 +184,6 @@ mod tests {
         count: usize,
     }
 
-    use std::collections::HashMap;
-
     use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as TungsteniteMessage};
 
     use crate::debug_frame::{DebugEntity, DebugTransform};
@@ -188,7 +196,8 @@ mod tests {
         let mut server: DebugServer = DebugServer::new();
         let test_entity = DebugEntity {
             name: "Environment".to_string(),
-            id: 0,
+            entity_id: 0,
+            id: "test".to_string(),
             transform: Some(DebugTransform {
                 translation: [0., 0., 0.],
                 rotation: [0., 0., 0.],
@@ -196,15 +205,14 @@ mod tests {
             }),
             collider: None,
         };
-        let mut entities = HashMap::new();
-        entities.insert(0, test_entity.clone());
 
-        let debug_data = DebugFrame {
+        let debug_frame = DebugFrame {
             id: Uuid::new_v4(),
             frame_number: 0,
-            entities,
+            entities: vec![test_entity.clone()],
             session_id: Uuid::new_v4(),
         };
+        server.frame_queue.push(debug_frame);
 
         let tokio_rt = Builder::new_current_thread().enable_all().build().unwrap();
         // Send an init message to the server..
@@ -218,7 +226,7 @@ mod tests {
             read
         });
 
-        server.sync(&debug_data);
+        server.sync();
 
         let data = tokio_rt.block_on(async {
             let message = stream.next().await.unwrap().unwrap();
@@ -227,7 +235,7 @@ mod tests {
             // We cover both bases just to be sure.
             match message {
                 TungsteniteMessage::Text(s) => match serde_json::from_str::<Message>(&s) {
-                    Ok(Message::Frame(d)) => d,
+                    Ok(Message::Frames(mut d)) => d.pop().unwrap(),
                     Ok(Message::Init(i)) => i.first_frame,
                     _ => panic!("Unexpected message: {}", s),
                 },
@@ -235,6 +243,6 @@ mod tests {
             }
         });
 
-        assert_eq!(data.entities.get(&0).unwrap(), &test_entity);
+        assert_eq!(data.entities.get(0).unwrap(), &test_entity);
     }
 }
