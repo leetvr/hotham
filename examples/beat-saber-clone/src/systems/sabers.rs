@@ -17,6 +17,11 @@ const ROTATION_OFFSET: Quaternion<f32> = Quaternion::new(
     -0.05061153302400824,
 );
 
+const SABER_HEIGHT: f32 = 0.8;
+const SABER_HALF_HEIGHT: f32 = SABER_HEIGHT / 2.;
+const SABER_WIDTH: f32 = 0.02;
+const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
+
 #[system(for_each)]
 pub fn sabers(
     _: &Saber,
@@ -59,7 +64,8 @@ pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext
     let mut saber_entry = world.entry(saber).unwrap();
 
     // Give it a collider and rigid-body
-    let collider = ColliderBuilder::cylinder(0.10, 0.01)
+    let collider = ColliderBuilder::cylinder(SABER_HALF_HEIGHT, SABER_HALF_WIDTH)
+        .translation(vector![-SABER_WIDTH, SABER_HALF_HEIGHT, 0.])
         .sensor(false)
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::INTERSECTION_EVENTS)
