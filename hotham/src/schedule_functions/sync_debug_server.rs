@@ -98,11 +98,13 @@ fn parse_collider(collider: &rapier3d::geometry::Collider) -> DebugCollider {
 
     let t = collider.translation();
     let translation = [t[0], t[1], t[2]];
+    let r = collider.rotation().euler_angles();
 
     DebugCollider {
         collider_type: collider_type.to_string(),
         geometry,
         translation,
+        rotation: [r.0, r.1, r.2],
     }
 }
 
@@ -197,6 +199,7 @@ mod tests {
                 collider_type: "cube".to_string(),
                 geometry: vec![1., 1., 1.,],
                 translation: [0., 0.5, 0.],
+                rotation: [0., 0., 0.]
             })
         );
 
