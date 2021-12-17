@@ -74,7 +74,8 @@ pub fn add_cube_physics(world: &mut World, physics_context: &mut PhysicsContext,
     let mut cube_entry = world.entry(cube).unwrap();
 
     // Give it a collider and rigid-body
-    let collider = ColliderBuilder::cuboid(0.1, 0.1, 0.1)
+    let collider = ColliderBuilder::cuboid(0.2, 0.2, 0.2)
+        .translation(vector![0., 0.2, 0.])
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::INTERSECTION_EVENTS)
         .build();
