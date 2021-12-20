@@ -1,5 +1,6 @@
 import styled from 'styled-components';
 import { Collider, Entity, Transform } from '../App';
+import { vec4toEuler } from '../util';
 
 const Container = styled.div`
   display: flex;
@@ -20,6 +21,8 @@ interface Props {
 
 function TransformInspector({ t }: { t?: Transform }): JSX.Element | null {
   if (!t) return null;
+  const rotation = vec4toEuler(t.rotation);
+
   return (
     <Indent>
       <strong>transform: </strong>
@@ -33,8 +36,8 @@ function TransformInspector({ t }: { t?: Transform }): JSX.Element | null {
         <strong>rotation: </strong>
         <br />
         <Indent>
-          <strong>x:</strong> {t.rotation[0]} <strong>y:</strong>{' '}
-          {t.rotation[1]} <strong>z:</strong> {t.rotation[2]}
+          <strong>x:</strong> {rotation.x} <strong>y:</strong> {rotation.y}{' '}
+          <strong>z:</strong> {rotation.z}
         </Indent>
         <strong>scale: </strong>
         <br />
