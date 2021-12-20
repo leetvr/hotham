@@ -25,7 +25,7 @@ pub struct DebugEntity {
 #[serde(rename_all = "camelCase")]
 pub struct DebugTransform {
     pub translation: [f32; 3],
-    pub rotation: [f32; 3],
+    pub rotation: [f32; 4],
     pub scale: [f32; 3],
 }
 
@@ -49,7 +49,7 @@ pub struct DebugCollider {
     pub collider_type: String,
     pub geometry: Vec<f32>,
     pub translation: [f32; 3],
-    pub rotation: [f32; 3],
+    pub rotation: [f32; 4],
 }
 
 // impl PartialEq for DebugCollider {

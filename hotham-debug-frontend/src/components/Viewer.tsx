@@ -5,8 +5,9 @@ import styled from 'styled-components';
 import { ViewOptions } from './ViewOptions';
 import { useGLTF } from '@react-three/drei';
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader';
-import THREE, { Euler, Mesh } from 'three';
+import THREE, { Matrix4, Mesh, Vector3 } from 'three';
 import { Entity, Transform } from '../App';
+import { vec4toQuaternion } from '../util';
 
 const CanvasContainer = styled.div`
   display: flex;
@@ -38,25 +39,23 @@ function Model({
   transform: Transform;
 }): JSX.Element {
   const group = useRef<THREE.Group>();
-  const rotation = getRotation(transform);
+  const { translation: t, rotation: r, scale: s } = transform;
+  const translation = new Vector3(t[0], t[1], t[2]);
+  const rotation = vec4toQuaternion(r);
+  const scale = new Vector3(s[0], s[1], s[2]);
+  const matrix = new Matrix4().compose(translation, rotation, scale);
+
   return (
-    <group ref={group} dispose={null}>
+    <group ref={group} dispose={null} matrix={matrix} matrixAutoUpdate={false}>
       <mesh
         castShadow
         receiveShadow
         geometry={mesh.geometry}
         material={mesh.material}
-        position={transform.translation}
-        scale={transform.scale}
-        rotation={rotation}
+        userData={{ name: 'Environment' }}
       />
     </group>
   );
-}
-
-function getRotation(t: Transform): Euler {
-  const r = t.rotation;
-  return new Euler(r[0], r[1], r[2]);
 }
 
 interface Props {
@@ -129,14 +128,17 @@ function getPhsicsObjects(
     if (!collider) return;
     if (e.name !== 'Red Saber' && e.name !== 'Blue Saber') return;
 
-    const { colliderType, geometry, translation, rotation: r } = collider;
-    const rotation = new Euler(r[0], r[1], r[2]);
+    const { colliderType, geometry, translation: t, rotation: r } = collider;
+    const rotationQuaternion = vec4toQuaternion(r);
+    const transformMatrix = new Matrix4()
+      .makeRotationFromQuaternion(rotationQuaternion)
+      .setPosition(t[0], t[1], t[2]);
 
     if (colliderType === 'cube') {
       elements.push(
         <Box
-          position={translation}
-          rotation={rotation}
+          matrixAutoUpdate={false}
+          matrix={transformMatrix}
           args={[geometry[0] * 2, geometry[1] * 2, geometry[2] * 2]}
         >
           <meshPhongMaterial attach="material" color="#bbb" wireframe />
@@ -150,8 +152,8 @@ function getPhsicsObjects(
       elements.push(
         <Cylinder
           args={[radius, radius, height]}
-          position={translation}
-          rotation={rotation}
+          matrixAutoUpdate={false}
+          matrix={transformMatrix}
         >
           <meshPhongMaterial attach="material" color="#bbb" wireframe />
         </Cylinder>

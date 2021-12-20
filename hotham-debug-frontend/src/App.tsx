@@ -101,6 +101,7 @@ const LoadingContainer = styled.div`
 `;
 
 export type Vector3 = [number, number, number];
+export type Vector4 = [number, number, number, number];
 
 export enum Command {
   Reset,
@@ -133,7 +134,7 @@ export interface Session {
 
 export interface Transform {
   translation: Vector3;
-  rotation: Vector3;
+  rotation: Vector4;
   scale: Vector3;
 }
 
@@ -141,7 +142,7 @@ export interface Collider {
   colliderType: 'cube' | 'cylinder';
   geometry: number[];
   translation: Vector3;
-  rotation: Vector3;
+  rotation: Vector4;
 }
 
 export interface Entity {

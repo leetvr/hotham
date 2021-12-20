@@ -45,14 +45,14 @@ const stubFrames: Frame[] = [
         name: 'Test Entity 1',
         transform: {
           translation: [0, 0, 0],
-          rotation: [0, 0, 0],
+          rotation: [0, 0, 0, 1],
           scale: [1, 1, 1],
         },
         collider: {
           colliderType: 'cube',
           geometry: [1, 2, 3],
           translation: [0, 0.5, 0],
-          rotation: [0, 0, 0],
+          rotation: [0, 0, 0, 1],
         },
       },
       {
