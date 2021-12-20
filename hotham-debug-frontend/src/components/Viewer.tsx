@@ -125,12 +125,14 @@ function getPhsicsObjects(
   Object.values(entities).forEach((e) => {
     const { collider } = e;
     if (!collider) return;
-
     const { colliderType, geometry, translation: t, rotation: r } = collider;
-    const rotationQuaternion = vec4toQuaternion(r);
-    const transformMatrix = new Matrix4()
-      .makeRotationFromQuaternion(rotationQuaternion)
-      .setPosition(t[0], t[1], t[2]);
+    const rotation = vec4toQuaternion(r);
+    const translation = new Vector3(t[0], t[1], t[2]);
+    const transformMatrix = new Matrix4().compose(
+      translation,
+      rotation,
+      new Vector3(1, 1, 1)
+    );
 
     if (colliderType === 'cube') {
       elements.push(

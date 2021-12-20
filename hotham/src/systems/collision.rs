@@ -13,7 +13,6 @@ pub fn collision(collider: &mut Collider, #[resource] physics_context: &mut Phys
             let other = if a == collider.handle { b } else { a };
             let other_collider = &physics_context.colliders[other];
             let other_entity = u64_to_entity(other_collider.user_data as _);
-            println!("{:?} is intersecting with {:?}!", collider.handle, other);
             collider.collisions_this_frame.push(other_entity);
         }
     }
