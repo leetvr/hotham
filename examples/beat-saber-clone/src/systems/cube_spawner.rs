@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use game_state::GameState;
 use hotham::{
     components::{RigidBody, Visible},
     gltf_loader::add_model_to_world,
@@ -14,7 +15,10 @@ use nalgebra::{vector, Vector3};
 use rand::Rng;
 use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder};
 
-use crate::components::{Colour, Cube};
+use crate::{
+    components::{Colour, Cube},
+    resources::game_state,
+};
 
 const CUBE_STARTING_VELOCITY: Vector3<f32> = Vector3::new(0., 0., 3.00);
 const CUBE_STARTING_DISTANCE: f32 = -10.;
@@ -29,8 +33,14 @@ pub fn cube_spawner(
     world: &mut SubWorld,
     command_buffer: &mut CommandBuffer,
     #[state] spawn_probability: &usize,
+    #[resource] game_state: &GameState,
     #[resource] physics_context: &mut PhysicsContext,
 ) {
+    // If the score is 0, do nothing.
+    if game_state.current_score == 0 {
+        return;
+    }
+
     let mut rng = rand::thread_rng();
     let r = rng.gen_range(0..*spawn_probability);
 
@@ -159,6 +169,7 @@ mod tests {
         );
 
         let mut resources = Resources::default();
+        resources.insert(GameState::default());
         resources.insert(physics_context);
         let mut schedule = Schedule::builder()
             .add_system(cube_spawner_system(2))

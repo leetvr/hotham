@@ -3,7 +3,7 @@ use legion::{system, systems::CommandBuffer, world::SubWorld, Entity, EntityStor
 
 use crate::{
     components::{Colour, Cube},
-    resources::GameState,
+    resources::{game_state, GameState},
 };
 
 #[system(for_each)]
@@ -19,6 +19,11 @@ pub fn game(
     collider: &mut Collider,
     #[resource] game_state: &mut GameState,
 ) {
+    // If score is zero, the game is over. Do nothing.
+    if game_state.current_score == 0 {
+        return;
+    }
+
     // Check if moved too far back
     if transform.translation.z > 0.0 {
         game_state.current_score -= 1;
@@ -174,6 +179,23 @@ mod tests {
 
             // Cube should be removed.
             assert!(world.entry(hit_red_cube).is_none());
+        }
+
+        // Do the same thing again. Score should stay 0 as we're at game over.
+        let hit_red_cube = world.push((Transform::default(), Visible {}, Cube {}, Colour::Red));
+        add_cube_physics(&mut world, &mut physics_context, hit_red_cube);
+        {
+            let mut entry = world.entry(hit_red_cube).unwrap();
+            let collider = entry.get_component_mut::<Collider>().unwrap();
+            collider.collisions_this_frame.push(blue_saber.clone());
+            drop(entry);
+            schedule.execute(&mut world, &mut resources);
+
+            let game_state = resources.get::<GameState>().unwrap();
+            assert_eq!(game_state.current_score, 0);
+
+            // Cube should _NOT_ be removed.
+            assert!(world.entry(hit_red_cube).is_some());
         }
     }
 }
