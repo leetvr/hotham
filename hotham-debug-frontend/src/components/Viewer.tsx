@@ -49,7 +49,6 @@ function Model({
         position={transform.translation}
         scale={transform.scale}
         rotation={rotation}
-        userData={{ name: 'Environment' }}
       />
     </group>
   );
@@ -70,6 +69,7 @@ function getModels(
 ): JSX.Element[] | [] {
   const elements: JSX.Element[] = [];
   for (let e of entities) {
+    if (e.name !== 'Red Saber' && e.name !== 'Blue Saber') continue;
     const key = e.name.replaceAll(' ', '_');
     const node = nodes[key];
     if (!node) {
@@ -127,6 +127,7 @@ function getPhsicsObjects(
   Object.values(entities).forEach((e) => {
     const { collider } = e;
     if (!collider) return;
+    if (e.name !== 'Red Saber' && e.name !== 'Blue Saber') return;
 
     const { colliderType, geometry, translation, rotation: r } = collider;
     const rotation = new Euler(r[0], r[1], r[2]);

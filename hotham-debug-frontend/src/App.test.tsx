@@ -52,6 +52,7 @@ const stubFrames: Frame[] = [
           colliderType: 'cube',
           geometry: [1, 2, 3],
           translation: [0, 0.5, 0],
+          rotation: [0, 0, 0],
         },
       },
       {
@@ -172,9 +173,9 @@ test('renders a list of sessions ordered in reverse chronological order when not
   const { getByText } = await setupAndRender();
   const sessionContainer = getByText(/Previous sessions/i).parentElement;
   const sessionDate = await within(sessionContainer!).findAllByText(DATE_REGEX);
-  expect(sessionDate[0]).toHaveTextContent('01/01/2021, 11:00:00 am');
-  expect(sessionDate[1]).toHaveTextContent('01/01/2021, 10:00:00 am');
-  expect(sessionDate[2]).toHaveTextContent('01/01/2020, 12:00:00 pm');
+  expect(sessionDate[0]).toHaveTextContent('01/01/2021, 12:00:00 pm');
+  expect(sessionDate[1]).toHaveTextContent('01/01/2021, 11:00:00 am');
+  expect(sessionDate[2]).toHaveTextContent('01/01/2020, 1:00:00 pm');
 });
 
 test('does not show sessions when connected', async () => {
