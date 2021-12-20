@@ -69,12 +69,12 @@ pub fn world_to_debug_data(
 
 fn parse_transform(transform: &Transform) -> DebugTransform {
     let t = transform.translation;
-    let r = transform.rotation.euler_angles();
+    let r = transform.rotation.quaternion();
     let s = transform.scale;
 
     return DebugTransform {
         translation: [t[0], t[1], t[2]],
-        rotation: [r.0, r.1, r.2],
+        rotation: [r[0], r[1], r[2], r[3]],
         scale: [s[0], s[1], s[2]],
     };
 }
@@ -98,13 +98,13 @@ fn parse_collider(collider: &rapier3d::geometry::Collider) -> DebugCollider {
 
     let t = collider.translation();
     let translation = [t[0], t[1], t[2]];
-    let r = collider.rotation().euler_angles();
+    let r = collider.rotation().quaternion();
 
     DebugCollider {
         collider_type: collider_type.to_string(),
         geometry,
         translation,
-        rotation: [r.0, r.1, r.2],
+        rotation: [r[0], r[1], r[2], r[3]],
     }
 }
 
@@ -133,7 +133,7 @@ mod tests {
             Transform {
                 translation: vector![1., 2., 3.],
                 scale: vector![3., 2., 1.],
-                rotation: UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3),
+                rotation: UnitQuaternion::from_euler_angles(0., 0., 0.),
             },
         ));
 
@@ -157,7 +157,7 @@ mod tests {
             Transform {
                 translation: vector![4., 5., 6.],
                 scale: vector![6., 5., 4.],
-                rotation: UnitQuaternion::from_euler_angles(0.4, 0.5, 0.6),
+                rotation: UnitQuaternion::from_euler_angles(0., 0., 0.),
             },
         ));
 
@@ -189,7 +189,7 @@ mod tests {
             debug_entity1.transform,
             Some(DebugTransform {
                 translation: [1., 2., 3.],
-                rotation: [0.1, 0.2, 0.3],
+                rotation: [0.0, 0.0, 0.0, 1.0],
                 scale: [3., 2., 1.]
             })
         );
@@ -199,7 +199,7 @@ mod tests {
                 collider_type: "cube".to_string(),
                 geometry: vec![1., 1., 1.,],
                 translation: [0., 0.5, 0.],
-                rotation: [0., 0., 0.]
+                rotation: [0.0, 0.0, 0.0, 1.0],
             })
         );
 
@@ -214,7 +214,7 @@ mod tests {
             debug_entity2.transform,
             Some(DebugTransform {
                 translation: [4., 5., 6.],
-                rotation: [0.4, 0.5, 0.6],
+                rotation: [0.0, 0.0, 0.0, 1.0],
                 scale: [6., 5., 4.]
             })
         );

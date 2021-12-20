@@ -30,6 +30,12 @@ pub fn main() {
     real_main().unwrap();
 }
 
+#[cfg(target_os = "android")]
+const SPAWN_RATE: usize = 100;
+
+#[cfg(not(target_os = "android"))]
+const SPAWN_RATE: usize = 1000;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 struct DebugInfo {
     position: Vector3<f32>,
@@ -98,7 +104,7 @@ pub fn real_main() -> HothamResult<()> {
         .add_system(sabers_system())
         .add_thread_local_fn(physics_step)
         .add_system(collision_system())
-        .add_system(cube_spawner_system(1000))
+        .add_system(cube_spawner_system(SPAWN_RATE))
         .add_system(update_rigid_body_transforms_system())
         .add_system(update_transform_matrix_system())
         .add_system(update_parent_transform_matrix_system())
