@@ -472,8 +472,6 @@ fn handle_panel_input(panel: &mut Panel) -> (egui::RawInput, Option<PanelInput>)
         raw_input.events.push(egui::Event::PointerGone);
     }
 
-    println!("[HOTHAM_GUI] RawInput.events: {:?}", raw_input.events);
-
     return (raw_input, panel_input);
 }
 
