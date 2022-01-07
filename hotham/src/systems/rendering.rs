@@ -75,6 +75,8 @@ pub fn rendering(
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::hash_map::DefaultHasher, hash::Hasher};
+
     use super::*;
     use ash::vk::Handle;
     use image::{jpeg::JpegEncoder, DynamicImage, RgbaImage};
@@ -186,6 +188,11 @@ mod tests {
         name: &str,
         debug_view_equation: f32,
     ) {
+        let mut resources = Resources::default();
+        resources.insert(vulkan_context.clone());
+        resources.insert(render_context.clone());
+        resources.insert(0 as usize);
+
         let mut schedule = Schedule::builder()
             .add_thread_local_fn(move |_, resources| {
                 // SPONZA
@@ -234,7 +241,9 @@ mod tests {
                         }],
                     )
                     .unwrap();
-                render_context.begin_render_pass(&vulkan_context, 0);
+
+                render_context.begin_frame(&vulkan_context, 0);
+                render_context.begin_pbr_render_pass(&vulkan_context, 0);
             })
             .add_system(update_transform_matrix_system())
             .add_system(update_parent_transform_matrix_system())
@@ -242,13 +251,10 @@ mod tests {
             .add_thread_local_fn(|_, resources| {
                 let vulkan_context = resources.get::<VulkanContext>().unwrap();
                 let mut render_context = resources.get_mut::<RenderContext>().unwrap();
-                render_context.end_render_pass(&vulkan_context, 0);
+                render_context.end_pbr_render_pass(&vulkan_context, 0);
+                render_context.end_frame(&vulkan_context, 0);
             })
             .build();
-        let mut resources = Resources::default();
-        resources.insert(vulkan_context.clone());
-        resources.insert(render_context.clone());
-        resources.insert(0 as usize);
         schedule.execute(world, &mut resources);
         let size = (resolution.height * resolution.width * 4) as usize;
         let vulkan_context = resources.get::<VulkanContext>().unwrap();
@@ -276,10 +282,26 @@ mod tests {
             RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
         );
 
-        let path = format!("../test_assets/render_{}.jpeg", name);
-        let path = std::path::Path::new(&path);
-        let mut file = std::fs::File::create(path).unwrap();
-        let mut jpeg_encoder = JpegEncoder::new(&mut file);
-        jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
+        let output_path = format!("../test_assets/render_{}.jpg", name);
+        {
+            let output_path = std::path::Path::new(&output_path);
+            let mut file = std::fs::File::create(output_path).unwrap();
+            let mut jpeg_encoder = JpegEncoder::new(&mut file);
+            jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
+        }
+
+        // Compare the render with a "known good" copy.
+        let output_hash = hash_file(&output_path);
+        let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
+        let known_good_hash = hash_file(&known_good_path);
+
+        assert_eq!(output_hash, known_good_hash);
+    }
+
+    fn hash_file(file_path: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        let bytes = std::fs::read(&file_path).unwrap();
+        bytes.iter().for_each(|b| hasher.write_u8(*b));
+        return hasher.finish();
     }
 }

@@ -3,7 +3,7 @@ use legion::{system, systems::CommandBuffer, world::SubWorld, Entity, EntityStor
 
 use crate::{
     components::{Colour, Cube},
-    resources::{game_state, GameState},
+    resources::GameState,
 };
 
 #[system(for_each)]
@@ -63,8 +63,6 @@ pub fn game(
 #[cfg(test)]
 mod tests {
     use hotham::resources::PhysicsContext;
-    use hotham::schedule_functions::physics_step;
-    use hotham::systems::collision_system;
     use legion::Schedule;
     use legion::{Resources, World};
     use nalgebra::{vector, UnitQuaternion};

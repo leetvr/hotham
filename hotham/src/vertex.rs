@@ -2,7 +2,7 @@ use ash::vk;
 use nalgebra::{Vector2, Vector3, Vector4};
 
 #[repr(C)]
-#[derive(Clone, Debug, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq, Default)]
 pub struct Vertex {
     pub position: Vector3<f32>,
     pub normal: Vector3<f32>,

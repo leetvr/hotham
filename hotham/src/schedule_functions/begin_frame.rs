@@ -2,14 +2,15 @@ use legion::{Resources, World};
 use openxr::ActiveActionSet;
 
 use crate::{
-    resources::xr_context::XrContext, resources::RenderContext, resources::VulkanContext, VIEW_TYPE,
+    resources::{xr_context::XrContext, RenderContext, VulkanContext},
+    VIEW_TYPE,
 };
 
 pub fn begin_frame(_world: &mut World, resources: &mut Resources) {
     // Get resources
     let mut xr_context = resources.get_mut::<XrContext>().unwrap();
-    let mut render_context = resources.get_mut::<RenderContext>().unwrap();
     let mut current_swapchain_image_index = resources.get_mut::<usize>().unwrap();
+    let render_context = resources.get_mut::<RenderContext>().unwrap();
     let vulkan_context = resources.get::<VulkanContext>().unwrap();
 
     let active_action_set = ActiveActionSet::new(&xr_context.action_set);
@@ -32,17 +33,9 @@ pub fn begin_frame(_world: &mut World, resources: &mut Resources) {
             &xr_context.reference_space,
         )
         .unwrap();
-
-    // Update uniform buffers
-    // TODO: We should do this ourselves.
-    render_context
-        .update_scene_data(&views, &vulkan_context)
-        .unwrap();
     xr_context.views = views;
 
-    // Begin the renderpass.
-    render_context.begin_render_pass(&vulkan_context, available_swapchain_image_index);
-    // ..and we're off!
+    render_context.begin_frame(&vulkan_context, available_swapchain_image_index);
 }
 
 #[cfg(test)]

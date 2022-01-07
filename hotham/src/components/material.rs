@@ -8,20 +8,20 @@ use crate::{resources::VulkanContext, texture::Texture};
 #[repr(C)]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Material {
-    base_colour_factor: Vector4<f32>,
-    emmissive_factor: Vector4<f32>,
-    diffuse_factor: Vector4<f32>,
-    specular_factor: Vector4<f32>,
-    workflow: f32,
-    base_color_texture_set: i32,
-    metallic_roughness_texture_set: i32,
-    normal_texture_set: i32,
-    occlusion_texture_set: i32,
-    emissive_texture_set: i32,
-    metallic_factor: f32,
-    roughness_factor: f32,
-    alpha_mask: f32,
-    alpha_mask_cutoff: f32,
+    pub base_colour_factor: Vector4<f32>,
+    pub emmissive_factor: Vector4<f32>,
+    pub diffuse_factor: Vector4<f32>,
+    pub specular_factor: Vector4<f32>,
+    pub workflow: f32,
+    pub base_color_texture_set: i32,
+    pub metallic_roughness_texture_set: i32,
+    pub normal_texture_set: i32,
+    pub occlusion_texture_set: i32,
+    pub emissive_texture_set: i32,
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub alpha_mask: f32,
+    pub alpha_mask_cutoff: f32,
 }
 
 impl Material {

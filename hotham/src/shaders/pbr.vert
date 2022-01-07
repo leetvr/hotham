@@ -53,6 +53,11 @@ void main()
 		locPos = node.matrix * vec4(inPos, 1.0);
 		outNormal = normalize(transpose(inverse(mat3(node.matrix))) * inNormal);
 	}
+
+	if (length(inNormal) == 0.0) {
+		outNormal = inNormal;
+	}
+
 	outWorldPos = locPos.xyz / locPos.w;
 	outUV0 = inUV0;
 	outUV1 = inUV1;
