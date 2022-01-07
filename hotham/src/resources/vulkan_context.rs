@@ -641,7 +641,7 @@ impl VulkanContext {
         }
     }
 
-    fn create_texture_sampler(
+    pub fn create_texture_sampler(
         &self,
         address_mode: vk::SamplerAddressMode,
         mip_count: u32,

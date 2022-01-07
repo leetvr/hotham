@@ -1,7 +1,9 @@
 pub mod animation;
 pub mod collision;
+pub mod draw_gui;
 pub mod grabbing;
 pub mod hands;
+pub mod pointers;
 pub mod rendering;
 pub mod skinning;
 pub mod update_parent_transform_matrix;
@@ -10,8 +12,10 @@ pub mod update_transform_matrix;
 
 pub use animation::animation_system;
 pub use collision::collision_system;
+pub use draw_gui::draw_gui_system;
 pub use grabbing::grabbing_system;
 pub use hands::hands_system;
+pub use pointers::pointers_system;
 pub use rendering::rendering_system;
 pub use skinning::skinning_system;
 pub use update_parent_transform_matrix::update_parent_transform_matrix_system;

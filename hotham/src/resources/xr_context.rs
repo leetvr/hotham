@@ -5,8 +5,8 @@ use openxr::{
     SessionState, Space, Swapchain, Vulkan,
 };
 use xr::{
-    vulkan::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType, SwapchainCreateFlags,
-    SwapchainCreateInfo, SwapchainUsageFlags, Time, View,
+    vulkan::SessionCreateInfo, Duration, FrameState, Haptic, ReferenceSpaceType,
+    SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View,
 };
 
 use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
@@ -20,10 +20,14 @@ pub struct XrContext {
     pub action_set: ActionSet,
     pub pose_action: Action<Posef>,
     pub grab_action: Action<f32>,
+    pub trigger_action: Action<f32>,
+    pub haptic_feedback_action: Action<Haptic>,
     pub left_hand_space: Space,
     pub left_hand_subaction_path: Path,
+    pub left_pointer_space: Space,
     pub right_hand_space: Space,
     pub right_hand_subaction_path: Path,
+    pub right_pointer_space: Space,
     pub swapchain_resolution: vk::Extent2D,
     pub frame_waiter: FrameWaiter,
     pub frame_stream: FrameStream<Vulkan>,
@@ -59,15 +63,31 @@ impl XrContext {
         let left_hand_pose_path = instance
             .string_to_path("/user/hand/left/input/grip/pose")
             .unwrap();
+        let left_pointer_path = instance
+            .string_to_path("/user/hand/left/input/aim/pose")
+            .unwrap();
         let right_hand_pose_path = instance
             .string_to_path("/user/hand/right/input/grip/pose")
+            .unwrap();
+        let right_pointer_path = instance
+            .string_to_path("/user/hand/right/input/aim/pose")
             .unwrap();
 
         let left_hand_grip_squeeze_path = instance
             .string_to_path("/user/hand/left/input/squeeze/value")
             .unwrap();
+        let left_hand_grip_trigger_path = instance
+            .string_to_path("/user/hand/left/input/trigger/value")
+            .unwrap();
+
         let right_hand_grip_squeeze_path = instance
             .string_to_path("/user/hand/right/input/squeeze/value")
+            .unwrap();
+        let right_hand_grip_trigger_path = instance
+            .string_to_path("/user/hand/right/input/trigger/value")
+            .unwrap();
+        let right_hand_haptic_feedback_path = instance
+            .string_to_path("/user/hand/right/output/haptic")
             .unwrap();
 
         let pose_action = action_set.create_action::<xr::Posef>(
@@ -76,9 +96,27 @@ impl XrContext {
             &[left_hand_subaction_path, right_hand_subaction_path],
         )?;
 
+        let aim_action = action_set.create_action::<xr::Posef>(
+            "pointer_pose",
+            "Pointer Pose",
+            &[left_hand_subaction_path, right_hand_subaction_path],
+        )?;
+
+        let trigger_action = action_set.create_action::<f32>(
+            "trigger_pulled",
+            "Pull Trigger",
+            &[left_hand_subaction_path, right_hand_subaction_path],
+        )?;
+
         let grab_action = action_set.create_action::<f32>(
             "grab_object",
             "Grab Object",
+            &[left_hand_subaction_path, right_hand_subaction_path],
+        )?;
+
+        let haptic_feedback_action = action_set.create_action::<Haptic>(
+            "haptic_feedback",
+            "Haptic Feedback",
             &[left_hand_subaction_path, right_hand_subaction_path],
         )?;
 
@@ -90,18 +128,29 @@ impl XrContext {
             &[
                 xr::Binding::new(&pose_action, left_hand_pose_path),
                 xr::Binding::new(&pose_action, right_hand_pose_path),
+                xr::Binding::new(&aim_action, left_pointer_path),
+                xr::Binding::new(&aim_action, right_pointer_path),
                 xr::Binding::new(&grab_action, left_hand_grip_squeeze_path),
                 xr::Binding::new(&grab_action, right_hand_grip_squeeze_path),
+                xr::Binding::new(&trigger_action, left_hand_grip_trigger_path),
+                xr::Binding::new(&trigger_action, right_hand_grip_trigger_path),
+                xr::Binding::new(&grab_action, right_hand_grip_squeeze_path),
+                xr::Binding::new(&haptic_feedback_action, right_hand_haptic_feedback_path),
             ],
         )?;
 
         let left_hand_space =
             pose_action.create_space(session.clone(), left_hand_subaction_path, Posef::IDENTITY)?;
+        let left_pointer_space =
+            aim_action.create_space(session.clone(), left_hand_subaction_path, Posef::IDENTITY)?;
+
         let right_hand_space = pose_action.create_space(
             session.clone(),
             right_hand_subaction_path,
             Posef::IDENTITY,
         )?;
+        let right_pointer_space =
+            aim_action.create_space(session.clone(), left_hand_subaction_path, Posef::IDENTITY)?;
 
         let frame_state = FrameState {
             predicted_display_time: Time::from_nanos(0),
@@ -119,10 +168,14 @@ impl XrContext {
             reference_space,
             action_set,
             pose_action,
+            trigger_action,
             grab_action,
+            haptic_feedback_action,
             left_hand_space,
+            left_pointer_space,
             left_hand_subaction_path,
             right_hand_space,
+            right_pointer_space,
             right_hand_subaction_path,
             swapchain_resolution,
             frame_waiter,

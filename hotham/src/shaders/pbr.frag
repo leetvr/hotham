@@ -80,6 +80,7 @@ const float c_MinRoughness = 0.04;
 
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
 const float PBR_WORKFLOW_SPECULAR_GLOSINESS = 1.0f;
+const float PBR_WORKFLOW_UNLIT = 2.0f;
 #define MANUAL_SRGB 1
 
 vec3 Uncharted2Tonemap(vec3 color)
@@ -353,6 +354,11 @@ void main()
 	
 	outColor = vec4(color, baseColor.a);
 
+
+	if (material.workflow == PBR_WORKFLOW_UNLIT) {
+		outColor = (texture(colorMap, material.baseColorTextureSet == 0 ? inUV0 : inUV1) * material.baseColorFactor);
+		outColor.a = 1;
+	}
 
 	// vec3 N = normalize(inNormal);
 	// vec3 L = normalize(inLightVec);

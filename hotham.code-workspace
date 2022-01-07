@@ -1,19 +1,10 @@
 {
 	"folders": [
 		{
-			"path": "hotham"
+			"path": "."
 		},
 		{
-			"path": "hotham-debug-frontend"
-		},
-		{
-			"path": "hotham-simulator"
-		},
-		{
-			"path": "examples\\beat-saber-clone"
-		},
-		{
-			"path": "hotham-debug-server"
+			"path": "..\\egui-winit-ash-integration"
 		}
 	],
 	"settings": {
@@ -26,7 +17,9 @@
 			"hotham",
 			"hotham-debug-server",
 			"hotham-simulator",
-			"beat-saber-clone"
+			"beat-saber-clone",
+			"test_assets"
 		],
+		"jest.rootPath": "hotham_debug_frontend",
 	}
 }

@@ -1,6 +1,6 @@
 use std::{ffi::CStr, io::Cursor, mem::size_of, time::Instant};
 
-static CLEAR_VALUES: [vk::ClearValue; 2] = [
+pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
         color: vk::ClearColorValue {
             float32: [0.0, 0.0, 0.0, 1.0],
@@ -281,14 +281,36 @@ impl RenderContext {
         Ok(())
     }
 
-    pub(crate) fn begin_render_pass(
+    pub(crate) fn begin_frame(
         &self,
         vulkan_context: &VulkanContext,
-        available_swapchain_image_index: usize,
+        swapchain_image_index: usize,
+    ) {
+        // Get the values we need to start the frame..
+        let device = &vulkan_context.device;
+        let frame = &self.frames[swapchain_image_index];
+        let command_buffer = frame.command_buffer;
+
+        // Begin recording the command buffer.
+        unsafe {
+            device
+                .begin_command_buffer(
+                    command_buffer,
+                    &vk::CommandBufferBeginInfo::builder()
+                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                )
+                .unwrap();
+        }
+    }
+
+    pub(crate) fn begin_pbr_render_pass(
+        &self,
+        vulkan_context: &VulkanContext,
+        swapchain_image_index: usize,
     ) {
         // Get the values we need to start a renderpass
         let device = &vulkan_context.device;
-        let frame = &self.frames[available_swapchain_image_index];
+        let frame = &self.frames[swapchain_image_index];
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
 
@@ -300,13 +322,6 @@ impl RenderContext {
             .clear_values(&CLEAR_VALUES);
 
         unsafe {
-            device
-                .begin_command_buffer(
-                    command_buffer,
-                    &vk::CommandBufferBeginInfo::builder()
-                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
-                )
-                .unwrap();
             device.cmd_begin_render_pass(
                 command_buffer,
                 &render_pass_begin_info,
@@ -328,20 +343,32 @@ impl RenderContext {
         }
     }
 
-    pub(crate) fn end_render_pass(
+    pub(crate) fn end_pbr_render_pass(
         &mut self,
         vulkan_context: &VulkanContext,
-        available_swapchain_image_index: usize,
+        swapchain_image_index: usize,
+    ) {
+        let device = &vulkan_context.device;
+        let frame = &self.frames[swapchain_image_index];
+        let command_buffer = frame.command_buffer;
+        unsafe {
+            device.cmd_end_render_pass(command_buffer);
+        }
+    }
+
+    pub(crate) fn end_frame(
+        &mut self,
+        vulkan_context: &VulkanContext,
+        swapchain_image_index: usize,
     ) {
         // Get the values we need to end the renderpass
         let device = &vulkan_context.device;
-        let frame = &self.frames[available_swapchain_image_index];
+        let frame = &self.frames[swapchain_image_index];
         let command_buffer = frame.command_buffer;
         let graphics_queue = vulkan_context.graphics_queue;
 
         // End the render pass and submit.
         unsafe {
-            device.cmd_end_render_pass(command_buffer);
             device.end_command_buffer(command_buffer).unwrap();
             let fence = frame.fence;
             let submit_info = vk::SubmitInfo::builder()
@@ -808,7 +835,7 @@ fn create_pipeline(
     Ok(primary_pipeline)
 }
 
-fn create_shader(
+pub fn create_shader(
     shader_code: &[u8],
     stage: vk::ShaderStageFlags,
     vulkan_context: &VulkanContext,

@@ -77,20 +77,35 @@ impl Texture {
                     .unwrap(),
                 )
             }
-            gltf::image::Source::View { .. } => {
+            // TODO: Fix this
+            gltf::image::Source::View { mime_type, .. } => {
                 let index = texture.source().index();
                 let image = &images[index];
-                let pixels = add_alpha_channel(&image);
-                Texture::new(
-                    texture_name,
-                    &vulkan_context,
-                    &pixels,
-                    image.width,
-                    image.height,
-                    TEXTURE_FORMAT,
-                )
-                .map_err(|e| eprintln!("Failed to load texture {} - {:?}", index, e))
-                .ok()
+                let texture = if mime_type == "image/jpeg" {
+                    let pixels = add_alpha_channel(&image);
+                    let texture = Texture::new(
+                        texture_name,
+                        &vulkan_context,
+                        &pixels,
+                        image.width,
+                        image.height,
+                        TEXTURE_FORMAT,
+                    );
+                    texture
+                } else {
+                    Texture::new(
+                        texture_name,
+                        &vulkan_context,
+                        &image.pixels,
+                        image.width,
+                        image.height,
+                        TEXTURE_FORMAT,
+                    )
+                };
+
+                texture
+                    .map_err(|e| eprintln!("Failed to load texture {} - {:?}", index, e))
+                    .ok()
             }
         }
     }

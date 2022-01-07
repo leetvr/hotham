@@ -6,6 +6,9 @@ use rapier3d::prelude::*;
 use crate::components::{Collider as ColliderComponent, RigidBody as RigidBodyComponent};
 use crate::util::entity_to_u64;
 
+pub const DEFAULT_COLLISION_GROUP: u32 = 0b01;
+pub const PANEL_COLLISION_GROUP: u32 = 0b10;
+
 pub struct PhysicsContext {
     pub physics_pipeline: PhysicsPipeline,
     pub gravity: Matrix3x1<f32>,
@@ -68,6 +71,9 @@ impl PhysicsContext {
             &(),
             &self.event_handler,
         );
+
+        self.query_pipeline
+            .update(&self.island_manager, &self.rigid_bodies, &self.colliders);
     }
 
     pub fn add_rigid_body_and_collider(
@@ -78,6 +84,12 @@ impl PhysicsContext {
     ) -> (RigidBodyComponent, ColliderComponent) {
         collider.user_data = entity_to_u64(entity) as _;
         let rigid_body_handle = self.rigid_bodies.insert(rigid_body);
+
+        // TODO: Users may wish to pass in their own interaction groups.
+        collider.set_collision_groups(InteractionGroups::new(
+            DEFAULT_COLLISION_GROUP,
+            DEFAULT_COLLISION_GROUP,
+        ));
 
         let a_collider_handle =
             self.colliders

@@ -2,27 +2,47 @@ mod components;
 pub mod resources;
 mod systems;
 
-use crate::components::{Colour, Saber};
-use crate::resources::GameState;
-use crate::systems::cube_spawner::{create_cubes, cube_spawner_system};
-use crate::systems::game_system;
+use crate::{
+    components::{Colour, Saber},
+    resources::GameState,
+    systems::{
+        cube_spawner::{create_cubes, cube_spawner_system},
+        game_system,
+        sabers::{add_saber_physics, sabers_system},
+        update_ui_system,
+    },
+};
 use hotham_debug_server::DebugServer;
+use rapier3d::prelude::{ColliderBuilder, InteractionGroups};
 use std::collections::HashMap;
 
-use hotham::gltf_loader::add_model_to_world;
-use hotham::legion::{Resources, Schedule, World};
-use hotham::resources::{PhysicsContext, RenderContext, XrContext};
-use hotham::schedule_functions::{begin_frame, end_frame, physics_step, sync_debug_server};
-use hotham::systems::rendering::rendering_system;
-use hotham::systems::{
-    collision_system, update_parent_transform_matrix_system, update_rigid_body_transforms_system,
-    update_transform_matrix_system,
+use hotham::{
+    components::{
+        hand::Handedness,
+        panel::{create_panel, PanelButton},
+        Collider, Pointer,
+    },
+    gltf_loader::{self, add_model_to_world},
+    legion::{Resources, Schedule, World},
+    resources::{
+        physics_context::PANEL_COLLISION_GROUP, GuiContext, HapticContext, PhysicsContext,
+        RenderContext, XrContext,
+    },
+    schedule_functions::{
+        apply_haptic_feedback, begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass,
+        physics_step, sync_debug_server,
+    },
+    systems::{
+        collision_system, draw_gui_system, pointers_system, rendering_system,
+        update_parent_transform_matrix_system, update_rigid_body_transforms_system,
+        update_transform_matrix_system,
+    },
+    util::entity_to_u64,
+    App, HothamResult,
 };
-use hotham::{gltf_loader, App, HothamResult};
 
-use nalgebra::{Matrix4, Vector3};
+use nalgebra::{vector, Matrix4, Vector3};
 use serde::{Deserialize, Serialize};
-use systems::sabers::{add_saber_physics, sabers_system};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -45,6 +65,7 @@ struct DebugInfo {
 pub fn real_main() -> HothamResult<()> {
     let (xr_context, vulkan_context) = XrContext::new()?;
     let render_context = RenderContext::new(&vulkan_context, &xr_context)?;
+    let gui_context = GuiContext::new(&vulkan_context);
     let mut physics_context = PhysicsContext::default();
     let mut world = World::default();
     let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../assets/beat_saber.glb")];
@@ -53,6 +74,7 @@ pub fn real_main() -> HothamResult<()> {
         &vulkan_context,
         &render_context.descriptor_set_layouts,
     )?;
+    let haptic_context = HapticContext::default();
 
     // Add Environment
     add_environment_models(&models, &mut world, &vulkan_context, &render_context);
@@ -77,31 +99,75 @@ pub fn real_main() -> HothamResult<()> {
         &mut physics_context,
     );
 
-    // Add Blue Saber
-    add_saber(
+    // // Add Blue Saber
+    // add_saber(
+    //     Colour::Blue,
+    //     &models,
+    //     &mut world,
+    //     &vulkan_context,
+    //     &render_context,
+    //     &mut physics_context,
+    // );
+
+    // Add pointer
+    add_pointer(
         Colour::Blue,
         &models,
         &mut world,
         &vulkan_context,
         &render_context,
-        &mut physics_context,
     );
+
+    // Add a panel
+    let mut panel_components = create_panel(
+        "Not clicked!",
+        800,
+        800,
+        &vulkan_context,
+        &render_context,
+        &gui_context,
+        vec![PanelButton::new("Test")],
+    );
+    let t = &mut panel_components.3.translation;
+    t[1] = 1.5;
+    t[2] = -2.;
+
+    let panel_entity = world.push(panel_components);
+    let collider = ColliderBuilder::cuboid(0.5, 0.5, 0.)
+        .sensor(true)
+        .collision_groups(InteractionGroups::new(
+            PANEL_COLLISION_GROUP,
+            PANEL_COLLISION_GROUP,
+        ))
+        .translation(vector![0.0, 1.5, -2.])
+        .user_data(entity_to_u64(panel_entity).into())
+        .build();
+    let handle = physics_context.colliders.insert(collider);
+    let collider = Collider {
+        collisions_this_frame: Vec::new(),
+        handle,
+    };
+    let mut panel_entry = world.entry(panel_entity).unwrap();
+    panel_entry.add_component(collider);
 
     let debug_server = DebugServer::new();
 
     let mut resources = Resources::default();
     resources.insert(xr_context);
     resources.insert(vulkan_context);
+    resources.insert(gui_context);
     resources.insert(physics_context);
     resources.insert(debug_server);
     resources.insert(render_context);
     resources.insert(models);
     resources.insert(0 as usize);
     resources.insert(GameState::default());
+    resources.insert(haptic_context);
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
         .add_system(sabers_system())
+        .add_system(pointers_system())
         .add_thread_local_fn(physics_step)
         .add_system(collision_system())
         .add_system(cube_spawner_system(SPAWN_RATE))
@@ -109,14 +175,49 @@ pub fn real_main() -> HothamResult<()> {
         .add_system(update_transform_matrix_system())
         .add_system(update_parent_transform_matrix_system())
         .add_system(game_system())
+        .add_system(update_ui_system())
+        .add_system(draw_gui_system())
+        .add_thread_local_fn(begin_pbr_renderpass)
         .add_system(rendering_system())
-        .add_thread_local_fn(sync_debug_server)
+        .add_thread_local_fn(end_pbr_renderpass)
+        .add_thread_local_fn(apply_haptic_feedback)
         .add_thread_local_fn(end_frame)
+        .add_thread_local_fn(sync_debug_server)
         .build();
 
     let mut app = App::new(world, resources, schedule)?;
     app.run()?;
     Ok(())
+}
+
+fn add_pointer(
+    colour: Colour,
+    models: &HashMap<String, World>,
+    world: &mut World,
+    vulkan_context: &hotham::resources::vulkan_context::VulkanContext,
+    render_context: &RenderContext,
+) {
+    let (handedness, model_name) = match colour {
+        Colour::Red => (Handedness::Left, "Red Pointer"),
+        Colour::Blue => (Handedness::Right, "Blue Pointer"),
+    };
+    let pointer = add_model_to_world(
+        model_name,
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
+    {
+        let mut pointer_entry = world.entry(pointer).unwrap();
+        pointer_entry.add_component(Pointer {
+            handedness,
+            trigger_value: 0.,
+        });
+        pointer_entry.add_component(colour);
+    }
 }
 
 fn add_saber(

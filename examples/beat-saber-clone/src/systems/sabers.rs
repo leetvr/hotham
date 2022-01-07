@@ -56,7 +56,7 @@ pub fn sabers(
         .unwrap();
 
     let mut position = posef_to_isometry(pose);
-    apply_offset(&mut position);
+    apply_grip_offset(&mut position);
     rigid_body.set_next_kinematic_position(position);
 }
 
@@ -77,7 +77,7 @@ pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext
     saber_entry.add_component(rigid_body);
 }
 
-fn apply_offset(position: &mut Isometry3<f32>) {
+pub fn apply_grip_offset(position: &mut Isometry3<f32>) {
     let updated_rotation = position.rotation.quaternion() * ROTATION_OFFSET;
     let updated_translation = position.translation.vector
         - vector!(POSITION_OFFSET[0], POSITION_OFFSET[1], POSITION_OFFSET[2]);
@@ -139,7 +139,7 @@ mod tests {
         ));
         let t = Translation3::new(0.2, 1.4, 2.);
         let mut position = Isometry3::from_parts(t, q1);
-        apply_offset(&mut position);
+        apply_grip_offset(&mut position);
 
         let expected_rotation = Quaternion::new(
             -0.5493369162990798,

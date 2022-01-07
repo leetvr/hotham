@@ -758,6 +758,7 @@ pub unsafe extern "system" fn attach_action_sets(
     Result::SUCCESS
 }
 
+// TODO: Handle aim pose.
 pub unsafe extern "system" fn create_action_space(
     _session: Session,
     create_info: *const ActionSpaceCreateInfo,
@@ -1066,6 +1067,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
             .with_drag_and_drop(false)
             .build(&event_loop)
             .unwrap();
+        println!("WINDOW SCALE FACTOR, {:?}", window.scale_factor());
         println!("[HOTHAM_SIMULATOR] ..done.");
         let extent = vk::Extent2D {
             height: VIEWPORT_HEIGHT,

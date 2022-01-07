@@ -4,10 +4,11 @@ use legion::{Resources, World};
 pub fn end_frame(_world: &mut World, resources: &mut Resources) {
     // Get resources
     let mut xr_context = resources.get_mut::<XrContext>().unwrap();
-    let vulkan_context = resources.get::<VulkanContext>().unwrap();
     let mut render_context = resources.get_mut::<RenderContext>().unwrap();
-    let swapchain_image_index = resources.get::<usize>().unwrap();
-    render_context.end_render_pass(&vulkan_context, *swapchain_image_index);
+    let current_swapchain_image_index = resources.get_mut::<usize>().unwrap();
+    let vulkan_context = resources.get::<VulkanContext>().unwrap();
+
+    render_context.end_frame(&vulkan_context, *current_swapchain_image_index);
     xr_context.end_frame().unwrap();
 }
 
