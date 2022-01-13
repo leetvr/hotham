@@ -1,5 +1,6 @@
 pub mod animation_controller;
 pub mod animation_target;
+pub mod audio_source;
 pub mod collider;
 pub mod hand;
 pub mod info;
@@ -19,6 +20,7 @@ pub mod visible;
 
 pub use animation_controller::AnimationController;
 pub use animation_target::AnimationTarget;
+pub use audio_source::AudioSource;
 pub use collider::Collider;
 pub use hand::Hand;
 pub use info::Info;
