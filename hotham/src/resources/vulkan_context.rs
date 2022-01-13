@@ -4,7 +4,7 @@ use crate::{
     image::Image,
     scene_data::{SceneData, SceneParams},
     texture::Texture,
-    DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, SWAPCHAIN_LENGTH,
+    DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -1024,7 +1024,7 @@ fn create_descriptor_pool(device: &Device) -> Result<vk::DescriptorPool, anyhow:
                 .pool_sizes(&[
                     vk::DescriptorPoolSize {
                         ty: vk::DescriptorType::UNIFORM_BUFFER,
-                        descriptor_count: SWAPCHAIN_LENGTH as _,
+                        descriptor_count: 100,
                     },
                     vk::DescriptorPoolSize {
                         ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
