@@ -2,9 +2,6 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "..\\egui-winit-ash-integration"
 		}
 	],
 	"settings": {
