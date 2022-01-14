@@ -1,3 +1,5 @@
+[![Discord](https://img.shields.io/discord/930970630612979782?label=Hotham%20Discord)](https://discord.gg/qxnd5XjD)
+
 ![Hotham Logo](logo.jpg?raw=true)
 
 🚧 Under construction! Please mind the mess! 🚧
