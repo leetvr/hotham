@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::components::{Info, Parent, Root, TransformMatrix};
+use crate::components::{Info, Parent, Root, Transform, TransformMatrix};
 use itertools::Itertools;
 use legion::{component, system, world::SubWorld, Entity, EntityStore, IntoQuery};
 use nalgebra::Matrix4;
@@ -21,7 +21,7 @@ pub fn update_parent_transform_matrix(world: &mut SubWorld) -> () {
         });
     });
 
-    let mut query = Entity::query().filter(!component::<Parent>());
+    let mut query = Entity::query().filter(!component::<Parent>() & component::<TransformMatrix>());
     let roots = query.iter(world).map(|e| e.clone()).collect_vec();
     for root in &roots {
         let root_entry = world.entry_ref(*root).unwrap();
@@ -55,7 +55,7 @@ mod tests {
     use std::collections::HashMap;
 
     use approx::{assert_relative_eq, relative_eq};
-    use legion::{Entity, Schedule, World};
+    use legion::{Entity, Resources, Schedule, World};
     use nalgebra::vector;
 
     use crate::{
@@ -66,7 +66,7 @@ mod tests {
     use super::*;
     #[test]
     pub fn test_transform_system() {
-        let mut world = World::default();
+        let (mut world, mut schedule, mut resources) = setup();
         let parent_transform_matrix =
             TransformMatrix(Matrix4::new_translation(&vector![1.0, 1.0, 100.0]));
 
@@ -74,10 +74,6 @@ mod tests {
         let child = world.push((parent_transform_matrix.clone(), Parent(parent)));
         let grandchild = world.push((parent_transform_matrix.clone(), Parent(child)));
 
-        let mut schedule = Schedule::builder()
-            .add_system(update_parent_transform_matrix_system())
-            .build();
-        let mut resources = Default::default();
         schedule.execute(&mut world, &mut resources);
 
         let grandchild = world.entry(grandchild).unwrap();
@@ -93,8 +89,8 @@ mod tests {
 
     #[test]
     pub fn test_transform_system_extensive() {
+        let (mut world, mut schedule, mut resources) = setup();
         let mut heirachy: HashMap<usize, Vec<usize>> = HashMap::new();
-        let mut world = World::default();
         let mut node_entity: HashMap<usize, Entity> = HashMap::new();
         let mut entity_node: HashMap<Entity, usize> = HashMap::new();
         heirachy.insert(0, vec![1, 2, 3, 4]);
@@ -133,12 +129,6 @@ mod tests {
         let mut root = world.entry(*root_entity).unwrap();
         let transform = root.get_component_mut::<Transform>().unwrap();
         transform.translation = vector![100.0, 100.0, 100.0];
-
-        let mut schedule = Schedule::builder()
-            .add_system(update_transform_matrix_system())
-            .add_system(update_parent_transform_matrix_system())
-            .build();
-        let mut resources = Default::default();
         schedule.execute(&mut world, &mut resources);
 
         let mut query = <(&TransformMatrix, &Parent, &Info)>::query();
@@ -175,5 +165,22 @@ mod tests {
             transform = transform * Matrix4::new_translation(&vector![1.0, 1.0, 1.0]);
         }
         transform
+    }
+
+    #[test]
+    pub fn test_entities_without_transforms() {
+        let (mut world, mut schedule, mut resources) = setup();
+        world.push((0,));
+
+        schedule.execute(&mut world, &mut resources);
+    }
+
+    fn setup() -> (World, Schedule, Resources) {
+        let schedule = Schedule::builder()
+            .add_system(update_transform_matrix_system())
+            .add_system(update_parent_transform_matrix_system())
+            .build();
+
+        (Default::default(), schedule, Default::default())
     }
 }
