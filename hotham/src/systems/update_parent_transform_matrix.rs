@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::components::{Info, Parent, Root, Transform, TransformMatrix};
+use crate::components::{Info, Parent, Root, TransformMatrix};
 use itertools::Itertools;
 use legion::{component, system, world::SubWorld, Entity, EntityStore, IntoQuery};
 use nalgebra::Matrix4;
