@@ -5,7 +5,7 @@ use legion::{Entity, World};
 use nalgebra::{
     vector, Isometry, Isometry3, Quaternion, Translation3, Unit, UnitQuaternion, Vector3,
 };
-use openxr::{Posef, SpaceLocation, SpaceLocationFlags};
+use openxr::{Posef, SpaceLocation, SpaceLocationFlags, ViewStateFlags};
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 use crate::{
@@ -92,10 +92,6 @@ pub fn u64_to_entity(entity: u64) -> Entity {
 }
 
 pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
-    println!(
-        "[!!!DEBUG!!!] Quaternion: x: {}, y: {}, z: {}, w: {}",
-        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w
-    );
     let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
     let translation: Translation3<f32> = Translation3::from(translation);
 
@@ -145,6 +141,11 @@ pub fn is_space_valid(space: &SpaceLocation) -> bool {
         && space
             .location_flags
             .contains(SpaceLocationFlags::ORIENTATION_VALID)
+}
+
+pub fn is_view_valid(view_flags: &ViewStateFlags) -> bool {
+    view_flags.contains(ViewStateFlags::POSITION_VALID)
+        && view_flags.contains(ViewStateFlags::ORIENTATION_VALID)
 }
 
 #[cfg(target_os = "android")]
