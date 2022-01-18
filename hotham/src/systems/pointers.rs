@@ -24,7 +24,7 @@ use crate::{
         Panel, Pointer, Transform,
     },
     resources::{gui_context::SCALE_FACTOR, PhysicsContext, XrContext},
-    util::{posef_to_isometry, u64_to_entity},
+    util::{is_space_valid, posef_to_isometry, u64_to_entity},
 };
 
 #[system(for_each)]
@@ -50,10 +50,16 @@ pub fn pointers(
     };
 
     // Locate the pointer in the space.
-    let pose = space
-        .locate(&xr_context.reference_space, time)
-        .unwrap()
-        .pose;
+    let space = space.locate(&xr_context.reference_space, time).unwrap();
+    if !is_space_valid(&space) {
+        println!(
+            "[HOTHAM_POINTERS] Unable to locate {:?} pointer - orientation or position invalid!",
+            pointer.handedness
+        );
+        return;
+    }
+
+    let pose = space.pose;
 
     // apply transform
     let mut position = posef_to_isometry(pose);

@@ -5,7 +5,7 @@ use legion::{Entity, World};
 use nalgebra::{
     vector, Isometry, Isometry3, Quaternion, Translation3, Unit, UnitQuaternion, Vector3,
 };
-use openxr::Posef;
+use openxr::{Posef, SpaceLocation, SpaceLocationFlags};
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 use crate::{
@@ -92,11 +92,16 @@ pub fn u64_to_entity(entity: u64) -> Entity {
 }
 
 pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
+    println!(
+        "[!!!DEBUG!!!] Quaternion: x: {}, y: {}, z: {}, w: {}",
+        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w
+    );
     let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
     let translation: Translation3<f32> = Translation3::from(translation);
 
     let rotation: Quaternion<f32> = mint::Quaternion::from(pose.orientation).into();
     let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
+
     Isometry {
         rotation,
         translation,
@@ -131,6 +136,15 @@ pub fn test_buffer<T>() -> Buffer<T> {
         device_memory_size: 0,
         usage: vk::BufferUsageFlags::empty(),
     }
+}
+
+pub fn is_space_valid(space: &SpaceLocation) -> bool {
+    space
+        .location_flags
+        .contains(SpaceLocationFlags::POSITION_VALID)
+        && space
+            .location_flags
+            .contains(SpaceLocationFlags::ORIENTATION_VALID)
 }
 
 #[cfg(target_os = "android")]
