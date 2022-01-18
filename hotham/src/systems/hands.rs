@@ -3,7 +3,7 @@ use legion::{system, world::SubWorld, IntoQuery};
 use crate::{
     components::{hand::Handedness, AnimationController, Hand, RigidBody},
     resources::{PhysicsContext, XrContext},
-    util::posef_to_isometry,
+    util::{is_space_valid, posef_to_isometry},
 };
 
 #[system(for_each)]
@@ -30,10 +30,18 @@ pub fn hands(
     };
 
     // Locate the hand in the space.
-    let pose = space
-        .locate(&xr_context.reference_space, time)
-        .unwrap()
-        .pose;
+    let space = space.locate(&xr_context.reference_space, time).unwrap();
+
+    // Check it's valid before using it
+    if !is_space_valid(&space) {
+        println!(
+            "[HOTHAM_POINTERS] Unable to locate {:?} hand - orientation or position invalid!",
+            hand.handedness
+        );
+        return;
+    }
+
+    let pose = space.pose;
 
     // apply transform
     let rigid_body = physics_context

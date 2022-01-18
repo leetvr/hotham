@@ -2,7 +2,7 @@ use hotham::{
     components::RigidBody,
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::{PhysicsContext, XrContext},
-    util::posef_to_isometry,
+    util::{is_space_valid, posef_to_isometry},
 };
 use legion::{system, Entity, World};
 use nalgebra::{vector, Isometry3, Quaternion, Translation3, UnitQuaternion};
@@ -44,10 +44,16 @@ pub fn sabers(
     };
 
     // Locate the hand in the space.
-    let pose = space
-        .locate(&xr_context.reference_space, time)
-        .unwrap()
-        .pose;
+    let space = space.locate(&xr_context.reference_space, time).unwrap();
+    if !is_space_valid(&space) {
+        println!(
+            "[HOTHAM_SABERS] ERROR: Unable to locate {:?} saber - position or orientation invalid",
+            colour
+        );
+        return;
+    }
+
+    let pose = space.pose;
 
     // apply transform
     let rigid_body = physics_context
@@ -57,6 +63,8 @@ pub fn sabers(
 
     let mut position = posef_to_isometry(pose);
     apply_grip_offset(&mut position);
+
+    println!("Would have set next kinematic position  to {:?}", position);
     rigid_body.set_next_kinematic_position(position);
 }
 
