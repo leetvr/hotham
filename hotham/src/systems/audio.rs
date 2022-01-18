@@ -13,26 +13,30 @@ mod tests {
     };
 
     use legion::{Resources, Schedule, World};
-    const DURATION_SECS: u32 = 6;
+    const DURATION_SECS: u32 = 60;
 
     use super::*;
     #[test]
     pub fn test_audio_system() {
         // Test that we can play an MP3 from disk.
-        let test_mp3 = include_bytes!("../../../test_assets/gymnopedie.mp3");
+        let test_mp3 = include_bytes!("../../../test_assets/Quartet 14 - Clip.mp3").to_vec();
         let mut audio_context = AudioContext::default();
         let audio_source = audio_context.create_audio_source(test_mp3);
 
+        // Create world
         let mut world = World::default();
-        let mut resources = Resources::default();
-
         world.push((audio_source,));
+
+        // Create resources
+        let mut resources = Resources::default();
+        resources.insert(AudioContext::default());
 
         let mut schedule = Schedule::builder().add_system(audio_system()).build();
 
         let start = Instant::now();
 
         loop {
+            println!("Playing audio..");
             thread::sleep(Duration::from_millis(50));
             let dt = start.elapsed();
             if dt >= Duration::from_secs(DURATION_SECS as u64) {
