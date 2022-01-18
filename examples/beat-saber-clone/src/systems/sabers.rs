@@ -64,7 +64,6 @@ pub fn sabers(
     let mut position = posef_to_isometry(pose);
     apply_grip_offset(&mut position);
 
-    println!("Would have set next kinematic position  to {:?}", position);
     rigid_body.set_next_kinematic_position(position);
 }
 

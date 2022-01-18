@@ -25,7 +25,7 @@ pub fn begin_frame(_world: &mut World, resources: &mut Resources) {
     (*current_swapchain_image_index) = available_swapchain_image_index;
     xr_context.frame_state = frame_state;
 
-    let (_, views) = xr_context
+    let (view_state_flags, views) = xr_context
         .session
         .locate_views(
             VIEW_TYPE,
@@ -34,6 +34,7 @@ pub fn begin_frame(_world: &mut World, resources: &mut Resources) {
         )
         .unwrap();
     xr_context.views = views;
+    xr_context.view_state_flags = view_state_flags;
 
     render_context.begin_frame(&vulkan_context, available_swapchain_image_index);
 }

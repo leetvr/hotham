@@ -6,7 +6,7 @@ use openxr::{
 };
 use xr::{
     vulkan::SessionCreateInfo, Duration, FrameState, Haptic, ReferenceSpaceType,
-    SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View,
+    SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
 };
 
 use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
@@ -33,6 +33,7 @@ pub struct XrContext {
     pub frame_stream: FrameStream<Vulkan>,
     pub frame_state: FrameState,
     pub views: Vec<View>,
+    pub view_state_flags: ViewStateFlags,
 }
 
 impl XrContext {
@@ -182,6 +183,7 @@ impl XrContext {
             frame_stream,
             frame_state,
             views: Vec::new(),
+            view_state_flags: ViewStateFlags::EMPTY,
         };
 
         Ok((xr_context, vulkan_context))
