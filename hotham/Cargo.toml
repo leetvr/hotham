@@ -12,7 +12,7 @@ shaderc = "0.7"
 anyhow = "1.0"
 ash = "0.33.2"
 console = "0.14"
-cpal = {git = "https://github.com/enfipy/cpal", branch = "patch-2"}
+cpal = {git = "https://github.com/RustAudio/cpal", rev = "f8b1ab53b46ef7a635c89c8758674cb36caea190"}
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
@@ -26,7 +26,7 @@ memoffset = "0.5.1"
 mint = "0.5.6"
 nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.29.0"}
 oddio = "0.5"
-openxr = {features = ["loaded", "mint"], git = "https://github.com/Ralith/openxrs"}
+openxr = {features = ["loaded", "mint"], git = "https://github.com/Ralith/openxrs", rev = "ca06a64557abc94559bdb30ceafb51b031e5ac9a"}
 rand = "0.8"
 rapier3d = "0.11.1"
 renderdoc = "0.10"
