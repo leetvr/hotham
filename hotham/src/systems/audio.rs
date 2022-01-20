@@ -2,14 +2,14 @@ use legion::system;
 use nalgebra::Point3;
 
 use crate::{
-    components::{audio_source::AudioState, rigid_body, AudioSource, RigidBody, Transform},
-    resources::{physics_context, AudioContext, PhysicsContext, XrContext},
+    components::{sound_emitter::SoundState, RigidBody, SoundEmitter},
+    resources::{AudioContext, PhysicsContext, XrContext},
     util::posef_to_isometry,
 };
 
 #[system(for_each)]
 pub fn audio(
-    audio_source: &mut AudioSource,
+    sound_emitter: &mut SoundEmitter,
     #[resource] audio_context: &mut AudioContext,
     #[resource] physics_context: &PhysicsContext,
     #[resource] xr_context: &XrContext,
@@ -33,24 +33,24 @@ pub fn audio(
         .into();
 
     // Determine what we should do with the audio source
-    match (audio_source.current_state(), &audio_source.next_state) {
-        (AudioState::Stopped, AudioState::Playing) => {
-            audio_context.play_audio(audio_source, position, velocity);
+    match (sound_emitter.current_state(), &sound_emitter.next_state) {
+        (SoundState::Stopped, SoundState::Playing) => {
+            audio_context.play_audio(sound_emitter, position, velocity);
         }
-        (AudioState::Paused, AudioState::Playing) => {
-            audio_context.resume_audio(audio_source);
+        (SoundState::Paused, SoundState::Playing) => {
+            audio_context.resume_audio(sound_emitter);
         }
-        (AudioState::Playing | AudioState::Paused, AudioState::Paused) => {
-            audio_context.pause_audio(audio_source);
+        (SoundState::Playing | SoundState::Paused, SoundState::Paused) => {
+            audio_context.pause_audio(sound_emitter);
         }
-        (_, AudioState::Stopped) => {
-            audio_context.stop_audio(audio_source);
+        (_, SoundState::Stopped) => {
+            audio_context.stop_audio(sound_emitter);
         }
         _ => {}
     }
 
     // Update its position and velocity
-    audio_context.update_motion(audio_source, position, velocity);
+    audio_context.update_motion(sound_emitter, position, velocity);
 }
 
 #[cfg(test)]
@@ -61,7 +61,6 @@ mod tests {
     };
 
     use legion::{IntoQuery, Resources, Schedule, World};
-    use nalgebra::{vector, Rotation3, Vector3};
     use rapier3d::prelude::RigidBodyBuilder;
     const DURATION_SECS: u32 = 30;
 
@@ -95,11 +94,11 @@ mod tests {
             .build();
         let handle = physics_context.rigid_bodies.insert(rigid_body);
         let rigid_body = RigidBody { handle };
-        let audio_source = audio_context.create_audio_source(sound_effect);
+        let sound_emitter = audio_context.create_audio_source(sound_effect);
 
         // Create world
         let mut world = World::default();
-        let audio_entity = world.push((audio_source, rigid_body));
+        let audio_entity = world.push((sound_emitter, rigid_body));
 
         // Create resources
         let mut resources = Resources::default();
@@ -110,7 +109,7 @@ mod tests {
 
         let mut schedule = Schedule::builder()
             .add_thread_local_fn(move |world, resources| {
-                let mut query = <(&mut AudioSource, &mut RigidBody)>::query();
+                let mut query = <(&mut SoundEmitter, &mut RigidBody)>::query();
                 let mut xr_context = resources.get_mut::<XrContext>().unwrap();
                 let mut physics_context = resources.get_mut::<PhysicsContext>().unwrap();
                 let mut audio_context = resources.get_mut::<AudioContext>().unwrap();
@@ -130,7 +129,7 @@ mod tests {
                 xr_context.view_state_flags = view_state_flags;
 
                 match source.current_state() {
-                    AudioState::Stopped => source.play(),
+                    SoundState::Stopped => source.play(),
                     _ => {}
                 }
 

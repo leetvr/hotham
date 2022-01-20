@@ -1,14 +1,12 @@
 use std::sync::{Arc, Mutex};
 
-use crate::components::{AudioSource, Transform};
+use crate::components::SoundEmitter;
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    SampleRate, Stream,
+    Stream,
 };
-use nalgebra::{Point3, Vector3};
 use oddio::{Frames, FramesSignal, Handle, Mixer, SpatialBuffered, SpatialScene, Stop};
-use symphonia::core::{audio::SampleBuffer, io::MediaSourceStream};
-use symphonia::core::{codecs::Decoder, probe::Hint};
+use symphonia::core::{audio::SampleBuffer, io::MediaSourceStream, probe::Hint};
 
 type MusicTrackHandle = Handle<Stop<FramesSignal<[f32; 2]>>>;
 use generational_arena::{Arena, Index};
@@ -87,15 +85,15 @@ impl Default for AudioContext {
 unsafe impl Send for AudioContext {}
 
 impl AudioContext {
-    pub fn create_audio_source(&mut self, mp3_bytes: Vec<u8>) -> AudioSource {
+    pub fn create_audio_source(&mut self, mp3_bytes: Vec<u8>) -> SoundEmitter {
         let frames = get_frames_from_mp3(mp3_bytes);
 
-        AudioSource::new(frames)
+        SoundEmitter::new(frames)
     }
 
     pub fn play_audio(
         &mut self,
-        audio_source: &mut AudioSource,
+        audio_source: &mut SoundEmitter,
         position: mint::Point3<f32>,
         velocity: mint::Vector3<f32>,
     ) {
@@ -112,21 +110,21 @@ impl AudioContext {
         audio_source.handle = Some(handle);
     }
 
-    pub fn resume_audio(&mut self, audio_source: &mut AudioSource) {
+    pub fn resume_audio(&mut self, audio_source: &mut SoundEmitter) {
         audio_source
             .handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().resume());
     }
 
-    pub fn pause_audio(&mut self, audio_source: &mut AudioSource) {
+    pub fn pause_audio(&mut self, audio_source: &mut SoundEmitter) {
         audio_source
             .handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().pause());
     }
 
-    pub fn stop_audio(&mut self, audio_source: &mut AudioSource) {
+    pub fn stop_audio(&mut self, audio_source: &mut SoundEmitter) {
         audio_source
             .handle
             .take()
@@ -135,7 +133,7 @@ impl AudioContext {
 
     pub fn update_motion(
         &mut self,
-        audio_source: &mut AudioSource,
+        audio_source: &mut SoundEmitter,
         position: mint::Point3<f32>,
         velocity: mint::Vector3<f32>,
     ) {

@@ -4,56 +4,56 @@ use oddio::{Frames, Stop};
 
 type AudioHandle = oddio::Handle<oddio::SpatialBuffered<oddio::Stop<oddio::FramesSignal<f32>>>>;
 
-pub struct AudioSource {
+pub struct SoundEmitter {
     pub frames: Arc<Frames<f32>>,
     pub handle: Option<AudioHandle>,
-    pub next_state: AudioState,
+    pub next_state: SoundState,
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum AudioState {
+pub enum SoundState {
     Stopped,
     Playing,
     Paused,
 }
 
-impl AudioSource {
+impl SoundEmitter {
     pub fn new(frames: Arc<Frames<f32>>) -> Self {
         Self {
             frames,
             handle: None,
-            next_state: AudioState::Stopped,
+            next_state: SoundState::Stopped,
         }
     }
 
-    pub fn current_state(&mut self) -> AudioState {
+    pub fn current_state(&mut self) -> SoundState {
         if let Some(handle) = self.handle.as_mut() {
             let control = handle.control::<Stop<_>, _>();
             if control.is_paused() {
-                return AudioState::Paused;
+                return SoundState::Paused;
             }
             if control.is_stopped() {
-                return AudioState::Stopped;
+                return SoundState::Stopped;
             }
-            return AudioState::Playing;
+            return SoundState::Playing;
         } else {
-            return AudioState::Stopped;
+            return SoundState::Stopped;
         }
     }
 
     pub fn play(&mut self) {
-        self.next_state = AudioState::Playing;
+        self.next_state = SoundState::Playing;
     }
 
     pub fn pause(&mut self) {
-        self.next_state = AudioState::Paused;
+        self.next_state = SoundState::Paused;
     }
 
     pub fn stop(&mut self) {
-        self.next_state = AudioState::Stopped;
+        self.next_state = SoundState::Stopped;
     }
 
     pub fn resume(&mut self) {
-        self.next_state = AudioState::Playing;
+        self.next_state = SoundState::Playing;
     }
 }
