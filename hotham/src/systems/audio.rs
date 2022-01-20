@@ -1,9 +1,57 @@
 use legion::system;
+use nalgebra::Point3;
 
-use crate::{components::AudioSource, resources::AudioContext};
+use crate::{
+    components::{audio_source::AudioState, rigid_body, AudioSource, RigidBody, Transform},
+    resources::{physics_context, AudioContext, PhysicsContext, XrContext},
+    util::posef_to_isometry,
+};
 
 #[system(for_each)]
-pub fn audio(audio_source: &mut AudioSource, #[resource] audio_context: &mut AudioContext) {}
+pub fn audio(
+    audio_source: &mut AudioSource,
+    #[resource] audio_context: &mut AudioContext,
+    #[resource] physics_context: &PhysicsContext,
+    #[resource] xr_context: &XrContext,
+    rigid_body: &RigidBody,
+) {
+    // First, where is the listener?
+    let listener_location = posef_to_isometry(xr_context.views[1].pose)
+        .lerp_slerp(&posef_to_isometry(xr_context.views[0].pose), 0.5);
+
+    // Get the position and velocity of the entity.
+    let rigid_body = physics_context
+        .rigid_bodies
+        .get(rigid_body.handle)
+        .expect("Unable to get RigidBody");
+
+    let velocity = (*rigid_body.linvel()).into();
+
+    // Now transform the position of the entity w.r.t. the listener
+    let position = listener_location
+        .transform_point(&Point3::from(*rigid_body.translation()))
+        .into();
+
+    // Determine what we should do with the audio source
+    match (audio_source.current_state(), &audio_source.next_state) {
+        (AudioState::Stopped, AudioState::Playing) => {
+            audio_context.play_audio(audio_source, position, velocity);
+        }
+        (AudioState::Paused, AudioState::Playing) => {
+            audio_context.resume_audio(audio_source);
+        }
+        (AudioState::Playing | AudioState::Paused, AudioState::Paused) => {
+            audio_context.pause_audio(audio_source);
+        }
+        (_, AudioState::Stopped) => {
+            audio_context.stop_audio(audio_source);
+        }
+        _ => {}
+    }
+
+    // Update its position and velocity
+    audio_context.update_motion(audio_source, position, velocity);
+}
 
 #[cfg(test)]
 mod tests {
@@ -12,31 +60,98 @@ mod tests {
         time::{Duration, Instant},
     };
 
-    use legion::{Resources, Schedule, World};
-    const DURATION_SECS: u32 = 60;
+    use legion::{IntoQuery, Resources, Schedule, World};
+    use nalgebra::{vector, Rotation3, Vector3};
+    use rapier3d::prelude::RigidBodyBuilder;
+    const DURATION_SECS: u32 = 30;
+
+    use crate::{resources::XrContext, VIEW_TYPE};
 
     use super::*;
     #[test]
     pub fn test_audio_system() {
-        // Test that we can play an MP3 from disk.
-        let test_mp3 = include_bytes!("../../../test_assets/Quartet 14 - Clip.mp3").to_vec();
+        // Create resources
+        let (xr_context, _) = XrContext::new().unwrap();
         let mut audio_context = AudioContext::default();
-        let audio_source = audio_context.create_audio_source(test_mp3);
+        let mut physics_context = PhysicsContext::default();
+
+        // Load MP3s from disk
+        let beethoven = include_bytes!("../../../test_assets/Quartet 14 - Clip.mp3").to_vec();
+        let right_here =
+            include_bytes!("../../../test_assets/right_here_beside_you_clip.mp3").to_vec();
+        let tell_me_that_i_cant =
+            include_bytes!("../../../test_assets/tell_me_that_i_cant_clip.mp3").to_vec();
+
+        let beethoven = audio_context.add_music_track(beethoven);
+        let right_here = audio_context.add_music_track(right_here);
+        let tell_me_that_i_cant = audio_context.add_music_track(tell_me_that_i_cant);
+        audio_context.play_music_track(beethoven);
+
+        // Create rigid body for the test entity
+        let sound_effect = include_bytes!("../../../test_assets/ice_crash.mp3").to_vec();
+        let rigid_body = RigidBodyBuilder::new_dynamic()
+            .linvel([0.5, 0., 0.].into())
+            .translation([-2., 0., 0.].into())
+            .build();
+        let handle = physics_context.rigid_bodies.insert(rigid_body);
+        let rigid_body = RigidBody { handle };
+        let audio_source = audio_context.create_audio_source(sound_effect);
 
         // Create world
         let mut world = World::default();
-        world.push((audio_source,));
+        let audio_entity = world.push((audio_source, rigid_body));
 
         // Create resources
         let mut resources = Resources::default();
-        resources.insert(AudioContext::default());
-
-        let mut schedule = Schedule::builder().add_system(audio_system()).build();
-
+        resources.insert(audio_context);
+        resources.insert(physics_context);
+        resources.insert(xr_context);
         let start = Instant::now();
 
+        let mut schedule = Schedule::builder()
+            .add_thread_local_fn(move |world, resources| {
+                let mut query = <(&mut AudioSource, &mut RigidBody)>::query();
+                let mut xr_context = resources.get_mut::<XrContext>().unwrap();
+                let mut physics_context = resources.get_mut::<PhysicsContext>().unwrap();
+                let mut audio_context = resources.get_mut::<AudioContext>().unwrap();
+
+                let (source, _) = query.get_mut(world, audio_entity).unwrap();
+
+                let (frame_state, _) = xr_context.begin_frame().unwrap();
+                let (view_state_flags, views) = xr_context
+                    .session
+                    .locate_views(
+                        VIEW_TYPE,
+                        frame_state.predicted_display_time,
+                        &xr_context.reference_space,
+                    )
+                    .unwrap();
+                xr_context.views = views;
+                xr_context.view_state_flags = view_state_flags;
+
+                match source.current_state() {
+                    AudioState::Stopped => source.play(),
+                    _ => {}
+                }
+
+                if start.elapsed().as_secs() >= 8
+                    && audio_context.current_music_track.unwrap() != right_here
+                {
+                    audio_context.play_music_track(right_here);
+                } else if start.elapsed().as_secs() >= 4
+                    && start.elapsed().as_secs() < 8
+                    && audio_context.current_music_track.unwrap() != tell_me_that_i_cant
+                {
+                    audio_context.play_music_track(tell_me_that_i_cant);
+                }
+
+                physics_context.update();
+                xr_context.end_frame().unwrap();
+            })
+            .add_system(audio_system())
+            .build();
+
         loop {
-            println!("Playing audio..");
             thread::sleep(Duration::from_millis(50));
             let dt = start.elapsed();
             if dt >= Duration::from_secs(DURATION_SECS as u64) {
@@ -44,24 +159,6 @@ mod tests {
             }
 
             schedule.execute(&mut world, &mut resources);
-
-            // // Access our Spatial Controls
-            // let mut spatial_control = signal.control::<oddio::SpatialBuffered<_>, _>();
-
-            // // This has no noticable effect because it matches the initial velocity, but serves to
-            // // demonstrate that `Spatial` can smooth over the inevitable small timing inconsistencies
-            // // between the main thread and the audio thread without glitching.
-            // spatial_control.set_motion(
-            //     [-SPEED + SPEED * dt.as_secs_f32(), 10.0, 0.0].into(),
-            //     [SPEED, 0.0, 0.0].into(),
-            //     false,
-            // );
-
-            // // We also could adjust the Gain here in the same way:
-            // let mut gain_control = signal.control::<oddio::Gain<_>, _>();
-
-            // // Just leave the gain at its natural volume. (sorry this can be a bit loud!)
-            // gain_control.set_gain(1.0);
         }
     }
 }

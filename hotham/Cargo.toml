@@ -16,6 +16,7 @@ cpal = {git = "https://github.com/RustAudio/cpal", rev = "f8b1ab53b46ef7a635c89c
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
+generational-arena = "0.2.8"
 gltf = {version = "0.16", features = ["KHR_materials_pbrSpecularGlossiness"]}
 hotham-debug-server = {path = "../hotham-debug-server"}
 image = "0.23"

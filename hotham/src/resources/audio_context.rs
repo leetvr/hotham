@@ -1,19 +1,25 @@
 use std::sync::{Arc, Mutex};
 
-use crate::components::AudioSource;
+use crate::components::{AudioSource, Transform};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     SampleRate, Stream,
 };
-use oddio::{Mixer, SpatialScene};
+use nalgebra::{Point3, Vector3};
+use oddio::{Frames, FramesSignal, Handle, Mixer, SpatialBuffered, SpatialScene, Stop};
 use symphonia::core::{audio::SampleBuffer, io::MediaSourceStream};
 use symphonia::core::{codecs::Decoder, probe::Hint};
 
+type MusicTrackHandle = Handle<Stop<FramesSignal<[f32; 2]>>>;
+use generational_arena::{Arena, Index};
+
 pub struct AudioContext {
-    // pub scene_handle: oddio::Handle<SpatialScene>,
+    pub scene_handle: oddio::Handle<SpatialScene>,
     pub mixer_handle: oddio::Handle<Mixer<[f32; 2]>>,
-    pub sample_rate: SampleRate,
     pub stream: Arc<Mutex<Stream>>,
+    pub current_music_track: Option<Index>,
+    music_tracks: Arena<Arc<Frames<[f32; 2]>>>,
+    music_track_handle: Option<MusicTrackHandle>,
 }
 
 impl Default for AudioContext {
@@ -23,46 +29,28 @@ impl Default for AudioContext {
         let device = host
             .default_output_device()
             .expect("no output device available");
-        println!("Detected default audio device: {}", device.name().unwrap());
+        println!(
+            "[HOTHAM_AUDIO_CONTEXT] Using default audio device: {}",
+            device.name().unwrap()
+        );
         let sample_rate = device.default_output_config().unwrap().sample_rate();
         let config = cpal::StreamConfig {
             channels: 2,
             sample_rate,
             buffer_size: cpal::BufferSize::Default,
         };
-        println!("Config: {:?}", config);
+        println!("[HOTHAM_AUDIO_CONTEXT] cpal AudioConfig: {:?}", config);
 
-        // Produce a sinusoid of maximum amplitude.
-        let sr = config.sample_rate.0 as f32;
-        let mut sample_clock = 0f32;
-        let mut next_value = move || {
-            sample_clock = (sample_clock + 1.0) % sr;
-            (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sr).sin()
-        };
+        // Create a spatialised audio scene
+        let (scene_handle, scene) = oddio::split(oddio::SpatialScene::new(sample_rate.0, 0.1));
 
-        // let (scene_handle, scene) = oddio::split(oddio::SpatialScene::new(sample_rate.0, 0.1));
-
-        let channels = config.channels as usize;
-        let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
-
-        // let config = device.default_output_config().unwrap();
-        // let stream = device
-        //     .build_output_stream(
-        //         &config.into(),
-        //         move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-        //             for frame in data.chunks_mut(channels) {
-        //                 let value = cpal::Sample::from::<f32>(&next_value());
-        //                 for sample in frame.iter_mut() {
-        //                     *sample = value;
-        //                 }
-        //             }
-        //         },
-        //         err_fn,
-        //     )
-        //     .expect("Unable to create stream");
-        // stream.play().expect("Unable to play stream");
+        // Create a mixer
         let (mut mixer_handle, mixer) = oddio::split(oddio::Mixer::new());
 
+        // Pipe the spatialised scene to the mixer
+        let _ = mixer_handle.control().play(scene);
+
+        // Pipe the mixer to the audio hardware.
         let stream = device
             .build_output_stream(
                 &config,
@@ -70,16 +58,25 @@ impl Default for AudioContext {
                     let out_stereo: &mut [[f32; 2]] = oddio::frame_stereo(out_flat);
                     oddio::run(&mixer, sample_rate.0, out_stereo);
                 },
-                err_fn,
+                |err| {
+                    eprintln!(
+                        "[HOTHAM_AUDIO_CONTEXT] An error occurred playing the audio stream: {}",
+                        err
+                    )
+                },
             )
             .unwrap();
-        stream.play().expect("Unable to play stream!");
+        stream
+            .play()
+            .expect("[HOTHAM_AUDIO_CONTEXT] Unable to play to audio hardware!");
 
         Self {
-            // scene_handle,
+            scene_handle,
             mixer_handle,
-            sample_rate,
             stream: Arc::new(Mutex::new(stream)),
+            music_tracks: Arena::new(),
+            music_track_handle: None,
+            current_music_track: None,
         }
     }
 }
@@ -91,47 +88,104 @@ unsafe impl Send for AudioContext {}
 
 impl AudioContext {
     pub fn create_audio_source(&mut self, mp3_bytes: Vec<u8>) -> AudioSource {
-        let mut decoded = decode_mp3_data(mp3_bytes);
-        let stereo = oddio::frame_stereo(&mut decoded);
-        let frames = oddio::Frames::from_slice(44100, &stereo);
-        // let frames = oddio::Frames::from_iter(self.sample_rate.0, decoded);
+        let frames = get_frames_from_mp3(mp3_bytes);
 
-        // let basic_signal: oddio::FramesSignal<_> = oddio::FramesSignal::from(boop);
-        let basic_signal: oddio::FramesSignal<_> = oddio::FramesSignal::from(frames);
-        // let gain = oddio::Gain::new(basic_signal, 1.0);
+        AudioSource::new(frames)
+    }
 
-        let handle = self
-            // .scene_handle
-            .mixer_handle
-            // .control::<oddio::SpatialScene, _>()
-            .control()
-            .play(basic_signal);
-        // let handle = self
-        //     .scene_handle
-        //     .control::<oddio::SpatialScene, _>()
-        //     .play_buffered(
-        //         gain,
-        //         oddio::SpatialOptions {
-        //             position: [0., 0., -1.0].into(),
-        //             velocity: [0., 0.0, 0.0].into(),
-        //             radius: 0.0,
-        //         },
-        //         1000.0,
-        //     );
-        AudioSource { handle }
+    pub fn play_audio(
+        &mut self,
+        audio_source: &mut AudioSource,
+        position: mint::Point3<f32>,
+        velocity: mint::Vector3<f32>,
+    ) {
+        let signal: oddio::FramesSignal<_> = oddio::FramesSignal::from(audio_source.frames.clone());
+        let handle = self.scene_handle.control().play_buffered(
+            signal,
+            oddio::SpatialOptions {
+                position,
+                velocity,
+                radius: 1.0, //
+            },
+            1000.0,
+        );
+        audio_source.handle = Some(handle);
+    }
+
+    pub fn resume_audio(&mut self, audio_source: &mut AudioSource) {
+        audio_source
+            .handle
+            .as_mut()
+            .map(|h| h.control::<Stop<_>, _>().resume());
+    }
+
+    pub fn pause_audio(&mut self, audio_source: &mut AudioSource) {
+        audio_source
+            .handle
+            .as_mut()
+            .map(|h| h.control::<Stop<_>, _>().pause());
+    }
+
+    pub fn stop_audio(&mut self, audio_source: &mut AudioSource) {
+        audio_source
+            .handle
+            .take()
+            .map(|mut h| h.control::<Stop<_>, _>().stop());
+    }
+
+    pub fn update_motion(
+        &mut self,
+        audio_source: &mut AudioSource,
+        position: mint::Point3<f32>,
+        velocity: mint::Vector3<f32>,
+    ) {
+        audio_source.handle.as_mut().map(|h| {
+            h.control::<SpatialBuffered<_>, _>()
+                .set_motion(position, velocity, false)
+        });
+    }
+
+    pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> Index {
+        let frames = get_stereo_frames_from_mp3(mp3_bytes);
+        self.music_tracks.insert(frames)
+    }
+
+    pub fn play_music_track(&mut self, index: Index) {
+        if let Some(mut handle) = self.music_track_handle.take() {
+            handle.control::<Stop<_>, _>().stop();
+        }
+
+        let frames = self.music_tracks[index].clone();
+        let signal = oddio::FramesSignal::from(frames);
+        self.music_track_handle = Some(self.mixer_handle.control().play(signal));
+        self.current_music_track = Some(index.clone());
+    }
+
+    pub fn pause_music_track(&mut self) {
+        self.music_track_handle
+            .as_mut()
+            .map(|h| h.control::<Stop<_>, _>().pause());
+    }
+
+    pub fn resume_music_track(&mut self) {
+        self.music_track_handle
+            .as_mut()
+            .map(|h| h.control::<Stop<_>, _>().resume());
     }
 }
 
-fn interleave(frames: Vec<f32>) -> Vec<[f32; 2]> {
-    let mut result = Vec::new();
-    for slice in frames.windows(2) {
-        result.push([slice[0], slice[1]]);
-    }
-
-    result
+fn get_frames_from_mp3(mp3_bytes: Vec<u8>) -> Arc<Frames<f32>> {
+    let (samples, sample_rate) = decode_mp3(mp3_bytes);
+    oddio::Frames::from_slice(sample_rate, &samples)
 }
 
-fn decode_mp3_data(mp3_bytes: Vec<u8>) -> Vec<f32> {
+fn get_stereo_frames_from_mp3(mp3_bytes: Vec<u8>) -> Arc<Frames<[f32; 2]>> {
+    let (mut samples, sample_rate) = decode_mp3(mp3_bytes);
+    let stereo = oddio::frame_stereo(&mut samples);
+    oddio::Frames::from_slice(sample_rate, &stereo)
+}
+
+fn decode_mp3(mp3_bytes: Vec<u8>) -> (Vec<f32>, u32) {
     let cursor = Box::new(std::io::Cursor::new(mp3_bytes));
     let mss = MediaSourceStream::new(cursor, Default::default());
     let hint = Hint::new();
@@ -148,7 +202,7 @@ fn decode_mp3_data(mp3_bytes: Vec<u8>) -> Vec<f32> {
     let mut decoder = symphonia::default::get_codecs()
         .make(&track.codec_params, &decode_opts)
         .expect("Unable to get decoder");
-    show_decoder_info(&decoder);
+    let sample_rate = decoder.codec_params().sample_rate.unwrap();
 
     let mut samples: Vec<f32> = Vec::new();
 
@@ -184,13 +238,5 @@ fn decode_mp3_data(mp3_bytes: Vec<u8>) -> Vec<f32> {
         }
     }
 
-    // Regardless of result, finalize the decoder to get the verification result.
-    samples
-}
-
-fn show_decoder_info(decoder: &Box<dyn Decoder>) {
-    let sample_rate = decoder.codec_params().sample_rate;
-    let channels = decoder.codec_params().channels.unwrap().count();
-    println!("Sample rate: {:?}", sample_rate);
-    println!("Channels: {:?}", channels);
+    (samples, sample_rate)
 }
