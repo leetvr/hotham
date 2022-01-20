@@ -1,4 +1,5 @@
 pub mod animation;
+pub mod audio;
 pub mod collision;
 pub mod draw_gui;
 pub mod grabbing;
@@ -11,6 +12,7 @@ pub mod update_rigid_body_transforms;
 pub mod update_transform_matrix;
 
 pub use animation::animation_system;
+pub use audio::audio_system;
 pub use collision::collision_system;
 pub use draw_gui::draw_gui_system;
 pub use grabbing::grabbing_system;

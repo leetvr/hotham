@@ -12,9 +12,11 @@ shaderc = "0.7"
 anyhow = "1.0"
 ash = "0.33.2"
 console = "0.14"
+cpal = {git = "https://github.com/RustAudio/cpal", rev = "f8b1ab53b46ef7a635c89c8758674cb36caea190"}
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
+generational-arena = "0.2.8"
 gltf = {version = "0.16", features = ["KHR_materials_pbrSpecularGlossiness"]}
 hotham-debug-server = {path = "../hotham-debug-server"}
 image = "0.23"
@@ -25,13 +27,13 @@ memoffset = "0.5.1"
 mint = "0.5.6"
 nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.29.0"}
 oddio = "0.5"
-openxr = {features = ["loaded", "mint"], version = "0.15.5"}
+openxr = {features = ["loaded", "mint"], git = "https://github.com/Ralith/openxrs", rev = "ca06a64557abc94559bdb30ceafb51b031e5ac9a"}
 rand = "0.8"
 rapier3d = "0.11.1"
 renderdoc = "0.10"
-schemars = "0.8"
 serde = {version = "1.0", features = ["derive"]}
 serde_json = "1.0"
+symphonia = {version = "0.4", features = ["mp3"]}
 thiserror = "1.0"
 uuid = {version = "0.8", features = ["serde", "v4"]}
 
@@ -40,8 +42,8 @@ approx = "0.5"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.18.0"
-ndk = "0.4.0"
-ndk-glue = "0.5"
+ndk = "0.6.0"
+ndk-glue = "=0.6.0"
 
 [dev-dependencies.criterion]
 features = ["html_reports"]

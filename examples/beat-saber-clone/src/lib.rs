@@ -25,8 +25,8 @@ use hotham::{
     gltf_loader::{self, add_model_to_world},
     legion::{Resources, Schedule, World},
     resources::{
-        physics_context::PANEL_COLLISION_GROUP, GuiContext, HapticContext, PhysicsContext,
-        RenderContext, XrContext,
+        physics_context::PANEL_COLLISION_GROUP, AudioContext, GuiContext, HapticContext,
+        PhysicsContext, RenderContext, XrContext,
     },
     schedule_functions::{
         apply_haptic_feedback, begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass,
@@ -75,6 +75,7 @@ pub fn real_main() -> HothamResult<()> {
         &render_context.descriptor_set_layouts,
     )?;
     let haptic_context = HapticContext::default();
+    let mut audio_context = AudioContext::default();
 
     // Add Environment
     add_environment_models(&models, &mut world, &vulkan_context, &render_context);
@@ -98,6 +99,11 @@ pub fn real_main() -> HothamResult<()> {
         &render_context,
         &mut physics_context,
     );
+
+    // Add Sound
+    let mp3_bytes = include_bytes!("../../../test_assets/Quartet 14 - Clip.mp3").to_vec();
+    let audio_source = audio_context.create_audio_source(mp3_bytes);
+    world.push((audio_source,));
 
     // // Add Blue Saber
     // add_saber(
@@ -163,6 +169,7 @@ pub fn real_main() -> HothamResult<()> {
     resources.insert(0 as usize);
     resources.insert(GameState::default());
     resources.insert(haptic_context);
+    resources.insert(audio_context);
 
     let schedule = Schedule::builder()
         .add_thread_local_fn(begin_frame)
