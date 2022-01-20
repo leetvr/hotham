@@ -2,3 +2,4 @@
 *.so filter=lfs diff=lfs merge=lfs -text
 *.ktx2 filter=lfs diff=lfs merge=lfs -text
 *.mp3 filter=lfs diff=lfs merge=lfs -text
+test_assets/Quartet[[:space:]]14[[:space:]]-[[:space:]]Clip.mp3 filter=lfs diff=lfs merge=lfs -text
