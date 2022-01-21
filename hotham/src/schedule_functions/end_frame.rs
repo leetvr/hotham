@@ -8,7 +8,14 @@ pub fn end_frame(_world: &mut World, resources: &mut Resources) {
     let current_swapchain_image_index = resources.get_mut::<usize>().unwrap();
     let vulkan_context = resources.get::<VulkanContext>().unwrap();
 
-    render_context.end_frame(&vulkan_context, *current_swapchain_image_index);
+    // Check if we should be rendering.
+    if xr_context.frame_state.should_render {
+        render_context.end_frame(&vulkan_context, *current_swapchain_image_index);
+    } else {
+        println!(
+            "[HOTHAM_END_FRAME] - Session is runing but shouldRender is false - not rendering"
+        );
+    }
     xr_context.end_frame().unwrap();
 }
 

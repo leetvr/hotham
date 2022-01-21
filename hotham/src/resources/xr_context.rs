@@ -197,26 +197,14 @@ impl XrContext {
             match self.instance.poll_event(event_buffer)? {
                 Some(xr::Event::SessionStateChanged(session_changed)) => {
                     let new_state = session_changed.state();
-
-                    if self.session_state == SessionState::IDLE && new_state == SessionState::READY
-                    {
-                        println!("[HOTHAM_POLL_EVENT] Beginning session!");
-                        self.session.begin(VIEW_TYPE)?;
-                    }
-
-                    if self.session_state != SessionState::STOPPING
-                        && new_state == SessionState::STOPPING
-                    {
-                        println!("[HOTHAM_POLL_EVENT] Ending session!");
-                        self.session.end()?;
-                    }
-
                     println!("[HOTHAM_POLL_EVENT] State is now {:?}", new_state);
                     self.session_state = new_state;
                 }
-                Some(_) => {
-                    println!("[HOTHAM_POLL_EVENT] Received some other event");
+                Some(xr::Event::InstanceLossPending(_)) => {
+                    println!("[HOTHAM_POLL_EVENT] Instance loss pending!");
+                    break;
                 }
+                Some(_) => println!("[HOTHAM_POLL_EVENT] Received some other event"),
                 None => break,
             }
         }
@@ -275,6 +263,13 @@ impl XrContext {
 
         let layers = [&*layer_projection];
         self.frame_stream.end(display_time, BLEND_MODE, &layers)
+    }
+
+    pub(crate) fn end_session(&mut self) -> anyhow::Result<()> {
+        println!("[HOTHAM_XR] - Ending session..");
+        self.session.end()?;
+        println!("[HOTHAM_XR] - ..done!");
+        Ok(())
     }
 }
 

@@ -36,7 +36,14 @@ pub fn begin_frame(_world: &mut World, resources: &mut Resources) {
     xr_context.views = views;
     xr_context.view_state_flags = view_state_flags;
 
-    render_context.begin_frame(&vulkan_context, available_swapchain_image_index);
+    // If the shouldRender flag is set, start rendering
+    if xr_context.frame_state.should_render {
+        render_context.begin_frame(&vulkan_context, available_swapchain_image_index);
+    } else {
+        println!(
+            "[HOTHAM_BEGIN_FRAME] - Session is runing but shouldRender is false - not rendering"
+        );
+    }
 }
 
 #[cfg(test)]
