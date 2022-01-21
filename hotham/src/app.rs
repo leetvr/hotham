@@ -1,4 +1,4 @@
-use crate::{resources::XrContext, HothamResult};
+use crate::{resources::XrContext, HothamResult, VIEW_TYPE};
 use legion::{Resources, Schedule, World};
 use openxr as xr;
 
@@ -31,6 +31,13 @@ pub struct App {
     resumed: bool,
 }
 
+impl Drop for App {
+    fn drop(&mut self) {
+        #[cfg(target_os = "android")]
+        ndk_glue::native_activity().finish();
+    }
+}
+
 impl App {
     pub fn new(world: World, resources: Resources, schedule: Schedule) -> HothamResult<Self> {
         Ok(Self {
@@ -54,42 +61,69 @@ impl App {
 
         while !self.should_quit.load(Ordering::Relaxed) {
             #[cfg(target_os = "android")]
-            self.process_android_events();
+            if self.process_android_events() {
+                // If this function returned true, it means we should quit.
+                break;
+            };
 
             let mut xr_context = self.resources.get_mut::<XrContext>().unwrap();
-            let current_state = xr_context.poll_xr_event(&mut event_buffer)?;
 
-            if current_state == SessionState::IDLE {
-                sleep(Duration::from_secs(1));
-                continue;
+            let (previous_state, current_state) = {
+                let previous_state = xr_context.session_state.clone();
+                let current_state = xr_context.poll_xr_event(&mut event_buffer)?;
+                (previous_state, current_state)
+            };
+
+            match (previous_state, current_state) {
+                (SessionState::EXITING, SessionState::IDLE) => {
+                    // return quickly so we can process the Android lifecycle
+                }
+                (_, SessionState::IDLE) => {
+                    sleep(Duration::from_secs(1)); // sleep to avoid thrashing the CPU
+                    continue;
+                }
+                (SessionState::IDLE, SessionState::READY) => {
+                    xr_context.session.begin(VIEW_TYPE)?;
+                    drop(xr_context);
+                    self.schedule.execute(&mut self.world, &mut self.resources);
+                }
+                (_, SessionState::STOPPING) => {
+                    xr_context.end_session()?;
+                }
+                (_, SessionState::EXITING | SessionState::LOSS_PENDING) => break,
+                (_, SessionState::SYNCHRONIZED | SessionState::VISIBLE | SessionState::FOCUSED) => {
+                    drop(xr_context);
+                    self.schedule.execute(&mut self.world, &mut self.resources);
+                }
+                _ => println!(
+                    "[HOTHAM_MAIN] - Unhandled - previous: {:?}, current: {:?}",
+                    previous_state, current_state
+                ),
             }
-
-            if current_state == SessionState::EXITING {
-                break;
-            }
-
-            drop(xr_context);
-
-            self.schedule.execute(&mut self.world, &mut self.resources);
         }
 
         Ok(())
     }
 
     #[cfg(target_os = "android")]
-    pub fn process_android_events(&mut self) {
+    pub fn process_android_events(&mut self) -> bool {
         loop {
             if let Some(event) = self.poll_android_events() {
                 println!("[HOTHAM_ANDROID] Received event {:?}", event);
                 match event {
                     ndk_glue::Event::Resume => self.resumed = true,
-                    ndk_glue::Event::Destroy => self.should_quit.store(true, Ordering::Relaxed),
+                    ndk_glue::Event::Destroy | ndk_glue::Event::WindowDestroyed => {
+                        self.should_quit.store(true, Ordering::Relaxed);
+                        return true;
+                    }
                     ndk_glue::Event::Pause => self.resumed = false,
                     _ => {}
                 }
             }
             break;
         }
+
+        false
     }
 
     #[cfg(target_os = "android")]
