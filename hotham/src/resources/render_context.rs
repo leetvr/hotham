@@ -314,6 +314,9 @@ impl RenderContext {
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
 
+        // Wait for the GPU to be ready.
+        self.wait(device, frame);
+
         // Begin the renderpass.
         let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
             .render_pass(self.render_pass)
@@ -374,15 +377,23 @@ impl RenderContext {
             let submit_info = vk::SubmitInfo::builder()
                 .command_buffers(&[command_buffer])
                 .build();
-            device.reset_fences(&[fence]).unwrap();
             device
                 .queue_submit(graphics_queue, &[submit_info], fence)
                 .unwrap();
-            device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
         }
 
         self.last_frame_time = Instant::now();
         self.frame_index += 1;
+    }
+
+    pub(crate) fn wait(&self, device: &ash::Device, frame: &Frame) {
+        let fence = frame.fence;
+
+        unsafe {
+            device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
+            device.reset_fences(&[fence]).unwrap();
+        }
+
     }
 }
 
