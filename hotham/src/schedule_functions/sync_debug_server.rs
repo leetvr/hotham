@@ -1,19 +1,20 @@
+use hecs::World;
 use hotham_debug_server::{
     debug_frame::{DebugCollider, DebugEntity, DebugFrame, DebugTransform},
     DebugServer,
 };
-use legion::{EntityStore, IntoQuery, Resources, World};
 use uuid::Uuid;
 
 use crate::{
     components::{Collider, Info, Transform},
     resources::PhysicsContext,
-    util::entity_to_u64,
 };
 
-pub fn sync_debug_server(world: &mut World, resources: &mut Resources) {
-    let mut debug_server = resources.get_mut::<DebugServer>().unwrap();
-    let physics_context = resources.get::<PhysicsContext>().unwrap();
+pub fn sync_debug_server(
+    world: &mut World,
+    debug_server: &mut DebugServer,
+    physics_context: &PhysicsContext,
+) {
     let debug_data = world_to_debug_data(
         &world,
         &physics_context,
@@ -37,28 +38,24 @@ pub fn world_to_debug_data(
     session_id: Uuid,
 ) -> DebugFrame {
     let mut entities = Vec::new();
-    let mut query = <&Info>::query();
-    query.for_each_chunk(world, |c| {
-        for (entity, info) in c.into_iter_entities() {
-            let entry = world.entry_ref(entity).unwrap();
-            let transform = entry.get_component::<Transform>().ok();
-            let collider = entry.get_component::<Collider>().ok();
-            let collider = collider
-                .map(|c| physics_context.colliders.get(c.handle))
-                .flatten();
-            let entity_id = entity_to_u64(entity);
+    for (entity, info) in world.query_mut::<&Info>() {
+        let transform = world.get_mut::<&Transform>(entity).ok();
+        let collider = world.get_mut::<&Collider>(entity).ok();
+        let collider = collider
+            .map(|c| physics_context.colliders.get(c.handle))
+            .flatten();
+        let entity_id = entity.id() as _;
 
-            let e = DebugEntity {
-                name: info.name.clone(),
-                id: format!("{}_{}", session_id, entity_id),
-                entity_id,
-                transform: transform.map(parse_transform),
-                collider: collider.map(parse_collider),
-            };
+        let e = DebugEntity {
+            name: info.name.clone(),
+            id: format!("{}_{}", session_id, entity_id),
+            entity_id,
+            transform: transform.map(|t| parse_transform(*t)),
+            collider: collider.map(parse_collider),
+        };
 
-            entities.push(e);
-        }
-    });
+        entities.push(e);
+    }
     return DebugFrame {
         id: Uuid::new_v4(),
         frame_number: frame as _,
@@ -111,7 +108,6 @@ fn parse_collider(collider: &rapier3d::geometry::Collider) -> DebugCollider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use legion::World;
     use nalgebra::{vector, UnitQuaternion};
     use rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder};
 
@@ -122,10 +118,10 @@ mod tests {
 
     #[test]
     fn test_world_to_debug() {
-        let mut world = World::default();
+        let mut world = World::new();
         let mut physics_context = PhysicsContext::default();
 
-        let e1 = world.push((
+        let e1 = world.spawn((
             Info {
                 name: "Test".to_string(),
                 node_id: 2,
@@ -141,15 +137,12 @@ mod tests {
         let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0)
             .translation(vector![0., 0.5, 0.])
             .build();
-        let (rigid_body, collider) =
-            physics_context.get_rigid_body_and_collider(e1, rigid_body, collider);
+        let components = physics_context.get_rigid_body_and_collider(e1, rigid_body, collider);
         {
-            let mut entry = world.entry(e1).unwrap();
-            entry.add_component(rigid_body);
-            entry.add_component(collider);
+            world.insert(e1, components);
         }
 
-        let e2 = world.push((
+        let e2 = world.spawn((
             Info {
                 name: "Test 2".to_string(),
                 node_id: 3,
@@ -163,20 +156,17 @@ mod tests {
 
         let rigid_body = RigidBodyBuilder::new_dynamic().build();
         let collider = ColliderBuilder::cylinder(1.0, 0.2).build();
-        let (rigid_body, collider) =
-            physics_context.get_rigid_body_and_collider(e2, rigid_body, collider);
+        let components = physics_context.get_rigid_body_and_collider(e2, rigid_body, collider);
         {
-            let mut entry = world.entry(e2).unwrap();
-            entry.add_component(rigid_body);
-            entry.add_component(collider);
+            world.insert(e2, components);
         }
 
         let session_id = Uuid::new_v4();
         let debug_data = world_to_debug_data(&world, &physics_context, 666, session_id);
         assert_eq!(debug_data.frame_number, 666);
 
-        let e1 = entity_to_u64(e1);
-        let e2 = entity_to_u64(e2);
+        let e1 = e1.id() as u64;
+        let e2 = e2.id() as u64;
 
         let debug_entity1 = debug_data
             .entities

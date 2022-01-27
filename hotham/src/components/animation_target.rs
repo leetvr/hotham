@@ -1,5 +1,5 @@
 use super::Transform;
-use legion::Entity;
+use hecs::Entity;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnimationTarget {

@@ -1,4 +1,4 @@
-use legion::Entity;
+use hecs::Entity;
 use nalgebra::Matrix4;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
