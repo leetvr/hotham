@@ -357,30 +357,30 @@ pub fn add_model_to_world(
         entity.add_component(Parent(parent));
     }
 
-    // We'll need to create a new UBO for the mesh:
+    // We'll also need to fix up any meshes
     let mut query = <(&Info, &mut Mesh)>::query();
-    let (info, mesh) = query.get_mut(world, new_entity).unwrap();
+    query.for_each_mut(world, |(info, mesh)| {
+        // Create new description sets
+        let new_descriptor_sets = vulkan_context
+            .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
+            .unwrap();
+        mesh.descriptor_sets = [new_descriptor_sets[0]];
 
-    // Create new description sets
-    let new_descriptor_sets = vulkan_context
-        .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
+        // Create a new buffer
+        let new_ubo_buffer = Buffer::new(
+            vulkan_context,
+            &[mesh.ubo_data],
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        )
         .unwrap();
-    mesh.descriptor_sets = [new_descriptor_sets[0]];
-
-    // Create a new buffer
-    let new_ubo_buffer = Buffer::new(
-        vulkan_context,
-        &[mesh.ubo_data],
-        vk::BufferUsageFlags::UNIFORM_BUFFER,
-    )
-    .unwrap();
-    vulkan_context.update_buffer_descriptor_set(
-        &new_ubo_buffer,
-        mesh.descriptor_sets[0],
-        0,
-        vk::DescriptorType::UNIFORM_BUFFER,
-    );
-    mesh.ubo_buffer = new_ubo_buffer;
+        vulkan_context.update_buffer_descriptor_set(
+            &new_ubo_buffer,
+            mesh.descriptor_sets[0],
+            0,
+            vk::DescriptorType::UNIFORM_BUFFER,
+        );
+        mesh.ubo_buffer = new_ubo_buffer;
+    });
 
     Some(new_entity)
 }
