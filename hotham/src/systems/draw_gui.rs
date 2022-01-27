@@ -1,26 +1,23 @@
-use legion::world::SubWorld;
-use legion::{system, IntoQuery};
+use crate::{
+    components::Panel,
+    resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
+};
+use hecs::{PreparedQuery, World};
 
-use crate::components::Panel;
-use crate::resources::{GuiContext, HapticContext};
-use crate::resources::{RenderContext, VulkanContext};
-
-#[system]
-#[write_component(Panel)]
-pub fn draw_gui(
-    world: &mut SubWorld,
-    #[resource] vulkan_context: &VulkanContext,
-    #[resource] swapchain_image_index: &usize,
-    #[resource] render_context: &RenderContext,
-    #[resource] gui_context: &mut GuiContext,
-    #[resource] haptic_context: &mut HapticContext,
+pub fn draw_gui_system(
+    query: &PreparedQuery<&mut Panel>,
+    world: &mut World,
+    vulkan_context: &VulkanContext,
+    swapchain_image_index: &usize,
+    render_context: &RenderContext,
+    gui_context: &mut GuiContext,
+    haptic_context: &mut HapticContext,
 ) {
     // Reset hovered_this_frame
     gui_context.hovered_this_frame = false;
 
     // Draw each panel
-    let mut query = <&mut Panel>::query();
-    query.for_each_mut(world, |panel| {
+    for (_, panel) in query.query_mut(world) {
         // Reset the button state
         for button in &mut panel.buttons {
             button.clicked_this_frame = false;
@@ -32,7 +29,7 @@ pub fn draw_gui(
             *swapchain_image_index,
             panel,
         );
-    });
+    }
 
     // Did we hover over a button in this frame? If so request haptic feedback.
     if !gui_context.hovered_last_frame && gui_context.hovered_this_frame {
@@ -45,15 +42,14 @@ pub fn draw_gui(
 
 #[cfg(test)]
 mod tests {
-    use std::process::Command;
-
+    use super::*;
     use ash::vk::{self, Handle};
     use egui::Pos2;
     use image::{jpeg::JpegEncoder, DynamicImage, RgbaImage};
-    use legion::{IntoQuery, Resources, Schedule, World};
     use nalgebra::UnitQuaternion;
     use openxr::{Fovf, Quaternionf, Vector3f};
     use renderdoc::RenderDoc;
+    use std::process::Command;
 
     use crate::{
         buffer::Buffer,
@@ -83,44 +79,66 @@ mod tests {
             height: 800,
             width: 800,
         };
-        let (mut world, mut resources, image, mut schedule) = setup(resolution.clone());
+        let (mut world, image, vulkan_context, render_context, mut haptic_context, mut gui_context) =
+            setup(resolution.clone());
 
         let mut renderdoc: RenderDoc<renderdoc::V141> = RenderDoc::new().unwrap();
 
         // Begin. Use renderdoc in headless mode for debugging.
         renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
-        schedule.execute(&mut world, &mut resources);
+        let query = PreparedQuery::<&mut Panel>::default();
+        schedule(
+            &query,
+            &mut world,
+            &mut gui_context,
+            &mut haptic_context,
+            &render_context,
+            &vulkan_context,
+        );
 
         // Assert that haptic feedback has been requested.
-        assert_eq!(get_haptic_amplitude(&mut resources), 1.0);
+        assert_eq!(haptic_context.amplitude_this_frame, 0.1);
 
         // Assert the button WAS NOT clicked this frame
         assert!(!button_was_clicked(&mut world));
 
         // Release the trigger slightly
-        change_panel_trigger_value(&mut world);
-        schedule.execute(&mut world, &mut resources);
+        change_panel_trigger_value(&mut world, &query);
+        schedule(
+            &query,
+            &mut world,
+            &mut gui_context,
+            &mut haptic_context,
+            &render_context,
+            &vulkan_context,
+        );
 
         // Assert that NO haptic feedback has been requested.
-        assert_eq!(get_haptic_amplitude(&mut resources), 0.);
+        assert_eq!(haptic_context.amplitude_this_frame, 0.);
 
         // Assert the button WAS clicked this frame
         assert!(button_was_clicked(&mut world));
 
         // Move the cursor off the panel and release the trigger entirely
-        move_cursor_off_panel(&mut world);
-        schedule.execute(&mut world, &mut resources);
+        move_cursor_off_panel(&mut world, &query);
+        schedule(
+            &query,
+            &mut world,
+            &mut gui_context,
+            &mut haptic_context,
+            &render_context,
+            &vulkan_context,
+        );
 
         // Assert the button WAS NOT clicked this frame
         assert!(!button_was_clicked(&mut world));
 
         // Assert that NO haptic feedback has been requested.
-        assert_eq!(get_haptic_amplitude(&mut resources), 0.);
+        assert_eq!(haptic_context.amplitude_this_frame, 0.);
 
         renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
 
         // Get the image off the GPU
-        let vulkan_context = resources.get::<VulkanContext>().unwrap();
         write_image_to_disk(&vulkan_context, image, resolution);
 
         if !renderdoc.is_target_control_connected() {
@@ -132,28 +150,25 @@ mod tests {
     }
 
     fn button_was_clicked(world: &mut World) -> bool {
-        let mut query = <&mut Panel>::query();
-        let panel = query.iter_mut(world).next().unwrap();
+        let panel = world
+            .query_mut::<&mut Panel>()
+            .into_iter()
+            .next()
+            .unwrap()
+            .1;
         return panel.buttons[0].clicked_this_frame;
     }
 
-    fn get_haptic_amplitude(resources: &mut Resources) -> f32 {
-        let haptic_context = resources.get::<HapticContext>().unwrap();
-        return haptic_context.amplitude_this_frame;
-    }
-
-    fn change_panel_trigger_value(world: &mut World) {
-        let mut query = <&mut Panel>::query();
-        let panel = query.iter_mut(world).next().unwrap();
+    fn change_panel_trigger_value(world: &mut World, query: &PreparedQuery<&mut Panel>) {
+        let panel = query.query_mut(world).into_iter().next().unwrap().1;
         panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.05 * (800. / SCALE_FACTOR)),
             trigger_value: 0.2,
         });
     }
 
-    fn move_cursor_off_panel(world: &mut World) {
-        let mut query = <&mut Panel>::query();
-        let panel = query.iter_mut(world).next().unwrap();
+    fn move_cursor_off_panel(world: &mut World, query: &PreparedQuery<&mut Panel>) {
+        let panel = query.query_mut(world).into_iter().next().unwrap().1;
         panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0., 0.),
             trigger_value: 0.0,
@@ -194,7 +209,16 @@ mod tests {
         }
     }
 
-    pub fn setup(resolution: vk::Extent2D) -> (World, Resources, Image, Schedule) {
+    pub fn setup(
+        resolution: vk::Extent2D,
+    ) -> (
+        World,
+        Image,
+        VulkanContext,
+        RenderContext,
+        HapticContext,
+        GuiContext,
+    ) {
         let vulkan_context = VulkanContext::testing().unwrap();
         // Create an image with vulkan_context
         let image = vulkan_context
@@ -244,97 +268,97 @@ mod tests {
             trigger_value: 1.,
         });
         panel_components.3.translation[0] = -1.0;
-        world.push(panel_components);
+        world.spawn(panel_components);
 
         let haptic_context = HapticContext::default();
 
-        let mut resources = Resources::default();
-        resources.insert(vulkan_context);
-        resources.insert(render_context);
-        resources.insert(gui_context);
-        resources.insert(0 as usize);
-        resources.insert(haptic_context);
-
-        let schedule = build_schedule();
-
-        (world, resources, image, schedule)
+        (
+            world,
+            image,
+            vulkan_context,
+            render_context,
+            haptic_context,
+            gui_context,
+        )
     }
 
-    fn build_schedule() -> Schedule {
-        Schedule::builder()
-            .add_thread_local_fn(|_, resources| {
-                // let rotation: mint::Quaternion<f32> =
-                //     UnitQuaternion::from_euler_angles(0., 45_f32.to_radians(), 0.).into();
-                // let rotation: mint::Quaternion<f32> = UnitQuaternion::from_euler_angles(
-                //     -10_f32.to_radians(),
-                //     10_f32.to_radians(),
-                //     0.,
-                // )
-                // .into();
-                let rotation: mint::Quaternion<f32> =
-                    UnitQuaternion::from_euler_angles(0., 0., 0.).into();
-                let position = Vector3f {
-                    x: -1.0,
-                    y: 0.0,
-                    z: 1.0,
-                };
+    fn schedule(
+        query: &PreparedQuery<&mut Panel>,
+        world: &mut World,
+        gui_context: &mut GuiContext,
+        haptic_context: &mut HapticContext,
+        render_context: &RenderContext,
+        vulkan_context: &VulkanContext,
+    ) -> () {
+        begin_frame(render_context, vulkan_context);
 
-                let view = openxr::View {
-                    pose: openxr::Posef {
-                        orientation: Quaternionf::from(rotation),
-                        position,
-                    },
-                    fov: Fovf {
-                        angle_up: 45.0_f32.to_radians(),
-                        angle_down: -45.0_f32.to_radians(),
-                        angle_left: -45.0_f32.to_radians(),
-                        angle_right: 45.0_f32.to_radians(),
-                    },
-                };
-                let views = vec![view.clone(), view];
-                let vulkan_context = resources.get::<VulkanContext>().unwrap();
-                let mut render_context = resources.get_mut::<RenderContext>().unwrap();
+        // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
+        haptic_context.amplitude_this_frame = 0.;
 
-                render_context
-                    .update_scene_data(&views, &vulkan_context)
-                    .unwrap();
-                render_context
-                    .scene_params_buffer
-                    .update(
-                        &vulkan_context,
-                        &[SceneParams {
-                            // debug_view_inputs: 1.,
-                            ..Default::default()
-                        }],
-                    )
-                    .unwrap();
+        // Draw the GUI
+        draw_gui_system(
+            query,
+            world,
+            vulkan_context,
+            &0,
+            render_context,
+            gui_context,
+            haptic_context,
+        );
 
-                render_context.begin_frame(&vulkan_context, 0);
-            })
-            .add_thread_local_fn(|_, resources| {
-                // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
-                let mut haptic_context = resources.get_mut::<HapticContext>().unwrap();
-                haptic_context.amplitude_this_frame = 0.;
-            })
-            .add_system(draw_gui_system())
-            .add_thread_local_fn(|_, resources| {
-                let vulkan_context = resources.get::<VulkanContext>().unwrap();
-                let render_context = resources.get_mut::<RenderContext>().unwrap();
-                render_context.begin_pbr_render_pass(&vulkan_context, 0);
-            })
-            .add_system(update_transform_matrix_system())
-            .add_system(update_parent_transform_matrix_system())
-            .add_system(rendering_system())
-            .add_thread_local_fn(|_, resources| {
-                let vulkan_context = resources.get::<VulkanContext>().unwrap();
-                let mut render_context = resources.get_mut::<RenderContext>().unwrap();
-                render_context.end_pbr_render_pass(&vulkan_context, 0);
-            })
-            .add_thread_local_fn(|_, resources| {
-                let vulkan_context = resources.get::<VulkanContext>().unwrap();
-                let mut render_context = resources.get_mut::<RenderContext>().unwrap();
-                render_context.end_frame(&vulkan_context, 0);
-            })
-            .build()
+        // Begin the PBR Render Pass
+        render_context.begin_pbr_render_pass(vulkan_context, 0);
+
+        // Update transforms, etc.
+        update_transform_matrix_system();
+
+        // Update parent transform matrix
+        update_parent_transform_matrix_system();
+
+        // Render
+        rendering_system();
+
+        // End PBR render
+        render_context.end_pbr_render_pass(vulkan_context, 0);
+        render_context.end_frame(vulkan_context, 0);
+    }
+
+    fn begin_frame(render_context: &RenderContext, vulkan_context: &VulkanContext) {
+        let rotation: mint::Quaternion<f32> = UnitQuaternion::from_euler_angles(0., 0., 0.).into();
+        let position = Vector3f {
+            x: -1.0,
+            y: 0.0,
+            z: 1.0,
+        };
+
+        let view = openxr::View {
+            pose: openxr::Posef {
+                orientation: Quaternionf::from(rotation),
+                position,
+            },
+            fov: Fovf {
+                angle_up: 45.0_f32.to_radians(),
+                angle_down: -45.0_f32.to_radians(),
+                angle_left: -45.0_f32.to_radians(),
+                angle_right: 45.0_f32.to_radians(),
+            },
+        };
+        let views = vec![view.clone(), view];
+
+        render_context
+            .update_scene_data(&views, &vulkan_context)
+            .unwrap();
+        render_context
+            .scene_params_buffer
+            .update(
+                &vulkan_context,
+                &[SceneParams {
+                    // debug_view_inputs: 1.,
+                    ..Default::default()
+                }],
+            )
+            .unwrap();
+
+        render_context.begin_frame(&vulkan_context, 0);
     }
 }
