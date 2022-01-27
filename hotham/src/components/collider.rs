@@ -1,4 +1,4 @@
-use legion::Entity;
+use hecs::Entity;
 use rapier3d::prelude::ColliderHandle;
 
 #[derive(Debug, Clone)]
