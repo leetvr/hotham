@@ -91,7 +91,7 @@ pub fn add_cube_physics(world: &mut World, physics_context: &mut PhysicsContext,
         .build();
     let rigid_body = RigidBodyBuilder::new_dynamic().lock_rotations().build();
     let (collider, rigid_body) =
-        physics_context.add_rigid_body_and_collider(cube, rigid_body, collider);
+        physics_context.get_rigid_body_and_collider(cube, rigid_body, collider);
     cube_entry.add_component(collider);
     cube_entry.add_component(rigid_body);
 }

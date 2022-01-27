@@ -169,7 +169,7 @@ mod tests {
             let mut rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
             rigid_body.set_next_kinematic_translation(vector![0.0, 1.4, 0.0]);
             let (collider, rigid_body) =
-                physics_context.add_rigid_body_and_collider(hand, rigid_body, collider);
+                physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
             hand_entry.add_component(collider);
             hand_entry.add_component(rigid_body);
 

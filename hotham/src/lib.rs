@@ -6,6 +6,7 @@ pub use app::App;
 pub use hotham_error::HothamError;
 pub use rapier3d;
 pub use vertex::Vertex;
+pub use hecs;
 
 mod app;
 mod buffer;

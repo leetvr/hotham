@@ -77,7 +77,7 @@ mod tests {
             name: "Test entity".to_string(),
             node_id: 0,
         },));
-        let (collider, rigid_body) = physics_context.add_rigid_body_and_collider(
+        let (collider, rigid_body) = physics_context.get_rigid_body_and_collider(
             grabbed_entity,
             grabbed_rigid_body,
             grabbed_collider,

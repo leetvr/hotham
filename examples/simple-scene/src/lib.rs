@@ -66,7 +66,7 @@ pub fn real_main() -> HothamResult<()> {
             .build();
         let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
         let (collider, rigid_body) =
-            physics_context.add_rigid_body_and_collider(helmet, rigid_body, collider);
+            physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
         helmet_entry.add_component(collider);
         helmet_entry.add_component(rigid_body);
     }
@@ -102,7 +102,7 @@ pub fn real_main() -> HothamResult<()> {
             .build();
         let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
         let (collider, rigid_body) =
-            physics_context.add_rigid_body_and_collider(left_hand, rigid_body, collider);
+            physics_context.get_rigid_body_and_collider(left_hand, rigid_body, collider);
         left_hand_entry.add_component(collider);
         left_hand_entry.add_component(rigid_body);
     }
@@ -134,7 +134,7 @@ pub fn real_main() -> HothamResult<()> {
             .build();
         let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
         let (collider, rigid_body) =
-            physics_context.add_rigid_body_and_collider(right_hand, rigid_body, collider);
+            physics_context.get_rigid_body_and_collider(right_hand, rigid_body, collider);
         right_hand_entry.add_component(collider);
         right_hand_entry.add_component(rigid_body);
     }

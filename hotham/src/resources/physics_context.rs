@@ -1,5 +1,5 @@
 use crossbeam::channel::Receiver;
-use legion::Entity;
+use hecs::Entity;
 use rapier3d::na::Matrix3x1;
 use rapier3d::prelude::*;
 
@@ -76,13 +76,13 @@ impl PhysicsContext {
             .update(&self.island_manager, &self.rigid_bodies, &self.colliders);
     }
 
-    pub fn add_rigid_body_and_collider(
+    pub fn get_rigid_body_and_collider(
         &mut self,
         entity: Entity,
         rigid_body: RigidBody,
         mut collider: Collider,
     ) -> (RigidBodyComponent, ColliderComponent) {
-        collider.user_data = entity_to_u64(entity) as _;
+        collider.user_data = entity.to_bits().get() as _;
         let rigid_body_handle = self.rigid_bodies.insert(rigid_body);
 
         // TODO: Users may wish to pass in their own interaction groups.

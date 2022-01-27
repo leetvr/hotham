@@ -62,7 +62,7 @@ mod tests {
 
     use legion::{IntoQuery, Resources, Schedule, World};
     use rapier3d::prelude::RigidBodyBuilder;
-    const DURATION_SECS: u32 = 30;
+    const DURATION_SECS: u32 = 8;
 
     use crate::{resources::XrContext, VIEW_TYPE};
 
@@ -133,12 +133,12 @@ mod tests {
                     _ => {}
                 }
 
-                if start.elapsed().as_secs() >= 8
+                if start.elapsed().as_secs() >= 4
                     && audio_context.current_music_track.unwrap() != right_here
                 {
                     audio_context.play_music_track(right_here);
-                } else if start.elapsed().as_secs() >= 4
-                    && start.elapsed().as_secs() < 8
+                } else if start.elapsed().as_secs() >= 2
+                    && start.elapsed().as_secs() < 4
                     && audio_context.current_music_track.unwrap() != tell_me_that_i_cant
                 {
                     audio_context.play_music_track(tell_me_that_i_cant);

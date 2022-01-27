@@ -1,10 +1,10 @@
 use hotham::{
     components::RigidBody,
+    hecs::{CommandBuffer, Entity, PreparedQuery, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
-use legion::{system, Entity, World};
 use nalgebra::{vector, Isometry3, Quaternion, Translation3, UnitQuaternion};
 
 use crate::components::{Colour, Saber};
@@ -22,54 +22,57 @@ const SABER_HALF_HEIGHT: f32 = SABER_HEIGHT / 2.;
 const SABER_WIDTH: f32 = 0.02;
 const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 
-#[system(for_each)]
-pub fn sabers(
-    _: &Saber,
-    colour: &Colour,
-    rigid_body_component: &RigidBody,
-    #[resource] xr_context: &XrContext,
-    #[resource] physics_context: &mut PhysicsContext,
+pub fn sabers_system(
+    world: &mut World,
+    query: &mut PreparedQuery<With<Saber, (&Colour, &RigidBody)>>,
+    xr_context: &XrContext,
+    physics_context: &mut PhysicsContext,
 ) {
-    // Get our the space and path of the hand.
-    let time = xr_context.frame_state.predicted_display_time;
-    let (space, _) = match colour {
-        Colour::Red => (
-            &xr_context.left_hand_space,
-            xr_context.left_hand_subaction_path,
-        ),
-        Colour::Blue => (
-            &xr_context.right_hand_space,
-            xr_context.right_hand_subaction_path,
-        ),
-    };
+    for (_, (colour, rigid_body)) in query.query_mut(world) {
+        // Get our the space and path of the hand.
+        let time = xr_context.frame_state.predicted_display_time;
+        let (space, _) = match colour {
+            Colour::Red => (
+                &xr_context.left_hand_space,
+                xr_context.left_hand_subaction_path,
+            ),
+            Colour::Blue => (
+                &xr_context.right_hand_space,
+                xr_context.right_hand_subaction_path,
+            ),
+        };
 
-    // Locate the hand in the space.
-    let space = space.locate(&xr_context.reference_space, time).unwrap();
-    if !is_space_valid(&space) {
-        println!(
+        // Locate the hand in the space.
+        let space = space.locate(&xr_context.reference_space, time).unwrap();
+        if !is_space_valid(&space) {
+            println!(
             "[HOTHAM_SABERS] ERROR: Unable to locate {:?} saber - position or orientation invalid",
             colour
         );
-        return;
+            return;
+        }
+
+        let pose = space.pose;
+
+        // apply transform
+        let rigid_body = physics_context
+            .rigid_bodies
+            .get_mut(rigid_body.handle)
+            .unwrap();
+
+        let mut position = posef_to_isometry(pose);
+        apply_grip_offset(&mut position);
+
+        rigid_body.set_next_kinematic_position(position);
     }
-
-    let pose = space.pose;
-
-    // apply transform
-    let rigid_body = physics_context
-        .rigid_bodies
-        .get_mut(rigid_body_component.handle)
-        .unwrap();
-
-    let mut position = posef_to_isometry(pose);
-    apply_grip_offset(&mut position);
-
-    rigid_body.set_next_kinematic_position(position);
 }
 
-pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, saber: Entity) {
-    let mut saber_entry = world.entry(saber).unwrap();
-
+pub fn add_saber_physics(
+    world: &mut World,
+    physics_context: &mut PhysicsContext,
+    command_buffer: &mut CommandBuffer,
+    saber: Entity,
+) {
     // Give it a collider and rigid-body
     let collider = ColliderBuilder::cylinder(SABER_HALF_HEIGHT, SABER_HALF_WIDTH)
         .translation(vector![0., SABER_HALF_HEIGHT, 0.])
@@ -78,10 +81,10 @@ pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext
         .active_events(ActiveEvents::INTERSECTION_EVENTS)
         .build();
     let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
-    let (collider, rigid_body) =
-        physics_context.add_rigid_body_and_collider(saber, rigid_body, collider);
-    saber_entry.add_component(collider);
-    saber_entry.add_component(rigid_body);
+
+    // Add the components to the entity.
+    let components = physics_context.get_rigid_body_and_collider(saber, rigid_body, collider);
+    command_buffer.insert(saber, components);
 }
 
 pub fn apply_grip_offset(position: &mut Isometry3<f32>) {
@@ -97,42 +100,45 @@ mod tests {
     use super::*;
     use hotham::{
         components::{Transform, TransformMatrix},
+        hecs::With,
         resources::{PhysicsContext, XrContext},
-        schedule_functions::physics_step,
         systems::update_rigid_body_transforms_system,
     };
-    use legion::{IntoQuery, Resources, Schedule, World};
     use nalgebra::{vector, Quaternion, Translation3};
 
     #[test]
     fn test_sabers() {
-        let mut world = World::default();
-        let mut resources = Resources::default();
+        let mut world = World::new();
         let path = std::path::Path::new("../../openxr_loader.dll");
         let (xr_context, _) = XrContext::new_from_path(path).unwrap();
         let mut physics_context = PhysicsContext::default();
-        let saber = world.push((
+        let mut command_buffer = CommandBuffer::new();
+        let saber = world.spawn((
             Colour::Red,
             Saber {},
             Transform::default(),
             TransformMatrix::default(),
         ));
-        add_saber_physics(&mut world, &mut physics_context, saber);
+        add_saber_physics(&mut world, &mut physics_context, &mut command_buffer, saber);
 
-        resources.insert(xr_context);
-        resources.insert(physics_context);
+        let saber_query = PreparedQuery::<With<Saber, (&Colour, &RigidBody)>>::default();
+        let rigid_body_transforms_query = PreparedQuery::<(&RigidBody, &mut Transform)>::default();
 
-        let mut schedule = Schedule::builder()
-            .add_system(sabers_system())
-            .add_thread_local_fn(physics_step)
-            .add_system(update_rigid_body_transforms_system())
-            .build();
+        let schedule = sabers_system(
+            &mut world,
+            &mut saber_query,
+            &xr_context,
+            &mut physics_context,
+        );
 
-        schedule.execute(&mut world, &mut resources);
+        physics_context.update();
+        update_rigid_body_transforms_system(
+            &mut world,
+            &mut rigid_body_transforms_query,
+            &physics_context,
+        );
 
-        let mut query = <(&Transform, &Saber)>::query();
-        let (transform, _) = query.get(&world, saber).unwrap();
-
+        let transform = world.get::<&Transform>(saber).unwrap();
         approx::assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
     }
 

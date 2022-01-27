@@ -142,7 +142,7 @@ mod tests {
             .translation(vector![0., 0.5, 0.])
             .build();
         let (rigid_body, collider) =
-            physics_context.add_rigid_body_and_collider(e1, rigid_body, collider);
+            physics_context.get_rigid_body_and_collider(e1, rigid_body, collider);
         {
             let mut entry = world.entry(e1).unwrap();
             entry.add_component(rigid_body);
@@ -164,7 +164,7 @@ mod tests {
         let rigid_body = RigidBodyBuilder::new_dynamic().build();
         let collider = ColliderBuilder::cylinder(1.0, 0.2).build();
         let (rigid_body, collider) =
-            physics_context.add_rigid_body_and_collider(e2, rigid_body, collider);
+            physics_context.get_rigid_body_and_collider(e2, rigid_body, collider);
         {
             let mut entry = world.entry(e2).unwrap();
             entry.add_component(rigid_body);
