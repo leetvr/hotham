@@ -7,7 +7,7 @@ pub fn animation_system(
 ) {
     for (_, (animation_target, transform)) in query.query(world).iter() {
         let controller = world
-            .get::<&AnimationController>(animation_target.controller)
+            .get::<AnimationController>(animation_target.controller)
             .unwrap();
         let blend_from = controller.blend_from;
         let blend_to = controller.blend_to;
