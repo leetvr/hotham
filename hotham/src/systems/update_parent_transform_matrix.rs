@@ -31,7 +31,7 @@ fn update_transform_matrix(
 ) {
     if let Some(children) = heirarchy.get(&entity) {
         for child in children {
-            let child_matrix = &mut world.get_mut::<&mut TransformMatrix>(*child).unwrap().0;
+            let child_matrix = &mut world.get_mut::<TransformMatrix>(*child).unwrap().0;
             *child_matrix = parent_matrix * *child_matrix;
             update_transform_matrix(child_matrix, *child, heirarchy, world);
         }
@@ -63,11 +63,11 @@ mod tests {
 
         schedule(&mut world);
 
-        let transform_matrix = world.get_mut::<&TransformMatrix>(grandchild).unwrap();
+        let transform_matrix = world.get_mut::<TransformMatrix>(grandchild).unwrap();
         let expected_matrix = Matrix4::new_translation(&vector![3.0, 3.0, 300.0]);
         assert_relative_eq!(transform_matrix.0, expected_matrix);
 
-        let transform_matrix = world.get_mut::<&TransformMatrix>(child).unwrap();
+        let transform_matrix = world.get_mut::<TransformMatrix>(child).unwrap();
         let expected_matrix = Matrix4::new_translation(&vector![2.0, 2.0, 200.0]);
         assert_relative_eq!(transform_matrix.0, expected_matrix);
     }
@@ -111,7 +111,7 @@ mod tests {
 
         let root_entity = node_entity.get(&0).unwrap();
         {
-            let mut transform = world.get_mut::<&mut Transform>(*root_entity).unwrap();
+            let mut transform = world.get_mut::<Transform>(*root_entity).unwrap();
             transform.translation = vector![100.0, 100.0, 100.0];
         }
         schedule(&mut world);
@@ -124,13 +124,12 @@ mod tests {
             let mut parent_entity = parent.0;
             let mut parent_matrices = vec![];
             loop {
-                let parent_transform_matrix = world
-                    .get_mut::<&mut TransformMatrix>(parent_entity)
-                    .unwrap();
+                let parent_transform_matrix =
+                    world.get_mut::<TransformMatrix>(parent_entity).unwrap();
                 parent_matrices.push(parent_transform_matrix.0);
 
                 // Walk up the tree until we find the root.
-                if let Ok(grand_parent) = world.get_mut::<&Parent>(parent_entity) {
+                if let Ok(grand_parent) = world.get_mut::<Parent>(parent_entity) {
                     depth += 1;
                     parent_entity = grand_parent.0;
                 } else {

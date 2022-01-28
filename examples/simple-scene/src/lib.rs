@@ -139,7 +139,7 @@ fn add_hand(
         world.insert_one(hand, handedness).unwrap();
 
         // Modify the animation controller
-        let mut animation_controller = world.get_mut::<&mut AnimationController>(hand).unwrap();
+        let mut animation_controller = world.get_mut::<AnimationController>(hand).unwrap();
         animation_controller.blend_from = 0;
         animation_controller.blend_to = 1;
         drop(animation_controller);

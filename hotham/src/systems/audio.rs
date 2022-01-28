@@ -182,7 +182,7 @@ mod tests {
         right_here: Index,
         tell_me_that_i_cant: Index,
     ) {
-        let mut source = world.get_mut::<&mut SoundEmitter>(entity).unwrap();
+        let mut source = world.get_mut::<SoundEmitter>(entity).unwrap();
         match source.current_state() {
             SoundState::Stopped => source.play(),
             _ => {}

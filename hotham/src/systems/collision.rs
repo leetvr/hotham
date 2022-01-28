@@ -72,7 +72,7 @@ mod tests {
         // do something that would cause a and b to collide
         collision_system(&mut Default::default(), &mut world, &mut physics_context);
 
-        let a_collider = world.get_mut::<&Collider>(a).unwrap();
+        let a_collider = world.get_mut::<Collider>(a).unwrap();
         assert!(a_collider.collisions_this_frame.contains(&b));
     }
 

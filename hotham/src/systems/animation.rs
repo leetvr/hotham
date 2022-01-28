@@ -55,9 +55,7 @@ mod tests {
         )
         .unwrap();
         {
-            let mut left_hand_controller = world
-                .get_mut::<&mut AnimationController>(left_hand)
-                .unwrap();
+            let mut left_hand_controller = world.get_mut::<AnimationController>(left_hand).unwrap();
             left_hand_controller.blend_from = 0;
             left_hand_controller.blend_from = 1;
             left_hand_controller.blend_amount = 0.5;

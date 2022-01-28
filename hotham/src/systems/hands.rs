@@ -109,7 +109,7 @@ mod tests {
 
         schedule(&mut world, &mut xr_context, &mut physics_context);
 
-        let transform = world.get_mut::<&Transform>(grabbed_entity).unwrap();
+        let transform = world.get_mut::<Transform>(grabbed_entity).unwrap();
         assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
     }
 

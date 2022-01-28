@@ -12,7 +12,7 @@ pub fn skinning_system(
     let mut joint_matrices: HashMap<Entity, HashMap<usize, Matrix4<f32>>> = HashMap::new();
     for (_, (transform_matrix, joint, info)) in joints_query.query(world).iter() {
         let inverse_transform = world
-            .get_mut::<&TransformMatrix>(joint.skeleton_root)
+            .get_mut::<TransformMatrix>(joint.skeleton_root)
             .unwrap()
             .0
             .try_inverse()
@@ -139,7 +139,7 @@ mod tests {
 
         skinning_system(&mut Default::default(), &mut Default::default(), &mut world);
 
-        let mesh = world.get_mut::<&Mesh>(skinned_entity).unwrap();
+        let mesh = world.get_mut::<Mesh>(skinned_entity).unwrap();
         let matrices_from_buffer = mesh.ubo_data.joint_matrices;
 
         for (from_buf, joint_matrices) in matrices_from_buffer.iter().zip(joint_matrices.iter()) {

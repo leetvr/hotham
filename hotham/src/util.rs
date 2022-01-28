@@ -61,7 +61,7 @@ pub fn get_world_with_hands() -> World {
     )
     .unwrap();
     {
-        let mut transform = world.get_mut::<&mut Transform>(left_hand).unwrap();
+        let mut transform = world.get_mut::<Transform>(left_hand).unwrap();
         transform.translation = vector![-0.2, 1.4, 0.0];
     }
 
@@ -75,7 +75,7 @@ pub fn get_world_with_hands() -> World {
     )
     .unwrap();
     {
-        let mut transform = world.get_mut::<&mut Transform>(right_hand).unwrap();
+        let mut transform = world.get_mut::<Transform>(right_hand).unwrap();
         transform.translation = vector![0.2, 1.4, 0.0];
     }
 

@@ -39,8 +39,8 @@ pub fn world_to_debug_data(
 ) -> DebugFrame {
     let mut entities = Vec::new();
     for (entity, info) in world.query::<&Info>().iter() {
-        let transform = world.get_mut::<&Transform>(entity).ok();
-        let collider = world.get_mut::<&Collider>(entity).ok();
+        let transform = world.get_mut::<Transform>(entity).ok();
+        let collider = world.get_mut::<Collider>(entity).ok();
         let collider = collider
             .map(|c| physics_context.colliders.get(c.handle))
             .flatten();
@@ -50,7 +50,7 @@ pub fn world_to_debug_data(
             name: info.name.clone(),
             id: format!("{}_{}", session_id, entity_id),
             entity_id,
-            transform: transform.map(|t| parse_transform(*t)),
+            transform: transform.map(|t| parse_transform(&t)),
             collider: collider.map(parse_collider),
         };
 

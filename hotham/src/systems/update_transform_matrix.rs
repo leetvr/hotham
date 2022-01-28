@@ -31,7 +31,7 @@ mod tests {
         let entity = world.spawn((transform, transform_matrix));
 
         {
-            let matrix = world.get_mut::<&mut TransformMatrix>(entity).unwrap();
+            let matrix = world.get_mut::<TransformMatrix>(entity).unwrap();
             assert_eq!(matrix.0, Matrix4::identity());
         }
 
@@ -39,7 +39,7 @@ mod tests {
         let test_rotation = UnitQuaternion::from_euler_angles(0.3, 0.3, 0.3);
 
         {
-            let mut transform = world.get_mut::<&mut Transform>(entity).unwrap();
+            let mut transform = world.get_mut::<Transform>(entity).unwrap();
             transform.translation = test_translation.clone();
             transform.rotation = test_rotation.clone();
             transform.scale = test_translation.clone();
@@ -51,7 +51,7 @@ mod tests {
             * Matrix4::from(test_rotation)
             * Matrix4::new_nonuniform_scaling(&vector![5.0, 1.0, 2.0]);
 
-        let matrix = world.get_mut::<&mut TransformMatrix>(entity).unwrap();
+        let matrix = world.get_mut::<TransformMatrix>(entity).unwrap();
         assert_relative_eq!(matrix.0, expected_matrix);
     }
 }

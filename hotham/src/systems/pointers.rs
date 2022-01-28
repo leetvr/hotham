@@ -96,7 +96,7 @@ pub fn pointers_system(
             let hit_collider = physics_context.colliders.get(handle).unwrap();
             let entity = unsafe { world.find_entity_from_id(hit_collider.user_data as _) };
             let mut panel = world
-                .get_mut::<&mut Panel>(entity)
+                .get_mut::<Panel>(entity)
                 .expect(&format!("Unable to find entity {:?} in world", entity));
             let panel_extent = &panel.extent;
             let panel_transform = hit_collider.position();
@@ -246,12 +246,12 @@ mod tests {
 
         schedule(&mut physics_context, &mut world, &mut xr_context);
 
-        let transform = world.get_mut::<&Transform>(pointer_entity).unwrap();
+        let transform = world.get_mut::<Transform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
         assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
 
-        let panel = world.get_mut::<&Panel>(panel_entity).unwrap();
+        let panel = world.get_mut::<Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 50.);
         assert_relative_eq!(input.cursor_location.y, 29.491043);
