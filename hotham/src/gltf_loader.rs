@@ -184,7 +184,7 @@ fn add_skins_and_joints(
         world.insert_one(this_entity, Skin { joint_ids });
 
         // Tell the vertex shader how many joints we have
-        let mesh = world.get_mut::<Mesh>(this_entity).unwrap();
+        let mut mesh = world.get_mut::<&mut Mesh>(this_entity).unwrap();
         mesh.ubo_data.joint_count = joint_matrices.len() as f32;
     }
 
@@ -263,16 +263,19 @@ fn add_animations(
                 .collect_vec();
 
             // If an animation target exists already, push this animation onto it. Otherwise, create a new one.
-            if let Ok(animation_target) = world.get_mut::<&mut AnimationTarget>(target_entity) {
-                animation_target.animations.push(animation);
-            } else {
-                world.insert_one(
-                    target_entity,
-                    AnimationTarget {
-                        controller: controller_entity.clone(),
-                        animations: vec![animation],
-                    },
-                );
+            match world.query_one_mut::<&mut AnimationTarget>(target_entity) {
+                Ok(animation_target) => {
+                    animation_target.animations.push(animation);
+                }
+                _ => {
+                    world.insert_one(
+                        target_entity,
+                        AnimationTarget {
+                            controller: controller_entity.clone(),
+                            animations: vec![animation],
+                        },
+                    );
+                }
             }
 
             // Add an animation controller to our parent, if needed.
@@ -305,18 +308,18 @@ pub fn add_model_to_world(
     }
 
     // Go through each entity in the source world and clone its components into the new world.
-    for (source_entity, destination_entity) in entity_map {
-        if let Ok(transform) = source_world.get_mut::<&Transform>(source_entity) {
-            destination_world.insert_one(destination_entity, transform.clone());
+    for (source_entity, destination_entity) in &entity_map {
+        if let Ok(transform) = source_world.get_mut::<&Transform>(*source_entity) {
+            destination_world.insert_one(*destination_entity, transform.clone());
         }
 
-        if let Ok(transform_matrix) = source_world.get_mut::<&TransformMatrix>(source_entity) {
-            destination_world.insert_one(destination_entity, transform_matrix.clone());
+        if let Ok(transform_matrix) = source_world.get_mut::<&TransformMatrix>(*source_entity) {
+            destination_world.insert_one(*destination_entity, transform_matrix.clone());
         }
 
         // Create a new mesh for this entity in the destination world.
-        if let Ok(mesh) = source_world.get_mut::<&Mesh>(source_entity) {
-            let info = source_world.get_mut::<&Info>(source_entity).unwrap();
+        if let Ok(mesh) = source_world.get_mut::<&Mesh>(*source_entity) {
+            let info = source_world.get_mut::<&Info>(*source_entity).unwrap();
 
             // Create new description sets
             let descriptor_sets = vulkan_context
@@ -343,54 +346,54 @@ pub fn add_model_to_world(
                 ubo_data: mesh.ubo_data.clone(),
                 primitives: mesh.primitives.clone(),
             };
-            destination_world.insert_one(destination_entity, new_mesh);
+            destination_world.insert_one(*destination_entity, new_mesh);
         }
 
-        if let Ok(skin) = source_world.get_mut::<&Skin>(source_entity) {
-            destination_world.insert_one(destination_entity, skin.clone());
+        if let Ok(skin) = source_world.get_mut::<&Skin>(*source_entity) {
+            destination_world.insert_one(*destination_entity, skin.clone());
         }
 
         // If the source entity had a joint, clone it and set the skeleton root to the corresponding entity in the destination world.
-        if let Ok(joint) = source_world.get_mut::<&Joint>(source_entity) {
+        if let Ok(joint) = source_world.get_mut::<&Joint>(*source_entity) {
             let mut new_joint = joint.clone();
             new_joint.skeleton_root = *entity_map.get(&joint.skeleton_root).unwrap();
-            destination_world.insert_one(destination_entity, new_joint);
+            destination_world.insert_one(*destination_entity, new_joint);
         }
 
         // If the source entity had a parent, set it to the corresponding entity in the destination world.
-        if let Ok(parent) = source_world.get_mut::<&Parent>(source_entity) {
+        if let Ok(parent) = source_world.get_mut::<&Parent>(*source_entity) {
             let new_parent = entity_map.get(&parent.0).unwrap();
-            destination_world.insert_one(destination_entity, Parent(*new_parent));
+            destination_world.insert_one(*destination_entity, Parent(*new_parent));
         }
 
-        if let Ok(root) = source_world.get_mut::<&Root>(source_entity) {
-            destination_world.insert_one(destination_entity, root.clone());
+        if let Ok(root) = source_world.get_mut::<&Root>(*source_entity) {
+            destination_world.insert_one(*destination_entity, root.clone());
 
             // Set a parent for the root entity if one was specified.
             if let Some(parent) = parent {
-                destination_world.insert_one(destination_entity, Parent(parent));
+                destination_world.insert_one(*destination_entity, Parent(parent));
             }
         }
 
-        if let Ok(info) = source_world.get_mut::<&Info>(source_entity) {
-            destination_world.insert_one(destination_entity, info.clone());
+        if let Ok(info) = source_world.get_mut::<&Info>(*source_entity) {
+            destination_world.insert_one(*destination_entity, info.clone());
         }
 
         if let Ok(animation_controller) =
-            source_world.get_mut::<&AnimationController>(source_entity)
+            source_world.get_mut::<&AnimationController>(*source_entity)
         {
-            destination_world.insert_one(destination_entity, animation_controller.clone());
+            destination_world.insert_one(*destination_entity, animation_controller.clone());
         }
 
-        if let Ok(animation_target) = source_world.get_mut::<&AnimationTarget>(source_entity) {
+        if let Ok(animation_target) = source_world.get_mut::<&AnimationTarget>(*source_entity) {
             let mut new_animation_target = animation_target.clone();
             new_animation_target.controller =
                 *entity_map.get(&animation_target.controller).unwrap();
-            destination_world.insert_one(destination_entity, new_animation_target);
+            destination_world.insert_one(*destination_entity, new_animation_target);
         }
 
-        if let Ok(visible) = source_world.get_mut::<&Visible>(source_entity) {
-            destination_world.insert_one(destination_entity, visible.clone());
+        if let Ok(visible) = source_world.get_mut::<&Visible>(*source_entity) {
+            destination_world.insert_one(*destination_entity, visible.clone());
         }
     }
 

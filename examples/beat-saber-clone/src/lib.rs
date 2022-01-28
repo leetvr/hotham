@@ -37,7 +37,6 @@ use hotham::{
         update_parent_transform_matrix_system, update_rigid_body_transforms_system,
         update_transform_matrix_system,
     },
-    util::entity_to_u64,
     App, HothamResult,
 };
 

@@ -4,7 +4,6 @@ use rapier3d::na::Matrix3x1;
 use rapier3d::prelude::*;
 
 use crate::components::{Collider as ColliderComponent, RigidBody as RigidBodyComponent};
-use crate::util::entity_to_u64;
 
 pub const DEFAULT_COLLISION_GROUP: u32 = 0b01;
 pub const PANEL_COLLISION_GROUP: u32 = 0b10;
