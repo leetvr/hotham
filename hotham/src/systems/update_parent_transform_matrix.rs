@@ -160,7 +160,7 @@ mod tests {
     }
 
     fn schedule(world: &mut World) {
-        update_transform_matrix_system();
+        update_transform_matrix_system(&mut Default::default(), world);
         update_parent_transform_matrix_system(
             &mut Default::default(),
             &mut Default::default(),
