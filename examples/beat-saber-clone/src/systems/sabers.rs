@@ -130,7 +130,7 @@ mod tests {
             &physics_context,
         );
 
-        let transform = world.get::<&Transform>(saber).unwrap();
+        let transform = world.get::<Transform>(saber).unwrap();
         approx::assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
     }
 

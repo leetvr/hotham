@@ -55,7 +55,7 @@ mod tests {
         schedule(&mut physics_context, &mut query, &mut world);
         schedule(&mut physics_context, &mut query, &mut world);
 
-        let transform = world.get::<&Transform>(entity).unwrap();
+        let transform = world.get::<Transform>(entity).unwrap();
         assert_relative_eq!(transform.translation, vector![1.0, 2.0, 3.0]);
         assert_relative_eq!(transform.rotation, rotation);
     }

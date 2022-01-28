@@ -49,7 +49,7 @@ pub fn hands_system(
         rigid_body.set_next_kinematic_position(position);
 
         if let Some(grabbed_entity) = hand.grabbed_entity {
-            let handle = world.get::<&RigidBody>(grabbed_entity).unwrap().handle;
+            let handle = world.get::<RigidBody>(grabbed_entity).unwrap().handle;
             let rigid_body = physics_context.rigid_bodies.get_mut(handle).unwrap();
             rigid_body.set_next_kinematic_position(position);
         }
@@ -84,7 +84,8 @@ mod tests {
 
     #[test]
     pub fn test_hands_system() {
-        let (mut world, hand, mut xr_context, mut physics_context) = setup();
+        let (mut world, mut xr_context, mut physics_context) = setup();
+        let hand = add_hand_to_world(&mut physics_context, &mut world, None);
 
         schedule(&mut world, &mut xr_context, &mut physics_context);
 
@@ -99,13 +100,14 @@ mod tests {
 
     #[test]
     pub fn test_move_grabbed_objects() {
-        let (mut world, _, mut xr_context, mut physics_context) = setup();
+        let (mut world, mut xr_context, mut physics_context) = setup();
 
         let grabbed_object_rigid_body = RigidBodyBuilder::new_kinematic_position_based().build(); // grabber sets the rigidbody as kinematic
         let handle = physics_context
             .rigid_bodies
             .insert(grabbed_object_rigid_body);
         let grabbed_entity = world.spawn((RigidBody { handle }, Transform::default()));
+        add_hand_to_world(&mut physics_context, &mut world, Some(grabbed_entity));
 
         schedule(&mut world, &mut xr_context, &mut physics_context);
 
@@ -114,12 +116,11 @@ mod tests {
     }
 
     // HELPER FUNCTIONS
-    fn setup() -> (World, hecs::Entity, XrContext, PhysicsContext) {
-        let mut world = World::new();
+    fn setup() -> (World, XrContext, PhysicsContext) {
+        let world = World::new();
         let (xr_context, _) = XrContext::new().unwrap();
-        let mut physics_context = PhysicsContext::default();
-        let hand = add_hand_to_world(&mut physics_context, &mut world, None);
-        (world, hand, xr_context, physics_context)
+        let physics_context = PhysicsContext::default();
+        (world, xr_context, physics_context)
     }
 
     fn schedule(

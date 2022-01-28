@@ -53,7 +53,7 @@ pub fn real_main() -> HothamResult<()> {
     .expect("Could not find Damaged Helmet");
 
     // Add the helmet model
-    let transform = world.get::<&Transform>(helmet).unwrap();
+    let transform = world.get::<Transform>(helmet).unwrap();
     let position = transform.position();
     drop(transform);
 

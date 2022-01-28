@@ -21,7 +21,7 @@ pub fn grabbing_system(
 
             // Check to see if we are colliding with an entity
             if let Some(other_entity) = collider.collisions_this_frame.first() {
-                let rigid_body_handle = world.get::<&RigidBody>(*other_entity).unwrap().handle;
+                let rigid_body_handle = world.get::<RigidBody>(*other_entity).unwrap().handle;
                 let rigid_body = physics_context
                     .rigid_bodies
                     .get_mut(rigid_body_handle)
@@ -36,7 +36,7 @@ pub fn grabbing_system(
         } else {
             // If we are not gripping, but we have a grabbed entity, release it
             if let Some(grabbed_entity) = hand.grabbed_entity.take() {
-                let rigid_body_handle = world.get::<&RigidBody>(grabbed_entity).unwrap().handle;
+                let rigid_body_handle = world.get::<RigidBody>(grabbed_entity).unwrap().handle;
                 let rigid_body = physics_context
                     .rigid_bodies
                     .get_mut(rigid_body_handle)
@@ -118,7 +118,6 @@ mod tests {
         );
 
         let hand = world.get_mut::<Hand>(hand_entity).unwrap();
-        assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
         assert!(hand.grabbed_entity.is_none());
     }
 
