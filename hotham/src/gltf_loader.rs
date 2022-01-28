@@ -478,12 +478,9 @@ mod tests {
             let model_world = models
                 .get(*name)
                 .expect(&format!("Unable to find model with name {}", name));
-            let meshes = model_world
-                .query::<(&Mesh, &Transform, &TransformMatrix, &Info)>()
-                .iter()
-                .map(|(_, (mesh, ..))| mesh)
-                .collect::<Vec<_>>();
-            assert_eq!(meshes.len(), 1);
+            let mut original_mesh =
+                model_world.query::<(&Mesh, &Transform, &TransformMatrix, &Info)>();
+            let original_mesh = original_mesh.iter().next().unwrap().1 .0;
 
             let mut world = World::default();
             let model = add_model_to_world(
@@ -515,7 +512,7 @@ mod tests {
             assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
 
             // Get mesh's initial buffer handle
-            let initial_buffer = meshes[0].ubo_buffer.handle;
+            let initial_buffer = original_mesh.ubo_buffer.handle;
             let new_buffer = mesh.ubo_buffer.handle;
             assert_ne!(initial_buffer, new_buffer);
         }
@@ -540,53 +537,53 @@ mod tests {
         );
 
         // Make sure there is only one root
-        let mut roots = world
-            .query_mut::<(&Root, &Info, &Transform)>()
-            .into_iter()
-            .map(|(_, c)| c)
-            .collect::<Vec<_>>();
+        let mut roots = world.query_mut::<(&Root, &Info, &Transform)>().into_iter();
         assert_eq!(roots.len(), 1);
-        let root = roots[0];
+        let root = roots.next().unwrap().1;
         assert_eq!(&root.1.name, "Left Hand");
 
         // Make sure its transform is correct
         assert_relative_eq!(root.2.translation, vector![0.0, 0.0, 0.0]);
 
         // Make sure we imported the mesh
-        let mut meshes = world
+        let meshes = world
             .query_mut::<(&Mesh, &Transform, &TransformMatrix)>()
-            .into_iter()
-            .map(|(_, a)| a)
-            .collect::<Vec<_>>();
+            .into_iter();
         assert_eq!(meshes.len(), 1);
 
         // Make sure we imported the AnimationController
-        let animation_controllers = world.query::<&AnimationController>().iter();
+        let animation_controllers = world.query_mut::<&AnimationController>().into_iter();
         assert_eq!(animation_controllers.len(), 1);
 
         // Make sure we got all the nodes
-        let transforms = world.query::<&Transform>().iter();
+        let transforms = world.query_mut::<&Transform>().into_iter();
         assert_eq!(transforms.len(), 28);
 
         // Make sure we got all the Parent -> Child relationships
-        let transforms_with_parents = world.query_mut::<(&Transform, &Parent)>().into_iter();
-        assert_eq!(transforms_with_parents.len(), 27);
-        for (_, (_, parent)) in transforms_with_parents {
-            assert!(world.contains(parent.0));
+        {
+            let mut transforms_with_parents = world.query::<(&Transform, &Parent)>();
+            assert_eq!(transforms_with_parents.iter().len(), 27);
+            for (_, (_, parent)) in transforms_with_parents.iter() {
+                assert!(world.contains(parent.0));
+            }
         }
 
         // Make sure we got all the joints
-        let joints = world.query_mut::<&Joint>().into_iter();
-        assert_eq!(joints.len(), 25);
-        for (_, joint) in joints {
-            assert!(world.contains(joint.skeleton_root));
+        {
+            let mut joints = world.query::<&Joint>();
+            assert_eq!(joints.iter().len(), 25);
+            for (_, joint) in joints.iter() {
+                assert!(world.contains(joint.skeleton_root));
+            }
         }
 
         // Make sure we got all the AnimationTargets
-        let animation_targets = world.query_mut::<&AnimationTarget>().into_iter();
-        assert_eq!(animation_targets.len(), 17);
-        for (_, animation_target) in animation_targets {
-            assert!(world.contains(animation_target.controller));
+        {
+            let mut animation_targets = world.query::<&AnimationTarget>();
+            assert_eq!(animation_targets.iter().len(), 17);
+            for (_, animation_target) in animation_targets.iter() {
+                assert!(world.contains(animation_target.controller));
+            }
         }
     }
 }

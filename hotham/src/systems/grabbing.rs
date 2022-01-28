@@ -7,11 +7,11 @@ use crate::{
 };
 
 pub fn grabbing_system(
-    query: &PreparedQuery<(&mut Hand, &Collider)>,
+    query: &mut PreparedQuery<(&mut Hand, &Collider)>,
     world: &mut World,
     physics_context: &mut PhysicsContext,
 ) {
-    for (_, (hand, collider)) in query.query_mut(world) {
+    for (_, (hand, collider)) in query.query(world).iter() {
         // Check to see if we are currently gripping
         if hand.grip_value >= 1.0 {
             // If we already have a grabbed entity, no need to do anything.
@@ -95,11 +95,11 @@ mod tests {
 
         let hand_entity = world.spawn((hand, collider));
 
-        let query = PreparedQuery::<(&mut Hand, &Collider)>::default();
+        let query = Default::default();
         let rigid_body_query = PreparedQuery::<(&RigidBody, &mut Transform)>::default();
 
-        let mut schedule = || {
-            grabbing_system(&query, &mut world, &mut physics_context);
+        let schedule = || {
+            grabbing_system(&mut query, &mut world, &mut physics_context);
             physics_context.update();
             update_rigid_body_transforms_system(
                 &mut rigid_body_query,

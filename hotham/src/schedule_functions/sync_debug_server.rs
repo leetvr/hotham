@@ -38,7 +38,7 @@ pub fn world_to_debug_data(
     session_id: Uuid,
 ) -> DebugFrame {
     let mut entities = Vec::new();
-    for (entity, info) in world.query_mut::<&Info>() {
+    for (entity, info) in world.query::<&Info>().iter() {
         let transform = world.get_mut::<&Transform>(entity).ok();
         let collider = world.get_mut::<&Collider>(entity).ok();
         let collider = collider

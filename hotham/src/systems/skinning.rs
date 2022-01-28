@@ -10,7 +10,7 @@ pub fn skinning_system(
     world: &mut World,
 ) -> () {
     let mut joint_matrices: HashMap<Entity, HashMap<usize, Matrix4<f32>>> = HashMap::new();
-    for (_, (transform_matrix, joint, info)) in joints_query.query_mut(world) {
+    for (_, (transform_matrix, joint, info)) in joints_query.query(world).iter() {
         let inverse_transform = world
             .get_mut::<&TransformMatrix>(joint.skeleton_root)
             .unwrap()

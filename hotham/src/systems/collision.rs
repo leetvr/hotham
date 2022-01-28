@@ -2,11 +2,11 @@ use crate::{components::Collider, resources::PhysicsContext};
 use hecs::{PreparedQuery, World};
 
 pub fn collision_system(
-    query: &PreparedQuery<&mut Collider>,
-    world: &mut World,
+    query: &mut PreparedQuery<&mut Collider>,
+    world: &World,
     physics_context: &mut PhysicsContext,
 ) {
-    for (_, collider) in query.query_mut(world) {
+    for (_, collider) in query.query(world).iter() {
         // Clear out any collisions from previous frames.
         collider.collisions_this_frame.clear();
         for (a, b, intersecting) in physics_context
@@ -70,8 +70,7 @@ mod tests {
         physics_context.update();
 
         // do something that would cause a and b to collide
-        let query = PreparedQuery::<&mut Collider>::default();
-        collision_system(&query, &mut world, &mut physics_context);
+        collision_system(&mut Default::default(), &mut world, &mut physics_context);
 
         let a_collider = world.get_mut::<&Collider>(a).unwrap();
         assert!(a_collider.collisions_this_frame.contains(&b));

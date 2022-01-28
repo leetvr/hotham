@@ -5,7 +5,7 @@ pub fn animation_system(
     query: &mut PreparedQuery<(&mut AnimationTarget, &mut Transform)>,
     world: &mut World,
 ) {
-    for (_, (animation_target, transform)) in query.query_mut(world) {
+    for (_, (animation_target, transform)) in query.query(world).iter() {
         let controller = world
             .get::<&AnimationController>(animation_target.controller)
             .unwrap();

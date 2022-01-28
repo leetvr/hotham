@@ -33,7 +33,7 @@ pub fn pointers_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
-    for (_, (pointer, transform)) in query.query_mut(world) {
+    for (_, (pointer, transform)) in query.query(world).iter() {
         // Get our the space and path of the pointer.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, path) = match pointer.handedness {
@@ -95,8 +95,8 @@ pub fn pointers_system(
             let hit_point = ray.point_at(toi); // Same as: `ray.origin + ray.dir * toi`
             let hit_collider = physics_context.colliders.get(handle).unwrap();
             let entity = unsafe { world.find_entity_from_id(hit_collider.user_data as _) };
-            let panel = world
-                .get_mut::<&Panel>(entity)
+            let mut panel = world
+                .get_mut::<&mut Panel>(entity)
                 .expect(&format!("Unable to find entity {:?} in world", entity));
             let panel_extent = &panel.extent;
             let panel_transform = hit_collider.position();

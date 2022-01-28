@@ -11,7 +11,7 @@ pub fn hands_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
-    for (_, (hand, animation_controller, rigid_body_component)) in query.query_mut(world) {
+    for (_, (hand, animation_controller, rigid_body_component)) in query.query(world).iter() {
         // Get our the space and path of the hand.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, path) = match hand.handedness {

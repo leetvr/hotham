@@ -5,7 +5,7 @@ use crate::{
 use hecs::{PreparedQuery, World};
 
 pub fn draw_gui_system(
-    query: &PreparedQuery<&mut Panel>,
+    query: &mut PreparedQuery<&mut Panel>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: &usize,
@@ -86,9 +86,9 @@ mod tests {
 
         // Begin. Use renderdoc in headless mode for debugging.
         renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
-        let query = PreparedQuery::<&mut Panel>::default();
+        let query = Default::default();
         schedule(
-            &query,
+            &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
@@ -105,7 +105,7 @@ mod tests {
         // Release the trigger slightly
         change_panel_trigger_value(&mut world, &query);
         schedule(
-            &query,
+            &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
@@ -122,7 +122,7 @@ mod tests {
         // Move the cursor off the panel and release the trigger entirely
         move_cursor_off_panel(&mut world, &query);
         schedule(
-            &query,
+            &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
@@ -283,7 +283,7 @@ mod tests {
     }
 
     fn schedule(
-        query: &PreparedQuery<&mut Panel>,
+        query: &mut PreparedQuery<&mut Panel>,
         world: &mut World,
         gui_context: &mut GuiContext,
         haptic_context: &mut HapticContext,
@@ -310,13 +310,23 @@ mod tests {
         render_context.begin_pbr_render_pass(vulkan_context, 0);
 
         // Update transforms, etc.
-        update_transform_matrix_system();
+        update_transform_matrix_system(&mut Default::default(), world);
 
         // Update parent transform matrix
-        update_parent_transform_matrix_system();
+        update_parent_transform_matrix_system(
+            &mut Default::default(),
+            &mut Default::default(),
+            world,
+        );
 
         // Render
-        rendering_system();
+        rendering_system(
+            &mut Default::default(),
+            world,
+            vulkan_context,
+            &0,
+            render_context,
+        );
 
         // End PBR render
         render_context.end_pbr_render_pass(vulkan_context, 0);

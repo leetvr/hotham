@@ -148,7 +148,7 @@ mod tests {
         for (name, debug_view_equation) in &params {
             render_object_with_debug_equation(
                 &vulkan_context,
-                &render_context,
+                &mut render_context,
                 &mut world,
                 resolution,
                 image.clone(),
@@ -160,7 +160,7 @@ mod tests {
 
     fn render_object_with_debug_equation(
         vulkan_context: &VulkanContext,
-        render_context: &RenderContext,
+        render_context: &mut RenderContext,
         world: &mut World,
         resolution: vk::Extent2D,
         image: crate::image::Image,
@@ -222,7 +222,7 @@ mod tests {
     }
 
     fn schedule(
-        mut render_context: &RenderContext,
+        render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
         debug_view_equation: f32,
         world: &mut World,
@@ -272,8 +272,12 @@ mod tests {
             .unwrap();
         render_context.begin_frame(&vulkan_context, 0);
         render_context.begin_pbr_render_pass(&vulkan_context, 0);
-        update_transform_matrix_system();
-        update_parent_transform_matrix_system();
+        update_transform_matrix_system(&mut Default::default(), world);
+        update_parent_transform_matrix_system(
+            &mut Default::default(),
+            &mut Default::default(),
+            world,
+        );
         rendering_system(
             &mut Default::default(),
             world,
