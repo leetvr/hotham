@@ -120,7 +120,7 @@ mod tests {
             resolution,
         };
 
-        let render_context =
+        let mut render_context =
             RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap();
 
         // Get a model from GLTF

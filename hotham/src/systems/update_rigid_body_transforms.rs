@@ -47,22 +47,25 @@ mod tests {
         let handle = physics_context.rigid_bodies.insert(rigid_body);
         world.insert_one(entity, RigidBody { handle });
 
-        let query = PreparedQuery::<(&RigidBody, &mut Transform)>::default();
+        let mut query = PreparedQuery::<(&RigidBody, &mut Transform)>::default();
 
-        // Build the schedule
-        let schedule = || {
-            physics_context.update();
-            update_rigid_body_transforms_system(&mut query, &mut world, &physics_context);
-        };
-
-        // Run it 4 times
-        schedule();
-        schedule();
-        schedule();
-        schedule();
+        // Run the schedule 4 times. Why 4 times? I can't remember.
+        schedule(&mut physics_context, &mut query, &mut world);
+        schedule(&mut physics_context, &mut query, &mut world);
+        schedule(&mut physics_context, &mut query, &mut world);
+        schedule(&mut physics_context, &mut query, &mut world);
 
         let transform = world.get::<&Transform>(entity).unwrap();
         assert_relative_eq!(transform.translation, vector![1.0, 2.0, 3.0]);
         assert_relative_eq!(transform.rotation, rotation);
+    }
+
+    fn schedule(
+        physics_context: &mut PhysicsContext,
+        query: &mut PreparedQuery<(&RigidBody, &mut Transform)>,
+        world: &mut World,
+    ) {
+        physics_context.update();
+        update_rigid_body_transforms_system(query, world, physics_context);
     }
 }

@@ -110,12 +110,14 @@ mod tests {
         }
 
         let root_entity = node_entity.get(&0).unwrap();
-        let transform = world.get_mut::<&mut Transform>(*root_entity).unwrap();
-        transform.translation = vector![100.0, 100.0, 100.0];
+        {
+            let mut transform = world.get_mut::<&mut Transform>(*root_entity).unwrap();
+            transform.translation = vector![100.0, 100.0, 100.0];
+        }
         schedule(&mut world);
 
         for (_, (transform_matrix, parent, info)) in
-            world.query_mut::<(&TransformMatrix, &Parent, &Info)>()
+            world.query::<(&TransformMatrix, &Parent, &Info)>().iter()
         {
             let mut depth = 1;
 
