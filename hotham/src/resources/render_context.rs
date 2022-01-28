@@ -286,10 +286,14 @@ impl RenderContext {
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,
     ) {
+        println!("[RENDER_CONTEXT] Beginning frame..");
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];
         let command_buffer = frame.command_buffer;
+
+        // Wait for the GPU to be ready.
+        self.wait(device, frame);
 
         // Begin recording the command buffer.
         unsafe {
@@ -313,9 +317,6 @@ impl RenderContext {
         let frame = &self.frames[swapchain_image_index];
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
-
-        // Wait for the GPU to be ready.
-        self.wait(device, frame);
 
         // Begin the renderpass.
         let render_pass_begin_info = vk::RenderPassBeginInfo::builder()

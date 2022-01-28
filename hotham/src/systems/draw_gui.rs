@@ -296,6 +296,7 @@ mod tests {
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
     ) -> () {
+        println!("[DRAW_GUI_TEST] Running schedule..");
         begin_frame(render_context, vulkan_context);
 
         // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
@@ -361,6 +362,8 @@ mod tests {
         };
         let views = vec![view.clone(), view];
 
+        render_context.begin_frame(&vulkan_context, 0);
+
         render_context
             .update_scene_data(&views, &vulkan_context)
             .unwrap();
@@ -374,7 +377,5 @@ mod tests {
                 }],
             )
             .unwrap();
-
-        render_context.begin_frame(&vulkan_context, 0);
     }
 }
