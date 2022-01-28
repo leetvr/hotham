@@ -7,8 +7,8 @@ use crate::{
 };
 
 pub fn update_rigid_body_transforms_system(
-    world: &mut World,
     query: &mut PreparedQuery<(&RigidBody, &mut Transform)>,
+    world: &mut World,
     physics_context: &PhysicsContext,
 ) {
     for (_, (rigid_body, transform)) in query.query_mut(world) {
@@ -52,7 +52,7 @@ mod tests {
         // Build the schedule
         let schedule = || {
             physics_context.update();
-            update_rigid_body_transforms_system(&mut world, &mut query, &physics_context);
+            update_rigid_body_transforms_system(&mut query, &mut world, &physics_context);
         };
 
         // Run it 4 times

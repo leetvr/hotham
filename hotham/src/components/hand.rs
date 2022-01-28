@@ -1,4 +1,4 @@
-use legion::Entity;
+use hecs::Entity;
 
 #[derive(Debug, PartialEq, Clone, Copy, Eq, PartialOrd, Ord)]
 pub enum Handedness {
