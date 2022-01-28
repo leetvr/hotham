@@ -76,7 +76,7 @@ mod tests {
             grabbed_rigid_body,
             grabbed_collider,
         );
-        world.insert(grabbed_entity, components);
+        world.insert(grabbed_entity, components).unwrap();
 
         // Fully gripped hand
         let hand = Hand {
@@ -105,7 +105,7 @@ mod tests {
             &mut rigid_body_query,
         );
 
-        let mut hand = world.get_mut::<&mut Hand>(grabbed_entity).unwrap();
+        let mut hand = world.get_mut::<&mut Hand>(hand_entity).unwrap();
         assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
         hand.grip_value = 0.0;
         drop(hand);
@@ -117,7 +117,7 @@ mod tests {
             &mut rigid_body_query,
         );
 
-        let hand = world.get_mut::<&Hand>(grabbed_entity).unwrap();
+        let hand = world.get_mut::<&Hand>(hand_entity).unwrap();
         assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
         assert!(hand.grabbed_entity.is_none());
     }

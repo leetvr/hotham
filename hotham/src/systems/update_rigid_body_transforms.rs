@@ -45,7 +45,7 @@ mod tests {
         rigid_body.set_next_kinematic_position(position);
 
         let handle = physics_context.rigid_bodies.insert(rigid_body);
-        world.insert_one(entity, RigidBody { handle });
+        world.insert_one(entity, RigidBody { handle }).unwrap();
 
         let mut query = PreparedQuery::<(&RigidBody, &mut Transform)>::default();
 

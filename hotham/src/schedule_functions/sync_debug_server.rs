@@ -139,7 +139,7 @@ mod tests {
             .build();
         let components = physics_context.get_rigid_body_and_collider(e1, rigid_body, collider);
         {
-            world.insert(e1, components);
+            world.insert(e1, components).unwrap();
         }
 
         let e2 = world.spawn((
@@ -158,7 +158,7 @@ mod tests {
         let collider = ColliderBuilder::cylinder(1.0, 0.2).build();
         let components = physics_context.get_rigid_body_and_collider(e2, rigid_body, collider);
         {
-            world.insert(e2, components);
+            world.insert(e2, components).unwrap();
         }
 
         let session_id = Uuid::new_v4();

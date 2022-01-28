@@ -217,7 +217,7 @@ mod tests {
             collisions_this_frame: Vec::new(),
             handle,
         };
-        world.insert_one(panel_entity, collider);
+        world.insert_one(panel_entity, collider).unwrap();
 
         // Add a decoy collider to ensure we're using collision groups correctly.
         let collider = ColliderBuilder::cuboid(0.1, 0.1, 0.1)

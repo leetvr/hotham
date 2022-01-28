@@ -67,12 +67,7 @@ pub fn sabers_system(
     }
 }
 
-pub fn add_saber_physics(
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-    command_buffer: &mut CommandBuffer,
-    saber: Entity,
-) {
+pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, saber: Entity) {
     // Give it a collider and rigid-body
     let collider = ColliderBuilder::cylinder(SABER_HALF_HEIGHT, SABER_HALF_WIDTH)
         .translation(vector![0., SABER_HALF_HEIGHT, 0.])
@@ -84,7 +79,7 @@ pub fn add_saber_physics(
 
     // Add the components to the entity.
     let components = physics_context.get_rigid_body_and_collider(saber, rigid_body, collider);
-    command_buffer.insert(saber, components);
+    world.insert(saber, components).unwrap();
 }
 
 pub fn apply_grip_offset(position: &mut Isometry3<f32>) {
@@ -100,7 +95,6 @@ mod tests {
     use super::*;
     use hotham::{
         components::{Transform, TransformMatrix},
-        hecs::With,
         resources::{PhysicsContext, XrContext},
         systems::update_rigid_body_transforms_system,
     };
@@ -112,25 +106,23 @@ mod tests {
         let path = std::path::Path::new("../../openxr_loader.dll");
         let (xr_context, _) = XrContext::new_from_path(path).unwrap();
         let mut physics_context = PhysicsContext::default();
-        let mut command_buffer = CommandBuffer::new();
         let saber = world.spawn((
             Colour::Red,
             Saber {},
             Transform::default(),
             TransformMatrix::default(),
         ));
-        add_saber_physics(&mut world, &mut physics_context, &mut command_buffer, saber);
+        add_saber_physics(&mut world, &mut physics_context, saber);
 
         let mut saber_query = Default::default();
         let mut rigid_body_transforms_query = Default::default();
 
-        let schedule = sabers_system(
+        sabers_system(
             &mut world,
             &mut saber_query,
             &xr_context,
             &mut physics_context,
         );
-
         physics_context.update();
         update_rigid_body_transforms_system(
             &mut rigid_body_transforms_query,

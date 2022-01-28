@@ -64,7 +64,7 @@ pub fn real_main() -> HothamResult<()> {
         .build();
     let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
     let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
-    world.insert(helmet, components);
+    world.insert(helmet, components).unwrap();
 
     // Add the left hand
     add_hand(
@@ -125,7 +125,7 @@ fn add_hand(
         Handedness::Left => "Left Hand",
         Handedness::Right => "Right Hand",
     };
-    let left_hand = add_model_to_world(
+    let hand = add_model_to_world(
         model_name,
         models,
         world,
@@ -136,14 +136,13 @@ fn add_hand(
     .unwrap();
     {
         // Add a hand component
-        world.insert_one(left_hand, Hand::left());
+        world.insert_one(hand, handedness).unwrap();
 
         // Modify the animation controller
-        let animation_controller = world
-            .get_mut::<&mut AnimationController>(left_hand)
-            .unwrap();
+        let mut animation_controller = world.get_mut::<&mut AnimationController>(hand).unwrap();
         animation_controller.blend_from = 0;
         animation_controller.blend_to = 1;
+        drop(animation_controller);
 
         // Give it a collider and rigid-body
         let collider = ColliderBuilder::capsule_y(0.05, 0.02)
@@ -152,8 +151,7 @@ fn add_hand(
             .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
             .build();
         let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
-        let components =
-            physics_context.get_rigid_body_and_collider(left_hand, rigid_body, collider);
-        world.insert(left_hand, components);
+        let components = physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
+        world.insert(hand, components).unwrap();
     }
 }

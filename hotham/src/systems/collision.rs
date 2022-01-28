@@ -89,7 +89,7 @@ mod tests {
         collider.user_data = entity.id() as _;
         let rigid_body = RigidBodyBuilder::new_dynamic().build();
         let components = physics_context.get_rigid_body_and_collider(entity, rigid_body, collider);
-        world.insert(entity, components);
+        world.insert(entity, components).unwrap();
 
         entity
     }

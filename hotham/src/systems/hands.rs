@@ -99,15 +99,13 @@ mod tests {
 
     #[test]
     pub fn test_move_grabbed_objects() {
-        let (mut world, hand, mut xr_context, mut physics_context) = setup();
+        let (mut world, _, mut xr_context, mut physics_context) = setup();
 
         let grabbed_object_rigid_body = RigidBodyBuilder::new_kinematic_position_based().build(); // grabber sets the rigidbody as kinematic
         let handle = physics_context
             .rigid_bodies
             .insert(grabbed_object_rigid_body);
         let grabbed_entity = world.spawn((RigidBody { handle }, Transform::default()));
-
-        let _ = add_hand_to_world(&mut physics_context, &mut world, Some(grabbed_entity));
 
         schedule(&mut world, &mut xr_context, &mut physics_context);
 
@@ -157,7 +155,7 @@ mod tests {
             rigid_body.set_next_kinematic_translation(vector![0.0, 1.4, 0.0]);
             let components =
                 physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
-            world.insert(hand, components);
+            world.insert(hand, components).unwrap();
         }
 
         hand

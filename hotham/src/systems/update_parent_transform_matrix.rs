@@ -105,7 +105,7 @@ mod tests {
             let parent = Parent(parent_entity);
             for node_id in children {
                 let entity = node_entity.get(node_id).unwrap();
-                world.insert_one(*entity, parent.clone());
+                world.insert_one(*entity, parent.clone()).unwrap();
             }
         }
 

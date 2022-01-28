@@ -111,11 +111,11 @@ fn load_node(
             images,
         )?;
 
-        world.insert(this_entity, (mesh, Visible {}));
+        world.insert(this_entity, (mesh, Visible {})).unwrap();
     }
 
     if is_root {
-        world.insert_one(this_entity, Root {});
+        world.insert_one(this_entity, Root {}).unwrap();
     }
 
     for child in node_data.children() {
@@ -144,7 +144,7 @@ fn add_parents(
     for child_node in node_data.children() {
         let child_id = child_node.index();
         let child_entity = node_entity_map.get(&child_id).unwrap();
-        world.insert_one(*child_entity, parent.clone());
+        world.insert_one(*child_entity, parent.clone()).unwrap();
         add_parents(&child_node, world, node_entity_map);
     }
 }
@@ -177,11 +177,11 @@ fn add_skins_and_joints(
             };
             joint_ids.push(joint_node.index());
             let joint_entity = node_entity_map.get(&joint_node.index()).unwrap();
-            world.insert_one(*joint_entity, joint);
+            world.insert_one(*joint_entity, joint).unwrap();
         }
 
         // Add a Skin to the entity.
-        world.insert_one(this_entity, Skin { joint_ids });
+        world.insert_one(this_entity, Skin { joint_ids }).unwrap();
 
         // Tell the vertex shader how many joints we have
         let mut mesh = world.get_mut::<&mut Mesh>(this_entity).unwrap();
@@ -268,19 +268,23 @@ fn add_animations(
                     animation_target.animations.push(animation);
                 }
                 _ => {
-                    world.insert_one(
-                        target_entity,
-                        AnimationTarget {
-                            controller: controller_entity.clone(),
-                            animations: vec![animation],
-                        },
-                    );
+                    world
+                        .insert_one(
+                            target_entity,
+                            AnimationTarget {
+                                controller: controller_entity.clone(),
+                                animations: vec![animation],
+                            },
+                        )
+                        .unwrap();
                 }
             }
 
             // Add an animation controller to our parent, if needed.
             if world.get::<&AnimationController>(target_entity).is_err() {
-                world.insert_one(target_entity, AnimationController::default());
+                world
+                    .insert_one(target_entity, AnimationController::default())
+                    .unwrap();
             }
         }
     }
@@ -310,11 +314,15 @@ pub fn add_model_to_world(
     // Go through each entity in the source world and clone its components into the new world.
     for (source_entity, destination_entity) in &entity_map {
         if let Ok(transform) = source_world.get_mut::<&Transform>(*source_entity) {
-            destination_world.insert_one(*destination_entity, transform.clone());
+            destination_world
+                .insert_one(*destination_entity, transform.clone())
+                .unwrap();
         }
 
         if let Ok(transform_matrix) = source_world.get_mut::<&TransformMatrix>(*source_entity) {
-            destination_world.insert_one(*destination_entity, transform_matrix.clone());
+            destination_world
+                .insert_one(*destination_entity, transform_matrix.clone())
+                .unwrap();
         }
 
         // Create a new mesh for this entity in the destination world.
@@ -346,54 +354,74 @@ pub fn add_model_to_world(
                 ubo_data: mesh.ubo_data.clone(),
                 primitives: mesh.primitives.clone(),
             };
-            destination_world.insert_one(*destination_entity, new_mesh);
+            destination_world
+                .insert_one(*destination_entity, new_mesh)
+                .unwrap();
         }
 
         if let Ok(skin) = source_world.get_mut::<&Skin>(*source_entity) {
-            destination_world.insert_one(*destination_entity, skin.clone());
+            destination_world
+                .insert_one(*destination_entity, skin.clone())
+                .unwrap();
         }
 
         // If the source entity had a joint, clone it and set the skeleton root to the corresponding entity in the destination world.
         if let Ok(joint) = source_world.get_mut::<&Joint>(*source_entity) {
             let mut new_joint = joint.clone();
             new_joint.skeleton_root = *entity_map.get(&joint.skeleton_root).unwrap();
-            destination_world.insert_one(*destination_entity, new_joint);
+            destination_world
+                .insert_one(*destination_entity, new_joint)
+                .unwrap();
         }
 
         // If the source entity had a parent, set it to the corresponding entity in the destination world.
         if let Ok(parent) = source_world.get_mut::<&Parent>(*source_entity) {
             let new_parent = entity_map.get(&parent.0).unwrap();
-            destination_world.insert_one(*destination_entity, Parent(*new_parent));
+            destination_world
+                .insert_one(*destination_entity, Parent(*new_parent))
+                .unwrap();
         }
 
         if let Ok(root) = source_world.get_mut::<&Root>(*source_entity) {
-            destination_world.insert_one(*destination_entity, root.clone());
+            destination_world
+                .insert_one(*destination_entity, root.clone())
+                .unwrap();
 
             // Set a parent for the root entity if one was specified.
             if let Some(parent) = parent {
-                destination_world.insert_one(*destination_entity, Parent(parent));
+                destination_world
+                    .insert_one(*destination_entity, Parent(parent))
+                    .unwrap();
             }
         }
 
         if let Ok(info) = source_world.get_mut::<&Info>(*source_entity) {
-            destination_world.insert_one(*destination_entity, info.clone());
+            destination_world
+                .insert_one(*destination_entity, info.clone())
+                .unwrap();
         }
 
         if let Ok(animation_controller) =
             source_world.get_mut::<&AnimationController>(*source_entity)
         {
-            destination_world.insert_one(*destination_entity, animation_controller.clone());
+            destination_world
+                .insert_one(*destination_entity, animation_controller.clone())
+                .unwrap();
         }
 
         if let Ok(animation_target) = source_world.get_mut::<&AnimationTarget>(*source_entity) {
             let mut new_animation_target = animation_target.clone();
             new_animation_target.controller =
                 *entity_map.get(&animation_target.controller).unwrap();
-            destination_world.insert_one(*destination_entity, new_animation_target);
+            destination_world
+                .insert_one(*destination_entity, new_animation_target)
+                .unwrap();
         }
 
         if let Ok(visible) = source_world.get_mut::<&Visible>(*source_entity) {
-            destination_world.insert_one(*destination_entity, visible.clone());
+            destination_world
+                .insert_one(*destination_entity, visible.clone())
+                .unwrap();
         }
     }
 
