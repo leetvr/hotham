@@ -120,7 +120,6 @@ impl App {
                     _ => {}
                 }
             }
-            break;
         }
 
         false

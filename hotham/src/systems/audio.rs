@@ -161,12 +161,12 @@ mod tests {
     }
 
     fn update_xr(xr_context: &mut XrContext) {
-        let (frame_state, _) = xr_context.begin_frame().unwrap();
+        xr_context.begin_frame().unwrap();
         let (view_state_flags, views) = xr_context
             .session
             .locate_views(
                 VIEW_TYPE,
-                frame_state.predicted_display_time,
+                xr_context.frame_state.predicted_display_time,
                 &xr_context.reference_space,
             )
             .unwrap();

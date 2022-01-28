@@ -1,6 +1,7 @@
 use hotham::components::hand::Handedness;
 use hotham::gltf_loader::add_model_to_world;
 use hotham::hecs::World;
+use hotham::resources::vulkan_context::VulkanContext;
 use hotham::resources::{RenderContext, XrContext};
 use hotham::schedule_functions::{begin_frame, end_frame, physics_step};
 use hotham::systems::rendering::rendering_system;
@@ -25,66 +26,7 @@ pub fn main() {
 }
 
 pub fn real_main() -> HothamResult<()> {
-    let (xr_context, vulkan_context) = XrContext::new()?;
-    let render_context = RenderContext::new(&vulkan_context, &xr_context)?;
-    let mut physics_context = PhysicsContext::default();
-    let glb_bufs: Vec<&[u8]> = vec![
-        include_bytes!("../../../test_assets/left_hand.glb"),
-        include_bytes!("../../../test_assets/right_hand.glb"),
-        include_bytes!("../../../test_assets/damaged_helmet.glb"),
-    ];
-    let models = gltf_loader::load_models_from_glb(
-        &glb_bufs,
-        &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )?;
-
-    let mut world = World::default();
-
-    // Add the damaged helmet
-    let helmet = add_model_to_world(
-        "Damaged Helmet",
-        &models,
-        &mut world,
-        None,
-        &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .expect("Could not find Damaged Helmet");
-
-    // Add the helmet model
-    let transform = world.get::<Transform>(helmet).unwrap();
-    let position = transform.position();
-    drop(transform);
-
-    // Give it a collider and rigid-body
-    let collider = ColliderBuilder::ball(0.35)
-        .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
-        .build();
-    let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
-    let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
-    world.insert(helmet, components).unwrap();
-
-    // Add the left hand
-    add_hand(
-        &models,
-        Handedness::Left,
-        &mut world,
-        &vulkan_context,
-        &render_context,
-        &mut physics_context,
-    );
-
-    // Add the right hand
-    add_hand(
-        &models,
-        Handedness::Right,
-        &mut world,
-        &vulkan_context,
-        &render_context,
-        &mut physics_context,
-    );
+    init()?;
 
     // let mut resources = Resources::default();
     // resources.insert(xr_context);
@@ -111,6 +53,78 @@ pub fn real_main() -> HothamResult<()> {
     // let mut app = App::new(world, resources, schedule)?;
     // app.run()?;
     Ok(())
+}
+
+fn init() -> Result<(), hotham::HothamError> {
+    let (xr_context, vulkan_context) = XrContext::new()?;
+    let render_context = RenderContext::new(&vulkan_context, &xr_context)?;
+    let mut physics_context = PhysicsContext::default();
+    let glb_bufs: Vec<&[u8]> = vec![
+        include_bytes!("../../../test_assets/left_hand.glb"),
+        include_bytes!("../../../test_assets/right_hand.glb"),
+        include_bytes!("../../../test_assets/damaged_helmet.glb"),
+    ];
+    let models = gltf_loader::load_models_from_glb(
+        &glb_bufs,
+        &vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )?;
+    let mut world = World::default();
+    let helmet = add_model_to_world(
+        "Damaged Helmet",
+        &models,
+        &mut world,
+        None,
+        &vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .expect("Could not find Damaged Helmet");
+    let transform = world.get::<Transform>(helmet).unwrap();
+    let position = transform.position();
+    drop(transform);
+    let collider = ColliderBuilder::ball(0.35)
+        .active_collision_types(ActiveCollisionTypes::all())
+        .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+        .build();
+    let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
+    let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
+    world.insert(helmet, components).unwrap();
+    add_hand(
+        &models,
+        Handedness::Left,
+        &mut world,
+        &vulkan_context,
+        &render_context,
+        &mut physics_context,
+    );
+    add_hand(
+        &models,
+        Handedness::Right,
+        &mut world,
+        &vulkan_context,
+        &render_context,
+        &mut physics_context,
+    );
+    Ok(())
+}
+
+fn tick(
+    xr_context: &mut XrContext,
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+) {
+    begin_frame(xr_context, vulkan_context, render_context);
+    // hands_system();
+    // collision_system();
+    // grabbing_system();
+    // physics_step();
+    // update_rigid_body_transforms_system();
+    // animation_system();
+    // update_transform_matrix_system();
+    // update_parent_transform_matrix_system();
+    // skinning_system();
+    // rendering_system();
+    // end_frame();
 }
 
 fn add_hand(
