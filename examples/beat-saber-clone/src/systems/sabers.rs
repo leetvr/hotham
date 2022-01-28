@@ -121,8 +121,8 @@ mod tests {
         ));
         add_saber_physics(&mut world, &mut physics_context, &mut command_buffer, saber);
 
-        let saber_query = PreparedQuery::<With<Saber, (&Colour, &RigidBody)>>::default();
-        let rigid_body_transforms_query = PreparedQuery::<(&RigidBody, &mut Transform)>::default();
+        let mut saber_query = Default::default();
+        let mut rigid_body_transforms_query = Default::default();
 
         let schedule = sabers_system(
             &mut world,
@@ -133,8 +133,8 @@ mod tests {
 
         physics_context.update();
         update_rigid_body_transforms_system(
-            &mut world,
             &mut rigid_body_transforms_query,
+            &mut world,
             &physics_context,
         );
 

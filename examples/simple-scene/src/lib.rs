@@ -1,5 +1,6 @@
+use hotham::components::hand::Handedness;
 use hotham::gltf_loader::add_model_to_world;
-use hotham::legion::Schedule;
+use hotham::hecs::World;
 use hotham::resources::{RenderContext, XrContext};
 use hotham::schedule_functions::{begin_frame, end_frame, physics_step};
 use hotham::systems::rendering::rendering_system;
@@ -13,7 +14,6 @@ use hotham::{gltf_loader, App, HothamResult};
 
 use hotham::{
     components::{AnimationController, Hand, Transform},
-    legion::{IntoQuery, Resources, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::PhysicsContext,
 };
@@ -53,75 +53,94 @@ pub fn real_main() -> HothamResult<()> {
     .expect("Could not find Damaged Helmet");
 
     // Add the helmet model
-    {
-        let mut query = <&Transform>::query();
-        let transform = query.get(&mut world, helmet).unwrap();
-        let position = transform.position();
+    let transform = world.get::<&Transform>(helmet).unwrap();
+    let position = transform.position();
+    drop(transform);
 
-        let mut helmet_entry = world.entry(helmet).unwrap();
-        // Give it a collider and rigid-body
-        let collider = ColliderBuilder::ball(0.35)
-            .active_collision_types(ActiveCollisionTypes::all())
-            .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
-            .build();
-        let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
-        let (collider, rigid_body) =
-            physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
-        helmet_entry.add_component(collider);
-        helmet_entry.add_component(rigid_body);
-    }
+    // Give it a collider and rigid-body
+    let collider = ColliderBuilder::ball(0.35)
+        .active_collision_types(ActiveCollisionTypes::all())
+        .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+        .build();
+    let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
+    let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
+    world.insert(helmet, components);
 
     // Add the left hand
-    let left_hand = add_model_to_world(
-        "Left Hand",
+    add_hand(
         &models,
+        Handedness::Left,
         &mut world,
-        None,
         &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
-    {
-        let mut left_hand_entry = world.entry(left_hand).unwrap();
-
-        // Add a hand component
-        left_hand_entry.add_component(Hand::left());
-
-        // Modify the animation controller
-        let animation_controller = left_hand_entry
-            .get_component_mut::<AnimationController>()
-            .unwrap();
-        animation_controller.blend_from = 0;
-        animation_controller.blend_to = 1;
-
-        // Give it a collider and rigid-body
-        let collider = ColliderBuilder::capsule_y(0.05, 0.02)
-            .sensor(true)
-            .active_collision_types(ActiveCollisionTypes::all())
-            .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
-            .build();
-        let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
-        let (collider, rigid_body) =
-            physics_context.get_rigid_body_and_collider(left_hand, rigid_body, collider);
-        left_hand_entry.add_component(collider);
-        left_hand_entry.add_component(rigid_body);
-    }
+        &render_context,
+        &mut physics_context,
+    );
 
     // Add the right hand
-    let right_hand = add_model_to_world(
-        "Right Hand",
+    add_hand(
         &models,
+        Handedness::Right,
         &mut world,
-        None,
         &vulkan_context,
+        &render_context,
+        &mut physics_context,
+    );
+
+    // let mut resources = Resources::default();
+    // resources.insert(xr_context);
+    // resources.insert(vulkan_context);
+    // resources.insert(render_context);
+    // resources.insert(physics_context);
+    // resources.insert(0 as usize);
+    // let schedule = Schedule::builder()
+    //     .add_thread_local_fn(begin_frame)
+    //     .add_system(hands_system())
+    //     .add_system(collision_system())
+    //     .add_system(grabbing_system())
+    //     .add_thread_local_fn(physics_step)
+    //     .add_system(update_rigid_body_transforms_system())
+    //     .add_system(animation_system())
+    //     .add_system(update_transform_matrix_system())
+    //     .add_system(update_parent_transform_matrix_system())
+    //     .add_system(skinning_system())
+    //     .add_system(rendering_system())
+    //     .add_thread_local_fn(end_frame)
+    //     .build();
+    // println!("[HOTHAM_INIT] DONE! INIT COMPLETE!");
+
+    // let mut app = App::new(world, resources, schedule)?;
+    // app.run()?;
+    Ok(())
+}
+
+fn add_hand(
+    models: &std::collections::HashMap<String, World>,
+    handedness: Handedness,
+    world: &mut World,
+    vulkan_context: &hotham::resources::vulkan_context::VulkanContext,
+    render_context: &RenderContext,
+    physics_context: &mut PhysicsContext,
+) {
+    let model_name = match handedness {
+        Handedness::Left => "Left Hand",
+        Handedness::Right => "Right Hand",
+    };
+    let left_hand = add_model_to_world(
+        model_name,
+        models,
+        world,
+        None,
+        vulkan_context,
         &render_context.descriptor_set_layouts,
     )
     .unwrap();
     {
-        let mut right_hand_entry = world.entry(right_hand).unwrap();
-        right_hand_entry.add_component(Hand::right());
-        let animation_controller = right_hand_entry
-            .get_component_mut::<AnimationController>()
+        // Add a hand component
+        world.insert_one(left_hand, Hand::left());
+
+        // Modify the animation controller
+        let animation_controller = world
+            .get_mut::<&mut AnimationController>(left_hand)
             .unwrap();
         animation_controller.blend_from = 0;
         animation_controller.blend_to = 1;
@@ -133,35 +152,8 @@ pub fn real_main() -> HothamResult<()> {
             .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
             .build();
         let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
-        let (collider, rigid_body) =
-            physics_context.get_rigid_body_and_collider(right_hand, rigid_body, collider);
-        right_hand_entry.add_component(collider);
-        right_hand_entry.add_component(rigid_body);
+        let components =
+            physics_context.get_rigid_body_and_collider(left_hand, rigid_body, collider);
+        world.insert(left_hand, components);
     }
-
-    let mut resources = Resources::default();
-    resources.insert(xr_context);
-    resources.insert(vulkan_context);
-    resources.insert(render_context);
-    resources.insert(physics_context);
-    resources.insert(0 as usize);
-    let schedule = Schedule::builder()
-        .add_thread_local_fn(begin_frame)
-        .add_system(hands_system())
-        .add_system(collision_system())
-        .add_system(grabbing_system())
-        .add_thread_local_fn(physics_step)
-        .add_system(update_rigid_body_transforms_system())
-        .add_system(animation_system())
-        .add_system(update_transform_matrix_system())
-        .add_system(update_parent_transform_matrix_system())
-        .add_system(skinning_system())
-        .add_system(rendering_system())
-        .add_thread_local_fn(end_frame)
-        .build();
-    println!("[HOTHAM_INIT] DONE! INIT COMPLETE!");
-
-    let mut app = App::new(world, resources, schedule)?;
-    app.run()?;
-    Ok(())
 }
