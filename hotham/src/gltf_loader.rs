@@ -184,12 +184,6 @@ fn add_skins_and_joints(
         // Add a Skin to the entity.
         world.insert_one(this_entity, Skin { joint_ids }).unwrap();
 
-        let r = world.entity(this_entity).unwrap();
-        println!("Looking for {:?}", core::any::TypeId::of::<Mesh>());
-        for t in r.component_types() {
-            println!("Has {:?}", t);
-        }
-
         // Tell the vertex shader how many joints we have
         let mut mesh = world.get_mut::<Mesh>(this_entity).unwrap();
         mesh.ubo_data.joint_count = joint_matrices.len() as f32;
@@ -290,10 +284,6 @@ fn add_animations(
             // Add an animation controller to our parent, if needed.
             let entity_ref = world.entity(controller_entity).unwrap();
             if !entity_ref.has::<AnimationController>() {
-                println!(
-                    "{:?} does not have an animation controller, but needs one. Adding",
-                    *world.get::<Info>(controller_entity).unwrap()
-                );
                 world
                     .insert_one(controller_entity, AnimationController::default())
                     .unwrap();
@@ -416,10 +406,6 @@ pub fn add_model_to_world(
         if let Ok(animation_controller) =
             source_world.get_mut::<AnimationController>(*source_entity)
         {
-            println!(
-                "{:?} has animation controller - adding to destination",
-                *source_world.get::<Info>(*source_entity).unwrap()
-            );
             destination_world
                 .insert_one(*destination_entity, animation_controller.clone())
                 .unwrap();
