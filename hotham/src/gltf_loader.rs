@@ -522,9 +522,6 @@ mod tests {
             let model_world = models
                 .get(*name)
                 .expect(&format!("Unable to find model with name {}", name));
-            let mut original_mesh =
-                model_world.query::<(&Mesh, &Transform, &TransformMatrix, &Info)>();
-            let original_mesh = original_mesh.iter().next().unwrap().1 .0;
 
             let mut world = World::default();
             let model = add_model_to_world(
@@ -556,6 +553,9 @@ mod tests {
             assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
 
             // Get mesh's initial buffer handle
+            let mut original_mesh =
+                model_world.query::<(&Mesh, &Transform, &TransformMatrix, &Info)>();
+            let original_mesh = original_mesh.iter().next().unwrap().1 .0;
             let initial_buffer = original_mesh.ubo_buffer.handle;
             let new_buffer = mesh.ubo_buffer.handle;
             assert_ne!(initial_buffer, new_buffer);
