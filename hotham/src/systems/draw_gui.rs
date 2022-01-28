@@ -103,7 +103,7 @@ mod tests {
         );
 
         // Assert that haptic feedback has been requested.
-        assert_eq!(haptic_context.amplitude_this_frame, 0.1);
+        assert_eq!(haptic_context.amplitude_this_frame, 1.0);
 
         // Assert the button WAS NOT clicked this frame
         assert!(!button_was_clicked(&mut world));
