@@ -1,52 +1,42 @@
-use legion::{system, world::SubWorld, Entity, EntityStore, IntoQuery};
+use hecs::{Entity, PreparedQuery, World};
 use nalgebra::Matrix4;
 use std::collections::HashMap;
 
 use crate::components::{Info, Joint, Mesh, Skin, TransformMatrix};
 
-#[system]
-#[read_component(Joint)]
-#[read_component(TransformMatrix)]
-#[write_component(Mesh)]
-#[read_component(Info)]
-#[read_component(Skin)]
-pub fn skinning(world: &mut SubWorld) -> () {
+pub fn skinning_system(
+    joints_query: &mut PreparedQuery<(&TransformMatrix, &Joint, &Info)>,
+    meshes_query: &mut PreparedQuery<(&mut Mesh, &Skin)>,
+    world: &mut World,
+) -> () {
     let mut joint_matrices: HashMap<Entity, HashMap<usize, Matrix4<f32>>> = HashMap::new();
-    unsafe {
-        let mut query = <(&TransformMatrix, &Joint, &Info)>::query();
-        query.for_each_unchecked(world, |(transform_matrix, joint, info)| {
-            let skeleton_root = joint.skeleton_root;
-            let skeleton_root_entity = world.entry_ref(skeleton_root).unwrap();
-            let inverse_transform = skeleton_root_entity
-                .get_component::<TransformMatrix>()
-                .unwrap()
-                .0
-                .try_inverse()
-                .unwrap();
-            let joint_transform = transform_matrix.0;
-            let inverse_bind_matrix = joint.inverse_bind_matrix;
-            let id = info.node_id;
+    for (_, (transform_matrix, joint, info)) in joints_query.query_mut(world) {
+        let inverse_transform = world
+            .get_mut::<&TransformMatrix>(joint.skeleton_root)
+            .unwrap()
+            .0
+            .try_inverse()
+            .unwrap();
+        let joint_transform = transform_matrix.0;
+        let inverse_bind_matrix = joint.inverse_bind_matrix;
+        let id = info.node_id;
 
-            let joint_matrix = inverse_transform * joint_transform * inverse_bind_matrix;
-            let matrices = joint_matrices.entry(skeleton_root).or_default();
-            matrices.insert(id, joint_matrix);
-        });
+        let joint_matrix = inverse_transform * joint_transform * inverse_bind_matrix;
+        let matrices = joint_matrices.entry(joint.skeleton_root).or_default();
+        matrices.insert(id, joint_matrix);
     }
 
-    let mut query = <(&mut Mesh, &Skin)>::query();
-    query.for_each_chunk_mut(world, |chunk| {
-        for (entity, (mesh, skin)) in chunk.into_iter_entities() {
-            let mut matrices_map = joint_matrices.remove(&entity).expect(&format!(
-                "Unable to get joint_matrix for entity: {:?}",
-                entity
-            ));
-            let joint_matrices = &mut mesh.ubo_data.joint_matrices;
-            for (i, joint_id) in skin.joint_ids.iter().enumerate() {
-                let joint_matrix = matrices_map.remove(&joint_id).unwrap();
-                joint_matrices[i] = joint_matrix;
-            }
+    for (entity, (mesh, skin)) in meshes_query.query_mut(world) {
+        let mut matrices_map = joint_matrices.remove(&entity).expect(&format!(
+            "Unable to get joint_matrix for entity: {:?}",
+            entity
+        ));
+        let joint_matrices = &mut mesh.ubo_data.joint_matrices;
+        for (i, joint_id) in skin.joint_ids.iter().enumerate() {
+            let joint_matrix = matrices_map.remove(&joint_id).unwrap();
+            joint_matrices[i] = joint_matrix;
         }
-    });
+    }
 }
 
 #[cfg(test)]
@@ -65,12 +55,12 @@ mod tests {
     use super::*;
     use approx::relative_eq;
     use ash::vk;
-    use legion::{component, Resources, Schedule, World};
+    use hecs::Satisfies;
     use nalgebra::vector;
 
     #[test]
     pub fn test_skinning_system() {
-        let mut world = World::default();
+        let mut world = World::new();
 
         // Create the transform for the skin entity
         let translation = vector![1.0, 2.0, 3.0];
@@ -103,7 +93,7 @@ mod tests {
         };
 
         // Now create the skin entity
-        let skinned_entity = world.push((
+        let skinned_entity = world.spawn((
             mesh,
             TransformMatrix(root_transform_matrix),
             Skin {
@@ -119,7 +109,7 @@ mod tests {
 
         let child_translation = vector![1.0, 0.0, 0.0];
         let matrix = Matrix4::new_translation(&child_translation);
-        let child = world.push((
+        let child = world.spawn((
             child_joint,
             TransformMatrix(matrix),
             Parent(skinned_entity),
@@ -137,7 +127,7 @@ mod tests {
 
         let grandchild_translation = vector![1.0, 0.0, 0.0];
         let matrix = Matrix4::new_translation(&grandchild_translation);
-        let _grandchild = world.push((
+        let _grandchild = world.spawn((
             grandchild_joint,
             TransformMatrix(matrix),
             Parent(child),
@@ -147,12 +137,9 @@ mod tests {
             },
         ));
 
-        let mut schedule = Schedule::builder().add_system(skinning_system()).build();
-        let mut resources = Resources::default();
-        schedule.execute(&mut world, &mut resources);
+        skinning_system(&mut Default::default(), &mut Default::default(), &mut world);
 
-        let entry = world.entry(skinned_entity).unwrap();
-        let mesh = entry.get_component::<Mesh>().unwrap();
+        let mesh = world.get_mut::<&Mesh>(skinned_entity).unwrap();
         let matrices_from_buffer = mesh.ubo_data.joint_matrices;
 
         for (from_buf, joint_matrices) in matrices_from_buffer.iter().zip(joint_matrices.iter()) {
@@ -164,66 +151,56 @@ mod tests {
     #[test]
     pub fn test_hand_skinning() {
         let vulkan_context = VulkanContext::testing().unwrap();
-
         let mut world = get_world_with_hands();
-        let mut resources = Resources::default();
-        resources.insert(vulkan_context);
 
-        let mut schedule = Schedule::builder()
-            .add_system(skinning_system())
-            .add_thread_local_fn(|world, resources| {
-                let vulkan_context = resources.get::<VulkanContext>().unwrap();
-                let mut query = <&Mesh>::query();
-                query.for_each(world, |mesh| {
-                    mesh.ubo_buffer
-                        .update(&vulkan_context, &[mesh.ubo_data])
-                        .unwrap();
-                })
-            })
-            .build();
-        schedule.execute(&mut world, &mut resources);
+        skinning_system(&mut Default::default(), &mut Default::default(), &mut world);
+        for (_, mesh) in world.query_mut::<&Mesh>() {
+            mesh.ubo_buffer
+                .update(&vulkan_context, &[mesh.ubo_data])
+                .unwrap();
+        }
 
-        let mut query = Entity::query().filter(component::<Skin>() & component::<Mesh>());
         let mut called = 0;
-        let vulkan_context = resources.get::<VulkanContext>().unwrap();
-        unsafe {
-            query.for_each_unchecked(&world, |skinned_entity| {
-                let entry = world.entry_ref(*skinned_entity).unwrap();
-                let mesh = entry.get_component::<Mesh>().unwrap();
-                let info = entry.get_component::<Info>().unwrap();
-                let correct_matrices: Vec<Matrix4<f32>> = if info.name == "hands:Lhand" {
-                    println!("Left hand!");
-                    serde_json::from_slice(include_bytes!(
-                        "../../../test_assets/left_hand_skinned_matrices.json"
-                    ))
-                    .unwrap()
-                } else {
-                    println!("Right hand!");
-                    serde_json::from_slice(include_bytes!(
-                        "../../../test_assets/right_hand_skinned_matrices.json"
-                    ))
-                    .unwrap()
-                };
-                let ubo = get_from_device_memory(&vulkan_context, &mesh.ubo_buffer);
-                let matrices_from_buffer = ubo[0].joint_matrices.to_vec();
-                for i in 0..correct_matrices.len() {
-                    let expected = correct_matrices[i];
-                    let actual = matrices_from_buffer[i];
-                    if !relative_eq!(expected, actual) {
-                        println!("Matrix {} is incorrect", i);
-                        println!("Actual:");
-                        println!("{}", serde_json::to_string_pretty(&actual).unwrap());
-                        println!("Expected:");
-                        println!("{}", serde_json::to_string_pretty(&expected).unwrap());
-                        std::fs::File::create("matrix_failed.json")
-                            .unwrap()
-                            .write_all(&serde_json::to_vec_pretty(&matrices_from_buffer).unwrap())
-                            .unwrap();
-                        panic!("FAIL!");
-                    }
+        for skinned_entity in world
+            .query_mut::<Satisfies<(&Skin, &Mesh)>>()
+            .into_iter()
+            .filter_map(|(e, s)| if s { Some(e) } else { None })
+        {
+            let (mesh, info) = world
+                .query_one_mut::<(&Mesh, &Info)>(skinned_entity)
+                .unwrap();
+            let correct_matrices: Vec<Matrix4<f32>> = if info.name == "hands:Lhand" {
+                println!("Left hand!");
+                serde_json::from_slice(include_bytes!(
+                    "../../../test_assets/left_hand_skinned_matrices.json"
+                ))
+                .unwrap()
+            } else {
+                println!("Right hand!");
+                serde_json::from_slice(include_bytes!(
+                    "../../../test_assets/right_hand_skinned_matrices.json"
+                ))
+                .unwrap()
+            };
+            let ubo = unsafe { get_from_device_memory(&vulkan_context, &mesh.ubo_buffer) };
+            let matrices_from_buffer = ubo[0].joint_matrices.to_vec();
+            for i in 0..correct_matrices.len() {
+                let expected = correct_matrices[i];
+                let actual = matrices_from_buffer[i];
+                if !relative_eq!(expected, actual) {
+                    println!("Matrix {} is incorrect", i);
+                    println!("Actual:");
+                    println!("{}", serde_json::to_string_pretty(&actual).unwrap());
+                    println!("Expected:");
+                    println!("{}", serde_json::to_string_pretty(&expected).unwrap());
+                    std::fs::File::create("matrix_failed.json")
+                        .unwrap()
+                        .write_all(&serde_json::to_vec_pretty(&matrices_from_buffer).unwrap())
+                        .unwrap();
+                    panic!("FAIL!");
                 }
-                called += 1;
-            });
+            }
+            called += 1;
         }
 
         assert_ne!(called, 0);
