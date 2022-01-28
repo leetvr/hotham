@@ -129,12 +129,7 @@ mod tests {
         xr_context: &mut XrContext,
         physics_context: &mut PhysicsContext,
     ) {
-        hands_system(
-            &mut Default::default(),
-            world,
-            &mut xr_context,
-            physics_context,
-        );
+        hands_system(&mut Default::default(), world, xr_context, physics_context);
         physics_context.update();
         update_rigid_body_transforms_system(&mut Default::default(), world, physics_context);
     }

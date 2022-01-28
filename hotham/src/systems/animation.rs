@@ -41,8 +41,7 @@ mod tests {
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
         let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
-        let query = PreparedQuery::<(&mut AnimationTarget, &mut Transform)>::default();
-
+        let mut query = PreparedQuery::<(&mut AnimationTarget, &mut Transform)>::default();
         let mut world = World::new();
 
         // Add the left hand

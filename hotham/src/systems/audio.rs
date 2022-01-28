@@ -72,7 +72,7 @@ mod tests {
     #[test]
     pub fn test_audio_system() {
         // Create resources
-        let (xr_context, _) = XrContext::new().unwrap();
+        let (mut xr_context, _) = XrContext::new().unwrap();
         let mut audio_context = AudioContext::default();
         let mut physics_context = PhysicsContext::default();
 
@@ -108,28 +108,6 @@ mod tests {
         // Timers
         let start = Instant::now();
 
-        let schedule = || {
-            update_xr(&mut xr_context);
-            update_audio(
-                audio_entity,
-                &mut world,
-                &mut audio_context,
-                &start,
-                beethoven,
-                right_here,
-                tell_me_that_i_cant,
-            );
-            physics_context.update();
-            xr_context.end_frame().unwrap();
-            audio_system(
-                &mut audio_query,
-                &mut world,
-                &mut audio_context,
-                &physics_context,
-                &xr_context,
-            );
-        };
-
         loop {
             thread::sleep(Duration::from_millis(50));
             let dt = start.elapsed();
@@ -137,8 +115,49 @@ mod tests {
                 break;
             }
 
-            schedule();
+            schedule(
+                &mut xr_context,
+                audio_entity,
+                &mut world,
+                &mut audio_context,
+                &start,
+                right_here,
+                tell_me_that_i_cant,
+                &mut physics_context,
+                &mut audio_query,
+            );
         }
+    }
+
+    fn schedule(
+        xr_context: &mut XrContext,
+        audio_entity: Entity,
+        world: &mut World,
+        audio_context: &mut AudioContext,
+        start: &Instant,
+        right_here: Index,
+        tell_me_that_i_cant: Index,
+        physics_context: &mut PhysicsContext,
+        audio_query: &mut PreparedQuery<(&mut SoundEmitter, &RigidBody)>,
+    ) {
+        update_xr(xr_context);
+        update_audio(
+            audio_entity,
+            world,
+            audio_context,
+            start,
+            right_here,
+            tell_me_that_i_cant,
+        );
+        physics_context.update();
+        xr_context.end_frame().unwrap();
+        audio_system(
+            audio_query,
+            world,
+            audio_context,
+            physics_context,
+            xr_context,
+        );
     }
 
     fn update_xr(xr_context: &mut XrContext) {
@@ -160,12 +179,10 @@ mod tests {
         world: &mut World,
         audio_context: &mut AudioContext,
         start: &Instant,
-        beethoven: Index,
         right_here: Index,
         tell_me_that_i_cant: Index,
     ) {
-        let source = world.get::<&SoundEmitter>(entity).unwrap();
-
+        let mut source = world.get_mut::<&mut SoundEmitter>(entity).unwrap();
         match source.current_state() {
             SoundState::Stopped => source.play(),
             _ => {}

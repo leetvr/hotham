@@ -95,29 +95,41 @@ mod tests {
 
         let hand_entity = world.spawn((hand, collider));
 
-        let query = Default::default();
-        let rigid_body_query = PreparedQuery::<(&RigidBody, &mut Transform)>::default();
+        let mut query = Default::default();
+        let mut rigid_body_query = Default::default();
 
-        let schedule = || {
-            grabbing_system(&mut query, &mut world, &mut physics_context);
-            physics_context.update();
-            update_rigid_body_transforms_system(
-                &mut rigid_body_query,
-                &mut world,
-                &mut physics_context,
-            );
-        };
+        schedule(
+            &mut query,
+            &mut world,
+            &mut physics_context,
+            &mut rigid_body_query,
+        );
 
-        schedule();
-
-        let hand = world.get_mut::<&Hand>(grabbed_entity).unwrap();
+        let mut hand = world.get_mut::<&mut Hand>(grabbed_entity).unwrap();
         assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
         hand.grip_value = 0.0;
+        drop(hand);
 
-        schedule();
+        schedule(
+            &mut query,
+            &mut world,
+            &mut physics_context,
+            &mut rigid_body_query,
+        );
 
         let hand = world.get_mut::<&Hand>(grabbed_entity).unwrap();
         assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
         assert!(hand.grabbed_entity.is_none());
+    }
+
+    fn schedule(
+        query: &mut PreparedQuery<(&mut Hand, &Collider)>,
+        world: &mut World,
+        physics_context: &mut PhysicsContext,
+        rigid_body_query: &mut PreparedQuery<(&RigidBody, &mut Transform)>,
+    ) {
+        grabbing_system(query, world, physics_context);
+        physics_context.update();
+        update_rigid_body_transforms_system(rigid_body_query, world, physics_context);
     }
 }

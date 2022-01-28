@@ -17,7 +17,8 @@ pub fn update_parent_transform_matrix_system(
         children.push(entity);
     }
 
-    for (root, root_matrix) in roots_query.query_mut(world) {
+    let mut roots = roots_query.query(world);
+    for (root, root_matrix) in roots.iter() {
         update_transform_matrix(&root_matrix.0, root, &heirarchy, world);
     }
 }
@@ -26,7 +27,7 @@ fn update_transform_matrix(
     parent_matrix: &Matrix4<f32>,
     entity: Entity,
     heirarchy: &HashMap<Entity, Vec<Entity>>,
-    world: &mut World,
+    world: &World,
 ) {
     if let Some(children) = heirarchy.get(&entity) {
         for child in children {

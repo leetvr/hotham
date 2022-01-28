@@ -36,7 +36,7 @@ mod tests {
         let test_translation = vector![5.0, 1.0, 2.0];
         let test_rotation = UnitQuaternion::from_euler_angles(0.3, 0.3, 0.3);
 
-        let transform = world.get_mut::<&Transform>(entity).unwrap();
+        let mut transform = world.get_mut::<&mut Transform>(entity).unwrap();
         transform.translation = test_translation.clone();
         transform.rotation = test_rotation.clone();
         transform.scale = test_translation.clone();

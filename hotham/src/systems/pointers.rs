@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     pub fn test_pointers_system() {
-        let (xr_context, _) = XrContext::new().unwrap();
+        let (mut xr_context, _) = XrContext::new().unwrap();
         let mut physics_context = PhysicsContext::default();
         let mut world = World::default();
 
@@ -244,17 +244,8 @@ mod tests {
             Transform::default(),
         ));
 
-        let schedule = || {
-            physics_context.update();
-            pointers_system(
-                &mut Default::default(),
-                &mut world,
-                &xr_context,
-                &mut physics_context,
-            );
-        };
+        schedule(&mut physics_context, &mut world, &mut xr_context);
 
-        schedule();
         let transform = world.get_mut::<&Transform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
@@ -265,6 +256,15 @@ mod tests {
         assert_relative_eq!(input.cursor_location.x, 50.);
         assert_relative_eq!(input.cursor_location.y, 29.491043);
         assert_eq!(input.trigger_value, 0.);
+    }
+
+    fn schedule(
+        physics_context: &mut PhysicsContext,
+        world: &mut World,
+        xr_context: &mut XrContext,
+    ) -> () {
+        physics_context.update();
+        pointers_system(&mut Default::default(), world, xr_context, physics_context)
     }
 
     #[test]

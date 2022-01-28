@@ -162,13 +162,12 @@ mod tests {
 
         let mut called = 0;
         for skinned_entity in world
-            .query_mut::<Satisfies<(&Skin, &Mesh)>>()
-            .into_iter()
+            .query::<Satisfies<(&Skin, &Mesh)>>()
+            .iter()
             .filter_map(|(e, s)| if s { Some(e) } else { None })
         {
-            let (mesh, info) = world
-                .query_one_mut::<(&Mesh, &Info)>(skinned_entity)
-                .unwrap();
+            let mut query = world.query_one::<(&Mesh, &Info)>(skinned_entity).unwrap();
+            let (mesh, info) = query.get().unwrap();
             let correct_matrices: Vec<Matrix4<f32>> = if info.name == "hands:Lhand" {
                 println!("Left hand!");
                 serde_json::from_slice(include_bytes!(

@@ -79,20 +79,26 @@ mod tests {
             height: 800,
             width: 800,
         };
-        let (mut world, image, vulkan_context, render_context, mut haptic_context, mut gui_context) =
-            setup(resolution.clone());
+        let (
+            mut world,
+            image,
+            vulkan_context,
+            mut render_context,
+            mut haptic_context,
+            mut gui_context,
+        ) = setup(resolution.clone());
 
         let mut renderdoc: RenderDoc<renderdoc::V141> = RenderDoc::new().unwrap();
 
         // Begin. Use renderdoc in headless mode for debugging.
         renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
-        let query = Default::default();
+        let mut query = Default::default();
         schedule(
             &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
-            &render_context,
+            &mut render_context,
             &vulkan_context,
         );
 
@@ -103,13 +109,13 @@ mod tests {
         assert!(!button_was_clicked(&mut world));
 
         // Release the trigger slightly
-        change_panel_trigger_value(&mut world, &query);
+        change_panel_trigger_value(&mut world, &mut query);
         schedule(
             &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
-            &render_context,
+            &mut render_context,
             &vulkan_context,
         );
 
@@ -120,13 +126,13 @@ mod tests {
         assert!(button_was_clicked(&mut world));
 
         // Move the cursor off the panel and release the trigger entirely
-        move_cursor_off_panel(&mut world, &query);
+        move_cursor_off_panel(&mut world, &mut query);
         schedule(
             &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
-            &render_context,
+            &mut render_context,
             &vulkan_context,
         );
 
@@ -159,7 +165,7 @@ mod tests {
         return panel.buttons[0].clicked_this_frame;
     }
 
-    fn change_panel_trigger_value(world: &mut World, query: &PreparedQuery<&mut Panel>) {
+    fn change_panel_trigger_value(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
         let panel = query.query_mut(world).into_iter().next().unwrap().1;
         panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.05 * (800. / SCALE_FACTOR)),
@@ -167,7 +173,7 @@ mod tests {
         });
     }
 
-    fn move_cursor_off_panel(world: &mut World, query: &PreparedQuery<&mut Panel>) {
+    fn move_cursor_off_panel(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
         let panel = query.query_mut(world).into_iter().next().unwrap().1;
         panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0., 0.),
@@ -287,7 +293,7 @@ mod tests {
         world: &mut World,
         gui_context: &mut GuiContext,
         haptic_context: &mut HapticContext,
-        render_context: &RenderContext,
+        render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
     ) -> () {
         begin_frame(render_context, vulkan_context);
@@ -333,7 +339,7 @@ mod tests {
         render_context.end_frame(vulkan_context, 0);
     }
 
-    fn begin_frame(render_context: &RenderContext, vulkan_context: &VulkanContext) {
+    fn begin_frame(render_context: &mut RenderContext, vulkan_context: &VulkanContext) {
         let rotation: mint::Quaternion<f32> = UnitQuaternion::from_euler_angles(0., 0., 0.).into();
         let position = Vector3f {
             x: -1.0,
