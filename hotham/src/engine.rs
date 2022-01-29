@@ -1,4 +1,4 @@
-use crate::{resources::XrContext, HothamError, HothamResult, VIEW_TYPE};
+use crate::{resources::XrContext, HothamResult, VIEW_TYPE};
 use openxr as xr;
 
 use std::{

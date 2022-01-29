@@ -1,5 +1,4 @@
 use ash::vk;
-pub use legion;
 use openxr as xr;
 
 pub use engine::Engine;

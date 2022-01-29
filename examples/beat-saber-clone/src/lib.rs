@@ -7,6 +7,5 @@ pub fn main() {
 }
 
 pub fn real_main() -> HothamResult<()> {
-    todo!();
-    Ok(())
+    todo!("The Beat Saber example needs to be rewritten to support hecs. Try `simple_scene_example` in the meantime.");
 }

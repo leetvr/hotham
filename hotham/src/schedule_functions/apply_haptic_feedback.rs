@@ -1,20 +1,11 @@
-use legion::{Resources, World};
 use openxr::{Duration, HapticVibration};
 
 use crate::resources::{HapticContext, XrContext};
 
-pub fn apply_haptic_feedback(_: &mut World, resources: &mut Resources) {
-    let mut haptic_context = resources
-        .get_mut::<HapticContext>()
-        .expect("Unable to get HapticContext");
-
+pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
     if haptic_context.amplitude_this_frame == 0. {
         return;
     }
-
-    let xr_context = resources
-        .get_mut::<XrContext>()
-        .expect("Unable to get XrContext");
 
     let duration = Duration::from_nanos(1e+7 as _);
     let frequency = 180.;
@@ -35,4 +26,18 @@ pub fn apply_haptic_feedback(_: &mut World, resources: &mut Resources) {
 
     // Reset the value
     haptic_context.amplitude_this_frame = 0.;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Simple smoke test.
+    #[test]
+    pub fn apply_haptic_feedback_test() {
+        let (mut xr_context, _) = XrContext::new().unwrap();
+        let mut haptic_context = HapticContext::default();
+
+        apply_haptic_feedback(&mut xr_context, &mut haptic_context);
+    }
 }

@@ -22,7 +22,6 @@ hecs = "0.7.5"
 hotham-debug-server = {path = "../hotham-debug-server"}
 image = "0.23"
 itertools = "0.10.0"
-legion = "0.4"
 libktx-rs = "0.2.3"
 memoffset = "0.5.1"
 mint = "0.5.6"
