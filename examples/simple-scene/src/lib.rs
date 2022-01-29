@@ -1,9 +1,14 @@
 use hotham::components::hand::Handedness;
+use hotham::components::{
+    AnimationTarget, Collider, Info, Joint, Mesh, Parent, RigidBody, Skin, TransformMatrix, Visible,
+};
 use hotham::gltf_loader::add_model_to_world;
-use hotham::hecs::World;
+use hotham::hecs::Without;
 use hotham::resources::vulkan_context::VulkanContext;
 use hotham::resources::{RenderContext, XrContext};
-use hotham::schedule_functions::{begin_frame, end_frame, physics_step};
+use hotham::schedule_functions::{
+    begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass, physics_step,
+};
 use hotham::systems::rendering::rendering_system;
 use hotham::systems::skinning::skinning_system;
 use hotham::systems::{
@@ -11,51 +16,42 @@ use hotham::systems::{
     update_parent_transform_matrix_system, update_rigid_body_transforms_system,
     update_transform_matrix_system,
 };
-use hotham::{gltf_loader, App, HothamResult};
+use hotham::{gltf_loader, Engine, HothamError, HothamResult};
 
 use hotham::{
     components::{AnimationController, Hand, Transform},
+    hecs::{PreparedQuery, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::PhysicsContext,
 };
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
-    println!("[HOTHAM_ASTEROID_ANDROID] MAIN!");
-    real_main().unwrap();
+    println!("[HOTHAM_SIMPLE_SCENE] MAIN!");
+    real_main().expect("Error running app!");
 }
 
 pub fn real_main() -> HothamResult<()> {
-    init()?;
+    let mut engine = Engine::new();
+    let mut resources = init()?;
+    let mut queries = Default::default();
 
-    // let mut resources = Resources::default();
-    // resources.insert(xr_context);
-    // resources.insert(vulkan_context);
-    // resources.insert(render_context);
-    // resources.insert(physics_context);
-    // resources.insert(0 as usize);
-    // let schedule = Schedule::builder()
-    //     .add_thread_local_fn(begin_frame)
-    //     .add_system(hands_system())
-    //     .add_system(collision_system())
-    //     .add_system(grabbing_system())
-    //     .add_thread_local_fn(physics_step)
-    //     .add_system(update_rigid_body_transforms_system())
-    //     .add_system(animation_system())
-    //     .add_system(update_transform_matrix_system())
-    //     .add_system(update_parent_transform_matrix_system())
-    //     .add_system(skinning_system())
-    //     .add_system(rendering_system())
-    //     .add_thread_local_fn(end_frame)
-    //     .build();
-    // println!("[HOTHAM_INIT] DONE! INIT COMPLETE!");
+    while !engine.should_quit() {
+        match engine.update(&mut resources.xr_context) {
+            Err(HothamError::ShuttingDown) => {
+                println!("[HOTHAM_SIMPLE_SCENE] Shutting down!");
+                break;
+            }
+            Err(e) => return Err(e),
+            _ => {}
+        }
+        tick(&mut resources, &mut queries);
+    }
 
-    // let mut app = App::new(world, resources, schedule)?;
-    // app.run()?;
     Ok(())
 }
 
-fn init() -> Result<(), hotham::HothamError> {
+fn init() -> Result<Resources, hotham::HothamError> {
     let (xr_context, vulkan_context) = XrContext::new()?;
     let render_context = RenderContext::new(&vulkan_context, &xr_context)?;
     let mut physics_context = PhysicsContext::default();
@@ -105,26 +101,78 @@ fn init() -> Result<(), hotham::HothamError> {
         &render_context,
         &mut physics_context,
     );
-    Ok(())
+
+    Ok(Resources {
+        xr_context,
+        vulkan_context,
+        render_context,
+        physics_context,
+        world,
+    })
 }
 
-fn tick(
-    xr_context: &mut XrContext,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
-) {
+struct Resources {
+    xr_context: XrContext,
+    vulkan_context: VulkanContext,
+    render_context: RenderContext,
+    physics_context: PhysicsContext,
+    world: World,
+}
+
+#[derive(Default)]
+struct Queries<'a> {
+    collision_query: PreparedQuery<&'a mut Collider>,
+    grabbing_query: PreparedQuery<(&'a mut Hand, &'a Collider)>,
+    update_rigid_body_transforms_query: PreparedQuery<(&'a RigidBody, &'a mut Transform)>,
+    animation_query: PreparedQuery<(&'a mut AnimationTarget, &'a mut Transform)>,
+    update_transform_matrix_query: PreparedQuery<(&'a Transform, &'a mut TransformMatrix)>,
+    parent_query: PreparedQuery<&'a Parent>,
+    roots_query: PreparedQuery<Without<Parent, &'a TransformMatrix>>,
+    joints_query: PreparedQuery<(&'a TransformMatrix, &'a Joint, &'a Info)>,
+    meshes_query: PreparedQuery<(&'a mut Mesh, &'a Skin)>,
+    rendering_query: PreparedQuery<With<Visible, (&'a mut Mesh, &'a TransformMatrix)>>,
+    hands_query: PreparedQuery<(
+        &'a mut Hand,
+        &'a mut AnimationController,
+        &'a mut hotham::components::RigidBody,
+    )>,
+}
+
+fn tick(resources: &mut Resources, queries: &mut Queries) {
+    let xr_context = &mut resources.xr_context;
+    let vulkan_context = &resources.vulkan_context;
+    let render_context = &mut resources.render_context;
+    let physics_context = &mut resources.physics_context;
+    let world = &mut resources.world;
+
     begin_frame(xr_context, vulkan_context, render_context);
-    // hands_system();
-    // collision_system();
-    // grabbing_system();
-    // physics_step();
-    // update_rigid_body_transforms_system();
-    // animation_system();
-    // update_transform_matrix_system();
-    // update_parent_transform_matrix_system();
-    // skinning_system();
-    // rendering_system();
-    // end_frame();
+    hands_system(&mut queries.hands_query, world, xr_context, physics_context);
+    collision_system(&mut queries.collision_query, world, physics_context);
+    grabbing_system(&mut queries.grabbing_query, world, physics_context);
+    physics_step(physics_context);
+    update_rigid_body_transforms_system(
+        &mut queries.update_rigid_body_transforms_query,
+        world,
+        physics_context,
+    );
+    animation_system(&mut queries.animation_query, world);
+    update_transform_matrix_system(&mut queries.update_transform_matrix_query, world);
+    update_parent_transform_matrix_system(
+        &mut queries.parent_query,
+        &mut queries.roots_query,
+        world,
+    );
+    skinning_system(&mut queries.joints_query, &mut queries.meshes_query, world);
+    begin_pbr_renderpass(xr_context, vulkan_context, render_context);
+    rendering_system(
+        &mut queries.rendering_query,
+        world,
+        vulkan_context,
+        xr_context.frame_index,
+        render_context,
+    );
+    end_pbr_renderpass(xr_context, vulkan_context, render_context);
+    end_frame(xr_context, vulkan_context, render_context);
 }
 
 fn add_hand(
@@ -150,7 +198,16 @@ fn add_hand(
     .unwrap();
     {
         // Add a hand component
-        world.insert_one(hand, handedness).unwrap();
+        world
+            .insert_one(
+                hand,
+                Hand {
+                    grip_value: 0.,
+                    handedness,
+                    grabbed_entity: None,
+                },
+            )
+            .unwrap();
 
         // Modify the animation controller
         let mut animation_controller = world.get_mut::<AnimationController>(hand).unwrap();

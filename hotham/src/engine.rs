@@ -1,5 +1,4 @@
-use crate::{resources::XrContext, HothamResult, VIEW_TYPE};
-use legion::{Resources, Schedule, World};
+use crate::{resources::XrContext, HothamError, HothamResult, VIEW_TYPE};
 use openxr as xr;
 
 use std::{
@@ -11,7 +10,7 @@ use std::{
     time::Duration,
 };
 
-use xr::SessionState;
+use xr::{EventDataBuffer, SessionState};
 
 #[cfg(target_os = "android")]
 pub const ANDROID_LOOPER_ID_MAIN: u32 = 0;
@@ -22,34 +21,34 @@ pub const ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(0
 #[cfg(target_os = "android")]
 pub const ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
 
-pub struct App {
+pub struct Engine {
     should_quit: Arc<AtomicBool>,
-    world: World,
-    resources: Resources,
-    schedule: Schedule,
     #[allow(dead_code)]
     resumed: bool,
+    event_data_buffer: EventDataBuffer,
 }
 
-impl Drop for App {
+impl Drop for Engine {
     fn drop(&mut self) {
         #[cfg(target_os = "android")]
         ndk_glue::native_activity().finish();
     }
 }
 
-impl App {
-    pub fn new(world: World, resources: Resources, schedule: Schedule) -> HothamResult<Self> {
-        Ok(Self {
+impl Engine {
+    pub fn new() -> Self {
+        Self {
             should_quit: Arc::new(AtomicBool::from(false)),
             resumed: true,
-            world,
-            resources,
-            schedule,
-        })
+            event_data_buffer: Default::default(),
+        }
     }
 
-    pub fn run(&mut self) -> HothamResult<()> {
+    pub fn should_quit(&self) -> bool {
+        self.should_quit.load(Ordering::Relaxed)
+    }
+
+    pub fn update(&mut self, xr_context: &mut XrContext) -> HothamResult<()> {
         #[cfg(not(target_os = "android"))]
         {
             let should_quit = self.should_quit.clone();
@@ -57,49 +56,42 @@ impl App {
                 .map_err(anyhow::Error::new)?;
         }
 
-        let mut event_buffer = Default::default();
+        #[cfg(target_os = "android")]
+        if self.process_android_events() {
+            return Ok(());
+        };
 
-        while !self.should_quit.load(Ordering::Relaxed) {
-            #[cfg(target_os = "android")]
-            if self.process_android_events() {
-                // If this function returned true, it means we should quit.
-                break;
-            };
+        let (previous_state, current_state) = {
+            let previous_state = xr_context.session_state.clone();
+            let current_state = xr_context.poll_xr_event(&mut self.event_data_buffer)?;
+            (previous_state, current_state)
+        };
 
-            let mut xr_context = self.resources.get_mut::<XrContext>().unwrap();
-
-            let (previous_state, current_state) = {
-                let previous_state = xr_context.session_state.clone();
-                let current_state = xr_context.poll_xr_event(&mut event_buffer)?;
-                (previous_state, current_state)
-            };
-
-            match (previous_state, current_state) {
-                (SessionState::EXITING, SessionState::IDLE) => {
-                    // return quickly so we can process the Android lifecycle
-                }
-                (_, SessionState::IDLE) => {
-                    sleep(Duration::from_secs(1)); // sleep to avoid thrashing the CPU
-                    continue;
-                }
-                (SessionState::IDLE, SessionState::READY) => {
-                    xr_context.session.begin(VIEW_TYPE)?;
-                    drop(xr_context);
-                    self.schedule.execute(&mut self.world, &mut self.resources);
-                }
-                (_, SessionState::STOPPING) => {
-                    xr_context.end_session()?;
-                }
-                (_, SessionState::EXITING | SessionState::LOSS_PENDING) => break,
-                (_, SessionState::SYNCHRONIZED | SessionState::VISIBLE | SessionState::FOCUSED) => {
-                    drop(xr_context);
-                    self.schedule.execute(&mut self.world, &mut self.resources);
-                }
-                _ => println!(
-                    "[HOTHAM_MAIN] - Unhandled - previous: {:?}, current: {:?}",
-                    previous_state, current_state
-                ),
+        match (previous_state, current_state) {
+            (SessionState::EXITING, SessionState::IDLE) => {
+                // return quickly so we can process the Android lifecycle
             }
+            (_, SessionState::IDLE) => {
+                sleep(Duration::from_millis(100)); // Sleep to avoid thrasing the CPU
+            }
+            (SessionState::IDLE, SessionState::READY) => {
+                xr_context.session.begin(VIEW_TYPE)?;
+            }
+            (_, SessionState::STOPPING) => {
+                xr_context.end_session()?;
+            }
+            (
+                _,
+                SessionState::EXITING
+                | SessionState::LOSS_PENDING
+                | SessionState::SYNCHRONIZED
+                | SessionState::VISIBLE
+                | SessionState::FOCUSED,
+            ) => {}
+            _ => println!(
+                "[HOTHAM_MAIN] - Unhandled - previous: {:?}, current: {:?}",
+                previous_state, current_state
+            ),
         }
 
         Ok(())
@@ -119,6 +111,8 @@ impl App {
                     ndk_glue::Event::Pause => self.resumed = false,
                     _ => {}
                 }
+            } else {
+                break;
             }
         }
 

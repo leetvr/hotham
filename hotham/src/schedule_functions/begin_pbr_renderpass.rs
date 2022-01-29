@@ -2,14 +2,11 @@ use crate::{
     resources::xr_context::XrContext, resources::RenderContext, resources::VulkanContext,
     util::is_view_valid,
 };
-use legion::{Resources, World};
-pub fn begin_pbr_renderpass(_world: &mut World, resources: &mut Resources) {
-    // Get resources
-    let xr_context = resources.get_mut::<XrContext>().unwrap();
-    let mut render_context = resources.get_mut::<RenderContext>().unwrap();
-    let current_swapchain_image_index = resources.get_mut::<usize>().unwrap();
-    let vulkan_context = resources.get::<VulkanContext>().unwrap();
-
+pub fn begin_pbr_renderpass(
+    xr_context: &mut XrContext,
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+) {
     // Check if we should be rendering.
     if !xr_context.frame_state.should_render {
         println!(
@@ -31,6 +28,6 @@ pub fn begin_pbr_renderpass(_world: &mut World, resources: &mut Resources) {
     // TODO: This begs the question: what if we never get a valid view from OpenXR..?
 
     // Begin the renderpass.
-    render_context.begin_pbr_render_pass(&vulkan_context, *current_swapchain_image_index);
+    render_context.begin_pbr_render_pass(&vulkan_context, xr_context.frame_index);
     // ..and we're off!
 }

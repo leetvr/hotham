@@ -286,7 +286,6 @@ impl RenderContext {
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,
     ) {
-        println!("[RENDER_CONTEXT] Beginning frame..");
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];
@@ -767,7 +766,7 @@ fn create_pipeline(
     // Rasterization state
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
-        .cull_mode(vk::CullModeFlags::NONE)
+        .cull_mode(vk::CullModeFlags::BACK)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)

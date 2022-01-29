@@ -14,6 +14,8 @@ pub enum HothamError {
     UnsupportedVersionError,
     #[error("The format provided - {format:?} - is not supported for this operation")]
     InvalidFormatError { format: String },
+    #[error("The engine is shutting down")]
+    ShuttingDown,
     #[error(transparent)]
     IO(#[from] std::io::Error),
     #[error(transparent)]

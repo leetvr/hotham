@@ -10,12 +10,12 @@ pub fn rendering_system(
     query: &mut PreparedQuery<With<Visible, (&mut Mesh, &TransformMatrix)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
-    swapchain_image_index: &usize,
+    swapchain_image_index: usize,
     render_context: &RenderContext,
 ) -> () {
     for (_, (mesh, transform_matrix)) in query.query_mut(world) {
         let device = &vulkan_context.device;
-        let command_buffer = render_context.frames[*swapchain_image_index].command_buffer;
+        let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
 
         unsafe {
             mesh.ubo_data.transform = transform_matrix.0.clone();
@@ -282,7 +282,7 @@ mod tests {
             &mut Default::default(),
             world,
             vulkan_context,
-            &0,
+            0,
             render_context,
         );
         render_context.end_pbr_render_pass(&vulkan_context, 0);

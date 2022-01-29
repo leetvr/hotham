@@ -331,7 +331,7 @@ mod tests {
             &mut Default::default(),
             world,
             vulkan_context,
-            &0,
+            0,
             render_context,
         );
 

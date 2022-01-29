@@ -2,16 +2,16 @@ use ash::vk;
 pub use legion;
 use openxr as xr;
 
-pub use app::App;
+pub use engine::Engine;
+pub use hecs;
 pub use hotham_error::HothamError;
 pub use rapier3d;
 pub use vertex::Vertex;
-pub use hecs;
 
-mod app;
 mod buffer;
 mod camera;
 pub mod components;
+mod engine;
 mod frame;
 pub mod gltf_loader;
 mod hotham_error;
