@@ -291,6 +291,9 @@ impl RenderContext {
         let frame = &self.frames[swapchain_image_index];
         let command_buffer = frame.command_buffer;
 
+        // Wait for the GPU to be ready.
+        self.wait(device, frame);
+
         // Begin recording the command buffer.
         unsafe {
             device
@@ -313,9 +316,6 @@ impl RenderContext {
         let frame = &self.frames[swapchain_image_index];
         let command_buffer = frame.command_buffer;
         let framebuffer = frame.framebuffer;
-
-        // Wait for the GPU to be ready.
-        self.wait(device, frame);
 
         // Begin the renderpass.
         let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
@@ -766,7 +766,7 @@ fn create_pipeline(
     // Rasterization state
     let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
         .polygon_mode(vk::PolygonMode::FILL)
-        .cull_mode(vk::CullModeFlags::NONE)
+        .cull_mode(vk::CullModeFlags::BACK)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .rasterizer_discard_enable(false)
         .depth_clamp_enable(false)

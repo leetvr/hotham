@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
-use legion::{Entity, World};
+use hecs::World;
 use nalgebra::{
     vector, Isometry, Isometry3, Quaternion, Translation3, Unit, UnitQuaternion, Vector3,
 };
@@ -48,7 +48,7 @@ pub fn get_world_with_hands() -> World {
     ];
     let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
 
-    let mut world = World::default();
+    let mut world = World::new();
 
     // Add two hands
     let left_hand = add_model_to_world(
@@ -61,8 +61,7 @@ pub fn get_world_with_hands() -> World {
     )
     .unwrap();
     {
-        let mut left_hand_entity = world.entry(left_hand).unwrap();
-        let transform = left_hand_entity.get_component_mut::<Transform>().unwrap();
+        let mut transform = world.get_mut::<Transform>(left_hand).unwrap();
         transform.translation = vector![-0.2, 1.4, 0.0];
     }
 
@@ -76,19 +75,11 @@ pub fn get_world_with_hands() -> World {
     )
     .unwrap();
     {
-        let mut right_hand_entity = world.entry(right_hand).unwrap();
-        let transform = right_hand_entity.get_component_mut::<Transform>().unwrap();
+        let mut transform = world.get_mut::<Transform>(right_hand).unwrap();
         transform.translation = vector![0.2, 1.4, 0.0];
     }
 
     world
-}
-
-pub fn entity_to_u64(entity: Entity) -> u64 {
-    unsafe { std::mem::transmute(entity) }
-}
-pub fn u64_to_entity(entity: u64) -> Entity {
-    unsafe { std::mem::transmute(entity) }
 }
 
 pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {

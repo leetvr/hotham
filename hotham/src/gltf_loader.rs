@@ -9,8 +9,8 @@ use crate::{
 use anyhow::Result;
 use ash::vk;
 use gltf::animation::util::ReadOutputs;
+use hecs::{Entity, World};
 use itertools::{izip, Itertools};
-use legion::{any, component, world::Duplicate, Entity, IntoQuery, World};
 use nalgebra::{vector, Matrix4, Quaternion, UnitQuaternion};
 use std::collections::HashMap;
 
@@ -99,9 +99,8 @@ fn load_node(
             .unwrap_or(format!("Node {}", node_data.index())),
         node_id: node_data.index(),
     };
-    let this_entity = world.push((transform, transform_matrix, info));
+    let this_entity = world.spawn((transform, transform_matrix, info));
     node_entity_map.insert(node_data.index(), this_entity);
-    let mut e = world.entry(this_entity).unwrap();
 
     if let Some(mesh) = node_data.mesh() {
         let mesh = Mesh::load(
@@ -112,12 +111,11 @@ fn load_node(
             images,
         )?;
 
-        e.add_component(mesh);
-        e.add_component(Visible {})
+        world.insert(this_entity, (mesh, Visible {})).unwrap();
     }
 
     if is_root {
-        e.add_component(Root {});
+        world.insert_one(this_entity, Root {}).unwrap();
     }
 
     for child in node_data.children() {
@@ -146,8 +144,7 @@ fn add_parents(
     for child_node in node_data.children() {
         let child_id = child_node.index();
         let child_entity = node_entity_map.get(&child_id).unwrap();
-        let mut child = world.entry(*child_entity).unwrap();
-        child.add_component(parent.clone());
+        world.insert_one(*child_entity, parent.clone()).unwrap();
         add_parents(&child_node, world, node_entity_map);
     }
 }
@@ -162,6 +159,7 @@ fn add_skins_and_joints(
     // Do we need to add a Skin?
     // TODO: Extract this to components::Skin
     if let Some(node_skin_data) = node_data.skin() {
+        println!("[HOTHAM_GLTF] Adding a skin to {}", node_data.index());
         let this_entity = *node_entity_map.get(&node_data.index()).unwrap();
         let mut joint_matrices = Vec::new();
         let reader = node_skin_data.reader(|_| Some(buffer));
@@ -180,18 +178,14 @@ fn add_skins_and_joints(
             };
             joint_ids.push(joint_node.index());
             let joint_entity = node_entity_map.get(&joint_node.index()).unwrap();
-            let mut entry = world.entry(*joint_entity).unwrap();
-            entry.add_component(joint);
+            world.insert_one(*joint_entity, joint).unwrap();
         }
 
         // Add a Skin to the entity.
-        let mut entry = world.entry(this_entity).unwrap();
-        entry.add_component(Skin { joint_ids });
-
-        // Create a new storage buffer with the inverse bind matrices.
-        let mesh = entry.get_component_mut::<Mesh>().unwrap();
+        world.insert_one(this_entity, Skin { joint_ids }).unwrap();
 
         // Tell the vertex shader how many joints we have
+        let mut mesh = world.get_mut::<Mesh>(this_entity).unwrap();
         mesh.ubo_data.joint_count = joint_matrices.len() as f32;
     }
 
@@ -206,8 +200,7 @@ fn add_animations(
     world: &mut World,
     node_entity_map: &mut HashMap<usize, Entity>,
 ) -> () {
-    let mut query = Entity::query().filter(component::<Root>());
-    let controller_entity = query.iter(world).next().unwrap().clone();
+    let (controller_entity, _) = world.query::<&Root>().iter().next().unwrap();
 
     for animation in animations.iter() {
         'chunks: for chunk in &animation.channels().chunks(3) {
@@ -245,13 +238,11 @@ fn add_animations(
                 }
             }
 
-            let target_entity = node_entity_map.get(&target).unwrap();
-            let mut target_entry = if let Some(target_entry) = world.entry(*target_entity) {
-                target_entry
-            } else {
+            let target_entity = *node_entity_map.get(&target).unwrap();
+            if !world.contains(target_entity) {
                 println!("[HOTHAM_GLTF] - Error importing animation {:?}. No target, probably due to malformed file. Ignoring", animation.name());
                 return;
-            };
+            }
 
             assert!(
                 translations.len() == rotations.len() && rotations.len() == scales.len(),
@@ -273,22 +264,29 @@ fn add_animations(
                 .collect_vec();
 
             // If an animation target exists already, push this animation onto it. Otherwise, create a new one.
-            if let Ok(animation_target) = target_entry.get_component_mut::<AnimationTarget>() {
-                animation_target.animations.push(animation);
-            } else {
-                target_entry.add_component(AnimationTarget {
-                    controller: controller_entity.clone(),
-                    animations: vec![animation],
-                });
+            match world.query_one_mut::<&mut AnimationTarget>(target_entity) {
+                Ok(animation_target) => {
+                    animation_target.animations.push(animation);
+                }
+                _ => {
+                    world
+                        .insert_one(
+                            target_entity,
+                            AnimationTarget {
+                                controller: controller_entity.clone(),
+                                animations: vec![animation],
+                            },
+                        )
+                        .unwrap();
+                }
             }
 
             // Add an animation controller to our parent, if needed.
-            let mut contoller_entry = world.entry(controller_entity).unwrap();
-            if contoller_entry
-                .get_component::<AnimationController>()
-                .is_err()
-            {
-                contoller_entry.add_component(AnimationController::default())
+            let entity_ref = world.entity(controller_entity).unwrap();
+            if !entity_ref.has::<AnimationController>() {
+                world
+                    .insert_one(controller_entity, AnimationController::default())
+                    .unwrap();
             }
         }
     }
@@ -297,92 +295,169 @@ fn add_animations(
 pub fn add_model_to_world(
     name: &str,
     models: &HashMap<String, World>,
-    world: &mut World,
+    destination_world: &mut World,
     parent: Option<Entity>,
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
 ) -> Option<Entity> {
-    let mut merger = Duplicate::default();
-    merger.register_clone::<Transform>();
-    merger.register_clone::<TransformMatrix>();
-    merger.register_clone::<Mesh>();
-    merger.register_clone::<Skin>();
-    merger.register_clone::<Joint>();
-    merger.register_clone::<Parent>();
-    merger.register_clone::<Entity>();
-    merger.register_clone::<Root>();
-    merger.register_clone::<Info>();
-    merger.register_clone::<AnimationController>();
-    merger.register_clone::<AnimationTarget>();
-    merger.register_clone::<Visible>();
+    let source_world = models.get(name)?;
+    let source_entities = source_world.iter();
+    let mut entity_map = HashMap::new();
 
-    let source = models.get(name)?;
-    let mut query = Entity::query().filter(component::<Root>());
-    let root_entity = query.iter(source).next().unwrap();
+    // Reserve some empty entities in the new world for us to use.
+    let new_entities = destination_world.reserve_entities(source_entities.len() as _);
 
-    let entity_map = world.clone_from(source, &any(), &mut merger);
-
-    // If any entities had Parents, then let's fix up their relationships
-    let mut query = <&mut Parent>::query();
-    query.for_each_mut(world, |p| {
-        // We have to make this conditional, as there may be entities from other models in the world.
-        if let Some(new_parent) = entity_map.get(&p.0) {
-            p.0 = *new_parent;
-        }
-    });
-
-    // If any entities had Joints, then let's fix up their relationships
-    let mut query = <&mut Joint>::query();
-    query.for_each_mut(world, |j| {
-        // We have to make this conditional, as there may be entities from other models in the world.
-        if let Some(new_parent) = entity_map.get(&j.skeleton_root) {
-            j.skeleton_root = *new_parent;
-        }
-    });
-
-    // If any entities had AnimationTargets, then let's fix up their relationships
-    let mut query = <&mut AnimationTarget>::query();
-    query.for_each_mut(world, |a| {
-        // We have to make this conditional, as there may be entities from other models in the world.
-        if let Some(new_parent) = entity_map.get(&a.controller) {
-            a.controller = *new_parent;
-        }
-    });
-
-    let new_entity = entity_map.get(&root_entity).cloned().unwrap();
-
-    // Optionally set a new parent for this entity, if it was passed in as a parameter.
-    if let Some(parent) = parent {
-        let mut entity = world.entry(new_entity).unwrap();
-        entity.add_component(Parent(parent));
+    // Create a map from the source entity to the new destination entity.
+    for (source_entity, destination_entity) in source_entities.zip(new_entities) {
+        let source_entity = source_entity.entity();
+        entity_map.insert(source_entity, destination_entity);
     }
 
-    // We'll need to create a new UBO for the mesh:
-    let mut query = <(&Info, &mut Mesh)>::query();
-    let (info, mesh) = query.get_mut(world, new_entity).unwrap();
+    // Go through each entity in the source world and clone its components into the new world.
+    for (source_entity, destination_entity) in &entity_map {
+        if let Ok(transform) = source_world.get_mut::<Transform>(*source_entity) {
+            destination_world
+                .insert_one(*destination_entity, transform.clone())
+                .unwrap();
+        }
 
-    // Create new description sets
-    let new_descriptor_sets = vulkan_context
-        .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
+        if let Ok(transform_matrix) = source_world.get_mut::<TransformMatrix>(*source_entity) {
+            destination_world
+                .insert_one(*destination_entity, transform_matrix.clone())
+                .unwrap();
+        }
+
+        // Create a new mesh for this entity in the destination world.
+        if let Ok(mesh) = source_world.get_mut::<Mesh>(*source_entity) {
+            let info = source_world.get_mut::<Info>(*source_entity).unwrap();
+
+            // Create new description sets
+            let descriptor_sets = vulkan_context
+                .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
+                .unwrap();
+
+            // Create a new buffer
+            let ubo_buffer = Buffer::new(
+                vulkan_context,
+                &[mesh.ubo_data],
+                vk::BufferUsageFlags::UNIFORM_BUFFER,
+            )
+            .unwrap();
+            vulkan_context.update_buffer_descriptor_set(
+                &ubo_buffer,
+                mesh.descriptor_sets[0],
+                0,
+                vk::DescriptorType::UNIFORM_BUFFER,
+            );
+
+            let new_mesh = Mesh {
+                descriptor_sets: [descriptor_sets[0]],
+                ubo_buffer,
+                ubo_data: mesh.ubo_data.clone(),
+                primitives: mesh.primitives.clone(),
+            };
+            destination_world
+                .insert_one(*destination_entity, new_mesh)
+                .unwrap();
+        }
+
+        if let Ok(skin) = source_world.get_mut::<Skin>(*source_entity) {
+            destination_world
+                .insert_one(*destination_entity, skin.clone())
+                .unwrap();
+        }
+
+        // If the source entity had a joint, clone it and set the skeleton root to the corresponding entity in the destination world.
+        if let Ok(joint) = source_world.get_mut::<Joint>(*source_entity) {
+            let mut new_joint = joint.clone();
+            new_joint.skeleton_root = *entity_map.get(&joint.skeleton_root).unwrap();
+            destination_world
+                .insert_one(*destination_entity, new_joint)
+                .unwrap();
+        }
+
+        // If the source entity had a parent, set it to the corresponding entity in the destination world.
+        if let Ok(parent) = source_world.get_mut::<Parent>(*source_entity) {
+            let new_parent = entity_map.get(&parent.0).unwrap();
+            destination_world
+                .insert_one(*destination_entity, Parent(*new_parent))
+                .unwrap();
+        }
+
+        if let Ok(root) = source_world.get_mut::<Root>(*source_entity) {
+            destination_world
+                .insert_one(*destination_entity, root.clone())
+                .unwrap();
+
+            // Set a parent for the root entity if one was specified.
+            if let Some(parent) = parent {
+                destination_world
+                    .insert_one(*destination_entity, Parent(parent))
+                    .unwrap();
+            }
+        }
+
+        if let Ok(info) = source_world.get_mut::<Info>(*source_entity) {
+            destination_world
+                .insert_one(*destination_entity, info.clone())
+                .unwrap();
+        }
+
+        if let Ok(animation_controller) =
+            source_world.get_mut::<AnimationController>(*source_entity)
+        {
+            destination_world
+                .insert_one(*destination_entity, animation_controller.clone())
+                .unwrap();
+        }
+
+        if let Ok(animation_target) = source_world.get_mut::<AnimationTarget>(*source_entity) {
+            let mut new_animation_target = animation_target.clone();
+            new_animation_target.controller =
+                *entity_map.get(&animation_target.controller).unwrap();
+            destination_world
+                .insert_one(*destination_entity, new_animation_target)
+                .unwrap();
+        }
+
+        if let Ok(visible) = source_world.get_mut::<Visible>(*source_entity) {
+            destination_world
+                .insert_one(*destination_entity, visible.clone())
+                .unwrap();
+        }
+    }
+
+    // Find the root entity of the source world.
+    let (root_entity, _) = source_world.query::<&Root>().iter().next().unwrap();
+
+    // Get the new root entity.
+    let new_root_entity = entity_map.get(&root_entity).cloned().unwrap();
+
+    // We'll also need to fix up any meshes
+    for (_, (info, mesh)) in destination_world.query_mut::<(&Info, &mut Mesh)>() {
+        // Create new description sets
+        let new_descriptor_sets = vulkan_context
+            .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
+            .unwrap();
+        mesh.descriptor_sets = [new_descriptor_sets[0]];
+
+        // Create a new buffer
+        let new_ubo_buffer = Buffer::new(
+            vulkan_context,
+            &[mesh.ubo_data],
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
+        )
         .unwrap();
-    mesh.descriptor_sets = [new_descriptor_sets[0]];
+        vulkan_context.update_buffer_descriptor_set(
+            &new_ubo_buffer,
+            mesh.descriptor_sets[0],
+            0,
+            vk::DescriptorType::UNIFORM_BUFFER,
+        );
+        mesh.ubo_buffer = new_ubo_buffer;
+    }
 
-    // Create a new buffer
-    let new_ubo_buffer = Buffer::new(
-        vulkan_context,
-        &[mesh.ubo_data],
-        vk::BufferUsageFlags::UNIFORM_BUFFER,
-    )
-    .unwrap();
-    vulkan_context.update_buffer_descriptor_set(
-        &new_ubo_buffer,
-        mesh.descriptor_sets[0],
-        0,
-        vk::DescriptorType::UNIFORM_BUFFER,
-    );
-    mesh.ubo_buffer = new_ubo_buffer;
-
-    Some(new_entity)
+    Some(new_root_entity)
 }
 
 #[cfg(test)]
@@ -393,7 +468,6 @@ mod tests {
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
     };
     use approx::assert_relative_eq;
-    use legion::{EntityStore, IntoQuery};
 
     #[test]
     pub fn test_load_models() {
@@ -434,9 +508,6 @@ mod tests {
             let model_world = models
                 .get(*name)
                 .expect(&format!("Unable to find model with name {}", name));
-            let mut query = <(&Mesh, &Transform, &TransformMatrix, &Info)>::query();
-            let meshes = query.iter(model_world).collect::<Vec<_>>();
-            assert_eq!(meshes.len(), 1);
 
             let mut world = World::default();
             let model = add_model_to_world(
@@ -449,9 +520,10 @@ mod tests {
             );
             assert!(model.is_some(), "Model {} could not be added", name);
 
-            let mut query = <(&Info, &Transform, &Mesh, &TransformMatrix, &Root)>::query();
             let model = model.unwrap();
-            let (info, transform, mesh, ..) = query.get(&mut world, model).unwrap();
+            let (info, transform, mesh, ..) = world
+                .query_one_mut::<(&Info, &Transform, &Mesh, &TransformMatrix, &Root)>(model)
+                .unwrap();
             assert_eq!(
                 transform.translation, *translation,
                 "Model {} has wrong translation",
@@ -467,7 +539,10 @@ mod tests {
             assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
 
             // Get mesh's initial buffer handle
-            let initial_buffer = meshes[0].0.ubo_buffer.handle;
+            let mut original_mesh =
+                model_world.query::<(&Mesh, &Transform, &TransformMatrix, &Info)>();
+            let original_mesh = original_mesh.iter().next().unwrap().1 .0;
+            let initial_buffer = original_mesh.ubo_buffer.handle;
             let new_buffer = mesh.ubo_buffer.handle;
             assert_ne!(initial_buffer, new_buffer);
         }
@@ -492,67 +567,53 @@ mod tests {
         );
 
         // Make sure there is only one root
-        let mut query = <(&Root, &Info, &Transform)>::query();
-        let roots = query.iter(&world).collect::<Vec<_>>();
+        let mut roots = world.query_mut::<(&Root, &Info, &Transform)>().into_iter();
         assert_eq!(roots.len(), 1);
-        let root = roots[0];
+        let root = roots.next().unwrap().1;
         assert_eq!(&root.1.name, "Left Hand");
 
         // Make sure its transform is correct
         assert_relative_eq!(root.2.translation, vector![0.0, 0.0, 0.0]);
 
         // Make sure we imported the mesh
-        let mut query = <(&Mesh, &Transform, &TransformMatrix)>::query();
-        let meshes = query.iter(&world).collect::<Vec<_>>();
+        let meshes = world
+            .query_mut::<(&Mesh, &Transform, &TransformMatrix)>()
+            .into_iter();
         assert_eq!(meshes.len(), 1);
 
         // Make sure we imported the AnimationController
-        let mut query = <&AnimationController>::query();
-        let animation_controllers = query.iter(&world).collect::<Vec<_>>();
+        let animation_controllers = world.query_mut::<&AnimationController>().into_iter();
         assert_eq!(animation_controllers.len(), 1);
 
         // Make sure we got all the nodes
-        let mut query = <&Transform>::query();
-        let transforms = query.iter(&world).collect::<Vec<_>>();
+        let transforms = world.query_mut::<&Transform>().into_iter();
         assert_eq!(transforms.len(), 28);
 
         // Make sure we got all the Parent -> Child relationships
-        let mut query = <(&Transform, &Parent)>::query();
-        let transforms_with_parents = query.iter(&world).collect::<Vec<_>>();
-        assert_eq!(transforms_with_parents.len(), 27);
+        {
+            let mut transforms_with_parents = world.query::<(&Transform, &Parent)>();
+            assert_eq!(transforms_with_parents.iter().len(), 27);
+            for (_, (_, parent)) in transforms_with_parents.iter() {
+                assert!(world.contains(parent.0));
+            }
+        }
 
         // Make sure we got all the joints
-        let mut query = <&Joint>::query();
-        let joints = query.iter(&world).collect::<Vec<_>>();
-        assert_eq!(joints.len(), 25);
+        {
+            let mut joints = world.query::<&Joint>();
+            assert_eq!(joints.iter().len(), 25);
+            for (_, joint) in joints.iter() {
+                assert!(world.contains(joint.skeleton_root));
+            }
+        }
 
         // Make sure we got all the AnimationTargets
-        let mut query = <&AnimationTarget>::query();
-        let animation_target = query.iter(&world).collect::<Vec<_>>();
-        assert_eq!(animation_target.len(), 17);
-
-        // Make sure the parent -> child relationships are correct
-        let mut query = <&Parent>::query();
-        unsafe {
-            query.for_each_unchecked(&world, |parent| {
-                let _ = world.entry_ref(parent.0).unwrap();
-            });
-        }
-
-        // Make sure the joint -> skeleton_root relationships are correct
-        let mut query = <&Joint>::query();
-        unsafe {
-            query.for_each_unchecked(&world, |joint| {
-                let _ = world.entry_ref(joint.skeleton_root).unwrap();
-            });
-        }
-
-        // Make sure the animation_target -> controller relationships are correct
-        let mut query = <&AnimationTarget>::query();
-        unsafe {
-            query.for_each_unchecked(&world, |animation_target| {
-                let _ = world.entry_ref(animation_target.controller).unwrap();
-            });
+        {
+            let mut animation_targets = world.query::<&AnimationTarget>();
+            assert_eq!(animation_targets.iter().len(), 17);
+            for (_, animation_target) in animation_targets.iter() {
+                assert!(world.contains(animation_target.controller));
+            }
         }
     }
 }

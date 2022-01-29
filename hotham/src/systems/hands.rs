@@ -1,113 +1,97 @@
-use legion::{system, world::SubWorld, IntoQuery};
-
 use crate::{
     components::{hand::Handedness, AnimationController, Hand, RigidBody},
     resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
+use hecs::{PreparedQuery, World};
 
-#[system(for_each)]
-#[read_component(RigidBody)]
-pub fn hands(
-    hand: &mut Hand,
-    animation_controller: &mut AnimationController,
-    rigid_body_component: &RigidBody,
-    #[resource] xr_context: &XrContext,
-    #[resource] physics_context: &mut PhysicsContext,
-    world: &mut SubWorld,
+pub fn hands_system(
+    query: &mut PreparedQuery<(&mut Hand, &mut AnimationController, &mut RigidBody)>,
+    world: &mut World,
+    xr_context: &XrContext,
+    physics_context: &mut PhysicsContext,
 ) {
-    // Get our the space and path of the hand.
-    let time = xr_context.frame_state.predicted_display_time;
-    let (space, path) = match hand.handedness {
-        Handedness::Left => (
-            &xr_context.left_hand_space,
-            xr_context.left_hand_subaction_path,
-        ),
-        Handedness::Right => (
-            &xr_context.right_hand_space,
-            xr_context.right_hand_subaction_path,
-        ),
-    };
+    for (_, (hand, animation_controller, rigid_body_component)) in query.query(world).iter() {
+        // Get our the space and path of the hand.
+        let time = xr_context.frame_state.predicted_display_time;
+        let (space, path) = match hand.handedness {
+            Handedness::Left => (
+                &xr_context.left_hand_space,
+                xr_context.left_hand_subaction_path,
+            ),
+            Handedness::Right => (
+                &xr_context.right_hand_space,
+                xr_context.right_hand_subaction_path,
+            ),
+        };
 
-    // Locate the hand in the space.
-    let space = space.locate(&xr_context.reference_space, time).unwrap();
+        // Locate the hand in the space.
+        let space = space.locate(&xr_context.reference_space, time).unwrap();
 
-    // Check it's valid before using it
-    if !is_space_valid(&space) {
-        println!(
-            "[HOTHAM_POINTERS] Unable to locate {:?} hand - orientation or position invalid!",
-            hand.handedness
-        );
-        return;
-    }
+        // Check it's valid before using it
+        if !is_space_valid(&space) {
+            println!(
+                "[HOTHAM_POINTERS] Unable to locate {:?} hand - orientation or position invalid!",
+                hand.handedness
+            );
+            return;
+        }
 
-    let pose = space.pose;
+        let pose = space.pose;
 
-    // apply transform
-    let rigid_body = physics_context
-        .rigid_bodies
-        .get_mut(rigid_body_component.handle)
-        .unwrap();
+        // apply transform
+        let rigid_body = physics_context
+            .rigid_bodies
+            .get_mut(rigid_body_component.handle)
+            .unwrap();
 
-    let position = posef_to_isometry(pose);
-    rigid_body.set_next_kinematic_position(position);
-
-    if let Some(grabbed_entity) = hand.grabbed_entity {
-        let mut query = <&RigidBody>::query();
-        let handle = query.get(world, grabbed_entity).unwrap().handle;
-        let rigid_body = physics_context.rigid_bodies.get_mut(handle).unwrap();
+        let position = posef_to_isometry(pose);
         rigid_body.set_next_kinematic_position(position);
+
+        if let Some(grabbed_entity) = hand.grabbed_entity {
+            let handle = world.get::<RigidBody>(grabbed_entity).unwrap().handle;
+            let rigid_body = physics_context.rigid_bodies.get_mut(handle).unwrap();
+            rigid_body.set_next_kinematic_position(position);
+        }
+
+        // get grip value
+        let grip_value =
+            openxr::ActionInput::get(&xr_context.grab_action, &xr_context.session, path)
+                .unwrap()
+                .current_state;
+
+        // Apply to Hand
+        hand.grip_value = grip_value;
+
+        // Apply to AnimationController
+        animation_controller.blend_amount = grip_value;
     }
-
-    // get grip value
-    let grip_value = openxr::ActionInput::get(&xr_context.grab_action, &xr_context.session, path)
-        .unwrap()
-        .current_state;
-
-    // Apply to Hand
-    hand.grip_value = grip_value;
-
-    // Apply to AnimationController
-    animation_controller.blend_amount = grip_value;
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use approx::assert_relative_eq;
-    use legion::{Entity, IntoQuery, Resources, Schedule, World};
+    use hecs::Entity;
     use nalgebra::vector;
     use rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder,
     };
 
-    use super::*;
     use crate::{
-        components::Transform, resources::XrContext, schedule_functions::physics_step,
-        systems::update_rigid_body_transforms_system,
+        components::Transform, resources::XrContext, systems::update_rigid_body_transforms_system,
     };
 
     #[test]
     pub fn test_hands_system() {
-        let mut world = World::default();
-        let mut resources = Resources::default();
-        let (xr_context, _) = XrContext::new().unwrap();
-        let mut physics_context = PhysicsContext::default();
-
+        let (mut world, mut xr_context, mut physics_context) = setup();
         let hand = add_hand_to_world(&mut physics_context, &mut world, None);
 
-        resources.insert(xr_context);
-        resources.insert(physics_context);
+        schedule(&mut world, &mut xr_context, &mut physics_context);
 
-        let mut schedule = Schedule::builder()
-            .add_system(hands_system())
-            .add_thread_local_fn(physics_step)
-            .add_system(update_rigid_body_transforms_system())
-            .build();
-
-        schedule.execute(&mut world, &mut resources);
-
-        let mut query = <(&Transform, &Hand, &AnimationController)>::query();
-        let (transform, hand, animation_controller) = query.get(&world, hand).unwrap();
+        let (transform, hand, animation_controller) = world
+            .query_one_mut::<(&Transform, &Hand, &AnimationController)>(hand)
+            .unwrap();
 
         assert_relative_eq!(hand.grip_value, 0.0);
         assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
@@ -116,34 +100,37 @@ mod tests {
 
     #[test]
     pub fn test_move_grabbed_objects() {
-        let mut world = World::default();
-        let mut resources = Resources::default();
-        let (xr_context, _) = XrContext::new().unwrap();
-        let mut physics_context = PhysicsContext::default();
+        let (mut world, mut xr_context, mut physics_context) = setup();
 
         let grabbed_object_rigid_body = RigidBodyBuilder::new_kinematic_position_based().build(); // grabber sets the rigidbody as kinematic
         let handle = physics_context
             .rigid_bodies
             .insert(grabbed_object_rigid_body);
-        let grabbed_entity = world.push((RigidBody { handle }, Transform::default()));
+        let grabbed_entity = world.spawn((RigidBody { handle }, Transform::default()));
+        add_hand_to_world(&mut physics_context, &mut world, Some(grabbed_entity));
 
-        let _ = add_hand_to_world(&mut physics_context, &mut world, Some(grabbed_entity));
+        schedule(&mut world, &mut xr_context, &mut physics_context);
 
-        resources.insert(xr_context);
-        resources.insert(physics_context);
-
-        let mut schedule = Schedule::builder()
-            .add_system(hands_system())
-            .add_thread_local_fn(physics_step)
-            .add_system(update_rigid_body_transforms_system())
-            .build();
-
-        schedule.execute(&mut world, &mut resources);
-
-        let mut query = <&Transform>::query();
-        let transform = query.get(&world, grabbed_entity).unwrap();
-
+        let transform = world.get_mut::<Transform>(grabbed_entity).unwrap();
         assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
+    }
+
+    // HELPER FUNCTIONS
+    fn setup() -> (World, XrContext, PhysicsContext) {
+        let world = World::new();
+        let (xr_context, _) = XrContext::new().unwrap();
+        let physics_context = PhysicsContext::default();
+        (world, xr_context, physics_context)
+    }
+
+    fn schedule(
+        world: &mut World,
+        xr_context: &mut XrContext,
+        physics_context: &mut PhysicsContext,
+    ) {
+        hands_system(&mut Default::default(), world, xr_context, physics_context);
+        physics_context.update();
+        update_rigid_body_transforms_system(&mut Default::default(), world, physics_context);
     }
 
     fn add_hand_to_world(
@@ -155,11 +142,10 @@ mod tests {
         animation_controller.blend_amount = 100.0; // bogus value
 
         let mut hand = Hand::left();
+        hand.grip_value = 100.0; // bogus value
         hand.grabbed_entity = grabbed_entity;
-        let hand = world.push((animation_controller, hand, Transform::default()));
+        let hand = world.spawn((animation_controller, hand, Transform::default()));
         {
-            let mut hand_entry = world.entry(hand).unwrap();
-
             // Give it a collider and rigid-body
             let collider = ColliderBuilder::capsule_y(0.05, 0.02)
                 .sensor(true)
@@ -168,13 +154,9 @@ mod tests {
                 .build();
             let mut rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
             rigid_body.set_next_kinematic_translation(vector![0.0, 1.4, 0.0]);
-            let (collider, rigid_body) =
-                physics_context.add_rigid_body_and_collider(hand, rigid_body, collider);
-            hand_entry.add_component(collider);
-            hand_entry.add_component(rigid_body);
-
-            let mut hand = hand_entry.get_component_mut::<Hand>().unwrap();
-            hand.grip_value = 100.0; // bogus value
+            let components =
+                physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
+            world.insert(hand, components).unwrap();
         }
 
         hand

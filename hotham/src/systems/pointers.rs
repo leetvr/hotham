@@ -1,6 +1,6 @@
 use ash::vk;
 use egui::Pos2;
-use legion::{system, world::SubWorld, IntoQuery};
+use hecs::{PreparedQuery, World};
 use nalgebra::{
     point, vector, Isometry3, Orthographic3, Point3, Quaternion, Translation3, UnitQuaternion,
 };
@@ -24,91 +24,89 @@ use crate::{
         Panel, Pointer, Transform,
     },
     resources::{gui_context::SCALE_FACTOR, PhysicsContext, XrContext},
-    util::{is_space_valid, posef_to_isometry, u64_to_entity},
+    util::{is_space_valid, posef_to_isometry},
 };
 
-#[system(for_each)]
-#[write_component(Panel)]
-pub fn pointers(
-    pointer: &mut Pointer,
-    transform: &mut Transform,
-    world: &mut SubWorld,
-    #[resource] xr_context: &XrContext,
-    #[resource] physics_context: &mut PhysicsContext,
+pub fn pointers_system(
+    query: &mut PreparedQuery<(&mut Pointer, &mut Transform)>,
+    world: &mut World,
+    xr_context: &XrContext,
+    physics_context: &mut PhysicsContext,
 ) {
-    // Get our the space and path of the pointer.
-    let time = xr_context.frame_state.predicted_display_time;
-    let (space, path) = match pointer.handedness {
-        Handedness::Left => (
-            &xr_context.left_hand_space,
-            xr_context.left_hand_subaction_path,
-        ),
-        Handedness::Right => (
-            &xr_context.right_hand_space,
-            xr_context.right_hand_subaction_path,
-        ),
-    };
+    for (_, (pointer, transform)) in query.query(world).iter() {
+        // Get our the space and path of the pointer.
+        let time = xr_context.frame_state.predicted_display_time;
+        let (space, path) = match pointer.handedness {
+            Handedness::Left => (
+                &xr_context.left_hand_space,
+                xr_context.left_hand_subaction_path,
+            ),
+            Handedness::Right => (
+                &xr_context.right_hand_space,
+                xr_context.right_hand_subaction_path,
+            ),
+        };
 
-    // Locate the pointer in the space.
-    let space = space.locate(&xr_context.reference_space, time).unwrap();
-    if !is_space_valid(&space) {
-        println!(
+        // Locate the pointer in the space.
+        let space = space.locate(&xr_context.reference_space, time).unwrap();
+        if !is_space_valid(&space) {
+            println!(
             "[HOTHAM_POINTERS] Unable to locate {:?} pointer - orientation or position invalid!",
             pointer.handedness
         );
-        return;
-    }
+            return;
+        }
 
-    let pose = space.pose;
+        let pose = space.pose;
 
-    // apply transform
-    let mut position = posef_to_isometry(pose);
-    apply_grip_offset(&mut position);
+        // apply transform
+        let mut position = posef_to_isometry(pose);
+        apply_grip_offset(&mut position);
 
-    transform.translation = position.translation.vector;
-    transform.rotation = position.rotation;
+        transform.translation = position.translation.vector;
+        transform.rotation = position.rotation;
 
-    // get trigger value
-    let trigger_value =
-        openxr::ActionInput::get(&xr_context.trigger_action, &xr_context.session, path)
-            .unwrap()
-            .current_state;
-    pointer.trigger_value = trigger_value;
+        // get trigger value
+        let trigger_value =
+            openxr::ActionInput::get(&xr_context.trigger_action, &xr_context.session, path)
+                .unwrap()
+                .current_state;
+        pointer.trigger_value = trigger_value;
 
-    let ray_direction = transform.rotation.transform_vector(&vector![0., 1.0, 0.]);
+        let ray_direction = transform.rotation.transform_vector(&vector![0., 1.0, 0.]);
 
-    // Sweet baby ray
-    let ray = Ray::new(Point::from(transform.translation), ray_direction);
-    let max_toi = 40.0;
-    let solid = true;
-    let groups = InteractionGroups::new(0b10, 0b10);
-    let filter = None;
+        // Sweet baby ray
+        let ray = Ray::new(Point::from(transform.translation), ray_direction);
+        let max_toi = 40.0;
+        let solid = true;
+        let groups = InteractionGroups::new(0b10, 0b10);
+        let filter = None;
 
-    if let Some((handle, toi)) = physics_context.query_pipeline.cast_ray(
-        &physics_context.colliders,
-        &ray,
-        max_toi,
-        solid,
-        groups,
-        filter,
-    ) {
-        // The first collider hit has the handle `handle` and it hit after
-        // the ray travelled a distance equal to `ray.dir * toi`.
-        let hit_point = ray.point_at(toi); // Same as: `ray.origin + ray.dir * toi`
-        let hit_collider = physics_context.colliders.get(handle).unwrap();
-        let entity = u64_to_entity(hit_collider.user_data as u64);
-        let mut query = <&mut Panel>::query();
-        let panel = query
-            .get_mut(world, entity)
-            .expect(&format!("Unable to find entity {:?} in world", entity));
-        let panel_extent = &panel.extent;
-        let panel_transform = hit_collider.position();
-        let cursor_location =
-            get_cursor_location_for_panel(&hit_point, panel_transform, panel_extent);
-        panel.input = Some(PanelInput {
-            cursor_location,
-            trigger_value,
-        });
+        if let Some((handle, toi)) = physics_context.query_pipeline.cast_ray(
+            &physics_context.colliders,
+            &ray,
+            max_toi,
+            solid,
+            groups,
+            filter,
+        ) {
+            // The first collider hit has the handle `handle` and it hit after
+            // the ray travelled a distance equal to `ray.dir * toi`.
+            let hit_point = ray.point_at(toi); // Same as: `ray.origin + ray.dir * toi`
+            let hit_collider = physics_context.colliders.get(handle).unwrap();
+            let entity = unsafe { world.find_entity_from_id(hit_collider.user_data as _) };
+            let mut panel = world
+                .get_mut::<Panel>(entity)
+                .expect(&format!("Unable to find entity {:?} in world", entity));
+            let panel_extent = &panel.extent;
+            let panel_transform = hit_collider.position();
+            let cursor_location =
+                get_cursor_location_for_panel(&hit_point, panel_transform, panel_extent);
+            panel.input = Some(PanelInput {
+                cursor_location,
+                trigger_value,
+            });
+        }
     }
 }
 
@@ -163,11 +161,12 @@ fn ray_to_panel_space(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use hecs::World;
     use std::marker::PhantomData;
 
     use approx::assert_relative_eq;
     use ash::vk;
-    use legion::{IntoQuery, Resources, Schedule, World};
     use nalgebra::vector;
     use rapier3d::prelude::ColliderBuilder;
 
@@ -178,17 +177,13 @@ mod tests {
             physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
             XrContext,
         },
-        schedule_functions::physics_step,
-        util::entity_to_u64,
     };
 
-    use super::*;
     #[test]
     pub fn test_pointers_system() {
-        let (xr_context, _) = XrContext::new().unwrap();
+        let (mut xr_context, _) = XrContext::new().unwrap();
         let mut physics_context = PhysicsContext::default();
         let mut world = World::default();
-        let mut resources = Resources::default();
 
         let panel = Panel {
             text: "Test Panel".to_string(),
@@ -204,7 +199,7 @@ mod tests {
             input: Default::default(),
             buttons: Vec::new(),
         };
-        let panel_entity = world.push((panel,));
+        let panel_entity = world.spawn((panel,));
 
         // Place the panel *directly above* where the pointer will be located.
         let collider = ColliderBuilder::cuboid(0.5, 0.5, 0.0)
@@ -215,15 +210,14 @@ mod tests {
             ))
             .translation(vector![-0.2, 2., -0.433918])
             .rotation(vector![(3. * std::f32::consts::PI) * 0.5, 0., 0.])
-            .user_data(entity_to_u64(panel_entity).into())
+            .user_data(panel_entity.id() as _)
             .build();
         let handle = physics_context.colliders.insert(collider);
         let collider = Collider {
             collisions_this_frame: Vec::new(),
             handle,
         };
-        let mut panel_entry = world.entry(panel_entity).unwrap();
-        panel_entry.add_component(collider);
+        world.insert_one(panel_entity, collider).unwrap();
 
         // Add a decoy collider to ensure we're using collision groups correctly.
         let collider = ColliderBuilder::cuboid(0.1, 0.1, 0.1)
@@ -240,11 +234,9 @@ mod tests {
             collisions_this_frame: Vec::new(),
             handle,
         };
-        world.push((collider,));
+        world.spawn((collider,));
 
-        resources.insert(xr_context);
-        resources.insert(physics_context);
-        let pointer_entity = world.push((
+        let pointer_entity = world.spawn((
             Pointer {
                 handedness: Handedness::Left,
                 trigger_value: 0.0,
@@ -252,24 +244,27 @@ mod tests {
             Transform::default(),
         ));
 
-        let mut schedule = Schedule::builder()
-            .add_thread_local_fn(physics_step)
-            .add_system(pointers_system())
-            .build();
+        schedule(&mut physics_context, &mut world, &mut xr_context);
 
-        schedule.execute(&mut world, &mut resources);
-        let mut query = <&Transform>::query();
-        let transform = query.get(&world, pointer_entity).unwrap();
+        let transform = world.get_mut::<Transform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
         assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
 
-        let mut query = <&Panel>::query();
-        let panel = query.get(&world, panel_entity).unwrap();
+        let panel = world.get_mut::<Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 50.);
         assert_relative_eq!(input.cursor_location.y, 29.491043);
         assert_eq!(input.trigger_value, 0.);
+    }
+
+    fn schedule(
+        physics_context: &mut PhysicsContext,
+        world: &mut World,
+        xr_context: &mut XrContext,
+    ) -> () {
+        physics_context.update();
+        pointers_system(&mut Default::default(), world, xr_context, physics_context)
     }
 
     #[test]
@@ -339,6 +334,7 @@ mod tests {
         assert_relative_eq!(result, point![-1.0, -1.0, -1.0]);
     }
 
+    // Helpers
     fn empty_buffer<T>() -> Buffer<T> {
         let vertex_buffer = Buffer {
             handle: vk::Buffer::null(),

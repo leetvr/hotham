@@ -4,71 +4,71 @@ use crate::{
     resources::{render_context::create_push_constant, RenderContext},
 };
 use ash::vk;
-use legion::system;
+use hecs::{PreparedQuery, With, World};
 
-#[system(for_each)]
-pub fn rendering(
-    mesh: &mut Mesh,
-    transform_matrix: &TransformMatrix,
-    _visible: &Visible, // NOTE: An entity mesh must declare that it is visible in order to be rendered.
-    #[resource] vulkan_context: &VulkanContext,
-    #[resource] swapchain_image_index: &usize,
-    #[resource] render_context: &RenderContext,
+pub fn rendering_system(
+    query: &mut PreparedQuery<With<Visible, (&mut Mesh, &TransformMatrix)>>,
+    world: &mut World,
+    vulkan_context: &VulkanContext,
+    swapchain_image_index: usize,
+    render_context: &RenderContext,
 ) -> () {
-    let device = &vulkan_context.device;
-    let command_buffer = render_context.frames[*swapchain_image_index].command_buffer;
+    for (_, (mesh, transform_matrix)) in query.query_mut(world) {
+        let device = &vulkan_context.device;
+        let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
 
-    unsafe {
-        mesh.ubo_data.transform = transform_matrix.0.clone();
-        mesh.ubo_buffer
-            .update(&vulkan_context, &[mesh.ubo_data])
-            .unwrap();
+        unsafe {
+            mesh.ubo_data.transform = transform_matrix.0.clone();
+            mesh.ubo_buffer
+                .update(&vulkan_context, &[mesh.ubo_data])
+                .unwrap();
 
-        // Bind mesh descriptor sets
-        device.cmd_bind_descriptor_sets(
-            command_buffer,
-            vk::PipelineBindPoint::GRAPHICS,
-            render_context.pipeline_layout,
-            2,
-            &mesh.descriptor_sets,
-            &[],
-        );
-
-        for primitive in &mesh.primitives {
-            // Bind vertex and index buffers
-            device.cmd_bind_vertex_buffers(
-                command_buffer,
-                0,
-                &[primitive.vertex_buffer.handle],
-                &[0],
-            );
-            device.cmd_bind_index_buffer(
-                command_buffer,
-                primitive.index_buffer.handle,
-                0,
-                vk::IndexType::UINT32,
-            );
-
-            // Bind texture descriptor sets
+            // Bind mesh descriptor sets
             device.cmd_bind_descriptor_sets(
                 command_buffer,
                 vk::PipelineBindPoint::GRAPHICS,
                 render_context.pipeline_layout,
-                1,
-                &[primitive.texture_descriptor_set],
+                2,
+                &mesh.descriptor_sets,
                 &[],
             );
 
-            // Push constants
-            let material_push_constant = create_push_constant(&primitive.material);
-            device.cmd_push_constants(
-                command_buffer,
-                render_context.pipeline_layout,
-                vk::ShaderStageFlags::FRAGMENT,
-                0,
-                material_push_constant,
-            );
-            device.cmd_draw_indexed(command_buffer, primitive.indicies_count, 1, 0, 0, 1);
+            for primitive in &mesh.primitives {
+                // Bind vertex and index buffers
+                device.cmd_bind_vertex_buffers(
+                    command_buffer,
+                    0,
+                    &[primitive.vertex_buffer.handle],
+                    &[0],
+                );
+                device.cmd_bind_index_buffer(
+                    command_buffer,
+                    primitive.index_buffer.handle,
+                    0,
+                    vk::IndexType::UINT32,
+                );
+
+                // Bind texture descriptor sets
+                device.cmd_bind_descriptor_sets(
+                    command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    render_context.pipeline_layout,
+                    1,
+                    &[primitive.texture_descriptor_set],
+                    &[],
+                );
+
+                // Push constants
+                let material_push_constant = create_push_constant(&primitive.material);
+                device.cmd_push_constants(
+                    command_buffer,
+                    render_context.pipeline_layout,
+                    vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    material_push_constant,
+                );
+                device.cmd_draw_indexed(command_buffer, primitive.indicies_count, 1, 0, 0, 1);
+            }
         }
     }
 }
@@ -80,40 +80,19 @@ mod tests {
     use super::*;
     use ash::vk::Handle;
     use image::{jpeg::JpegEncoder, DynamicImage, RgbaImage};
-    use legion::{Resources, Schedule, World};
     use nalgebra::UnitQuaternion;
     use openxr::{Fovf, Quaternionf, Vector3f};
 
     use crate::{
         buffer::Buffer,
         gltf_loader,
-        resources::{RenderContext, XrContext},
+        resources::RenderContext,
         scene_data::SceneParams,
         swapchain::Swapchain,
         systems::{update_parent_transform_matrix_system, update_transform_matrix_system},
         util::get_from_device_memory,
         COLOR_FORMAT,
     };
-
-    // TODO: This test is useless.
-    #[test]
-    pub fn test_rendering_system() {
-        let mut world = World::default();
-        let (xr_context, vulkan_context) = XrContext::new().unwrap();
-        let render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
-
-        let mut schedule = Schedule::builder().add_system(rendering_system()).build();
-        let mut resources = Resources::default();
-        resources.insert(vulkan_context);
-        resources.insert(render_context);
-        resources.insert(0 as usize);
-        schedule.execute(&mut world, &mut resources);
-
-        let mut frame_index = resources.get_mut::<usize>().unwrap();
-        (*frame_index) = 1;
-        drop(frame_index);
-        schedule.execute(&mut world, &mut resources);
-    }
 
     #[test]
     pub fn test_rendering_pbr() {
@@ -141,7 +120,7 @@ mod tests {
             resolution,
         };
 
-        let render_context =
+        let mut render_context =
             RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap();
 
         // Get a model from GLTF
@@ -169,7 +148,7 @@ mod tests {
         for (name, debug_view_equation) in &params {
             render_object_with_debug_equation(
                 &vulkan_context,
-                &render_context,
+                &mut render_context,
                 &mut world,
                 resolution,
                 image.clone(),
@@ -181,83 +160,31 @@ mod tests {
 
     fn render_object_with_debug_equation(
         vulkan_context: &VulkanContext,
-        render_context: &RenderContext,
+        render_context: &mut RenderContext,
         world: &mut World,
         resolution: vk::Extent2D,
         image: crate::image::Image,
         name: &str,
         debug_view_equation: f32,
     ) {
-        let mut resources = Resources::default();
-        resources.insert(vulkan_context.clone());
-        resources.insert(render_context.clone());
-        resources.insert(0 as usize);
+        // Render the scene
+        schedule(render_context, vulkan_context, debug_view_equation, world);
 
-        let mut schedule = Schedule::builder()
-            .add_thread_local_fn(move |_, resources| {
-                // SPONZA
-                // let rotation: mint::Quaternion<f32> =
-                //     UnitQuaternion::from_euler_angles(0., 90_f32.to_radians(), 0.).into();
-                // let position = Vector3f {
-                //     x: 0.0,
-                //     y: 1.4,
-                //     z: 0.0,
-                // };
+        // Save the resulting image to the disk and get its hash, along with a "known good" hash
+        // of what the image *should* be.
+        let (output_hash, known_good_hash) =
+            save_image_to_disk(resolution, vulkan_context, image, name);
 
-                // HELMET
-                let rotation: mint::Quaternion<f32> =
-                    UnitQuaternion::from_euler_angles(0., 45_f32.to_radians(), 0.).into();
-                let position = Vector3f {
-                    x: 0.8,
-                    y: 1.4,
-                    z: 0.8,
-                };
+        assert_eq!(output_hash, known_good_hash);
+    }
 
-                let view = openxr::View {
-                    pose: openxr::Posef {
-                        orientation: Quaternionf::from(rotation),
-                        position,
-                    },
-                    fov: Fovf {
-                        angle_up: 45.0_f32.to_radians(),
-                        angle_down: -45.0_f32.to_radians(),
-                        angle_left: -45.0_f32.to_radians(),
-                        angle_right: 45.0_f32.to_radians(),
-                    },
-                };
-                let views = vec![view.clone(), view];
-                let vulkan_context = resources.get::<VulkanContext>().unwrap();
-                let mut render_context = resources.get_mut::<RenderContext>().unwrap();
-                render_context
-                    .update_scene_data(&views, &vulkan_context)
-                    .unwrap();
-                render_context
-                    .scene_params_buffer
-                    .update(
-                        &vulkan_context,
-                        &[SceneParams {
-                            debug_view_equation,
-                            ..Default::default()
-                        }],
-                    )
-                    .unwrap();
-
-                render_context.begin_frame(&vulkan_context, 0);
-                render_context.begin_pbr_render_pass(&vulkan_context, 0);
-            })
-            .add_system(update_transform_matrix_system())
-            .add_system(update_parent_transform_matrix_system())
-            .add_system(rendering_system())
-            .add_thread_local_fn(|_, resources| {
-                let vulkan_context = resources.get::<VulkanContext>().unwrap();
-                let mut render_context = resources.get_mut::<RenderContext>().unwrap();
-                render_context.end_pbr_render_pass(&vulkan_context, 0);
-                render_context.end_frame(&vulkan_context, 0);
-            })
-            .build();
-        schedule.execute(world, &mut resources);
+    fn save_image_to_disk(
+        resolution: vk::Extent2D,
+        vulkan_context: &VulkanContext,
+        image: crate::image::Image,
+        name: &str,
+    ) -> (u64, u64) {
         let size = (resolution.height * resolution.width * 4) as usize;
-        let vulkan_context = resources.get::<VulkanContext>().unwrap();
         let image_data = vec![0; size];
         let buffer = Buffer::new(
             &vulkan_context,
@@ -281,7 +208,6 @@ mod tests {
         let image_from_vulkan = DynamicImage::ImageRgba8(
             RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
         );
-
         let output_path = format!("../test_assets/render_{}.jpg", name);
         {
             let output_path = std::path::Path::new(&output_path);
@@ -289,13 +215,78 @@ mod tests {
             let mut jpeg_encoder = JpegEncoder::new(&mut file);
             jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
         }
-
-        // Compare the render with a "known good" copy.
         let output_hash = hash_file(&output_path);
         let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
         let known_good_hash = hash_file(&known_good_path);
+        (output_hash, known_good_hash)
+    }
 
-        assert_eq!(output_hash, known_good_hash);
+    fn schedule(
+        render_context: &mut RenderContext,
+        vulkan_context: &VulkanContext,
+        debug_view_equation: f32,
+        world: &mut World,
+    ) {
+        // SPONZA
+        // let rotation: mint::Quaternion<f32> =
+        //     UnitQuaternion::from_euler_angles(0., 90_f32.to_radians(), 0.).into();
+        // let position = Vector3f {
+        //     x: 0.0,
+        //     y: 1.4,
+        //     z: 0.0,
+        // };
+
+        // HELMET
+        let rotation: mint::Quaternion<f32> =
+            UnitQuaternion::from_euler_angles(0., 45_f32.to_radians(), 0.).into();
+        let position = Vector3f {
+            x: 0.8,
+            y: 1.4,
+            z: 0.8,
+        };
+        let view = openxr::View {
+            pose: openxr::Posef {
+                orientation: Quaternionf::from(rotation),
+                position,
+            },
+            fov: Fovf {
+                angle_up: 45.0_f32.to_radians(),
+                angle_down: -45.0_f32.to_radians(),
+                angle_left: -45.0_f32.to_radians(),
+                angle_right: 45.0_f32.to_radians(),
+            },
+        };
+        let views = vec![view.clone(), view];
+        render_context
+            .update_scene_data(&views, &vulkan_context)
+            .unwrap();
+        render_context
+            .scene_params_buffer
+            .update(
+                &vulkan_context,
+                &[SceneParams {
+                    debug_view_equation,
+                    ..Default::default()
+                }],
+            )
+            .unwrap();
+        render_context.begin_frame(&vulkan_context, 0);
+        render_context.begin_pbr_render_pass(&vulkan_context, 0);
+        update_transform_matrix_system(&mut Default::default(), world);
+        update_parent_transform_matrix_system(
+            &mut Default::default(),
+            &mut Default::default(),
+            world,
+        );
+        rendering_system(
+            &mut Default::default(),
+            world,
+            vulkan_context,
+            0,
+            render_context,
+        );
+        render_context.end_pbr_render_pass(&vulkan_context, 0);
+        render_context.end_frame(&vulkan_context, 0);
     }
 
     fn hash_file(file_path: &str) -> u64 {
