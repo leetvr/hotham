@@ -1,4 +1,7 @@
-use crate::{resources::XrContext, HothamResult, VIEW_TYPE};
+use crate::{
+    resources::{AudioContext, PhysicsContext, RenderContext, VulkanContext, XrContext},
+    HothamResult, VIEW_TYPE,
+};
 use openxr as xr;
 
 use std::{
@@ -26,6 +29,11 @@ pub struct Engine {
     #[allow(dead_code)]
     resumed: bool,
     event_data_buffer: EventDataBuffer,
+    pub xr_context: XrContext,
+    pub vulkan_context: VulkanContext,
+    pub render_context: RenderContext,
+    pub physics_context: PhysicsContext,
+    pub audio_context: AudioContext,
 }
 
 impl Drop for Engine {
@@ -37,18 +45,39 @@ impl Drop for Engine {
 
 impl Engine {
     pub fn new() -> Self {
+        // Process Android events early.
+        #[cfg(target_os = "android")]
+        if self.process_android_events() {
+            return Ok(());
+        };
+
+        let (xr_context, vulkan_context) =
+            XrContext::new().expect("!!FATAL ERROR - Unable to initialise OpenXR!!");
+        let render_context = RenderContext::new(&vulkan_context, &xr_context)
+            .expect("!!FATAL ERROR - Unable to initialise renderer!");
+
         Self {
             should_quit: Arc::new(AtomicBool::from(false)),
             resumed: true,
             event_data_buffer: Default::default(),
+            xr_context,
+            vulkan_context,
+            render_context,
+            physics_context: Default::default(),
+            audio_context: Default::default(),
         }
     }
 
+    // TODO: I don't like this. I think `update` should return when it's truly time to quit. This will
+    // let us write our game loop like:
+    // ```
+    // while engine.update() { tick() };
+    // ```
     pub fn should_quit(&self) -> bool {
         self.should_quit.load(Ordering::Relaxed)
     }
 
-    pub fn update(&mut self, xr_context: &mut XrContext) -> HothamResult<()> {
+    pub fn update(&mut self) -> HothamResult<()> {
         #[cfg(not(target_os = "android"))]
         {
             let should_quit = self.should_quit.clone();
@@ -62,8 +91,8 @@ impl Engine {
         };
 
         let (previous_state, current_state) = {
-            let previous_state = xr_context.session_state.clone();
-            let current_state = xr_context.poll_xr_event(&mut self.event_data_buffer)?;
+            let previous_state = self.xr_context.session_state.clone();
+            let current_state = self.xr_context.poll_xr_event(&mut self.event_data_buffer)?;
             (previous_state, current_state)
         };
 
@@ -75,10 +104,10 @@ impl Engine {
                 sleep(Duration::from_millis(100)); // Sleep to avoid thrasing the CPU
             }
             (SessionState::IDLE, SessionState::READY) => {
-                xr_context.session.begin(VIEW_TYPE)?;
+                self.xr_context.session.begin(VIEW_TYPE)?;
             }
             (_, SessionState::STOPPING) => {
-                xr_context.end_session()?;
+                self.xr_context.end_session()?;
             }
             (
                 _,
