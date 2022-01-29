@@ -3,7 +3,11 @@ mod resources;
 mod systems;
 
 use hotham::{
-    components::{hand::Handedness, Pointer},
+    components::{
+        hand::Handedness,
+        panel::{create_panel, PanelButton},
+        Pointer,
+    },
     gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
     resources::{vulkan_context::VulkanContext, RenderContext},
@@ -96,7 +100,7 @@ fn tick(
     );
 
     // Game
-    game_system(beat_saber_queries, world, game_state);
+    game_system(beat_saber_queries, world, game_state, audio_context);
 
     // GUI
     draw_gui_system(
@@ -133,8 +137,10 @@ fn tick(
 
 fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     let render_context = &mut engine.render_context;
-    let vulkan_context = &mut engine.vulkan_context;
+    let vulkan_context = &engine.vulkan_context;
     let physics_context = &mut engine.physics_context;
+    let audio_context = &mut engine.audio_context;
+    let gui_context = &engine.gui_context;
     let mut world = World::default();
 
     let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../assets/beat_saber.glb")];
@@ -162,7 +168,16 @@ fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     // Add pointer
     let pointer = add_pointer(&models, &mut world, vulkan_context, render_context);
 
-    let main_menu_panel = todo!();
+    let main_menu_panel_components = create_panel(
+        "Main Menu",
+        800,
+        800,
+        vulkan_context,
+        render_context,
+        gui_context,
+        vec![PanelButton::new("Beethoven - Op. 131")],
+    );
+    let main_menu_panel = world.spawn(main_menu_panel_components);
 
     // Create game context
     let game_context = GameContext::new(pointer, main_menu_panel);
@@ -173,7 +188,7 @@ fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
 fn add_pointer(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
-    vulkan_context: &mut VulkanContext,
+    vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) -> Entity {
     let pointer = add_model_to_world(

@@ -1,4 +1,7 @@
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use crate::components::SoundEmitter;
 use cpal::{
@@ -16,7 +19,8 @@ pub struct AudioContext {
     pub mixer_handle: oddio::Handle<Mixer<[f32; 2]>>,
     pub stream: Arc<Mutex<Stream>>,
     pub current_music_track: Option<MusicTrack>,
-    music_tracks: Arena<Arc<Frames<[f32; 2]>>>,
+    pub music_tracks: HashMap<String, MusicTrack>,
+    music_tracks_inner: Arena<Arc<Frames<[f32; 2]>>>,
     music_track_handle: Option<MusicTrackHandle>,
 }
 
@@ -77,9 +81,10 @@ impl Default for AudioContext {
             scene_handle,
             mixer_handle,
             stream: Arc::new(Mutex::new(stream)),
-            music_tracks: Arena::new(),
+            music_tracks_inner: Arena::new(),
             music_track_handle: None,
             current_music_track: None,
+            music_tracks: Default::default(),
         }
     }
 }
@@ -148,11 +153,13 @@ impl AudioContext {
         });
     }
 
-    pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> MusicTrack {
+    pub fn add_music_track(&mut self, name: &str, mp3_bytes: Vec<u8>) -> MusicTrack {
         let frames = get_stereo_frames_from_mp3(mp3_bytes);
-        MusicTrack {
-            index: self.music_tracks.insert(frames),
-        }
+        let track = MusicTrack {
+            index: self.music_tracks_inner.insert(frames),
+        };
+        self.music_tracks.insert(name.to_string(), track);
+        track
     }
 
     pub fn play_music_track(&mut self, track: MusicTrack) {
@@ -160,7 +167,7 @@ impl AudioContext {
             handle.control::<Stop<_>, _>().stop();
         }
 
-        let frames = self.music_tracks[track.index].clone();
+        let frames = self.music_tracks_inner[track.index].clone();
         let signal = oddio::FramesSignal::from(frames);
         self.music_track_handle = Some(self.mixer_handle.control().play(signal));
         self.current_music_track = Some(track.clone());
@@ -176,6 +183,13 @@ impl AudioContext {
         self.music_track_handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().resume());
+    }
+
+    pub fn dummy_track(&mut self) -> MusicTrack {
+        let frames = oddio::Frames::from_slice(0, &[]);
+        MusicTrack {
+            index: self.music_tracks_inner.insert(frames),
+        }
     }
 }
 

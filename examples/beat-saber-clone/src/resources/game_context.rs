@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use hotham::{hecs::Entity, resources::audio_context::MusicTrack};
+use hotham::hecs::Entity;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GameContext {
@@ -8,7 +6,6 @@ pub struct GameContext {
     pub state: GameState,
     pub pointer: Entity,
     pub main_menu_panel: Entity,
-    pub music_tracks: HashMap<String, MusicTrack>,
 }
 
 impl GameContext {
@@ -18,7 +15,6 @@ impl GameContext {
             state: GameState::Init,
             pointer,
             main_menu_panel,
-            music_tracks: Default::default(),
         }
     }
 }

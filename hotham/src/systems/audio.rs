@@ -56,7 +56,6 @@ pub fn audio_system(
 
 #[cfg(test)]
 mod tests {
-    use generational_arena::Index;
     use hecs::{Entity, PreparedQuery, World};
     use std::{
         thread,
@@ -86,9 +85,10 @@ mod tests {
         let tell_me_that_i_cant =
             include_bytes!("../../../test_assets/tell_me_that_i_cant_clip.mp3").to_vec();
 
-        let beethoven = audio_context.add_music_track(beethoven);
-        let right_here = audio_context.add_music_track(right_here);
-        let tell_me_that_i_cant = audio_context.add_music_track(tell_me_that_i_cant);
+        let beethoven = audio_context.add_music_track("Beethoven", beethoven);
+        let right_here = audio_context.add_music_track("Right Here", right_here);
+        let tell_me_that_i_cant =
+            audio_context.add_music_track("Tell Me That I Can't", tell_me_that_i_cant);
         audio_context.play_music_track(beethoven);
 
         // Create rigid body for the test entity
