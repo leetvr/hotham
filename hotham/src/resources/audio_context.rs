@@ -15,9 +15,14 @@ pub struct AudioContext {
     pub scene_handle: oddio::Handle<SpatialScene>,
     pub mixer_handle: oddio::Handle<Mixer<[f32; 2]>>,
     pub stream: Arc<Mutex<Stream>>,
-    pub current_music_track: Option<Index>,
+    pub current_music_track: Option<MusicTrack>,
     music_tracks: Arena<Arc<Frames<[f32; 2]>>>,
     music_track_handle: Option<MusicTrackHandle>,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub struct MusicTrack {
+    index: Index,
 }
 
 impl Default for AudioContext {
@@ -143,20 +148,22 @@ impl AudioContext {
         });
     }
 
-    pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> Index {
+    pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> MusicTrack {
         let frames = get_stereo_frames_from_mp3(mp3_bytes);
-        self.music_tracks.insert(frames)
+        MusicTrack {
+            index: self.music_tracks.insert(frames),
+        }
     }
 
-    pub fn play_music_track(&mut self, index: Index) {
+    pub fn play_music_track(&mut self, track: MusicTrack) {
         if let Some(mut handle) = self.music_track_handle.take() {
             handle.control::<Stop<_>, _>().stop();
         }
 
-        let frames = self.music_tracks[index].clone();
+        let frames = self.music_tracks[track.index].clone();
         let signal = oddio::FramesSignal::from(frames);
         self.music_track_handle = Some(self.mixer_handle.control().play(signal));
-        self.current_music_track = Some(index.clone());
+        self.current_music_track = Some(track.clone());
     }
 
     pub fn pause_music_track(&mut self) {

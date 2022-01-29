@@ -66,7 +66,10 @@ mod tests {
     use rapier3d::prelude::RigidBodyBuilder;
     const DURATION_SECS: u32 = 8;
 
-    use crate::{resources::XrContext, VIEW_TYPE};
+    use crate::{
+        resources::{audio_context::MusicTrack, XrContext},
+        VIEW_TYPE,
+    };
 
     use super::*;
     #[test]
@@ -135,8 +138,8 @@ mod tests {
         world: &mut World,
         audio_context: &mut AudioContext,
         start: &Instant,
-        right_here: Index,
-        tell_me_that_i_cant: Index,
+        right_here: MusicTrack,
+        tell_me_that_i_cant: MusicTrack,
         physics_context: &mut PhysicsContext,
         audio_query: &mut PreparedQuery<(&mut SoundEmitter, &RigidBody)>,
     ) {
@@ -179,8 +182,8 @@ mod tests {
         world: &mut World,
         audio_context: &mut AudioContext,
         start: &Instant,
-        right_here: Index,
-        tell_me_that_i_cant: Index,
+        right_here: MusicTrack,
+        tell_me_that_i_cant: MusicTrack,
     ) {
         let mut source = world.get_mut::<SoundEmitter>(entity).unwrap();
         match source.current_state() {

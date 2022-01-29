@@ -31,10 +31,9 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let mut world = init(&mut engine)?;
+    let (mut world, mut game_context) = init(&mut engine)?;
     let mut hotham_queries = Default::default();
     let mut beat_saber_queries = Default::default();
-    let mut game_context = Default::default();
 
     while !engine.should_quit() {
         tick(
@@ -132,7 +131,7 @@ fn tick(
     end_frame(xr_context, vulkan_context, render_context);
 }
 
-fn init(engine: &mut Engine) -> Result<World, HothamError> {
+fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let physics_context = &mut engine.physics_context;
@@ -161,9 +160,14 @@ fn init(engine: &mut Engine) -> Result<World, HothamError> {
     }
 
     // Add pointer
-    add_pointer(&models, &mut world, vulkan_context, render_context);
+    let pointer = add_pointer(&models, &mut world, vulkan_context, render_context);
 
-    Ok(world)
+    let main_menu_panel = todo!();
+
+    // Create game context
+    let game_context = GameContext::new(pointer, main_menu_panel);
+
+    Ok((world, game_context))
 }
 
 fn add_pointer(

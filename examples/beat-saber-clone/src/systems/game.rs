@@ -1,7 +1,7 @@
 use crate::resources::{game_context::GameState, GameContext};
 
 use super::BeatSaberQueries;
-use hotham::hecs::World;
+use hotham::{components::Visible, hecs::World};
 
 pub fn game_system(
     queries: &mut BeatSaberQueries,
@@ -9,27 +9,30 @@ pub fn game_system(
     game_context: &mut GameContext,
 ) {
     // Get next state
-    let current_state = game_context.state.clone();
-
     let next_state = get_next_state(queries, world, game_context);
-    if next_state == current_state {
+    if next_state == game_context.state {
         // Nothing to do.
         return;
     };
 
     // If state has changed, transition
-    transition(queries, world, game_context, current_state, next_state);
+    transition(queries, world, game_context, next_state);
 }
 
 fn transition(
     queries: &mut BeatSaberQueries,
     world: &mut World,
     game_context: &mut GameContext,
-    current_state: GameState,
     next_state: GameState,
 ) {
-    match (&current_state, &next_state) {
-        (GameState::Init, GameState::MainMenu) => {}
+    let current_state = &game_context.state;
+    match (current_state, &next_state) {
+        (GameState::Init, GameState::MainMenu) => {
+            world.insert_one(game_context.pointer, Visible {}).unwrap();
+            world
+                .insert_one(game_context.main_menu_panel, Visible {})
+                .unwrap();
+        }
         _ => panic!(
             "Invalid state transition {:?} -> {:?}",
             current_state, next_state
@@ -53,15 +56,25 @@ fn get_next_state(
 
 #[cfg(test)]
 mod tests {
+
+    use hotham::resources::AudioContext;
+
     use super::*;
     #[test]
     pub fn game_system_test() {
         let mut queries = Default::default();
-        let mut world = Default::default();
-        let mut game_context = Default::default();
+        let mut world = World::new();
+        let pointer = world.spawn(());
+        let main_menu_panel = world.spawn(());
+
+        let mut audio_context = AudioContext::default();
+        let main_menu_music = audio_context.add_music_track(vec![]);
+        let mut game_context = GameContext::new(pointer, main_menu_panel);
 
         // INIT -> MAIN_MENU
         game_system(&mut queries, &mut world, &mut game_context);
         assert_eq!(game_context.state, GameState::MainMenu);
+        assert!(world.get::<Visible>(pointer).is_ok());
+        assert!(world.get::<Visible>(main_menu_panel).is_ok());
     }
 }
