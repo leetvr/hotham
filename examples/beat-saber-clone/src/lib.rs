@@ -150,6 +150,9 @@ fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
         &render_context.descriptor_set_layouts,
     )?;
 
+    // Add music
+    add_music(audio_context);
+
     // Add environment
     add_environment(&models, &mut world, vulkan_context, render_context);
 
@@ -168,6 +171,7 @@ fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     // Add pointer
     let pointer = add_pointer(&models, &mut world, vulkan_context, render_context);
 
+    // Add panels
     let main_menu_panel_components = create_panel(
         "Main Menu",
         800,
@@ -183,6 +187,11 @@ fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     let game_context = GameContext::new(pointer, main_menu_panel);
 
     Ok((world, game_context))
+}
+
+fn add_music(audio_context: &mut hotham::resources::AudioContext) {
+    let main_menu_mp3 = include_bytes!("../assets/Cloud Echo - TrackTribe.mp3").to_vec();
+    audio_context.add_music_track("Main Menu", main_menu_mp3);
 }
 
 fn add_pointer(

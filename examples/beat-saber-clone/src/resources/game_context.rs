@@ -1,4 +1,4 @@
-use hotham::hecs::Entity;
+use hotham::{hecs::Entity, resources::audio_context::MusicTrack};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct GameContext {
@@ -23,4 +23,5 @@ impl GameContext {
 pub enum GameState {
     Init,
     MainMenu,
+    Playing(MusicTrack),
 }
