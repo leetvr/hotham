@@ -1,3 +1,3 @@
-pub mod game_state;
+pub mod game_context;
 
-pub use game_state::GameState;
+pub use game_context::GameContext;

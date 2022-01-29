@@ -115,9 +115,9 @@ fn tick(engine: &mut Engine, world: &mut World, queries: &mut Queries) {
 
     begin_frame(xr_context, vulkan_context, render_context);
     hands_system(&mut queries.hands_query, world, xr_context, physics_context);
+    physics_step(physics_context);
     collision_system(&mut queries.collision_query, world, physics_context);
     grabbing_system(&mut queries.grabbing_query, world, physics_context);
-    physics_step(physics_context);
     update_rigid_body_transforms_system(
         &mut queries.update_rigid_body_transforms_query,
         world,

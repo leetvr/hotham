@@ -1,8 +1,9 @@
 use hotham::{
     components::RigidBody,
-    hecs::{CommandBuffer, Entity, PreparedQuery, With, World},
+    gltf_loader::{add_model_to_world, Models},
+    hecs::{Entity, PreparedQuery, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    resources::{PhysicsContext, XrContext},
+    resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
 use nalgebra::{vector, Isometry3, Quaternion, Translation3, UnitQuaternion};
@@ -23,8 +24,8 @@ const SABER_WIDTH: f32 = 0.02;
 const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 
 pub fn sabers_system(
-    world: &mut World,
     query: &mut PreparedQuery<With<Saber, (&Colour, &RigidBody)>>,
+    world: &mut World,
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
@@ -67,7 +68,32 @@ pub fn sabers_system(
     }
 }
 
-pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, saber: Entity) {
+pub fn add_saber(
+    colour: Colour,
+    models: &Models,
+    world: &mut World,
+    vulkan_context: &VulkanContext,
+    render_context: &RenderContext,
+    physics_context: &mut PhysicsContext,
+) {
+    let model_name = match colour {
+        Colour::Blue => "Blue Saber",
+        Colour::Red => "Red Saber",
+    };
+    let saber = add_model_to_world(
+        model_name,
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
+    add_saber_physics(world, physics_context, saber);
+    world.insert(saber, (Saber {}, colour)).unwrap();
+}
+
+fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, saber: Entity) {
     // Give it a collider and rigid-body
     let collider = ColliderBuilder::cylinder(SABER_HALF_HEIGHT, SABER_HALF_WIDTH)
         .translation(vector![0., SABER_HALF_HEIGHT, 0.])
@@ -118,8 +144,8 @@ mod tests {
         let mut rigid_body_transforms_query = Default::default();
 
         sabers_system(
-            &mut world,
             &mut saber_query,
+            &mut world,
             &xr_context,
             &mut physics_context,
         );

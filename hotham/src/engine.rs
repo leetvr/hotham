@@ -1,5 +1,8 @@
 use crate::{
-    resources::{AudioContext, PhysicsContext, RenderContext, VulkanContext, XrContext},
+    resources::{
+        AudioContext, GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext,
+        XrContext,
+    },
     HothamResult, VIEW_TYPE,
 };
 use openxr as xr;
@@ -34,6 +37,8 @@ pub struct Engine {
     pub render_context: RenderContext,
     pub physics_context: PhysicsContext,
     pub audio_context: AudioContext,
+    pub gui_context: GuiContext,
+    pub haptic_context: HapticContext,
 }
 
 impl Drop for Engine {
@@ -55,6 +60,7 @@ impl Engine {
             XrContext::new().expect("!!FATAL ERROR - Unable to initialise OpenXR!!");
         let render_context = RenderContext::new(&vulkan_context, &xr_context)
             .expect("!!FATAL ERROR - Unable to initialise renderer!");
+        let gui_context = GuiContext::new(&vulkan_context);
 
         Self {
             should_quit: Arc::new(AtomicBool::from(false)),
@@ -65,6 +71,8 @@ impl Engine {
             render_context,
             physics_context: Default::default(),
             audio_context: Default::default(),
+            gui_context,
+            haptic_context: Default::default(),
         }
     }
 

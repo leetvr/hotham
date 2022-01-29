@@ -14,11 +14,13 @@ use itertools::{izip, Itertools};
 use nalgebra::{vector, Matrix4, Quaternion, UnitQuaternion};
 use std::collections::HashMap;
 
+pub type Models = HashMap<String, World>;
+
 pub fn load_models_from_glb(
     glb_bufs: &Vec<&[u8]>,
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
-) -> Result<HashMap<String, World>> {
+) -> Result<Models> {
     let mut models = HashMap::new();
 
     for glb_buf in glb_bufs {
@@ -43,7 +45,7 @@ pub fn load_models_from_gltf_data(
     images: &Vec<gltf::image::Data>,
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
-    models: &mut HashMap<String, World>,
+    models: &mut Models,
 ) -> Result<()> {
     let root_scene = document.scenes().next().unwrap(); // safe as there is always one scene
     let mut node_entity_map = HashMap::new();
@@ -294,7 +296,7 @@ fn add_animations(
 
 pub fn add_model_to_world(
     name: &str,
-    models: &HashMap<String, World>,
+    models: &Models,
     destination_world: &mut World,
     parent: Option<Entity>,
     vulkan_context: &VulkanContext,
