@@ -96,44 +96,17 @@ mod tests {
         let mut engine = Engine::new();
         let mut queries = Default::default();
         let mut world = World::new();
-        let mut audio_context = &mut engine.audio_context;
-        let gui_context = &engine.gui_context;
-        let vulkan_context = &engine.vulkan_context;
-        let render_context = &engine.render_context;
+        let mut game_context = GameContext::new(&mut engine, &mut world);
+        let audio_context = &mut engine.audio_context;
 
-        let pointer = world.spawn(());
-
-        let components = create_panel(
-            "Test",
-            1,
-            1,
-            vulkan_context,
-            render_context,
-            gui_context,
-            vec![PanelButton::new("Beethoven")],
-        );
-        let main_menu_panel = world.spawn(components);
-
-        let main_menu_music = audio_context.dummy_track();
-        let beethoven = audio_context.dummy_track();
-        audio_context
-            .music_tracks
-            .insert("Main Menu".to_string(), main_menu_music);
-        audio_context
-            .music_tracks
-            .insert("Beethoven".to_string(), beethoven);
-        let mut game_context = GameContext::new(pointer, main_menu_panel);
+        let main_menu_music = *audio_context.music_tracks.get("Main Menu").unwrap();
+        let beethoven = *audio_context.music_tracks.get("Beethoven").unwrap();
 
         // INIT -> MAIN_MENU
-        game_system(
-            &mut queries,
-            &mut world,
-            &mut game_context,
-            &mut audio_context,
-        );
+        game_system(&mut queries, &mut world, &mut game_context, audio_context);
         assert_eq!(game_context.state, GameState::MainMenu);
-        assert!(world.get::<Visible>(pointer).is_ok());
-        assert!(world.get::<Visible>(main_menu_panel).is_ok());
+        assert!(world.get::<Visible>(game_context.pointer).is_ok());
+        assert!(world.get::<Visible>(game_context.main_menu_panel).is_ok());
         assert_eq!(audio_context.current_music_track.unwrap(), main_menu_music);
 
         // MAIN_MENU -> PLAYING
@@ -143,15 +116,10 @@ mod tests {
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
-        game_system(
-            &mut queries,
-            &mut world,
-            &mut game_context,
-            &mut audio_context,
-        );
+        game_system(&mut queries, &mut world, &mut game_context, audio_context);
         assert_eq!(game_context.state, GameState::Playing(beethoven));
         assert_eq!(audio_context.current_music_track, Some(beethoven));
-        assert!(world.get::<Visible>(pointer).is_err());
-        assert!(world.get::<Visible>(main_menu_panel).is_err());
+        assert!(world.get::<Visible>(game_context.pointer).is_err());
+        assert!(world.get::<Visible>(game_context.main_menu_panel).is_err());
     }
 }

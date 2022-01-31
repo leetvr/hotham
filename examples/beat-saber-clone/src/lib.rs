@@ -136,62 +136,9 @@ fn tick(
 }
 
 fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
-    let render_context = &mut engine.render_context;
-    let vulkan_context = &engine.vulkan_context;
-    let physics_context = &mut engine.physics_context;
-    let audio_context = &mut engine.audio_context;
-    let gui_context = &engine.gui_context;
     let mut world = World::default();
-
-    let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../assets/beat_saber.glb")];
-    let models = gltf_loader::load_models_from_glb(
-        &glb_bufs,
-        &vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )?;
-
-    // Add music
-    add_music(audio_context);
-
-    // Add environment
-    add_environment(&models, &mut world, vulkan_context, render_context);
-
-    // Add sabers
-    for colour in [Colour::Blue, Colour::Red] {
-        add_saber(
-            colour,
-            &models,
-            &mut world,
-            vulkan_context,
-            render_context,
-            physics_context,
-        );
-    }
-
-    // Add pointer
-    let pointer = add_pointer(&models, &mut world, vulkan_context, render_context);
-
-    // Add panels
-    let main_menu_panel_components = create_panel(
-        "Main Menu",
-        800,
-        800,
-        vulkan_context,
-        render_context,
-        gui_context,
-        vec![PanelButton::new("Beethoven - Op. 131")],
-    );
-    let main_menu_panel = world.spawn(main_menu_panel_components);
-
-    // Create game context
-    let game_context = GameContext::new(pointer, main_menu_panel);
-
+    let game_context = GameContext::new(engine, &mut world);
     Ok((world, game_context))
-}
-
-fn add_music(audio_context: &mut hotham::resources::AudioContext) {
-    let main_menu_mp3 = include_bytes!("../assets/Cloud Echo - TrackTribe.mp3").to_vec();
-    audio_context.add_music_track("Main Menu", main_menu_mp3);
 }
 
 fn add_pointer(
