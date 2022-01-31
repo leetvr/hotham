@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::sync::{Arc, Mutex};
 
 use crate::components::SoundEmitter;
 use cpal::{
@@ -19,7 +16,6 @@ pub struct AudioContext {
     pub mixer_handle: oddio::Handle<Mixer<[f32; 2]>>,
     pub stream: Arc<Mutex<Stream>>,
     pub current_music_track: Option<MusicTrack>,
-    pub music_tracks: HashMap<String, MusicTrack>,
     music_tracks_inner: Arena<Arc<Frames<[f32; 2]>>>,
     music_track_handle: Option<MusicTrackHandle>,
 }
@@ -84,7 +80,6 @@ impl Default for AudioContext {
             music_tracks_inner: Arena::new(),
             music_track_handle: None,
             current_music_track: None,
-            music_tracks: Default::default(),
         }
     }
 }
@@ -153,12 +148,13 @@ impl AudioContext {
         });
     }
 
-    pub fn add_music_track(&mut self, name: &str, mp3_bytes: Vec<u8>) -> MusicTrack {
+    pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> MusicTrack {
+        println!("[AUDIO_CONTEXT] Decoding MP3..");
         let frames = get_stereo_frames_from_mp3(mp3_bytes);
+        println!("[AUDIO_CONTEXT] ..done!");
         let track = MusicTrack {
             index: self.music_tracks_inner.insert(frames),
         };
-        self.music_tracks.insert(name.to_string(), track);
         track
     }
 

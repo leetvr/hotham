@@ -3,14 +3,7 @@ mod resources;
 mod systems;
 
 use hotham::{
-    components::{
-        hand::Handedness,
-        panel::{create_panel, PanelButton},
-        Pointer,
-    },
-    gltf_loader::{self, add_model_to_world},
-    hecs::{Entity, World},
-    resources::{vulkan_context::VulkanContext, RenderContext},
+    hecs::World,
     schedule_functions::{
         begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass, physics_step,
     },
@@ -23,9 +16,8 @@ use hotham::{
     Engine, HothamError, HothamResult,
 };
 
-use components::Colour;
 use resources::GameContext;
-use systems::{game::game_system, sabers::add_saber, sabers_system, BeatSaberQueries};
+use systems::{game::game_system, sabers_system, BeatSaberQueries};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -100,7 +92,14 @@ fn tick(
     );
 
     // Game
-    game_system(beat_saber_queries, world, game_state, audio_context);
+    game_system(
+        beat_saber_queries,
+        world,
+        game_state,
+        audio_context,
+        vulkan_context,
+        render_context,
+    );
 
     // GUI
     draw_gui_system(
@@ -137,51 +136,21 @@ fn tick(
 
 fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     let mut world = World::default();
-    let game_context = GameContext::new(engine, &mut world);
+    let mut game_context = GameContext::new(engine, &mut world);
+    add_music(&mut engine.audio_context, &mut game_context);
     Ok((world, game_context))
 }
 
-fn add_pointer(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
-) -> Entity {
-    let pointer = add_model_to_world(
-        "Blue Pointer",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
+fn add_music(audio_context: &mut hotham::resources::AudioContext, game_context: &mut GameContext) {
+    let main_menu_mp3 = include_bytes!("../assets/Cloud Echo - TrackTribe.mp3").to_vec();
+    game_context.music_tracks.insert(
+        "Main Menu".to_string(),
+        audio_context.add_music_track(main_menu_mp3),
+    );
 
-    world
-        .insert_one(
-            pointer,
-            Pointer {
-                handedness: Handedness::Right,
-                trigger_value: 0.0,
-            },
-        )
-        .unwrap();
-
-    pointer
-}
-
-fn add_environment(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
-) {
-    add_model_to_world(
-        "Environment",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
+    let beethoven = include_bytes!("../assets/Quartet 14 - Beethoven.mp3").to_vec();
+    game_context.music_tracks.insert(
+        "Beethoven".to_string(),
+        audio_context.add_music_track(beethoven),
     );
 }

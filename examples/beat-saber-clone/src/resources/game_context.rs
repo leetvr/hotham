@@ -1,14 +1,19 @@
+use std::{collections::HashMap, fmt::Debug};
+
 use hotham::{
-    components::panel::{create_panel, PanelButton},
-    gltf_loader,
+    components::{
+        hand::Handedness,
+        panel::{create_panel, PanelButton},
+        Pointer,
+    },
+    gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
-    resources::audio_context::MusicTrack,
+    resources::{audio_context::MusicTrack, vulkan_context::VulkanContext, RenderContext},
     Engine,
 };
 
-use crate::{add_environment, add_pointer, components::Colour, systems::sabers::add_saber};
+use crate::{components::Colour, systems::sabers::add_saber};
 
-#[derive(Debug, Clone, PartialEq)]
 pub struct GameContext {
     pub current_score: usize,
     pub state: GameState,
@@ -16,6 +21,18 @@ pub struct GameContext {
     pub main_menu_panel: Entity,
     pub blue_saber: Entity,
     pub red_saber: Entity,
+    pub music_tracks: HashMap<String, MusicTrack>,
+    pub models: HashMap<String, World>,
+}
+
+impl Debug for GameContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("GameContext")
+            .field("current_score", &self.current_score)
+            .field("state", &self.state)
+            .field("music_tracks", &self.music_tracks)
+            .finish()
+    }
 }
 
 impl GameContext {
@@ -23,7 +40,6 @@ impl GameContext {
         let render_context = &mut engine.render_context;
         let vulkan_context = &engine.vulkan_context;
         let physics_context = &mut engine.physics_context;
-        let audio_context = &mut engine.audio_context;
         let gui_context = &engine.gui_context;
 
         let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../../assets/beat_saber.glb")];
@@ -33,9 +49,6 @@ impl GameContext {
             &render_context.descriptor_set_layouts,
         )
         .expect("Unable to load models!");
-
-        // Add music
-        add_music(audio_context);
 
         // Add environment
         add_environment(&models, world, vulkan_context, render_context);
@@ -75,16 +88,55 @@ impl GameContext {
             state: GameState::Init,
             blue_saber: sabers[0],
             red_saber: sabers[1],
+            music_tracks: Default::default(),
+            models,
         }
     }
 }
 
-fn add_music(audio_context: &mut hotham::resources::AudioContext) {
-    let main_menu_mp3 = include_bytes!("../../assets/Cloud Echo - TrackTribe.mp3").to_vec();
-    audio_context.add_music_track("Main Menu", main_menu_mp3);
+fn add_pointer(
+    models: &std::collections::HashMap<String, World>,
+    world: &mut World,
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+) -> Entity {
+    let pointer = add_model_to_world(
+        "Blue Pointer",
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
 
-    let beethoven = include_bytes!("../../assets/Quartet 14 - Beethoven.mp3").to_vec();
-    audio_context.add_music_track("Beethoven", beethoven);
+    world
+        .insert_one(
+            pointer,
+            Pointer {
+                handedness: Handedness::Right,
+                trigger_value: 0.0,
+            },
+        )
+        .unwrap();
+
+    pointer
+}
+
+fn add_environment(
+    models: &std::collections::HashMap<String, World>,
+    world: &mut World,
+    vulkan_context: &VulkanContext,
+    render_context: &RenderContext,
+) {
+    add_model_to_world(
+        "Environment",
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    );
 }
 
 #[derive(Debug, Clone, PartialEq)]
