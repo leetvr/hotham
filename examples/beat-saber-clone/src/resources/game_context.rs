@@ -21,7 +21,7 @@ pub struct GameContext {
     pub main_menu_panel: Entity,
     pub blue_saber: Entity,
     pub red_saber: Entity,
-    pub music_tracks: HashMap<String, MusicTrack>,
+    pub songs: HashMap<String, Song>,
     pub models: HashMap<String, World>,
 }
 
@@ -30,7 +30,7 @@ impl Debug for GameContext {
         f.debug_struct("GameContext")
             .field("current_score", &self.current_score)
             .field("state", &self.state)
-            .field("music_tracks", &self.music_tracks)
+            .field("music_tracks", &self.songs)
             .finish()
     }
 }
@@ -76,7 +76,7 @@ impl GameContext {
             vulkan_context,
             render_context,
             gui_context,
-            vec![PanelButton::new("Beethoven - Op. 131")],
+            vec![PanelButton::new("Spence - Right Here Beside You")],
         );
         let main_menu_panel = world.spawn(main_menu_panel_components);
 
@@ -88,10 +88,16 @@ impl GameContext {
             state: GameState::Init,
             blue_saber: sabers[0],
             red_saber: sabers[1],
-            music_tracks: Default::default(),
+            songs: Default::default(),
             models,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Song {
+    pub track: MusicTrack,
+    pub beat_length: f32,
 }
 
 fn add_pointer(
@@ -139,9 +145,33 @@ fn add_environment(
     );
 }
 
+pub fn add_music(
+    audio_context: &mut hotham::resources::AudioContext,
+    game_context: &mut GameContext,
+) {
+    let main_menu_mp3 = include_bytes!("../../assets/TrackTribe - Cloud Echo.mp3").to_vec();
+    game_context.songs.insert(
+        "Main Menu".to_string(),
+        Song {
+            beat_length: 0.,
+            track: audio_context.add_music_track(main_menu_mp3),
+        },
+    );
+
+    let right_here_beside_you =
+        include_bytes!("../../assets/Spence - Right Here Beside You.mp3").to_vec();
+    game_context.songs.insert(
+        "Spence - Right Here Beside You".to_string(),
+        Song {
+            beat_length: 129. / 60.,
+            track: audio_context.add_music_track(right_here_beside_you),
+        },
+    );
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum GameState {
     Init,
     MainMenu,
-    Playing(MusicTrack),
+    Playing(Song),
 }

@@ -16,7 +16,7 @@ use hotham::{
     Engine, HothamError, HothamResult,
 };
 
-use resources::GameContext;
+use resources::{game_context::add_music, GameContext};
 use systems::{game::game_system, sabers_system, BeatSaberQueries};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -140,18 +140,4 @@ fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     let mut game_context = GameContext::new(engine, &mut world);
     add_music(&mut engine.audio_context, &mut game_context);
     Ok((world, game_context))
-}
-
-fn add_music(audio_context: &mut hotham::resources::AudioContext, game_context: &mut GameContext) {
-    let main_menu_mp3 = include_bytes!("../assets/Cloud Echo - TrackTribe.mp3").to_vec();
-    game_context.music_tracks.insert(
-        "Main Menu".to_string(),
-        audio_context.add_music_track(main_menu_mp3),
-    );
-
-    let beethoven = include_bytes!("../assets/Quartet 14 - Beethoven.mp3").to_vec();
-    game_context.music_tracks.insert(
-        "Beethoven".to_string(),
-        audio_context.add_music_track(beethoven),
-    );
 }
