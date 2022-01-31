@@ -99,6 +99,7 @@ fn tick(
         audio_context,
         vulkan_context,
         render_context,
+        physics_context,
     );
 
     // GUI

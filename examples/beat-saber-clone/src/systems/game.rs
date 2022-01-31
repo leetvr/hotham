@@ -8,8 +8,9 @@ use hotham::{
     components::{Panel, Visible},
     gltf_loader::add_model_to_world,
     hecs::World,
-    resources::{vulkan_context::VulkanContext, AudioContext, RenderContext},
+    resources::{vulkan_context::VulkanContext, AudioContext, PhysicsContext, RenderContext},
 };
+use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder};
 
 pub fn game_system(
     queries: &mut BeatSaberQueries,
@@ -18,9 +19,17 @@ pub fn game_system(
     audio_context: &mut AudioContext,
     vulkan_context: &VulkanContext,
     render_context: &RenderContext,
+    physics_context: &mut PhysicsContext,
 ) {
     // Get next state
-    if let Some(next_state) = run(queries, world, game_context, vulkan_context, render_context) {
+    if let Some(next_state) = run(
+        queries,
+        world,
+        game_context,
+        vulkan_context,
+        render_context,
+        physics_context,
+    ) {
         // If state has changed, transition
         transition(queries, world, game_context, audio_context, next_state);
     };
@@ -69,6 +78,7 @@ fn run(
     game_context: &mut GameContext,
     vulkan_context: &VulkanContext,
     render_context: &RenderContext,
+    physics_context: &mut PhysicsContext,
 ) -> Option<GameState> {
     match &game_context.state {
         GameState::Init => return Some(GameState::MainMenu),
@@ -81,7 +91,13 @@ fn run(
         }
         GameState::Playing(_) => {
             // Spawn a cube if necessary
-            spawn_cube(world, game_context, vulkan_context, render_context)
+            spawn_cube(
+                world,
+                game_context,
+                vulkan_context,
+                render_context,
+                physics_context,
+            )
         }
     }
 
@@ -93,6 +109,7 @@ fn spawn_cube(
     game_context: &mut GameContext,
     vulkan_context: &VulkanContext,
     render_context: &RenderContext,
+    physics_context: &mut PhysicsContext,
 ) {
     let cube = add_model_to_world(
         "Blue Cube",
@@ -104,7 +121,17 @@ fn spawn_cube(
     )
     .unwrap();
 
-    world.insert_one(cube, Cube {}).unwrap();
+    // Give it a collider and rigid-body
+    let collider = ColliderBuilder::cuboid(0.2, 0.2, 0.2)
+        .translation([0., 0.2, 0.].into())
+        .active_collision_types(ActiveCollisionTypes::all())
+        .active_events(ActiveEvents::INTERSECTION_EVENTS)
+        .build();
+    let rigid_body = RigidBodyBuilder::new_dynamic().lock_rotations().build();
+    let (collider, rigid_body) =
+        physics_context.get_rigid_body_and_collider(cube, rigid_body, collider);
+
+    world.insert(cube, (Cube {}, collider, rigid_body)).unwrap();
 }
 
 #[cfg(test)]
@@ -127,6 +154,7 @@ mod tests {
         let audio_context = &mut engine.audio_context;
         let vulkan_context = &engine.vulkan_context;
         let render_context = &engine.render_context;
+        let physics_context = &mut engine.physics_context;
 
         let main_menu_music = audio_context.dummy_track();
         game_context
@@ -146,6 +174,7 @@ mod tests {
             audio_context,
             vulkan_context,
             render_context,
+            physics_context,
         );
         assert_eq!(game_context.state, GameState::MainMenu);
         assert!(world.get::<Visible>(game_context.pointer).is_ok());
@@ -166,6 +195,7 @@ mod tests {
             audio_context,
             vulkan_context,
             render_context,
+            physics_context,
         );
         assert_eq!(game_context.state, GameState::Playing(beethoven));
         assert_eq!(audio_context.current_music_track, Some(beethoven));
@@ -182,6 +212,7 @@ mod tests {
             audio_context,
             vulkan_context,
             render_context,
+            physics_context,
         );
 
         // Did we spawn a cube?
