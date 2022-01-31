@@ -16,7 +16,7 @@ use crate::{
     resources::{RenderContext, VulkanContext},
     texture::Texture,
 };
-use crate::{Vertex, COLOR_FORMAT};
+use crate::{vertex::Vertex, COLOR_FORMAT};
 
 use super::{Transform, TransformMatrix, Visible};
 #[derive(Clone)]

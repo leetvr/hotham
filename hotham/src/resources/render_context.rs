@@ -24,7 +24,7 @@ use crate::{
     scene_data::{SceneData, SceneParams},
     swapchain::Swapchain,
     texture::Texture,
-    Vertex, COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
+    vertex::Vertex, COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{
