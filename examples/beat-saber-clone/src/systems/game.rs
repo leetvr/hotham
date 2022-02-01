@@ -271,9 +271,17 @@ fn check_for_hits(
     let mut cubes_to_dispose = Vec::new();
 
     {
+        println!(
+            "[BEAT_SABER] Checking blue saber collider: {:?}",
+            game_context.blue_saber
+        );
         let blue_saber_collider = world.get::<Collider>(game_context.blue_saber).unwrap();
         for c in &blue_saber_collider.collisions_this_frame {
-            if let Ok(colour) = world.get::<Colour>(*c) {
+            let e = world.entity(*c).unwrap();
+            if !e.has::<Cube>() {
+                continue;
+            };
+            if let Some(colour) = e.get::<Colour>() {
                 match *colour {
                     Colour::Red => {
                         game_context.current_score -= 1;
@@ -289,9 +297,17 @@ fn check_for_hits(
             }
         }
 
+        println!(
+            "[BEAT_SABER] Checking red saber collider: {:?}",
+            game_context.red_saber
+        );
         let red_saber_collider = world.get::<Collider>(game_context.red_saber).unwrap();
         for c in &red_saber_collider.collisions_this_frame {
-            if let Ok(colour) = world.get::<Colour>(*c) {
+            let e = world.entity(*c).unwrap();
+            if !e.has::<Cube>() {
+                continue;
+            };
+            if let Some(colour) = e.get::<Colour>() {
                 match *colour {
                     Colour::Red => {
                         game_context.current_score += 1;
@@ -309,7 +325,11 @@ fn check_for_hits(
 
         let backstop_collider = world.get::<Collider>(game_context.backstop).unwrap();
         for c in &backstop_collider.collisions_this_frame {
-            if world.get::<Cube>(*c).is_ok() {
+            let e = world.entity(*c).unwrap();
+            if !e.has::<Cube>() {
+                continue;
+            };
+            if e.get::<Cube>().is_some() {
                 game_context.current_score -= 1;
                 pending_sound_effects.push((c.clone(), "Miss"));
                 cubes_to_dispose.push(c.clone());
@@ -604,6 +624,9 @@ mod tests {
                 world,
                 physics_context,
             );
+
+            // Make the sabers collide
+            collide_sabers(game_context, world);
         }
 
         // PLAYING - TICK FIVE
@@ -793,6 +816,19 @@ mod tests {
             haptic_context,
         );
         assert_eq!(num_cubes(world), 1);
+    }
+
+    fn collide_sabers(game_context: &mut GameContext, world: &mut World) {
+        world
+            .get_mut::<Collider>(game_context.blue_saber)
+            .unwrap()
+            .collisions_this_frame
+            .push(game_context.red_saber.clone());
+        world
+            .get_mut::<Collider>(game_context.red_saber)
+            .unwrap()
+            .collisions_this_frame
+            .push(game_context.blue_saber.clone());
     }
 
     fn num_cubes(world: &mut World) -> usize {
