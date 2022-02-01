@@ -27,7 +27,7 @@ use rand::prelude::*;
 
 const CUBE_X_OFFSETS: [f32; 4] = [-0.6, -0.2, 0.2, 0.6];
 const CUBE_Y: f32 = 1.1;
-const CUBE_Z: f32 = 10.;
+const CUBE_Z: f32 = -10.;
 
 pub fn game_system(
     queries: &mut BeatSaberQueries,
@@ -50,7 +50,14 @@ pub fn game_system(
         haptic_context,
     ) {
         // If state has changed, transition
-        transition(queries, world, game_context, audio_context, next_state);
+        transition(
+            queries,
+            world,
+            game_context,
+            audio_context,
+            physics_context,
+            next_state,
+        );
     };
 }
 
@@ -59,6 +66,7 @@ fn transition(
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
+    physics_context: &mut PhysicsContext,
     next_state: GameState,
 ) {
     let current_state = &game_context.state;
@@ -96,8 +104,14 @@ fn transition(
                     }
                 })
                 .collect();
+
+            // Reset spawn time
+            game_context.last_spawn_time -= Duration::new(100, 0);
         }
         (GameState::MainMenu, GameState::Playing(song)) => {
+            // Reset score
+            game_context.current_score = 0;
+
             // Make visible
             world
                 .insert_one(game_context.score_panel, Visible {})
@@ -129,13 +143,13 @@ fn transition(
             let _ = world.remove_one::<Visible>(game_context.red_saber);
 
             // Destroy all cubes
-            let mut to_destroy = queries
-                .cubes_query
+            let live_cubes = queries
+                .live_cubes_query
                 .query(world)
                 .iter()
                 .map(|(e, _)| e.clone())
                 .collect::<Vec<_>>();
-            to_destroy.drain(..).for_each(|e| drop(world.despawn(e)));
+            dispose_of_cubes(live_cubes, world, physics_context);
 
             // Switch tracks
             let song = game_context.songs.get("Game Over").unwrap();
@@ -160,6 +174,11 @@ fn transition(
         ),
     }
 
+    println!(
+        "[BEAT_SABER] TRANSITION {:?} -> {:?}",
+        current_state, next_state
+    );
+
     game_context.state = next_state;
 }
 
@@ -172,6 +191,7 @@ fn run(
     physics_context: &mut PhysicsContext,
     haptic_context: &mut HapticContext,
 ) -> Option<GameState> {
+    println!("[BEAT_SABER] TICK {:?}", game_context.state);
     match &mut game_context.state {
         GameState::Init => return Some(GameState::MainMenu),
         GameState::MainMenu => {
@@ -183,10 +203,8 @@ fn run(
         }
         GameState::Playing(song) => {
             spawn_cube(
+                queries,
                 world,
-                &game_context.models,
-                vulkan_context,
-                render_context,
                 physics_context,
                 song,
                 &mut game_context.last_spawn_time,
@@ -212,6 +230,28 @@ fn run(
     }
 
     None
+}
+
+fn spawn_cube(
+    queries: &mut BeatSaberQueries,
+    world: &mut World,
+    physics_context: &mut PhysicsContext,
+    song: &mut Song,
+    last_spawn_time: &mut Instant,
+) {
+    if !should_spawn_cube(*last_spawn_time, song.beat_length) {
+        return;
+    }
+
+    println!("[BEAT_SABER] Spawning cube!");
+    let colour = if random() { Colour::Red } else { Colour::Blue };
+    let dead_cube = queries
+        .dead_cubes_query
+        .query_mut(world)
+        .find_map(|(e, c)| if c == &colour { Some(e) } else { None })
+        .unwrap();
+    revive_cube(dead_cube, world, physics_context, song);
+    *last_spawn_time = Instant::now();
 }
 
 fn update_panel_text(world: &mut World, game_context: &mut GameContext) {
@@ -287,6 +327,7 @@ fn dispose_of_cubes(
     physics_context: &mut PhysicsContext,
 ) {
     for e in cubes_to_dispose.into_iter() {
+        println!("[BEAT_SABER] Disposing of cube {:?}", e);
         let handle = world.get::<RigidBody>(e).unwrap().handle;
         physics_context.rigid_bodies.remove(
             handle,
@@ -315,32 +356,16 @@ fn should_spawn_cube(last_spawn_time: Instant, beat_length: Duration) -> bool {
     delta > beat_length
 }
 
-fn spawn_cube(
+fn revive_cube(
+    cube_entity: Entity,
     world: &mut World,
-    models: &HashMap<String, World>,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
     song: &Song,
-    last_spawn_time: &mut Instant,
 ) {
-    if !should_spawn_cube(*last_spawn_time, song.beat_length) {
-        return;
-    }
-
-    let cube = add_model_to_world(
-        "Blue Cube",
-        &models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
-
+    println!("[BEAT_SABER] Reviving dead cube - {:?}", cube_entity);
     let mut rng = thread_rng();
     let translation_x = CUBE_X_OFFSETS[rng.gen_range(0..4)];
-    let z_linvel = CUBE_Z / (song.beat_length.as_secs_f32() * 4.); // distance / time for 4 beats
+    let z_linvel = -CUBE_Z / (song.beat_length.as_secs_f32() * 4.); // distance / time for 4 beats
 
     // Give it a collider and rigid-body
     let collider = ColliderBuilder::cuboid(0.2, 0.2, 0.2)
@@ -353,16 +378,9 @@ fn spawn_cube(
         .linvel([0., 0., z_linvel].into())
         .lock_rotations()
         .build();
-    let (collider, rigid_body) =
-        physics_context.get_rigid_body_and_collider(cube, rigid_body, collider);
-
-    // Set the colour randomly
-    let colour = if random() { Colour::Red } else { Colour::Blue };
-
-    world
-        .insert(cube, (Cube {}, collider, rigid_body, colour))
-        .unwrap();
-    *last_spawn_time = Instant::now();
+    let components = physics_context.get_rigid_body_and_collider(cube_entity, rigid_body, collider);
+    world.insert(cube_entity, components).unwrap();
+    world.insert_one(cube_entity, Visible {}).unwrap();
 }
 
 #[cfg(test)]
@@ -378,7 +396,10 @@ mod tests {
         Engine,
     };
 
-    use crate::{components::Cube, resources::game_context::Song};
+    use crate::{
+        components::Cube,
+        resources::game_context::{pre_spawn_cube, Song},
+    };
 
     use super::*;
     #[test]
@@ -491,12 +512,12 @@ mod tests {
         );
 
         {
-            let mut query = world.query::<(&Cube, &Visible, &RigidBody, &Collider)>();
-            let mut i = query.iter();
+            let mut q = queries.live_cubes_query.query(world);
+            let mut i = q.iter();
             assert_eq!(i.len(), 1);
-            let (_, (_, _, rigid_body, _)) = i.next().unwrap();
+            let (_, (_, rigid_body, _)) = i.next().unwrap();
             let rigid_body = &physics_context.rigid_bodies[rigid_body.handle];
-            drop(query);
+            drop(q);
 
             let t = rigid_body.translation();
             assert!(
@@ -662,7 +683,7 @@ mod tests {
             hit_cube(game_context.red_saber, Colour::Blue, world, physics_context);
         }
 
-        // PLAYING - TICK NINE - GAME OVER!
+        // PLAYING - TICK NINE -> GAME OVER
         game_system(
             &mut queries,
             world,
@@ -694,7 +715,7 @@ mod tests {
             panel.buttons[0].clicked_this_frame = true;
         }
 
-        // PLAYING - TICK TEN - BACK TO MAIN MENU
+        // GAME_OVER -> MAIN_MENU
         game_system(
             &mut queries,
             world,
@@ -732,6 +753,46 @@ mod tests {
                 "Spence - Right Here Beside You",
             );
         }
+
+        // MAIN_MENU -> PLAYING
+        {
+            let mut panel = world
+                .get_mut::<Panel>(game_context.main_menu_panel)
+                .unwrap();
+            panel.buttons[0].clicked_this_frame = true;
+        }
+        game_system(
+            &mut queries,
+            world,
+            game_context,
+            audio_context,
+            vulkan_context,
+            render_context,
+            physics_context,
+            haptic_context,
+        );
+        reset(world, game_context, haptic_context);
+        assert_eq!(game_context.current_score, 0);
+        assert_eq!(game_context.state, GameState::Playing(beside_you.clone()));
+        assert_eq!(audio_context.current_music_track, Some(beside_you.track));
+        assert!(!is_visible(world, game_context.pointer));
+        assert!(!is_visible(world, game_context.main_menu_panel));
+        assert!(is_visible(world, game_context.blue_saber));
+        assert!(is_visible(world, game_context.red_saber));
+        assert!(is_visible(world, game_context.score_panel));
+
+        // PLAYING - TICK ONE
+        game_system(
+            &mut queries,
+            world,
+            game_context,
+            audio_context,
+            vulkan_context,
+            render_context,
+            physics_context,
+            haptic_context,
+        );
+        assert_eq!(num_cubes(world), 1);
     }
 
     fn num_cubes(world: &mut World) -> usize {

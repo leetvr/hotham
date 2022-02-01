@@ -68,6 +68,7 @@ pub fn add_panel_to_world(
     physics_context: &mut PhysicsContext,
     world: &mut World,
 ) -> Entity {
+    println!("[PANEL] Adding panel with text {}", text);
     let extent = vk::Extent2D { width, height };
     let output_image = vulkan_context
         .create_image(
@@ -136,7 +137,10 @@ pub fn add_panel_to_world(
         },
         mesh,
         output_texture,
-        Transform::default(),
+        Transform {
+            translation,
+            ..Default::default()
+        },
         TransformMatrix::default(),
         Visible {},
     );
@@ -158,6 +162,7 @@ pub fn add_panel_to_world(
         handle,
     };
     world.insert_one(panel_entity, collider).unwrap();
+    println!("[PANEL] ..done! {:?}", panel_entity);
     panel_entity
 }
 

@@ -8,19 +8,23 @@ use hotham::{
     components::{
         hand::Handedness,
         panel::{add_panel_to_world, PanelButton},
-        Collider, Pointer, SoundEmitter,
+        Collider, Pointer, SoundEmitter, Visible,
     },
     gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
     resources::{
         audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP,
-        vulkan_context::VulkanContext, AudioContext, RenderContext,
+        vulkan_context::VulkanContext, AudioContext, PhysicsContext, RenderContext,
     },
     Engine,
 };
+use rand::prelude::*;
 
-use crate::{components::Colour, systems::sabers::add_saber};
+use crate::{
+    components::{Colour, Cube},
+    systems::sabers::add_saber,
+};
 
 pub struct GameContext {
     pub current_score: i32,
@@ -76,6 +80,17 @@ impl GameContext {
                 physics_context,
             )
         });
+
+        // Spawn cubes
+        for _ in 0..20 {
+            pre_spawn_cube(
+                world,
+                &models,
+                vulkan_context,
+                render_context,
+                physics_context,
+            );
+        }
 
         // Add pointer
         let pointer = add_pointer(&models, world, vulkan_context, render_context);
@@ -235,6 +250,34 @@ pub fn add_sound_effects(audio_context: &mut AudioContext, game_context: &mut Ga
         "Miss".to_string(),
         audio_context.create_audio_source(miss_mp3),
     );
+}
+
+pub fn pre_spawn_cube(
+    world: &mut World,
+    models: &HashMap<String, World>,
+    vulkan_context: &VulkanContext,
+    render_context: &RenderContext,
+    physics_context: &mut PhysicsContext,
+) {
+    // Set the colour randomly
+    let colour = if random() { Colour::Red } else { Colour::Blue };
+    let model_name = match colour {
+        Colour::Red => "Red Cube",
+        Colour::Blue => "Blue Cube",
+    };
+
+    let cube = add_model_to_world(
+        model_name,
+        &models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
+
+    world.remove_one::<Visible>(cube).unwrap();
+    world.insert(cube, (Cube {}, colour)).unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
