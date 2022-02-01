@@ -14,7 +14,8 @@ use crate::{
 use super::BeatSaberQueries;
 use hotham::{
     components::{
-        hand::Handedness, panel::PanelButton, Collider, Panel, RigidBody, SoundEmitter, Visible,
+        hand::Handedness, panel::PanelButton, Collider, Info, Panel, RigidBody, SoundEmitter,
+        Visible,
     },
     gltf_loader::add_model_to_world,
     hecs::{Entity, World},
@@ -278,7 +279,7 @@ fn check_for_hits(
         let blue_saber_collider = world.get::<Collider>(game_context.blue_saber).unwrap();
         for c in &blue_saber_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
-            if !e.has::<Cube>() {
+            if !is_cube(e) {
                 continue;
             };
             if let Some(colour) = e.get::<Colour>() {
@@ -304,7 +305,7 @@ fn check_for_hits(
         let red_saber_collider = world.get::<Collider>(game_context.red_saber).unwrap();
         for c in &red_saber_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
-            if !e.has::<Cube>() {
+            if !is_cube(e) {
                 continue;
             };
             if let Some(colour) = e.get::<Colour>() {
@@ -326,7 +327,7 @@ fn check_for_hits(
         let backstop_collider = world.get::<Collider>(game_context.backstop).unwrap();
         for c in &backstop_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
-            if !e.has::<Cube>() {
+            if !is_cube(e) {
                 continue;
             };
             if e.get::<Cube>().is_some() {
@@ -341,6 +342,10 @@ fn check_for_hits(
     dispose_of_cubes(cubes_to_dispose, world, physics_context);
 }
 
+fn is_cube(e: hotham::hecs::EntityRef) -> bool {
+    e.has::<Cube>() && e.has::<Visible>() && e.has::<Collider>() && e.has::<RigidBody>()
+}
+
 fn dispose_of_cubes(
     cubes_to_dispose: Vec<Entity>,
     world: &mut World,
@@ -348,13 +353,21 @@ fn dispose_of_cubes(
 ) {
     for e in cubes_to_dispose.into_iter() {
         println!("[BEAT_SABER] Disposing of cube {:?}", e);
-        let handle = world.get::<RigidBody>(e).unwrap().handle;
-        physics_context.rigid_bodies.remove(
-            handle,
-            &mut physics_context.island_manager,
-            &mut physics_context.colliders,
-            &mut physics_context.joint_set,
-        );
+        match world.get::<RigidBody>(e) {
+            Ok(r) => {
+                let handle = r.handle;
+                physics_context.rigid_bodies.remove(
+                    handle,
+                    &mut physics_context.island_manager,
+                    &mut physics_context.colliders,
+                    &mut physics_context.joint_set,
+                );
+            }
+            Err(_) => {
+                let info = world.get::<Info>(e).unwrap();
+                println!("Unable to find collider for entity {:?} - {:?}", e, *info);
+            }
+        }
         drop(world.remove::<(RigidBody, Collider, Visible)>(e));
     }
 }
