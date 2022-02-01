@@ -1,5 +1,5 @@
 use crate::{
-    components::Panel,
+    components::{hand::Handedness, Panel},
     resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
 };
 use hecs::{PreparedQuery, World};
@@ -33,7 +33,7 @@ pub fn draw_gui_system(
 
     // Did we hover over a button in this frame? If so request haptic feedback.
     if !gui_context.hovered_last_frame && gui_context.hovered_this_frame {
-        haptic_context.request_haptic_feedback(1.);
+        haptic_context.request_haptic_feedback(1., Handedness::Right);
     }
 
     // Stash the value for the next frame.
@@ -54,13 +54,14 @@ mod tests {
     use crate::{
         buffer::Buffer,
         components::{
-            panel::{create_panel, PanelButton, PanelInput},
+            panel::{add_panel_to_world, PanelButton, PanelInput},
             Panel,
         },
         gltf_loader,
         image::Image,
         resources::{
-            gui_context::SCALE_FACTOR, GuiContext, HapticContext, RenderContext, VulkanContext,
+            gui_context::SCALE_FACTOR, GuiContext, HapticContext, PhysicsContext, RenderContext,
+            VulkanContext,
         },
         scene_data::SceneParams,
         swapchain::Swapchain,
@@ -103,7 +104,7 @@ mod tests {
         );
 
         // Assert that haptic feedback has been requested.
-        assert_eq!(haptic_context.amplitude_this_frame, 1.0);
+        assert_eq!(haptic_context.right_hand_amplitude_this_frame, 1.0);
 
         // Assert the button WAS NOT clicked this frame
         assert!(!button_was_clicked(&mut world));
@@ -120,7 +121,7 @@ mod tests {
         );
 
         // Assert that NO haptic feedback has been requested.
-        assert_eq!(haptic_context.amplitude_this_frame, 0.);
+        assert_eq!(haptic_context.right_hand_amplitude_this_frame, 0.);
 
         // Assert the button WAS clicked this frame
         assert!(button_was_clicked(&mut world));
@@ -140,7 +141,7 @@ mod tests {
         assert!(!button_was_clicked(&mut world));
 
         // Assert that NO haptic feedback has been requested.
-        assert_eq!(haptic_context.amplitude_this_frame, 0.);
+        assert_eq!(haptic_context.right_hand_amplitude_this_frame, 0.);
 
         renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
 
@@ -226,6 +227,7 @@ mod tests {
         GuiContext,
     ) {
         let vulkan_context = VulkanContext::testing().unwrap();
+        let mut physics_context = PhysicsContext::default();
         // Create an image with vulkan_context
         let image = vulkan_context
             .create_image(
@@ -260,21 +262,22 @@ mod tests {
         .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
-        let mut panel_components = create_panel(
+        let panel = add_panel_to_world(
             "Hello..",
             800,
             800,
+            vec![PanelButton::new("Click me!")],
+            [-1.0, 0., 0.].into(),
             &vulkan_context,
             &render_context,
             &gui_context,
-            vec![PanelButton::new("Click me!")],
+            &mut physics_context,
+            &mut world,
         );
-        panel_components.0.input = Some(PanelInput {
+        world.get_mut::<Panel>(panel).unwrap().input = Some(PanelInput {
             cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.05 * (800. / SCALE_FACTOR)),
             trigger_value: 1.,
         });
-        panel_components.3.translation[0] = -1.0;
-        world.spawn(panel_components);
 
         let haptic_context = HapticContext::default();
 
@@ -300,7 +303,7 @@ mod tests {
         begin_frame(render_context, vulkan_context);
 
         // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
-        haptic_context.amplitude_this_frame = 0.;
+        haptic_context.right_hand_amplitude_this_frame = 0.;
 
         // Draw the GUI
         draw_gui_system(

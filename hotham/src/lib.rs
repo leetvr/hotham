@@ -1,5 +1,5 @@
-use ash::vk;
-use openxr as xr;
+pub use ash::vk;
+pub use openxr as xr;
 
 pub use engine::Engine;
 pub use hecs;

@@ -6,9 +6,10 @@ use hotham::{
 };
 pub use sabers::sabers_system;
 
-use crate::components::{Colour, Saber};
+use crate::components::{Colour, Cube, Saber};
 
 #[derive(Default)]
 pub struct BeatSaberQueries<'a> {
     pub sabers_query: PreparedQuery<With<Saber, (&'a Colour, &'a RigidBody)>>,
+    pub cubes_query: PreparedQuery<&'a Cube>,
 }

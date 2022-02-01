@@ -1,6 +1,6 @@
 use ash::vk;
 use egui::Pos2;
-use hecs::{PreparedQuery, World};
+use hecs::{PreparedQuery, With, World};
 use nalgebra::{
     point, vector, Isometry3, Orthographic3, Point3, Quaternion, Translation3, UnitQuaternion,
 };
@@ -21,14 +21,14 @@ use crate::{
     components::{
         hand::Handedness,
         panel::{get_panel_dimensions, PanelInput},
-        Panel, Pointer, Transform,
+        Panel, Pointer, Transform, Visible,
     },
     resources::{gui_context::SCALE_FACTOR, PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
 
 pub fn pointers_system(
-    query: &mut PreparedQuery<(&mut Pointer, &mut Transform)>,
+    query: &mut PreparedQuery<With<Visible, (&mut Pointer, &mut Transform)>>,
     world: &mut World,
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,

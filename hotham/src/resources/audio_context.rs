@@ -98,21 +98,22 @@ impl AudioContext {
 
     pub fn play_audio(
         &mut self,
-        audio_source: &mut SoundEmitter,
+        sound_emitter: &mut SoundEmitter,
         position: mint::Point3<f32>,
         velocity: mint::Vector3<f32>,
     ) {
-        let signal: oddio::FramesSignal<_> = oddio::FramesSignal::from(audio_source.frames.clone());
+        let signal: oddio::FramesSignal<_> =
+            oddio::FramesSignal::from(sound_emitter.frames.clone());
         let handle = self.scene_handle.control().play_buffered(
             signal,
             oddio::SpatialOptions {
                 position,
                 velocity,
-                radius: 1.0, //
+                radius: 0.1, //
             },
             1000.0,
         );
-        audio_source.handle = Some(handle);
+        sound_emitter.handle = Some(handle);
     }
 
     pub fn resume_audio(&mut self, audio_source: &mut SoundEmitter) {
@@ -186,6 +187,11 @@ impl AudioContext {
         MusicTrack {
             index: self.music_tracks_inner.insert(frames),
         }
+    }
+
+    pub fn dummy_sound_emitter(&mut self) -> SoundEmitter {
+        let frames = oddio::Frames::from_slice(0, &[]);
+        SoundEmitter::new(frames)
     }
 }
 

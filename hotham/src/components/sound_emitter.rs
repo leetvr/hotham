@@ -10,7 +10,17 @@ pub struct SoundEmitter {
     pub next_state: SoundState,
 }
 
-#[derive(Debug, Clone, Copy)]
+impl Clone for SoundEmitter {
+    fn clone(&self) -> Self {
+        Self {
+            frames: self.frames.clone(),
+            handle: None,
+            next_state: SoundState::Stopped,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SoundState {
     Stopped,
     Playing,

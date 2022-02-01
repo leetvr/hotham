@@ -1,28 +1,40 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    time::{Duration, Instant},
+};
 
 use hotham::{
     components::{
         hand::Handedness,
-        panel::{create_panel, PanelButton},
-        Pointer,
+        panel::{add_panel_to_world, PanelButton},
+        Collider, Pointer, SoundEmitter,
     },
     gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
-    resources::{audio_context::MusicTrack, vulkan_context::VulkanContext, RenderContext},
+    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
+    resources::{
+        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP,
+        vulkan_context::VulkanContext, AudioContext, RenderContext,
+    },
     Engine,
 };
 
 use crate::{components::Colour, systems::sabers::add_saber};
 
 pub struct GameContext {
-    pub current_score: usize,
+    pub current_score: i32,
     pub state: GameState,
     pub pointer: Entity,
     pub main_menu_panel: Entity,
+    pub score_panel: Entity,
     pub blue_saber: Entity,
     pub red_saber: Entity,
+    pub backstop: Entity,
     pub songs: HashMap<String, Song>,
     pub models: HashMap<String, World>,
+    pub last_spawn_time: Instant,
+    pub sound_effects: HashMap<String, SoundEmitter>,
 }
 
 impl Debug for GameContext {
@@ -68,36 +80,72 @@ impl GameContext {
         // Add pointer
         let pointer = add_pointer(&models, world, vulkan_context, render_context);
 
+        // Add backstop
+        let backstop = add_backstop(world, physics_context);
+
         // Add panels
-        let main_menu_panel_components = create_panel(
+        let main_menu_panel = add_panel_to_world(
             "Main Menu",
             800,
             800,
+            vec![],
+            [0., 1., -1.].into(),
             vulkan_context,
             render_context,
             gui_context,
-            vec![PanelButton::new("Spence - Right Here Beside You")],
+            physics_context,
+            world,
         );
-        let main_menu_panel = world.spawn(main_menu_panel_components);
+
+        // Add panels
+        let score_panel = add_panel_to_world(
+            "Current Score: 0",
+            300,
+            600,
+            vec![],
+            [-2.5, 1., -2.].into(),
+            vulkan_context,
+            render_context,
+            gui_context,
+            physics_context,
+            world,
+        );
 
         // Create game context
         Self {
             pointer,
+            backstop,
             main_menu_panel,
+            score_panel,
             current_score: 0,
             state: GameState::Init,
             blue_saber: sabers[0],
             red_saber: sabers[1],
             songs: Default::default(),
             models,
+            last_spawn_time: Instant::now() - Duration::new(100, 0),
+            sound_effects: Default::default(),
         }
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct Song {
-    pub track: MusicTrack,
-    pub beat_length: f32,
+fn add_backstop(
+    world: &mut World,
+    physics_context: &mut hotham::resources::PhysicsContext,
+) -> Entity {
+    let collider = ColliderBuilder::cuboid(1., 1., 0.1)
+        .translation([0., 1., 0.].into())
+        .sensor(true)
+        .collision_groups(InteractionGroups::new(
+            DEFAULT_COLLISION_GROUP,
+            DEFAULT_COLLISION_GROUP,
+        ))
+        .active_collision_types(ActiveCollisionTypes::all())
+        .active_events(ActiveEvents::INTERSECTION_EVENTS)
+        .build();
+
+    let handle = physics_context.colliders.insert(collider);
+    world.spawn((Collider::new(handle),))
 }
 
 fn add_pointer(
@@ -145,16 +193,22 @@ fn add_environment(
     );
 }
 
-pub fn add_music(
-    audio_context: &mut hotham::resources::AudioContext,
-    game_context: &mut GameContext,
-) {
+pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContext) {
     let main_menu_mp3 = include_bytes!("../../assets/TrackTribe - Cloud Echo.mp3").to_vec();
     game_context.songs.insert(
         "Main Menu".to_string(),
         Song {
-            beat_length: 0.,
+            beat_length: Duration::new(0, 0),
             track: audio_context.add_music_track(main_menu_mp3),
+        },
+    );
+
+    let game_over_mp3 = include_bytes!("../../assets/Chasms - Dark Matter.mp3").to_vec();
+    game_context.songs.insert(
+        "Game Over".to_string(),
+        Song {
+            beat_length: Duration::new(0, 0),
+            track: audio_context.add_music_track(game_over_mp3),
         },
     );
 
@@ -163,9 +217,23 @@ pub fn add_music(
     game_context.songs.insert(
         "Spence - Right Here Beside You".to_string(),
         Song {
-            beat_length: 129. / 60.,
+            beat_length: Duration::from_millis(60_000 / 129),
             track: audio_context.add_music_track(right_here_beside_you),
         },
+    );
+}
+
+pub fn add_sound_effects(audio_context: &mut AudioContext, game_context: &mut GameContext) {
+    let hit_mp3 = include_bytes!("../../assets/Hit.mp3").to_vec();
+    game_context.sound_effects.insert(
+        "Hit".to_string(),
+        audio_context.create_audio_source(hit_mp3),
+    );
+
+    let miss_mp3 = include_bytes!("../../assets/Miss.mp3").to_vec();
+    game_context.sound_effects.insert(
+        "Miss".to_string(),
+        audio_context.create_audio_source(miss_mp3),
     );
 }
 
@@ -174,4 +242,11 @@ pub enum GameState {
     Init,
     MainMenu,
     Playing(Song),
+    GameOver,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Song {
+    pub track: MusicTrack,
+    pub beat_length: Duration,
 }

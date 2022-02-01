@@ -5,7 +5,8 @@ mod systems;
 use hotham::{
     hecs::World,
     schedule_functions::{
-        begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass, physics_step,
+        apply_haptic_feedback, begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass,
+        physics_step,
     },
     systems::{
         audio_system, collision_system, draw_gui_system, rendering_system,
@@ -13,10 +14,13 @@ use hotham::{
         update_transform_matrix_system,
     },
     systems::{pointers_system, Queries},
-    Engine, HothamError, HothamResult,
+    xr, Engine, HothamError, HothamResult,
 };
 
-use resources::{game_context::add_music, GameContext};
+use resources::{
+    game_context::{add_songs, add_sound_effects},
+    GameContext,
+};
 use systems::{game::game_system, sabers_system, BeatSaberQueries};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -31,7 +35,7 @@ pub fn real_main() -> HothamResult<()> {
     let mut hotham_queries = Default::default();
     let mut beat_saber_queries = Default::default();
 
-    while !engine.should_quit() {
+    while engine.update()? {
         tick(
             &mut engine,
             &mut world,
@@ -58,6 +62,12 @@ fn tick(
     let gui_context = &mut engine.gui_context;
     let haptic_context = &mut engine.haptic_context;
     let audio_context = &mut engine.audio_context;
+
+    // If we're not in a session, don't run the frame loop.
+    match xr_context.session_state {
+        xr::SessionState::IDLE | xr::SessionState::EXITING | xr::SessionState::STOPPING => return,
+        _ => {}
+    }
 
     // Frame start
     begin_frame(xr_context, vulkan_context, render_context);
@@ -100,6 +110,7 @@ fn tick(
         vulkan_context,
         render_context,
         physics_context,
+        haptic_context,
     );
 
     // GUI
@@ -112,6 +123,9 @@ fn tick(
         gui_context,
         haptic_context,
     );
+
+    // Haptics
+    apply_haptic_feedback(xr_context, haptic_context);
 
     // Audio
     audio_system(
@@ -138,6 +152,7 @@ fn tick(
 fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     let mut world = World::default();
     let mut game_context = GameContext::new(engine, &mut world);
-    add_music(&mut engine.audio_context, &mut game_context);
+    add_songs(&mut engine.audio_context, &mut game_context);
+    add_sound_effects(&mut engine.audio_context, &mut game_context);
     Ok((world, game_context))
 }
