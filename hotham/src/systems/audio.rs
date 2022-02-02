@@ -1,5 +1,5 @@
 use hecs::{PreparedQuery, World};
-use nalgebra::Point3;
+use nalgebra::{Isometry3, Point3};
 
 use crate::{
     components::{sound_emitter::SoundState, RigidBody, SoundEmitter},
@@ -16,8 +16,8 @@ pub fn audio_system(
 ) {
     for (_, (sound_emitter, rigid_body)) in query.query_mut(world) {
         // First, where is the listener?
-        let listener_location = posef_to_isometry(xr_context.views[1].pose)
-            .lerp_slerp(&posef_to_isometry(xr_context.views[0].pose), 0.5);
+        let listener_location =
+            get_location_from_poses(xr_context.views[0].pose, xr_context.views[1].pose);
 
         // Get the position and velocity of the entity.
         let rigid_body = physics_context
@@ -29,42 +29,56 @@ pub fn audio_system(
 
         // Now transform the position of the entity w.r.t. the listener
         let position = listener_location
-            .transform_point(&Point3::from(*rigid_body.translation()))
+            .inverse_transform_point(&Point3::from(*rigid_body.translation()))
             .into();
 
         // Determine what we should do with the audio source
         match (sound_emitter.current_state(), &sound_emitter.next_state) {
-            (SoundState::Stopped, SoundState::Playing) => {
-                println!("[HOTHAM_AUDIO] - Playing sound effect!");
+            (SoundState::Stopped, Some(SoundState::Playing)) => {
+                println!(
+                    "[HOTHAM_AUDIO] - Playing sound effect at {:?}, {:?} from {:?}!. Original position: {:?}",
+                    position, velocity, listener_location, rigid_body.translation()
+                );
                 audio_context.play_audio(sound_emitter, position, velocity);
             }
-            (SoundState::Paused, SoundState::Playing) => {
+            (SoundState::Paused, Some(SoundState::Playing)) => {
                 audio_context.resume_audio(sound_emitter);
             }
-            (SoundState::Playing | SoundState::Paused, SoundState::Paused) => {
+            (SoundState::Playing | SoundState::Paused, Some(SoundState::Paused)) => {
                 audio_context.pause_audio(sound_emitter);
             }
-            (_, SoundState::Stopped) => {
+            (SoundState::Stopped, Some(SoundState::Stopped)) => {
+                // Do nothing
+            }
+            (_, Some(SoundState::Stopped)) => {
                 audio_context.stop_audio(sound_emitter);
             }
             _ => {}
         }
+
+        // Reset the sound emitter's intent
+        sound_emitter.next_state = None;
 
         // Update its position and velocity
         audio_context.update_motion(sound_emitter, position, velocity);
     }
 }
 
+fn get_location_from_poses(left_eye: openxr::Posef, right_eye: openxr::Posef) -> Isometry3<f32> {
+    posef_to_isometry(left_eye).lerp_slerp(&posef_to_isometry(right_eye), 0.5)
+}
+
 #[cfg(test)]
 mod tests {
     use hecs::{Entity, PreparedQuery, World};
+    use openxr::{Posef, Quaternionf, Vector3f};
     use std::{
         thread,
         time::{Duration, Instant},
     };
 
     use rapier3d::prelude::RigidBodyBuilder;
-    const DURATION_SECS: u32 = 8;
+    const DURATION_SECS: u32 = 80;
 
     use crate::{
         resources::{audio_context::MusicTrack, XrContext},
@@ -80,16 +94,13 @@ mod tests {
         let mut physics_context = PhysicsContext::default();
 
         // Load MP3s from disk
-        let beethoven = include_bytes!("../../../test_assets/Quartet 14 - Clip.mp3").to_vec();
         let right_here =
             include_bytes!("../../../test_assets/right_here_beside_you_clip.mp3").to_vec();
         let tell_me_that_i_cant =
             include_bytes!("../../../test_assets/tell_me_that_i_cant_clip.mp3").to_vec();
 
-        let beethoven = audio_context.add_music_track(beethoven);
         let right_here = audio_context.add_music_track(right_here);
         let tell_me_that_i_cant = audio_context.add_music_track(tell_me_that_i_cant);
-        audio_context.play_music_track(beethoven);
 
         // Create rigid body for the test entity
         let sound_effect = include_bytes!("../../../test_assets/ice_crash.mp3").to_vec();
@@ -191,15 +202,30 @@ mod tests {
             _ => {}
         }
 
-        if start.elapsed().as_secs() >= 4
-            && audio_context.current_music_track.unwrap() != right_here
-        {
-            audio_context.play_music_track(right_here);
-        } else if start.elapsed().as_secs() >= 2
-            && start.elapsed().as_secs() < 4
-            && audio_context.current_music_track.unwrap() != tell_me_that_i_cant
-        {
-            audio_context.play_music_track(tell_me_that_i_cant);
-        }
+        // if start.elapsed().as_secs() >= 4 && audio_context.current_music_track != Some(right_here) {
+        //     audio_context.play_music_track(right_here);
+        // } else if start.elapsed().as_secs() >= 2
+        //     && start.elapsed().as_secs() < 4
+        //     && audio_context.current_music_track != Some(tell_me_that_i_cant)
+        // {
+        //     audio_context.play_music_track(tell_me_that_i_cant);
+        // }
+    }
+
+    #[test]
+    pub fn test_poses_to_location() {
+        let pose_0 = Posef {
+            orientation: Quaternionf {
+                x: 0.,
+                y: 0.,
+                z: 0.,
+                w: 0.,
+            },
+            position: Vector3f {
+                x: 0.,
+                y: 0.,
+                z: 0.,
+            },
+        };
     }
 }

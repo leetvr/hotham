@@ -109,7 +109,7 @@ impl AudioContext {
             oddio::SpatialOptions {
                 position,
                 velocity,
-                radius: 0.1, //
+                radius: 1.0, //
             },
             1000.0,
         );

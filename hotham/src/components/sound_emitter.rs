@@ -7,7 +7,7 @@ type AudioHandle = oddio::Handle<oddio::SpatialBuffered<oddio::Stop<oddio::Frame
 pub struct SoundEmitter {
     pub frames: Arc<Frames<f32>>,
     pub handle: Option<AudioHandle>,
-    pub next_state: SoundState,
+    pub next_state: Option<SoundState>,
 }
 
 impl Clone for SoundEmitter {
@@ -15,7 +15,7 @@ impl Clone for SoundEmitter {
         Self {
             frames: self.frames.clone(),
             handle: None,
-            next_state: SoundState::Stopped,
+            next_state: None,
         }
     }
 }
@@ -32,7 +32,7 @@ impl SoundEmitter {
         Self {
             frames,
             handle: None,
-            next_state: SoundState::Stopped,
+            next_state: None,
         }
     }
 
@@ -52,18 +52,18 @@ impl SoundEmitter {
     }
 
     pub fn play(&mut self) {
-        self.next_state = SoundState::Playing;
+        self.next_state = Some(SoundState::Playing);
     }
 
     pub fn pause(&mut self) {
-        self.next_state = SoundState::Paused;
+        self.next_state = Some(SoundState::Paused);
     }
 
     pub fn stop(&mut self) {
-        self.next_state = SoundState::Stopped;
+        self.next_state = Some(SoundState::Stopped);
     }
 
     pub fn resume(&mut self) {
-        self.next_state = SoundState::Playing;
+        self.next_state = Some(SoundState::Playing);
     }
 }
