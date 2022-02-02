@@ -83,7 +83,7 @@ async fn accept_connection(
     let from_hotham = BroadcastStream::new(from_hotham).map(|message| match message {
         Ok(message) => {
             let json = serde_json::to_string(&message)
-                .expect(&format!("Unable to deserialize {:?}", message));
+                .unwrap_or_else(|_| panic!("Unable to deserialize {:?}", message));
             Ok(tungstenite::Message::Text(json))
         }
         Err(e) => Err(tokio_tungstenite::tungstenite::Error::Io(IOError::new(
