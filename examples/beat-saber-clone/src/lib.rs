@@ -96,8 +96,6 @@ fn tick(
         world,
         game_state,
         audio_context,
-        vulkan_context,
-        render_context,
         physics_context,
         haptic_context,
     );

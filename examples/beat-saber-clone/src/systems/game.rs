@@ -10,12 +10,14 @@ use crate::{
 
 use super::BeatSaberQueries;
 use hotham::{
-    components::{hand::Handedness, panel::PanelButton, Collider, Info, Panel, RigidBody, Visible},
+    components::{
+        hand::Handedness, panel::PanelButton, sound_emitter::SoundState, Collider, Info, Panel,
+        RigidBody, Visible,
+    },
     hecs::{Entity, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
     resources::{
-        physics_context::DEFAULT_COLLISION_GROUP, vulkan_context::VulkanContext, AudioContext,
-        HapticContext, PhysicsContext, RenderContext,
+        physics_context::DEFAULT_COLLISION_GROUP, AudioContext, HapticContext, PhysicsContext,
     },
 };
 use rand::prelude::*;
@@ -29,8 +31,6 @@ pub fn game_system(
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
     haptic_context: &mut HapticContext,
 ) {
@@ -39,8 +39,7 @@ pub fn game_system(
         queries,
         world,
         game_context,
-        vulkan_context,
-        render_context,
+        audio_context,
         physics_context,
         haptic_context,
     ) {
@@ -181,8 +180,7 @@ fn run(
     queries: &mut BeatSaberQueries,
     world: &mut World,
     game_context: &mut GameContext,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    audio_context: &mut AudioContext,
     physics_context: &mut PhysicsContext,
     haptic_context: &mut HapticContext,
 ) -> Option<GameState> {
@@ -208,7 +206,9 @@ fn run(
             check_for_hits(world, game_context, physics_context, haptic_context);
             update_panel_text(world, game_context);
 
-            if game_context.current_score < 0 {
+            if game_context.current_score < 0
+                || audio_context.music_track_status() == SoundState::Stopped
+            {
                 return Some(GameState::GameOver);
             };
         }
@@ -450,8 +450,6 @@ mod tests {
         let mut world = World::new();
         let mut game_context = GameContext::new(&mut engine, &mut world);
         let audio_context = &mut engine.audio_context;
-        let vulkan_context = &engine.vulkan_context;
-        let render_context = &engine.render_context;
         let physics_context = &mut engine.physics_context;
         let haptic_context = &mut engine.haptic_context;
         let world = &mut world;
@@ -499,8 +497,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -527,8 +523,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -546,8 +540,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -580,8 +572,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -605,8 +595,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -628,8 +616,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -657,8 +643,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -676,8 +660,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -696,8 +678,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -715,8 +695,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -734,8 +712,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -766,8 +742,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -811,8 +785,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );
@@ -832,8 +804,6 @@ mod tests {
             world,
             game_context,
             audio_context,
-            vulkan_context,
-            render_context,
             physics_context,
             haptic_context,
         );

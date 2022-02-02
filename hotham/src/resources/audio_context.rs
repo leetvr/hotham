@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::components::SoundEmitter;
+use crate::components::{sound_emitter::SoundState, SoundEmitter};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     Stream,
@@ -180,6 +180,21 @@ impl AudioContext {
         self.music_track_handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().resume());
+    }
+
+    pub fn music_track_status(&mut self) -> SoundState {
+        if let Some(handle) = self.music_track_handle.as_mut() {
+            let control = handle.control::<Stop<_>, _>();
+            if control.is_paused() {
+                return SoundState::Paused;
+            }
+            if control.is_stopped() {
+                return SoundState::Stopped;
+            }
+            return SoundState::Playing;
+        } else {
+            SoundState::Stopped
+        }
     }
 
     pub fn dummy_track(&mut self) -> MusicTrack {
