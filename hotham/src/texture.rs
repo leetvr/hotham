@@ -1,6 +1,7 @@
 use crate::{image::Image, resources::VulkanContext};
 use anyhow::{anyhow, Result};
 use ash::vk;
+use gltf::image::Format;
 use image::io::Reader as ImageReader;
 use libktx_rs::{sources::StreamSource, RustKtxStream, TextureCreateFlags, TextureSource};
 use std::{
@@ -78,20 +79,19 @@ impl Texture {
                 )
             }
             // TODO: Fix this
-            gltf::image::Source::View { mime_type, .. } => {
+            gltf::image::Source::View { .. } => {
                 let index = texture.source().index();
                 let image = &images[index];
-                let texture = if mime_type == "image/jpeg" {
+                let texture = if image.format != Format::R8G8B8A8 {
                     let pixels = add_alpha_channel(&image);
-                    let texture = Texture::new(
+                    Texture::new(
                         texture_name,
                         &vulkan_context,
                         &pixels,
                         image.width,
                         image.height,
                         TEXTURE_FORMAT,
-                    );
-                    texture
+                    )
                 } else {
                     Texture::new(
                         texture_name,

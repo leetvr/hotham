@@ -184,7 +184,6 @@ fn run(
     physics_context: &mut PhysicsContext,
     haptic_context: &mut HapticContext,
 ) -> Option<GameState> {
-    println!("[BEAT_SABER] TICK {:?}", game_context.state);
     match &mut game_context.state {
         GameState::Init => return Some(GameState::MainMenu),
         GameState::MainMenu => {
@@ -266,10 +265,6 @@ fn check_for_hits(
     let mut cubes_to_dispose = Vec::new();
 
     {
-        println!(
-            "[BEAT_SABER] Checking blue saber collider: {:?}",
-            game_context.blue_saber
-        );
         let blue_saber_collider = world.get::<Collider>(game_context.blue_saber).unwrap();
         for c in &blue_saber_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
@@ -292,10 +287,6 @@ fn check_for_hits(
             }
         }
 
-        println!(
-            "[BEAT_SABER] Checking red saber collider: {:?}",
-            game_context.red_saber
-        );
         let red_saber_collider = world.get::<Collider>(game_context.red_saber).unwrap();
         for c in &red_saber_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
