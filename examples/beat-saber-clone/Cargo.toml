@@ -21,13 +21,10 @@ approx = "0.5"
 ndk-glue = "=0.6.0"
 
 [package.metadata.android]
-apk_label = "Hotham Beat Saber Example"
+apk_label = "Crab Saber"
 fullscreen = true
 runtime_libs = "../common_lib"
 target_sdk_version = 26
-
-[package.metadata.android.application]
-debuggable = true
 
 [[package.metadata.android.uses_permission]]
 name = "android.permission.INTERNET"
@@ -35,6 +32,38 @@ name = "android.permission.INTERNET"
 [[package.metadata.android.uses_permission]]
 name = "android.permission.ACCESS_NETWORK_STATE"
 
-[[package.metadata.android.application.intent_filter]]
+[package.metadata.android.application]
+debuggable = false
+label = "Crab Saber"
+theme = "@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
+
+[package.metadata.android.application.activity]
+config_changes = "screenSize|screenLayout|orientation|keyboardHidden|keyboard|navigation|uiMode"
+launch_mode = "singleTask"
+orientation = "landscape"
+
+[[package.metadata.android.application.meta_data]]
+name = "com.oculus.supportedDevices"
+value = "quest|quest2"
+
+[[package.metadata.android.application.meta_data]]
+name = "com.oculus.intent.category.VR"
+value = "vr_only"
+
+[[package.metadata.android.application.activity.intent_filter]]
 actions = ["android.intent.action.MAIN"]
 categories = ["com.oculus.intent.category.VR", "android.intent.category.LAUNCHER"]
+
+[[package.metadata.android.application.activity.meta_data]]
+name = "com.oculus.vr.focusaware"
+value = "true"
+
+[[package.metadata.android.uses_feature]]
+name = "android.hardware.vulkan.level"
+required = true
+version = 1
+
+[[package.metadata.android.uses_feature]]
+name = "android.hardware.vr.headtracking"
+required = true
+version = 1

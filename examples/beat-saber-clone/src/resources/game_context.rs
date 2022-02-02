@@ -246,6 +246,16 @@ pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContex
             track: audio_context.add_music_track(right_here_beside_you),
         },
     );
+
+    let tell_me_that_i_cant =
+        include_bytes!("../../assets/NEFFEX - Tell Me That I Can't.mp3").to_vec();
+    game_context.songs.insert(
+        "NEFFEX - Tell Me That I Can't".to_string(),
+        Song {
+            beat_length: Duration::from_millis(60_000 / 70),
+            track: audio_context.add_music_track(tell_me_that_i_cant),
+        },
+    );
 }
 
 pub fn add_sound_effects(audio_context: &mut AudioContext, game_context: &mut GameContext) {
