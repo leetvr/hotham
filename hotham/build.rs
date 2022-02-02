@@ -27,7 +27,7 @@ fn compile_shader(
     path: std::path::PathBuf,
     compiler: &mut Compiler,
     shader_kind: ShaderKind,
-) -> () {
+) {
     let artifact = {
         let input_file_name = path.file_name().unwrap().to_str().unwrap();
         let source_text = fs::read_to_string(&path).unwrap();
