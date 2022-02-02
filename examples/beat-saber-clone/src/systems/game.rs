@@ -73,7 +73,7 @@ fn transition(
                 .unwrap();
 
             // Remove visibility
-            let _ = world.remove_one::<Visible>(game_context.score_panel);
+            // let _ = world.remove_one::<Visible>(game_context.score_panel);
             let _ = world.remove_one::<Visible>(game_context.blue_saber);
             let _ = world.remove_one::<Visible>(game_context.red_saber);
 
@@ -86,7 +86,7 @@ fn transition(
                 .get_mut::<Panel>(game_context.main_menu_panel)
                 .unwrap();
 
-            panel.text = "Main Menu".to_string();
+            panel.text = "CRAB SABER".to_string();
             panel.buttons = game_context
                 .songs
                 .iter()

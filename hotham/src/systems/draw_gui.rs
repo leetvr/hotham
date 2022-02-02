@@ -115,7 +115,7 @@ mod tests {
         assert!(!button_was_clicked(&mut world));
 
         // Release the trigger slightly
-        change_panel_trigger_value(&mut world, &mut query);
+        release_trigger(&mut world, &mut query);
         schedule(
             &mut query,
             &mut world,
@@ -161,6 +161,97 @@ mod tests {
         }
     }
 
+    fn schedule(
+        query: &mut PreparedQuery<&mut Panel>,
+        world: &mut World,
+        gui_context: &mut GuiContext,
+        haptic_context: &mut HapticContext,
+        render_context: &mut RenderContext,
+        vulkan_context: &VulkanContext,
+    ) -> () {
+        println!("[DRAW_GUI_TEST] Running schedule..");
+        begin_frame(render_context, vulkan_context);
+
+        // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
+        haptic_context.right_hand_amplitude_this_frame = 0.;
+
+        // Draw the GUI
+        draw_gui_system(
+            query,
+            world,
+            vulkan_context,
+            &0,
+            render_context,
+            gui_context,
+            haptic_context,
+        );
+
+        // Begin the PBR Render Pass
+        render_context.begin_pbr_render_pass(vulkan_context, 0);
+
+        // Update transforms, etc.
+        update_transform_matrix_system(&mut Default::default(), world);
+
+        // Update parent transform matrix
+        update_parent_transform_matrix_system(
+            &mut Default::default(),
+            &mut Default::default(),
+            world,
+        );
+
+        // Render
+        rendering_system(
+            &mut Default::default(),
+            world,
+            vulkan_context,
+            0,
+            render_context,
+        );
+
+        // End PBR render
+        render_context.end_pbr_render_pass(vulkan_context, 0);
+        render_context.end_frame(vulkan_context, 0);
+    }
+
+    fn begin_frame(render_context: &mut RenderContext, vulkan_context: &VulkanContext) {
+        let rotation: mint::Quaternion<f32> = UnitQuaternion::from_euler_angles(0., 0., 0.).into();
+        let position = Vector3f {
+            x: -1.0,
+            y: 0.0,
+            z: 1.0,
+        };
+
+        let view = openxr::View {
+            pose: openxr::Posef {
+                orientation: Quaternionf::from(rotation),
+                position,
+            },
+            fov: Fovf {
+                angle_up: 45.0_f32.to_radians(),
+                angle_down: -45.0_f32.to_radians(),
+                angle_left: -45.0_f32.to_radians(),
+                angle_right: 45.0_f32.to_radians(),
+            },
+        };
+        let views = vec![view.clone(), view];
+
+        render_context.begin_frame(&vulkan_context, 0);
+
+        render_context
+            .update_scene_data(&views, &vulkan_context)
+            .unwrap();
+        render_context
+            .scene_params_buffer
+            .update(
+                &vulkan_context,
+                &[SceneParams {
+                    // debug_view_inputs: 1.,
+                    ..Default::default()
+                }],
+            )
+            .unwrap();
+    }
+
     fn button_was_clicked(world: &mut World) -> bool {
         let panel = world
             .query_mut::<&mut Panel>()
@@ -171,10 +262,10 @@ mod tests {
         return panel.buttons[0].clicked_this_frame;
     }
 
-    fn change_panel_trigger_value(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
+    fn release_trigger(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
         let panel = query.query_mut(world).into_iter().next().unwrap().1;
         panel.input = Some(PanelInput {
-            cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.05 * (800. / SCALE_FACTOR)),
+            cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.15 * (800. / SCALE_FACTOR)),
             trigger_value: 0.2,
         });
     }
@@ -271,7 +362,10 @@ mod tests {
             "Hello..",
             800,
             800,
-            vec![PanelButton::new("Click me!")],
+            vec![
+                PanelButton::new("Click me!"),
+                PanelButton::new("Don't click me!"),
+            ],
             [-1.0, 0., 0.].into(),
             &vulkan_context,
             &render_context,
@@ -280,7 +374,7 @@ mod tests {
             &mut world,
         );
         world.get_mut::<Panel>(panel).unwrap().input = Some(PanelInput {
-            cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.05 * (800. / SCALE_FACTOR)),
+            cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.15 * (800. / SCALE_FACTOR)),
             trigger_value: 1.,
         });
 
@@ -294,96 +388,5 @@ mod tests {
             haptic_context,
             gui_context,
         )
-    }
-
-    fn schedule(
-        query: &mut PreparedQuery<&mut Panel>,
-        world: &mut World,
-        gui_context: &mut GuiContext,
-        haptic_context: &mut HapticContext,
-        render_context: &mut RenderContext,
-        vulkan_context: &VulkanContext,
-    ) -> () {
-        println!("[DRAW_GUI_TEST] Running schedule..");
-        begin_frame(render_context, vulkan_context);
-
-        // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
-        haptic_context.right_hand_amplitude_this_frame = 0.;
-
-        // Draw the GUI
-        draw_gui_system(
-            query,
-            world,
-            vulkan_context,
-            &0,
-            render_context,
-            gui_context,
-            haptic_context,
-        );
-
-        // Begin the PBR Render Pass
-        render_context.begin_pbr_render_pass(vulkan_context, 0);
-
-        // Update transforms, etc.
-        update_transform_matrix_system(&mut Default::default(), world);
-
-        // Update parent transform matrix
-        update_parent_transform_matrix_system(
-            &mut Default::default(),
-            &mut Default::default(),
-            world,
-        );
-
-        // Render
-        rendering_system(
-            &mut Default::default(),
-            world,
-            vulkan_context,
-            0,
-            render_context,
-        );
-
-        // End PBR render
-        render_context.end_pbr_render_pass(vulkan_context, 0);
-        render_context.end_frame(vulkan_context, 0);
-    }
-
-    fn begin_frame(render_context: &mut RenderContext, vulkan_context: &VulkanContext) {
-        let rotation: mint::Quaternion<f32> = UnitQuaternion::from_euler_angles(0., 0., 0.).into();
-        let position = Vector3f {
-            x: -1.0,
-            y: 0.0,
-            z: 1.0,
-        };
-
-        let view = openxr::View {
-            pose: openxr::Posef {
-                orientation: Quaternionf::from(rotation),
-                position,
-            },
-            fov: Fovf {
-                angle_up: 45.0_f32.to_radians(),
-                angle_down: -45.0_f32.to_radians(),
-                angle_left: -45.0_f32.to_radians(),
-                angle_right: 45.0_f32.to_radians(),
-            },
-        };
-        let views = vec![view.clone(), view];
-
-        render_context.begin_frame(&vulkan_context, 0);
-
-        render_context
-            .update_scene_data(&views, &vulkan_context)
-            .unwrap();
-        render_context
-            .scene_params_buffer
-            .update(
-                &vulkan_context,
-                &[SceneParams {
-                    // debug_view_inputs: 1.,
-                    ..Default::default()
-                }],
-            )
-            .unwrap();
     }
 }

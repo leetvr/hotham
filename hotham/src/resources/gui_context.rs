@@ -282,6 +282,8 @@ impl GuiContext {
         // GUI Layout
         egui::CentralPanel::default().show(&egui_context, |ui| {
             ui.with_layout(inner_layout, |ui| {
+                ui.heading(&text);
+
                 for button in &mut updated_buttons {
                     let response = ui.button(&button.text);
 
@@ -293,8 +295,6 @@ impl GuiContext {
                         button.clicked_this_frame = true;
                     }
                 }
-
-                ui.label(&text);
 
                 if let Some(panel_input) = panel_input {
                     let position = ui

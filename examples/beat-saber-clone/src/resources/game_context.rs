@@ -119,7 +119,7 @@ impl GameContext {
             300,
             600,
             vec![],
-            [-2.5, 1., -2.].into(),
+            [-1.25, 1., -2.].into(),
             vulkan_context,
             render_context,
             gui_context,
