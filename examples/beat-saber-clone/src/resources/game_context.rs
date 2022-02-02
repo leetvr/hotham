@@ -6,9 +6,8 @@ use std::{
 
 use hotham::{
     components::{
-        hand::Handedness,
-        panel::{add_panel_to_world, PanelButton},
-        Collider, Pointer, RigidBody, SoundEmitter, Visible,
+        hand::Handedness, panel::add_panel_to_world, Collider, Pointer, RigidBody, SoundEmitter,
+        Visible,
     },
     gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},

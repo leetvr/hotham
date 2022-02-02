@@ -14,7 +14,7 @@ pub fn audio_system(
     physics_context: &PhysicsContext,
     xr_context: &XrContext,
 ) {
-    for (e, (sound_emitter, rigid_body)) in query.query_mut(world) {
+    for (_, (sound_emitter, rigid_body)) in query.query_mut(world) {
         // First, where is the listener?
         let listener_location = posef_to_isometry(xr_context.views[1].pose)
             .lerp_slerp(&posef_to_isometry(xr_context.views[0].pose), 0.5);

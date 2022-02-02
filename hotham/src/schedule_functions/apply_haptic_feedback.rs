@@ -1,9 +1,6 @@
 use openxr::{Duration, HapticVibration};
 
-use crate::{
-    components::hand::Handedness,
-    resources::{HapticContext, XrContext},
-};
+use crate::resources::{HapticContext, XrContext};
 
 pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
     if haptic_context.left_hand_amplitude_this_frame != 0. {

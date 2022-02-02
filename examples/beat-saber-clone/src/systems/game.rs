@@ -1,7 +1,4 @@
-use std::{
-    collections::HashMap,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crate::{
     components::{Colour, Cube},
@@ -13,15 +10,9 @@ use crate::{
 
 use super::BeatSaberQueries;
 use hotham::{
-    components::{
-        hand::Handedness, panel::PanelButton, Collider, Info, Panel, RigidBody, SoundEmitter,
-        Transform, Visible,
-    },
-    gltf_loader::add_model_to_world,
+    components::{hand::Handedness, panel::PanelButton, Collider, Info, Panel, RigidBody, Visible},
     hecs::{Entity, World},
-    rapier3d::prelude::{
-        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
-    },
+    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
     resources::{
         physics_context::DEFAULT_COLLISION_GROUP, vulkan_context::VulkanContext, AudioContext,
         HapticContext, PhysicsContext, RenderContext,
@@ -407,7 +398,7 @@ fn revive_cube(
     let rigid_body_handle = world.get::<RigidBody>(cube_entity).unwrap().handle;
     let rigid_body = &mut physics_context.rigid_bodies[rigid_body_handle];
     rigid_body.set_translation([translation_x, CUBE_Y, CUBE_Z].into(), true);
-    rigid_body.set_linvel([0., 0., z_linvel].into(), false);
+    rigid_body.set_linvel([0., 0., z_linvel].into(), true);
 
     // Create a new collider
     let collider = ColliderBuilder::cuboid(0.2, 0.2, 0.2)
@@ -438,17 +429,15 @@ mod tests {
     use std::time::Duration;
 
     use hotham::{
-        components::{sound_emitter::SoundState, Collider, RigidBody, SoundEmitter, Transform},
+        components::{Collider, RigidBody, SoundEmitter},
         hecs::Entity,
         nalgebra::Vector3,
+        rapier3d::prelude::RigidBodyBuilder,
         resources::HapticContext,
         Engine,
     };
 
-    use crate::{
-        components::Cube,
-        resources::game_context::{pre_spawn_cube, Song},
-    };
+    use crate::{components::Cube, resources::game_context::Song};
 
     use super::*;
     #[test]
@@ -564,7 +553,7 @@ mod tests {
             let mut q = queries.live_cubes_query.query(world);
             let mut i = q.iter();
             assert_eq!(i.len(), 1);
-            let (e, (_, rigid_body, _)) = i.next().unwrap();
+            let (_, (_, rigid_body, _)) = i.next().unwrap();
             let rigid_body = &physics_context.rigid_bodies[rigid_body.handle];
             drop(q);
 
