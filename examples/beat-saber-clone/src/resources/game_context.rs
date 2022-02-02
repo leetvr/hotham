@@ -150,7 +150,7 @@ fn add_backstop(
     physics_context: &mut hotham::resources::PhysicsContext,
 ) -> Entity {
     let collider = ColliderBuilder::cuboid(1., 1., 0.1)
-        .translation([0., 1., 2.].into())
+        .translation([0., 1., 1.].into())
         .sensor(true)
         .collision_groups(InteractionGroups::new(
             DEFAULT_COLLISION_GROUP,
