@@ -14,7 +14,7 @@ pub fn audio_system(
     physics_context: &PhysicsContext,
     xr_context: &XrContext,
 ) {
-    for (_, (sound_emitter, rigid_body)) in query.query_mut(world) {
+    for (e, (sound_emitter, rigid_body)) in query.query_mut(world) {
         // First, where is the listener?
         let listener_location = posef_to_isometry(xr_context.views[1].pose)
             .lerp_slerp(&posef_to_isometry(xr_context.views[0].pose), 0.5);
@@ -35,6 +35,7 @@ pub fn audio_system(
         // Determine what we should do with the audio source
         match (sound_emitter.current_state(), &sound_emitter.next_state) {
             (SoundState::Stopped, SoundState::Playing) => {
+                println!("[HOTHAM_AUDIO] - Playing sound effect!");
                 audio_context.play_audio(sound_emitter, position, velocity);
             }
             (SoundState::Paused, SoundState::Playing) => {

@@ -85,10 +85,6 @@ impl PhysicsContext {
         let rigid_body_handle = self.rigid_bodies.insert(rigid_body);
 
         // TODO: Users may wish to pass in their own interaction groups.
-        collider.set_collision_groups(InteractionGroups::new(
-            DEFAULT_COLLISION_GROUP,
-            DEFAULT_COLLISION_GROUP,
-        ));
 
         let a_collider_handle =
             self.colliders

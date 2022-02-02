@@ -15,13 +15,16 @@ use super::BeatSaberQueries;
 use hotham::{
     components::{
         hand::Handedness, panel::PanelButton, Collider, Info, Panel, RigidBody, SoundEmitter,
-        Visible,
+        Transform, Visible,
     },
     gltf_loader::add_model_to_world,
     hecs::{Entity, World},
-    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
+    rapier3d::prelude::{
+        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
+    },
     resources::{
-        vulkan_context::VulkanContext, AudioContext, HapticContext, PhysicsContext, RenderContext,
+        physics_context::DEFAULT_COLLISION_GROUP, vulkan_context::VulkanContext, AudioContext,
+        HapticContext, PhysicsContext, RenderContext,
     },
 };
 use rand::prelude::*;
@@ -353,14 +356,14 @@ fn dispose_of_cubes(
 ) {
     for e in cubes_to_dispose.into_iter() {
         println!("[BEAT_SABER] Disposing of cube {:?}", e);
-        match world.get::<RigidBody>(e) {
-            Ok(r) => {
-                let handle = r.handle;
-                physics_context.rigid_bodies.remove(
+        match world.get::<Collider>(e) {
+            Ok(c) => {
+                let handle = c.handle;
+                physics_context.colliders.remove(
                     handle,
                     &mut physics_context.island_manager,
-                    &mut physics_context.colliders,
-                    &mut physics_context.joint_set,
+                    &mut physics_context.rigid_bodies,
+                    false,
                 );
             }
             Err(_) => {
@@ -368,7 +371,7 @@ fn dispose_of_cubes(
                 println!("Unable to find collider for entity {:?} - {:?}", e, *info);
             }
         }
-        drop(world.remove::<(RigidBody, Collider, Visible)>(e));
+        drop(world.remove::<(Collider, Visible)>(e));
     }
 }
 
@@ -400,20 +403,33 @@ fn revive_cube(
     let translation_x = CUBE_X_OFFSETS[rng.gen_range(0..4)];
     let z_linvel = -CUBE_Z / (song.beat_length.as_secs_f32() * 4.); // distance / time for 4 beats
 
-    // Give it a collider and rigid-body
+    // Update the Rigid Body
+    let rigid_body_handle = world.get::<RigidBody>(cube_entity).unwrap().handle;
+    let rigid_body = &mut physics_context.rigid_bodies[rigid_body_handle];
+    rigid_body.set_translation([translation_x, CUBE_Y, CUBE_Z].into(), true);
+    rigid_body.set_linvel([0., 0., z_linvel].into(), false);
+
+    // Create a new collider
     let collider = ColliderBuilder::cuboid(0.2, 0.2, 0.2)
         .translation([0., 0.2, 0.].into()) // Offset the collider slightly
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::INTERSECTION_EVENTS)
+        .collision_groups(InteractionGroups::new(
+            DEFAULT_COLLISION_GROUP,
+            DEFAULT_COLLISION_GROUP,
+        ))
         .build();
-    let rigid_body = RigidBodyBuilder::new_dynamic()
-        .translation([translation_x, CUBE_Y, CUBE_Z].into())
-        .linvel([0., 0., z_linvel].into())
-        .lock_rotations()
-        .build();
-    let components = physics_context.get_rigid_body_and_collider(cube_entity, rigid_body, collider);
-    world.insert(cube_entity, components).unwrap();
-    world.insert_one(cube_entity, Visible {}).unwrap();
+
+    // Attach it to the rigidbody
+    let collider_handle = physics_context.colliders.insert_with_parent(
+        collider,
+        rigid_body_handle,
+        &mut physics_context.rigid_bodies,
+    );
+
+    world
+        .insert(cube_entity, (Visible {}, Collider::new(collider_handle)))
+        .unwrap();
 }
 
 #[cfg(test)]
@@ -422,7 +438,7 @@ mod tests {
     use std::time::Duration;
 
     use hotham::{
-        components::{sound_emitter::SoundState, Collider, RigidBody, SoundEmitter},
+        components::{sound_emitter::SoundState, Collider, RigidBody, SoundEmitter, Transform},
         hecs::Entity,
         nalgebra::Vector3,
         resources::HapticContext,
@@ -548,7 +564,7 @@ mod tests {
             let mut q = queries.live_cubes_query.query(world);
             let mut i = q.iter();
             assert_eq!(i.len(), 1);
-            let (_, (_, rigid_body, _)) = i.next().unwrap();
+            let (e, (_, rigid_body, _)) = i.next().unwrap();
             let rigid_body = &physics_context.rigid_bodies[rigid_body.handle];
             drop(q);
 
@@ -561,6 +577,7 @@ mod tests {
             );
             assert_eq!(t[1], CUBE_Y);
             assert_eq!(t[2], CUBE_Z);
+
             assert_eq!(rigid_body.linvel(), &Vector3::new(0., 0., 5.,));
             assert_score_is(world, game_context, 0);
         }
@@ -882,8 +899,8 @@ mod tests {
         let hit_cube = world.get::<Collider>(saber).unwrap().collisions_this_frame[0];
         let hit_cube = world.entity(hit_cube).unwrap();
         assert!(hit_cube.has::<SoundEmitter>());
+        assert!(hit_cube.has::<RigidBody>()); // Necessary to play a sound
         assert!(!hit_cube.has::<Visible>());
-        assert!(!hit_cube.has::<RigidBody>());
         assert!(!hit_cube.has::<Collider>());
 
         if let Ok(c) = world.get::<Colour>(saber) {

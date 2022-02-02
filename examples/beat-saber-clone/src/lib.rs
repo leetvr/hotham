@@ -89,17 +89,6 @@ fn tick(
     // Physics
     physics_step(physics_context);
     collision_system(&mut hotham_queries.collision_query, world, physics_context);
-    update_rigid_body_transforms_system(
-        &mut hotham_queries.update_rigid_body_transforms_query,
-        world,
-        physics_context,
-    );
-    update_transform_matrix_system(&mut hotham_queries.update_transform_matrix_query, world);
-    update_parent_transform_matrix_system(
-        &mut hotham_queries.parent_query,
-        &mut hotham_queries.roots_query,
-        world,
-    );
 
     // Game
     game_system(
@@ -111,6 +100,18 @@ fn tick(
         render_context,
         physics_context,
         haptic_context,
+    );
+
+    update_rigid_body_transforms_system(
+        &mut hotham_queries.update_rigid_body_transforms_query,
+        world,
+        physics_context,
+    );
+    update_transform_matrix_system(&mut hotham_queries.update_transform_matrix_query, world);
+    update_parent_transform_matrix_system(
+        &mut hotham_queries.parent_query,
+        &mut hotham_queries.roots_query,
+        world,
     );
 
     // GUI

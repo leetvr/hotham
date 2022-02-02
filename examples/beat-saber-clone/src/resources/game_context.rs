@@ -8,11 +8,13 @@ use hotham::{
     components::{
         hand::Handedness,
         panel::{add_panel_to_world, PanelButton},
-        Collider, Pointer, SoundEmitter, Visible,
+        Collider, Pointer, RigidBody, SoundEmitter, Visible,
     },
     gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
-    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
+    rapier3d::prelude::{
+        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
+    },
     resources::{
         audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP,
         vulkan_context::VulkanContext, AudioContext, PhysicsContext, RenderContext,
@@ -149,7 +151,7 @@ fn add_backstop(
     physics_context: &mut hotham::resources::PhysicsContext,
 ) -> Entity {
     let collider = ColliderBuilder::cuboid(1., 1., 0.1)
-        .translation([0., 1., 0.].into())
+        .translation([0., 1., 2.].into())
         .sensor(true)
         .collision_groups(InteractionGroups::new(
             DEFAULT_COLLISION_GROUP,
@@ -276,8 +278,13 @@ pub fn pre_spawn_cube(
     )
     .unwrap();
 
+    let rigid_body = RigidBodyBuilder::new_dynamic().lock_rotations().build();
+    let handle = physics_context.rigid_bodies.insert(rigid_body);
+
     world.remove_one::<Visible>(cube).unwrap();
-    world.insert(cube, (Cube {}, colour)).unwrap();
+    world
+        .insert(cube, (Cube {}, colour, RigidBody { handle }))
+        .unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq)]
