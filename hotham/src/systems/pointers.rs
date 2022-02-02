@@ -21,7 +21,7 @@ use crate::{
     components::{
         hand::Handedness,
         panel::{get_panel_dimensions, PanelInput},
-        Panel, Pointer, Transform, Visible,
+        Info, Panel, Pointer, Transform, Visible,
     },
     resources::{gui_context::SCALE_FACTOR, PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
@@ -95,17 +95,22 @@ pub fn pointers_system(
             let hit_point = ray.point_at(toi); // Same as: `ray.origin + ray.dir * toi`
             let hit_collider = physics_context.colliders.get(handle).unwrap();
             let entity = unsafe { world.find_entity_from_id(hit_collider.user_data as _) };
-            let mut panel = world
-                .get_mut::<Panel>(entity)
-                .expect(&format!("Unable to find entity {:?} in world", entity));
-            let panel_extent = &panel.extent;
-            let panel_transform = hit_collider.position();
-            let cursor_location =
-                get_cursor_location_for_panel(&hit_point, panel_transform, panel_extent);
-            panel.input = Some(PanelInput {
-                cursor_location,
-                trigger_value,
-            });
+            match world.get_mut::<Panel>(entity) {
+                Ok(mut panel) => {
+                    let panel_extent = &panel.extent;
+                    let panel_transform = hit_collider.position();
+                    let cursor_location =
+                        get_cursor_location_for_panel(&hit_point, panel_transform, panel_extent);
+                    panel.input = Some(PanelInput {
+                        cursor_location,
+                        trigger_value,
+                    });
+                }
+                Err(_) => {
+                    let info = world.get::<Info>(entity).map(|i| format!("{:?}", *i));
+                    println!("[HOTHAM_POINTERS] Ray collided with object that does not have a panel: {:?} - {:?}", entity, info);
+                }
+            }
         }
     }
 }

@@ -409,6 +409,7 @@ fn revive_cube(
             DEFAULT_COLLISION_GROUP,
             DEFAULT_COLLISION_GROUP,
         ))
+        .user_data(cube_entity.id() as _)
         .build();
 
     // Attach it to the rigidbody
@@ -417,6 +418,8 @@ fn revive_cube(
         rigid_body_handle,
         &mut physics_context.rigid_bodies,
     );
+
+    let collider = &physics_context.colliders[collider_handle];
 
     world
         .insert(cube_entity, (Visible {}, Collider::new(collider_handle)))
