@@ -127,7 +127,7 @@ impl Engine {
             ),
         }
 
-        Ok(self.should_quit.load(Ordering::Acquire))
+        Ok(!self.should_quit.load(Ordering::Acquire))
     }
 }
 
