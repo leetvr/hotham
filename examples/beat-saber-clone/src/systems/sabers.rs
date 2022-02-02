@@ -46,10 +46,6 @@ pub fn sabers_system(
         // Locate the hand in the space.
         let space = space.locate(&xr_context.reference_space, time).unwrap();
         if !is_space_valid(&space) {
-            println!(
-            "[HOTHAM_SABERS] ERROR: Unable to locate {:?} saber - position or orientation invalid",
-            colour
-        );
             return;
         }
 

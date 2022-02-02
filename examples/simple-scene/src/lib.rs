@@ -28,7 +28,7 @@ pub fn real_main() -> HothamResult<()> {
     let mut world = init(&mut engine)?;
     let mut queries = Default::default();
 
-    while engine.update()? {
+    while let Ok((_, _)) = engine.update() {
         tick(&mut engine, &mut world, &mut queries);
     }
 

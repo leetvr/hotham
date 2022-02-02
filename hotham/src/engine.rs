@@ -3,7 +3,7 @@ use crate::{
         AudioContext, GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext,
         XrContext,
     },
-    HothamResult, VIEW_TYPE,
+    HothamError, HothamResult, VIEW_TYPE,
 };
 use openxr as xr;
 
@@ -39,13 +39,6 @@ pub struct Engine {
     pub audio_context: AudioContext,
     pub gui_context: GuiContext,
     pub haptic_context: HapticContext,
-}
-
-impl Drop for Engine {
-    fn drop(&mut self) {
-        #[cfg(target_os = "android")]
-        ndk_glue::native_activity().finish();
-    }
 }
 
 impl Engine {
@@ -89,11 +82,14 @@ impl Engine {
         engine
     }
 
-    pub fn update(&mut self) -> HothamResult<bool> {
+    pub fn update(&mut self) -> HothamResult<(xr::SessionState, xr::SessionState)> {
         #[cfg(target_os = "android")]
         if process_android_events(&mut self.resumed, &self.should_quit) {
-            return Ok(false);
-        };
+            // Show's over
+            println!("[HOTHAM_ENGINE] Destroyed!");
+            ndk_glue::native_activity().finish();
+            return Err(HothamError::ShuttingDown);
+        }
 
         let (previous_state, current_state) = {
             let previous_state = self.xr_context.session_state.clone();
@@ -102,7 +98,7 @@ impl Engine {
         };
 
         match (previous_state, current_state) {
-            (SessionState::EXITING, SessionState::IDLE) => {
+            (SessionState::STOPPING, SessionState::IDLE) => {
                 // return quickly so we can process the Android lifecycle
             }
             (_, SessionState::IDLE) => {
@@ -111,24 +107,18 @@ impl Engine {
             (SessionState::IDLE, SessionState::READY) => {
                 self.xr_context.session.begin(VIEW_TYPE)?;
             }
+            (_, SessionState::EXITING) => {
+                // Show's over
+                println!("[HOTHAM_ENGINE] State is now exiting!");
+                return Err(HothamError::ShuttingDown);
+            }
             (_, SessionState::STOPPING) => {
                 self.xr_context.end_session()?;
             }
-            (
-                _,
-                SessionState::EXITING
-                | SessionState::LOSS_PENDING
-                | SessionState::SYNCHRONIZED
-                | SessionState::VISIBLE
-                | SessionState::FOCUSED,
-            ) => {}
-            _ => println!(
-                "[HOTHAM_MAIN] - Unhandled - previous: {:?}, current: {:?}",
-                previous_state, current_state
-            ),
+            _ => {}
         }
 
-        Ok(!self.should_quit.load(Ordering::Acquire))
+        Ok((previous_state, current_state))
     }
 }
 
@@ -138,7 +128,7 @@ pub fn process_android_events(resumed: &mut bool, should_quit: &Arc<AtomicBool>)
         println!("[HOTHAM_ANDROID] Received event {:?}", event);
         match event {
             ndk_glue::Event::Resume => *resumed = true,
-            ndk_glue::Event::Destroy | ndk_glue::Event::WindowDestroyed => {
+            ndk_glue::Event::Destroy => {
                 should_quit.store(true, Ordering::Relaxed);
                 return true;
             }

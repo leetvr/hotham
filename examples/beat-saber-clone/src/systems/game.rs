@@ -19,6 +19,7 @@ use hotham::{
     resources::{
         physics_context::DEFAULT_COLLISION_GROUP, AudioContext, HapticContext, PhysicsContext,
     },
+    xr,
 };
 use rand::prelude::*;
 

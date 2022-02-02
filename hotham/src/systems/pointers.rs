@@ -50,10 +50,6 @@ pub fn pointers_system(
         // Locate the pointer in the space.
         let space = space.locate(&xr_context.reference_space, time).unwrap();
         if !is_space_valid(&space) {
-            println!(
-            "[HOTHAM_POINTERS] Unable to locate {:?} pointer - orientation or position invalid!",
-            pointer.handedness
-        );
             return;
         }
 
