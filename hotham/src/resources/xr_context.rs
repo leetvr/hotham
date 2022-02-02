@@ -81,6 +81,9 @@ impl XrContext {
         let left_hand_grip_trigger_path = instance
             .string_to_path("/user/hand/left/input/trigger/value")
             .unwrap();
+        let left_hand_haptic_feedback_path = instance
+            .string_to_path("/user/hand/left/output/haptic")
+            .unwrap();
 
         let right_hand_grip_squeeze_path = instance
             .string_to_path("/user/hand/right/input/squeeze/value")
@@ -137,6 +140,7 @@ impl XrContext {
                 xr::Binding::new(&trigger_action, left_hand_grip_trigger_path),
                 xr::Binding::new(&trigger_action, right_hand_grip_trigger_path),
                 xr::Binding::new(&grab_action, right_hand_grip_squeeze_path),
+                xr::Binding::new(&haptic_feedback_action, left_hand_haptic_feedback_path),
                 xr::Binding::new(&haptic_feedback_action, right_hand_haptic_feedback_path),
             ],
         )?;

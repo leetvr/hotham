@@ -1,11 +1,12 @@
+use hotham::nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
 use hotham::{
     components::RigidBody,
-    hecs::{CommandBuffer, Entity, PreparedQuery, With, World},
+    gltf_loader::{add_model_to_world, Models},
+    hecs::{Entity, PreparedQuery, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    resources::{PhysicsContext, XrContext},
+    resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
-use nalgebra::{vector, Isometry3, Quaternion, Translation3, UnitQuaternion};
 
 use crate::components::{Colour, Saber};
 
@@ -23,8 +24,8 @@ const SABER_WIDTH: f32 = 0.02;
 const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 
 pub fn sabers_system(
-    world: &mut World,
     query: &mut PreparedQuery<With<Saber, (&Colour, &RigidBody)>>,
+    world: &mut World,
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
@@ -45,10 +46,6 @@ pub fn sabers_system(
         // Locate the hand in the space.
         let space = space.locate(&xr_context.reference_space, time).unwrap();
         if !is_space_valid(&space) {
-            println!(
-            "[HOTHAM_SABERS] ERROR: Unable to locate {:?} saber - position or orientation invalid",
-            colour
-        );
             return;
         }
 
@@ -67,10 +64,36 @@ pub fn sabers_system(
     }
 }
 
-pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, saber: Entity) {
+pub fn add_saber(
+    colour: Colour,
+    models: &Models,
+    world: &mut World,
+    vulkan_context: &VulkanContext,
+    render_context: &RenderContext,
+    physics_context: &mut PhysicsContext,
+) -> Entity {
+    let model_name = match colour {
+        Colour::Blue => "Blue Saber",
+        Colour::Red => "Red Saber",
+    };
+    let saber = add_model_to_world(
+        model_name,
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    )
+    .unwrap();
+    add_saber_physics(world, physics_context, saber);
+    world.insert(saber, (Saber {}, colour)).unwrap();
+    saber
+}
+
+fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, saber: Entity) {
     // Give it a collider and rigid-body
     let collider = ColliderBuilder::cylinder(SABER_HALF_HEIGHT, SABER_HALF_WIDTH)
-        .translation(vector![0., SABER_HALF_HEIGHT, 0.])
+        .translation([0., SABER_HALF_HEIGHT, 0.].into())
         .sensor(true)
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::INTERSECTION_EVENTS)
@@ -85,7 +108,7 @@ pub fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext
 pub fn apply_grip_offset(position: &mut Isometry3<f32>) {
     let updated_rotation = position.rotation.quaternion() * ROTATION_OFFSET;
     let updated_translation = position.translation.vector
-        - vector!(POSITION_OFFSET[0], POSITION_OFFSET[1], POSITION_OFFSET[2]);
+        - Vector3::new(POSITION_OFFSET[0], POSITION_OFFSET[1], POSITION_OFFSET[2]);
     position.rotation = UnitQuaternion::from_quaternion(updated_rotation);
     position.translation = Translation3::from(updated_translation);
 }
@@ -95,10 +118,10 @@ mod tests {
     use super::*;
     use hotham::{
         components::{Transform, TransformMatrix},
+        nalgebra::{Quaternion, Translation3},
         resources::{PhysicsContext, XrContext},
         systems::update_rigid_body_transforms_system,
     };
-    use nalgebra::{vector, Quaternion, Translation3};
 
     #[test]
     fn test_sabers() {
@@ -118,8 +141,8 @@ mod tests {
         let mut rigid_body_transforms_query = Default::default();
 
         sabers_system(
-            &mut world,
             &mut saber_query,
+            &mut world,
             &xr_context,
             &mut physics_context,
         );
@@ -131,7 +154,7 @@ mod tests {
         );
 
         let transform = world.get::<Transform>(saber).unwrap();
-        approx::assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
+        approx::assert_relative_eq!(transform.translation, [-0.2, 1.328827, -0.433918].into());
     }
 
     #[test]

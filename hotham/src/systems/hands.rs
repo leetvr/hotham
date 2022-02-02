@@ -32,10 +32,6 @@ pub fn hands_system(
 
         // Check it's valid before using it
         if !is_space_valid(&space) {
-            println!(
-                "[HOTHAM_POINTERS] Unable to locate {:?} hand - orientation or position invalid!",
-                hand.handedness
-            );
             return;
         }
 

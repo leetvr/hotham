@@ -2,8 +2,10 @@ use ash::vk::{self};
 use egui::emath::vec2;
 use egui::epaint::Vertex as EguiVertex;
 use egui::{CtxRef, Pos2};
+use hecs::{Entity, World};
 use itertools::izip;
-use nalgebra::{vector, Vector4};
+use nalgebra::{vector, Vector3, Vector4};
+use rapier3d::prelude::{ColliderBuilder, InteractionGroups};
 
 const BUFFER_SIZE: usize = 1024;
 
@@ -11,14 +13,15 @@ use crate::buffer::Buffer;
 use crate::components::mesh::MeshUBO;
 use crate::components::{Material, Mesh, Primitive};
 use crate::resources::gui_context::SCALE_FACTOR;
-use crate::resources::GuiContext;
+use crate::resources::physics_context::PANEL_COLLISION_GROUP;
+use crate::resources::{GuiContext, PhysicsContext};
 use crate::{
     resources::{RenderContext, VulkanContext},
     texture::Texture,
 };
-use crate::{Vertex, COLOR_FORMAT};
+use crate::{vertex::Vertex, COLOR_FORMAT};
 
-use super::{Transform, TransformMatrix, Visible};
+use super::{Collider, Transform, TransformMatrix, Visible};
 #[derive(Clone)]
 pub struct Panel {
     pub text: String,
@@ -53,15 +56,19 @@ impl PanelButton {
     }
 }
 
-pub fn create_panel(
+pub fn add_panel_to_world(
     text: &str,
     width: u32,
     height: u32,
+    buttons: Vec<PanelButton>,
+    translation: Vector3<f32>,
     vulkan_context: &VulkanContext,
     render_context: &RenderContext,
     gui_context: &GuiContext,
-    buttons: Vec<PanelButton>,
-) -> (Panel, Mesh, Texture, Transform, TransformMatrix, Visible) {
+    physics_context: &mut PhysicsContext,
+    world: &mut World,
+) -> Entity {
+    println!("[PANEL] Adding panel with text {}", text);
     let extent = vk::Extent2D { width, height };
     let output_image = vulkan_context
         .create_image(
@@ -116,7 +123,7 @@ pub fn create_panel(
 
     let (vertex_buffer, index_buffer) = create_mesh_buffers(vulkan_context);
 
-    (
+    let components = (
         Panel {
             text: text.to_string(),
             extent,
@@ -130,10 +137,33 @@ pub fn create_panel(
         },
         mesh,
         output_texture,
-        Default::default(),
-        Default::default(),
+        Transform {
+            translation,
+            ..Default::default()
+        },
+        TransformMatrix::default(),
         Visible {},
-    )
+    );
+
+    let panel_entity = world.spawn(components);
+    let (half_width, half_height) = get_panel_dimensions(&extent);
+    let collider = ColliderBuilder::cuboid(half_width, half_height, 0.0)
+        .sensor(true)
+        .collision_groups(InteractionGroups::new(
+            PANEL_COLLISION_GROUP,
+            PANEL_COLLISION_GROUP,
+        ))
+        .translation(translation)
+        .user_data(panel_entity.id() as _)
+        .build();
+    let handle = physics_context.colliders.insert(collider);
+    let collider = Collider {
+        collisions_this_frame: Vec::new(),
+        handle,
+    };
+    world.insert_one(panel_entity, collider).unwrap();
+    println!("[PANEL] ..done! {:?}", panel_entity);
+    panel_entity
 }
 
 fn create_mesh(

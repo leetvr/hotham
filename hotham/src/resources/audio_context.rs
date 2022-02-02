@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::components::SoundEmitter;
+use crate::components::{sound_emitter::SoundState, SoundEmitter};
 use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     Stream,
@@ -15,9 +15,14 @@ pub struct AudioContext {
     pub scene_handle: oddio::Handle<SpatialScene>,
     pub mixer_handle: oddio::Handle<Mixer<[f32; 2]>>,
     pub stream: Arc<Mutex<Stream>>,
-    pub current_music_track: Option<Index>,
-    music_tracks: Arena<Arc<Frames<[f32; 2]>>>,
+    pub current_music_track: Option<MusicTrack>,
+    music_tracks_inner: Arena<Arc<Frames<[f32; 2]>>>,
     music_track_handle: Option<MusicTrackHandle>,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub struct MusicTrack {
+    index: Index,
 }
 
 impl Default for AudioContext {
@@ -72,7 +77,7 @@ impl Default for AudioContext {
             scene_handle,
             mixer_handle,
             stream: Arc::new(Mutex::new(stream)),
-            music_tracks: Arena::new(),
+            music_tracks_inner: Arena::new(),
             music_track_handle: None,
             current_music_track: None,
         }
@@ -93,11 +98,12 @@ impl AudioContext {
 
     pub fn play_audio(
         &mut self,
-        audio_source: &mut SoundEmitter,
+        sound_emitter: &mut SoundEmitter,
         position: mint::Point3<f32>,
         velocity: mint::Vector3<f32>,
     ) {
-        let signal: oddio::FramesSignal<_> = oddio::FramesSignal::from(audio_source.frames.clone());
+        let signal: oddio::FramesSignal<_> =
+            oddio::FramesSignal::from(sound_emitter.frames.clone());
         let handle = self.scene_handle.control().play_buffered(
             signal,
             oddio::SpatialOptions {
@@ -107,7 +113,7 @@ impl AudioContext {
             },
             1000.0,
         );
-        audio_source.handle = Some(handle);
+        sound_emitter.handle = Some(handle);
     }
 
     pub fn resume_audio(&mut self, audio_source: &mut SoundEmitter) {
@@ -143,20 +149,25 @@ impl AudioContext {
         });
     }
 
-    pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> Index {
+    pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> MusicTrack {
+        println!("[AUDIO_CONTEXT] Decoding MP3..");
         let frames = get_stereo_frames_from_mp3(mp3_bytes);
-        self.music_tracks.insert(frames)
+        println!("[AUDIO_CONTEXT] ..done!");
+        let track = MusicTrack {
+            index: self.music_tracks_inner.insert(frames),
+        };
+        track
     }
 
-    pub fn play_music_track(&mut self, index: Index) {
+    pub fn play_music_track(&mut self, track: MusicTrack) {
         if let Some(mut handle) = self.music_track_handle.take() {
             handle.control::<Stop<_>, _>().stop();
         }
 
-        let frames = self.music_tracks[index].clone();
+        let frames = self.music_tracks_inner[track.index].clone();
         let signal = oddio::FramesSignal::from(frames);
         self.music_track_handle = Some(self.mixer_handle.control().play(signal));
-        self.current_music_track = Some(index.clone());
+        self.current_music_track = Some(track.clone());
     }
 
     pub fn pause_music_track(&mut self) {
@@ -169,6 +180,33 @@ impl AudioContext {
         self.music_track_handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().resume());
+    }
+
+    pub fn music_track_status(&mut self) -> SoundState {
+        if let Some(handle) = self.music_track_handle.as_mut() {
+            let control = handle.control::<Stop<_>, _>();
+            if control.is_paused() {
+                return SoundState::Paused;
+            }
+            if control.is_stopped() {
+                return SoundState::Stopped;
+            }
+            return SoundState::Playing;
+        } else {
+            SoundState::Stopped
+        }
+    }
+
+    pub fn dummy_track(&mut self) -> MusicTrack {
+        let frames = oddio::Frames::from_slice(0, &[]);
+        MusicTrack {
+            index: self.music_tracks_inner.insert(frames),
+        }
+    }
+
+    pub fn dummy_sound_emitter(&mut self) -> SoundEmitter {
+        let frames = oddio::Frames::from_slice(0, &[]);
+        SoundEmitter::new(frames)
     }
 }
 

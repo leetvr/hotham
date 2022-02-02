@@ -1,31 +1,48 @@
 use openxr::{Duration, HapticVibration};
 
 use crate::resources::{HapticContext, XrContext};
+static HAPTIC_FREQUENCY: f32 = 400.;
+static HAPTIC_DURATION: i64 = 1e+8 as _; // 100ms
 
 pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
-    if haptic_context.amplitude_this_frame == 0. {
-        return;
+    let haptic_duration = Duration::from_nanos(HAPTIC_DURATION);
+    if haptic_context.left_hand_amplitude_this_frame != 0. {
+        let event = HapticVibration::new()
+            .amplitude(haptic_context.left_hand_amplitude_this_frame)
+            .frequency(HAPTIC_FREQUENCY)
+            .duration(haptic_duration);
+
+        xr_context
+            .haptic_feedback_action
+            .apply_feedback(
+                &xr_context.session,
+                xr_context.left_hand_subaction_path,
+                &event,
+            )
+            .expect("Unable to apply haptic feedback!");
+
+        // Reset the value
+        haptic_context.left_hand_amplitude_this_frame = 0.;
     }
 
-    let duration = Duration::from_nanos(1e+7 as _);
-    let frequency = 180.;
+    if haptic_context.right_hand_amplitude_this_frame != 0. {
+        let event = HapticVibration::new()
+            .amplitude(haptic_context.right_hand_amplitude_this_frame)
+            .frequency(HAPTIC_FREQUENCY)
+            .duration(haptic_duration);
 
-    let event = HapticVibration::new()
-        .amplitude(haptic_context.amplitude_this_frame)
-        .frequency(frequency)
-        .duration(duration);
+        xr_context
+            .haptic_feedback_action
+            .apply_feedback(
+                &xr_context.session,
+                xr_context.right_hand_subaction_path,
+                &event,
+            )
+            .expect("Unable to apply haptic feedback!");
 
-    xr_context
-        .haptic_feedback_action
-        .apply_feedback(
-            &xr_context.session,
-            xr_context.right_hand_subaction_path,
-            &event,
-        )
-        .expect("Unable to apply haptic feedback!");
-
-    // Reset the value
-    haptic_context.amplitude_this_frame = 0.;
+        // Reset the value
+        haptic_context.right_hand_amplitude_this_frame = 0.;
+    }
 }
 
 #[cfg(test)]

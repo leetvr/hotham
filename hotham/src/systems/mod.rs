@@ -45,5 +45,5 @@ pub struct Queries<'a> {
     pub roots_query: PreparedQuery<Without<Parent, &'a TransformMatrix>>,
     pub update_rigid_body_transforms_query: PreparedQuery<(&'a RigidBody, &'a mut Transform)>,
     pub update_transform_matrix_query: PreparedQuery<(&'a Transform, &'a mut TransformMatrix)>,
-    pub pointers_query: PreparedQuery<(&'a mut Pointer, &'a mut Transform)>,
+    pub pointers_query: PreparedQuery<With<Visible, (&'a mut Pointer, &'a mut Transform)>>,
 }
