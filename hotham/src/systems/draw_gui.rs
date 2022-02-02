@@ -3,6 +3,7 @@ use crate::{
     resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
 };
 use hecs::{PreparedQuery, World};
+static GUI_HAPTIC_AMPLITUDE: f32 = 0.5;
 
 pub fn draw_gui_system(
     query: &mut PreparedQuery<&mut Panel>,
@@ -33,7 +34,8 @@ pub fn draw_gui_system(
 
     // Did we hover over a button in this frame? If so request haptic feedback.
     if !gui_context.hovered_last_frame && gui_context.hovered_this_frame {
-        haptic_context.request_haptic_feedback(0.5, Handedness::Right);
+        // TODO - We should really have two pointer hands..
+        haptic_context.request_haptic_feedback(GUI_HAPTIC_AMPLITUDE, Handedness::Right);
     }
 
     // Stash the value for the next frame.
@@ -104,7 +106,10 @@ mod tests {
         );
 
         // Assert that haptic feedback has been requested.
-        assert_eq!(haptic_context.right_hand_amplitude_this_frame, 1.0);
+        assert_eq!(
+            haptic_context.right_hand_amplitude_this_frame,
+            GUI_HAPTIC_AMPLITUDE
+        );
 
         // Assert the button WAS NOT clicked this frame
         assert!(!button_was_clicked(&mut world));
