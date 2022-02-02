@@ -19,13 +19,11 @@ use std::{
 use xr::{EventDataBuffer, SessionState};
 
 #[cfg(target_os = "android")]
-pub const ANDROID_LOOPER_ID_MAIN: u32 = 0;
+pub static ANDROID_LOOPER_ID_MAIN: u32 = 0;
 #[cfg(target_os = "android")]
-pub const ANDROID_LOOPER_ID_INPUT: u32 = 1;
+pub static ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(0);
 #[cfg(target_os = "android")]
-pub const ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(0);
-#[cfg(target_os = "android")]
-pub const ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
+pub static ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
 
 pub struct Engine {
     should_quit: Arc<AtomicBool>,

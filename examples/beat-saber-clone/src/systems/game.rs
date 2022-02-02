@@ -19,7 +19,6 @@ use hotham::{
     resources::{
         physics_context::DEFAULT_COLLISION_GROUP, AudioContext, HapticContext, PhysicsContext,
     },
-    xr,
 };
 use rand::prelude::*;
 
@@ -410,8 +409,6 @@ fn revive_cube(
         rigid_body_handle,
         &mut physics_context.rigid_bodies,
     );
-
-    let collider = &physics_context.colliders[collider_handle];
 
     world
         .insert(cube_entity, (Visible {}, Collider::new(collider_handle)))
