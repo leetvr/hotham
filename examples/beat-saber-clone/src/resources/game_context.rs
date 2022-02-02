@@ -207,6 +207,15 @@ fn add_environment(
         vulkan_context,
         &render_context.descriptor_set_layouts,
     );
+
+    add_model_to_world(
+        "Ramp",
+        models,
+        world,
+        None,
+        vulkan_context,
+        &render_context.descriptor_set_layouts,
+    );
 }
 
 pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContext) {
