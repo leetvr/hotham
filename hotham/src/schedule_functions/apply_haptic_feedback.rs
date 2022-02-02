@@ -1,16 +1,16 @@
 use openxr::{Duration, HapticVibration};
 
 use crate::resources::{HapticContext, XrContext};
+static HAPTIC_FREQUENCY: f32 = 400.;
+static HAPTIC_DURATION: i64 = 1e+8 as _; // 100ms
 
 pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
+    let haptic_duration = Duration::from_nanos(HAPTIC_DURATION);
     if haptic_context.left_hand_amplitude_this_frame != 0. {
-        let duration = Duration::from_nanos(1e+7 as _);
-        let frequency = 180.;
-
         let event = HapticVibration::new()
             .amplitude(haptic_context.left_hand_amplitude_this_frame)
-            .frequency(frequency)
-            .duration(duration);
+            .frequency(HAPTIC_FREQUENCY)
+            .duration(haptic_duration);
 
         xr_context
             .haptic_feedback_action
@@ -26,13 +26,10 @@ pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut Ha
     }
 
     if haptic_context.right_hand_amplitude_this_frame != 0. {
-        let duration = Duration::from_nanos(1e+7 as _);
-        let frequency = 180.;
-
         let event = HapticVibration::new()
             .amplitude(haptic_context.right_hand_amplitude_this_frame)
-            .frequency(frequency)
-            .duration(duration);
+            .frequency(HAPTIC_FREQUENCY)
+            .duration(haptic_duration);
 
         xr_context
             .haptic_feedback_action

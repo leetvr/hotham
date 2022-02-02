@@ -33,7 +33,7 @@ pub fn draw_gui_system(
 
     // Did we hover over a button in this frame? If so request haptic feedback.
     if !gui_context.hovered_last_frame && gui_context.hovered_this_frame {
-        haptic_context.request_haptic_feedback(1., Handedness::Right);
+        haptic_context.request_haptic_feedback(0.5, Handedness::Right);
     }
 
     // Stash the value for the next frame.

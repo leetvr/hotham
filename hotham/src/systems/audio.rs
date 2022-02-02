@@ -71,7 +71,6 @@ fn get_location_from_poses(left_eye: openxr::Posef, right_eye: openxr::Posef) ->
 #[cfg(test)]
 mod tests {
     use hecs::{Entity, PreparedQuery, World};
-    use openxr::{Posef, Quaternionf, Vector3f};
     use std::{
         thread,
         time::{Duration, Instant},
@@ -202,30 +201,13 @@ mod tests {
             _ => {}
         }
 
-        // if start.elapsed().as_secs() >= 4 && audio_context.current_music_track != Some(right_here) {
-        //     audio_context.play_music_track(right_here);
-        // } else if start.elapsed().as_secs() >= 2
-        //     && start.elapsed().as_secs() < 4
-        //     && audio_context.current_music_track != Some(tell_me_that_i_cant)
-        // {
-        //     audio_context.play_music_track(tell_me_that_i_cant);
-        // }
-    }
-
-    #[test]
-    pub fn test_poses_to_location() {
-        let pose_0 = Posef {
-            orientation: Quaternionf {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-                w: 0.,
-            },
-            position: Vector3f {
-                x: 0.,
-                y: 0.,
-                z: 0.,
-            },
-        };
+        if start.elapsed().as_secs() >= 4 && audio_context.current_music_track != Some(right_here) {
+            audio_context.play_music_track(right_here);
+        } else if start.elapsed().as_secs() >= 2
+            && start.elapsed().as_secs() < 4
+            && audio_context.current_music_track != Some(tell_me_that_i_cant)
+        {
+            audio_context.play_music_track(tell_me_that_i_cant);
+        }
     }
 }

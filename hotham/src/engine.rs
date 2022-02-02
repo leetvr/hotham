@@ -50,6 +50,7 @@ impl Drop for Engine {
 
 impl Engine {
     pub fn new() -> Self {
+        #[allow(unused_mut)] // Only Android mutates this.
         let mut resumed = false;
         let should_quit = Arc::new(AtomicBool::from(false));
 
