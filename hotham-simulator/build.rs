@@ -2,6 +2,10 @@ use std::{fs, path::Path, str};
 
 use shaderc::{Compiler, ShaderKind};
 
+// Dummy function
+#[cfg(not(any(target_os = "windows", target_os = "linux")))]
+fn main() {}
+
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 fn main() {
     println!("cargo:rerun-if-changed=build_input");
