@@ -6,8 +6,8 @@ No technical endeavour in the modern era can truly claim to be completely origin
 In addition no person can truly claim to be self-made, or completely autonomous. We're all influenced by the people and environment around us to make us who we are. This document is my (@kanerogers) attempt to acknowledge those who've helped make this project possible.
 
 ## Direct technical inspiration
-- Much of Hotham's design and its use of Vulkan is inspired by or in some cases directly borrowed from the amazing @SaschaWillems and his [Vulkan Samples](https://github.com/SaschaWillems/Vulkan) repository.
-- The use of Rust to build a powerful and robust game engine built around a strong ECS is directly influenced by the incredible work on Bevy by @cart and [the Bevy team](https://github.com/bevyengine/bevy).
+- Much of Hotham's design and its use of Vulkan is inspired by or in some cases directly borrowed from the amazing [@SaschaWillems](https://github.com/SaschaWillems/) and his [Vulkan Samples](https://github.com/SaschaWillems/Vulkan) repository.
+- The use of Rust to build a powerful and robust game engine built around a strong ECS is directly influenced by the incredible work on Bevy by Carter Anderson ([@cart](https://github.com/cart)) and [the Bevy team](https://github.com/bevyengine/bevy).
 
 ## Indirect technical inspiration
 - It seems cliche for a graphics or games programmer to cite **John Carmack** as an inspiration, but it would be equally disengeous not to. John Carmack is a genius in every possible interpretation of that word. His work to make real-time, interactive 3D graphics a reality cannot be overlooked. His talk on [The Physics of Light and Rendering](https://www.youtube.com/watch?v=P6UKhR0T6cs&t=3067s) was absolutely fundamental in my journey to understand how to beam light into people's eyes at a distance.
