@@ -1,0 +1,25 @@
+# Acknowledgements
+No technical endeavour in the modern era can truly claim to be completely original work. We live in an unprecedented time of collaboration and evolution, where great ideas and the software that powers them can spread, grow and spawn new ideas of their own.
+
+In addition no person can truly claim to be self-made, or completely autonomous. We're all influenced by the people and environment around us to make us who we are.
+
+## Direct inspiration
+- Much of Hotham's design and its use of Vulkan is inspired by or in some cases directly borrowed from the amazing @SaschaWillems and his [Vulkan Samples](https://github.com/SaschaWillems/Vulkan) repository.
+- The use of Rust to build a powerful and robust game engine built around a strong ECS is directly influenced by the incredible work on Bevy by @cart and [the Bevy team](https://github.com/bevyengine/bevy).
+
+## Indirect inspiration
+- It seems cliche for a graphics or games programmer to cite John Carmack as an inspiration, but it would be equally disengeous not to. John Carmack is a genius in every possible interpretation of that word. His work to make real-time, interactive 3D graphics a reality cannot be overlooked. His talk on [The Physics of Light and Rendering](https://www.youtube.com/watch?v=P6UKhR0T6cs&t=3067s) was absolutely fundamental in my journey to understand how to beam light into people's eyes at a distance.
+- Though Palmer Luckey is a complicated figure who produces strong and varied feelings among the technical community, it's no exagguration to say that there's a good chance virtual reality in its current form would not exist without his mix of complete conviction in VR and endless passion.
+- Mike Acton's talks make me want to be a better programmer. He has a speaking style that cuts through the bullshit and handwaving and gets straight to the heart of what matters. I admire to someday claim that [he would not fire me](https://www.youtube.com/watch?v=cV5HArLYajE&).
+
+## Direct support
+- Hotham would simply not be possible were it not for the support of Benjamin Saunders (@Ralith). Ben is a meticulous, deeply intelligent person who gives large amounts of his limited free time to members of the Rust game community. Fully half out of 6 of Hotham's main dependencies are his work: (`openxrs`, `hecs` and `oddio`). His deep knowledge of game development and near infinite patience have been life savers again and again.
+- Will Brickner (@wbrickner) was one of the people who first helped me get Hotham off the ground. His work on getting Oculus' `libovr` to run correctly on the Quest was instrumental in my first experiments with Rust and VR. Since then he's been a constant and enthusiastic supporter of Hotham. It's my sincere hope he will succunb to the cult of graphics programming soon.
+- Nick Hemsley expressed an early interest in Hotham as part of his work on fluid simulations. He bravely fought through Hotham's undocumented build process and contributed the project's very first PR!
+- Nick Thompson (@sinoth) was the first person crazy enough to contribute _actual hard currency_ to the Hotham project. He valiantly fought to get the example project running on his headset and helped find every single pothole along the way. Since then he's been instrumental in getting the Hotham community off the ground, being the first so suggest a Discord and being an active member there. His deep knowledge of VR and game development has been incredibly helpful.
+- @pierrelarger was the second person to valiantly attempt to build the project and run examples despite zero documentation being provided. He's since gone on to contribute documentation and Linux versions of the build scripts which has been extremely helpful.
+- Modding extraordinaire and RustConf 2020 speaker @jam1garner was the second person to forgoe hard fiat currency in support of the Hotham project. He's since contributed several PRs and issues, including fixing apalling handling of the Android lifecycle and inability to use the Quest 2's headphone jack.
+
+## Indirect support
+- The big jump forward for Hotham started in June 2021 when I arrogantly bet 3 of my friends that I could render a 3D object on the Quest 2, in Rust in less than 30 days (despite having almost zero graphics knowledge). I paid them each $500 on the proviso it could only be returned if I achieved my goal. Without their love and support it's unlikely I'd have ever pushed the first boulder up the hill. Thanks guys.
+- My wonderful partner has put up with all the things that come with dating someone who's obsessed with their work - constant wearing of tracksuit pants, emotional distance, mood swings, odd hours and too much time looking at the back of a loved one's head. Her kindness, patience and wise advice has helped me not only get this work done, but stay sane and healthy on the other side of it. I love you always.
