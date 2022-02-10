@@ -16,6 +16,7 @@ pub fn end_frame(
     xr_context.end_frame().unwrap();
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
 

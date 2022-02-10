@@ -40,6 +40,7 @@ pub fn begin_frame(
     }
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use crate::resources::{RenderContext, XrContext};
@@ -47,6 +48,7 @@ mod tests {
     use super::begin_frame;
 
     #[test]
+
     pub fn test_begin_frame() {
         let (mut xr_context, vulkan_context) = XrContext::new().unwrap();
         let render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
