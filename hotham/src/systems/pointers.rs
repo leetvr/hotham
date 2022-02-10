@@ -163,25 +163,21 @@ fn ray_to_panel_space(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hecs::World;
-    use std::marker::PhantomData;
 
     use approx::assert_relative_eq;
     use ash::vk;
-    use nalgebra::vector;
-    use rapier3d::prelude::ColliderBuilder;
 
-    use crate::{
-        buffer::Buffer,
-        components::{Collider, Panel, Transform},
-        resources::{
-            physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
-            XrContext,
-        },
-    };
-
+    // #[cfg(target_os = "windows")]
     #[test]
     pub fn test_pointers_system() {
+        use crate::{
+            components::{Collider, Panel, Transform},
+            resources::physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
+            util::test_buffer,
+        };
+        use nalgebra::vector;
+        use rapier3d::prelude::ColliderBuilder;
+
         let (mut xr_context, _) = XrContext::new().unwrap();
         let mut physics_context = PhysicsContext::default();
         let mut world = World::default();
@@ -193,8 +189,8 @@ mod tests {
                 height: 300,
             },
             framebuffer: vk::Framebuffer::null(),
-            vertex_buffer: empty_buffer(),
-            index_buffer: empty_buffer(),
+            vertex_buffer: test_buffer(),
+            index_buffer: test_buffer(),
             egui_context: Default::default(),
             raw_input: Default::default(),
             input: Default::default(),
@@ -259,9 +255,10 @@ mod tests {
         assert_eq!(input.trigger_value, 0.);
     }
 
+    // #[cfg(target_os = "windows")]
     fn schedule(
         physics_context: &mut PhysicsContext,
-        world: &mut World,
+        world: &mut hecs::World,
         xr_context: &mut XrContext,
     ) -> () {
         physics_context.update();
@@ -333,18 +330,5 @@ mod tests {
         // hit bottom left
         let result = ray_to_panel_space(&point![-0.5, -0.5, 0.], &panel_transform, &panel_extent);
         assert_relative_eq!(result, point![-1.0, -1.0, -1.0]);
-    }
-
-    // Helpers
-    fn empty_buffer<T>() -> Buffer<T> {
-        let vertex_buffer = Buffer {
-            handle: vk::Buffer::null(),
-            device_memory: vk::DeviceMemory::null(),
-            _phantom: PhantomData,
-            size: 0,
-            device_memory_size: 0,
-            usage: vk::BufferUsageFlags::empty(),
-        };
-        vertex_buffer
     }
 }

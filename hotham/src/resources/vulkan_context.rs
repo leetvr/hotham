@@ -210,7 +210,9 @@ impl VulkanContext {
     pub fn testing() -> Result<Self> {
         let (instance, entry) = vulkan_init_test()?;
         let physical_device = get_test_physical_device(&instance);
-        let extension_names = Vec::new();
+        let mut extension_names = Vec::new();
+        add_device_extension_names(&mut extension_names);
+
         let (device, graphics_queue, queue_family_index) =
             create_vulkan_device(&extension_names, &instance, physical_device)?;
 
@@ -998,6 +1000,15 @@ impl VulkanContext {
     }
 }
 
+fn add_device_extension_names(extension_names: &mut Vec<CString>) {
+    // Add Multiview extension
+    extension_names.push(CString::new("VK_KHR_multiview").unwrap());
+
+    // If we're on macOS we've got to add portability
+    #[cfg(target_os = "macos")]
+    extension_names.push(CString::new("VK_KHR_portability_subset").unwrap());
+}
+
 fn create_command_pool(
     device: &Device,
     queue_family_index: u32,
@@ -1157,15 +1168,15 @@ pub fn create_vulkan_device_legacy(
 ) -> Result<(Device, vk::Queue, u32)> {
     println!("[HOTHAM_VULKAN] Creating logical device.. ");
 
-    unsafe {
-        let extension_names = xr_instance.vulkan_legacy_device_extensions(system)?;
-        let mut extension_names = extension_names
-            .split(' ')
-            .map(|x| CString::new(x).unwrap())
-            .collect::<Vec<_>>();
-        extension_names.push(CString::from_vec_unchecked(b"VK_KHR_multiview".to_vec()));
-        create_vulkan_device(&extension_names, vulkan_instance, physical_device)
-    }
+    let extension_names = xr_instance.vulkan_legacy_device_extensions(system)?;
+    let mut extension_names = extension_names
+        .split(' ')
+        .map(|x| CString::new(x).unwrap())
+        .collect::<Vec<_>>();
+
+    add_device_extension_names(&mut extension_names);
+
+    create_vulkan_device(&extension_names, vulkan_instance, physical_device)
 }
 
 fn create_vulkan_device(

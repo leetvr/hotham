@@ -45,6 +45,7 @@ pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut Ha
     }
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use super::*;
