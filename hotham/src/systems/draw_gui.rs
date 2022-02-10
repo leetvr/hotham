@@ -91,7 +91,7 @@ mod tests {
         ) = setup(resolution.clone());
 
         // Begin. Use renderdoc in headless mode for debugging.
-        let renderdoc = begin_renderdoc();
+        let mut renderdoc = begin_renderdoc();
 
         let mut query = Default::default();
         schedule(
@@ -146,12 +146,12 @@ mod tests {
         // Assert that NO haptic feedback has been requested.
         assert_eq!(haptic_context.right_hand_amplitude_this_frame, 0.);
 
-        end_renderdoc(renderdoc);
+        end_renderdoc(&mut renderdoc);
 
         // Get the image off the GPU
         write_image_to_disk(&vulkan_context, image, resolution);
 
-        open_file(renderdoc);
+        open_file(&mut renderdoc);
     }
 
     fn schedule(
@@ -387,14 +387,14 @@ mod tests {
     use renderdoc::RenderDoc;
 
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn begin_renderdoc() -> Renderdoc<renderdoc::V141> {
-        let mut renderdoc = RenderDoc::new().unwrap();
+    fn begin_renderdoc() -> RenderDoc<renderdoc::V141> {
+        let mut renderdoc: RenderDoc<renderdoc::V141> = RenderDoc::new().unwrap();
         renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
         renderdoc
     }
 
     #[cfg(target_os = "windows")]
-    fn open_file(renderdoc: Renderdoc<renderdoc::V141>) {
+    fn open_file(renderdoc: &mut RenderDoc<renderdoc::V141>) {
         if !renderdoc.is_target_control_connected() {
             let _ = Command::new("explorer.exe")
                 .args(["..\\test_assets\\render_gui.jpg"])
@@ -418,7 +418,7 @@ mod tests {
     fn begin_renderdoc() {}
 
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn end_renderdoc(renderdoc: Renderdoc<renderdoc::V141>) {
+    fn end_renderdoc(renderdoc: &mut RenderDoc<renderdoc::V141>) {
         renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
     }
 
