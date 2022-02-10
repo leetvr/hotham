@@ -404,7 +404,7 @@ mod tests {
     }
 
     #[cfg(target_os = "macos")]
-    fn open_file(_: ()) {
+    fn open_file(_: &mut ()) {
         let _ = Command::new("open")
             .args(["../test_assets/render_gui.jpg"])
             .output()
@@ -423,5 +423,5 @@ mod tests {
     }
 
     #[cfg(any(target_os = "macos", target_os = "ios"))]
-    fn end_renderdoc(_: ()) {}
+    fn end_renderdoc(_: &mut ()) {}
 }
