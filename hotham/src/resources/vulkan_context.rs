@@ -350,10 +350,10 @@ impl VulkanContext {
 
         println!(
             "[HOTHAM_VULKAN] Allocated {} bits of buffer memory: {:?}",
-            buffer_size, device_memory
+            device_memory_size, device_memory
         );
         unsafe { device.bind_buffer_memory(buffer, device_memory, 0) }?;
-        self.update_buffer(data, device_memory, device_memory_size, usage)?;
+        self.update_buffer(data, device_memory, buffer_size, usage)?;
 
         Ok((buffer, device_memory, device_memory_size))
     }
@@ -374,8 +374,12 @@ impl VulkanContext {
             )?;
 
             if usage == vk::BufferUsageFlags::UNIFORM_BUFFER {
-                let alignment = self.get_alignment::<T>();
-                let mut align = Align::new(dst, alignment, device_memory_size);
+                let (alignment, aligned_size) = self.get_alignment_info::<T>(device_memory_size);
+                println!(
+                    "[HOTHAM_VULKAN] Alignment {} - Size: {} - Aligned Size: {}",
+                    alignment, device_memory_size, aligned_size
+                );
+                let mut align = Align::new(dst, alignment, aligned_size);
                 align.copy_from_slice(data);
             } else {
                 copy(data.as_ptr(), dst as *mut _, data.len())
@@ -386,13 +390,19 @@ impl VulkanContext {
         Ok(())
     }
 
-    pub fn get_alignment<T: Sized>(&self) -> vk::DeviceSize {
-        max(
-            self.physical_device_properties
-                .limits
-                .min_uniform_buffer_offset_alignment,
-            std::mem::align_of::<T>() as vk::DeviceSize,
-        )
+    pub fn get_alignment_info<T: Sized>(
+        &self,
+        original_size: vk::DeviceSize,
+    ) -> (vk::DeviceSize, vk::DeviceSize) {
+        let min_alignment = self
+            .physical_device_properties
+            .limits
+            .min_uniform_buffer_offset_alignment;
+        let alignment = max(std::mem::align_of::<T>() as vk::DeviceSize, min_alignment);
+
+        let aligned_size = (original_size + min_alignment - 1) & !(min_alignment - 1);
+
+        (alignment, aligned_size)
     }
 
     pub fn find_memory_type(
