@@ -191,7 +191,7 @@ mod tests {
 
     use super::*;
     #[test]
-    fn it_works() {
+    fn test_debug_server_smoke() {
         // This is simulating the inside of Hotham.
         let mut server: DebugServer = DebugServer::new();
         let test_entity = DebugEntity {
