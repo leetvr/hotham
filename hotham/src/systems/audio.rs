@@ -68,6 +68,7 @@ fn get_location_from_poses(left_eye: openxr::Posef, right_eye: openxr::Posef) ->
     posef_to_isometry(left_eye).lerp_slerp(&posef_to_isometry(right_eye), 0.5)
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use hecs::{Entity, PreparedQuery, World};
@@ -85,6 +86,7 @@ mod tests {
     };
 
     use super::*;
+
     #[test]
     pub fn test_audio_system() {
         // Create resources

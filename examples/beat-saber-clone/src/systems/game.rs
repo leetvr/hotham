@@ -415,6 +415,7 @@ fn revive_cube(
         .unwrap();
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
 
@@ -429,9 +430,9 @@ mod tests {
         Engine,
     };
 
+    use super::*;
     use crate::{components::Cube, resources::game_context::Song};
 
-    use super::*;
     #[test]
     pub fn game_system_test() {
         let mut engine = Engine::new();

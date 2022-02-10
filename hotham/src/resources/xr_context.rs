@@ -412,6 +412,7 @@ pub(crate) fn create_xr_instance_from_path(
     Ok((instance, system))
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use super::XrContext;
