@@ -78,7 +78,7 @@ mod tests {
     };
 
     use rapier3d::prelude::RigidBodyBuilder;
-    const DURATION_SECS: u32 = 80;
+    const DURATION_SECS: u32 = 8;
 
     use crate::{
         resources::{audio_context::MusicTrack, XrContext},
