@@ -375,10 +375,6 @@ impl VulkanContext {
 
             if usage == vk::BufferUsageFlags::UNIFORM_BUFFER {
                 let (alignment, aligned_size) = self.get_alignment_info::<T>(device_memory_size);
-                println!(
-                    "[HOTHAM_VULKAN] Alignment {} - Size: {} - Aligned Size: {}",
-                    alignment, device_memory_size, aligned_size
-                );
                 let mut align = Align::new(dst, alignment, aligned_size);
                 align.copy_from_slice(data);
             } else {
