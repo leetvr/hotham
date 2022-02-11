@@ -3,7 +3,10 @@ use crate::{
     util::is_view_valid,
 };
 /// Begin the PBR renderpass
+/// Evaluates the provided XrContext to ensure a valid frame state and view before initiating the
+/// Vulkan render pass.
 /// Make sure to only call this ONCE per frame and AFTER calling `begin_frame`, BEFORE calling `end_pbr_render_pass` and BEFORE calling `end_frame`
+
 pub fn begin_pbr_renderpass(
     xr_context: &mut XrContext,
     vulkan_context: &VulkanContext,
@@ -12,7 +15,7 @@ pub fn begin_pbr_renderpass(
     // Check if we should be rendering.
     if !xr_context.frame_state.should_render {
         println!(
-            "[HOTHAM_BEGIN_PBR_RENDERPASS] - Session is runing but shouldRender is false - not rendering"
+            "[HOTHAM_BEGIN_PBR_RENDERPASS] - Session is running but shouldRender is false - not rendering"
         );
         return;
     }
