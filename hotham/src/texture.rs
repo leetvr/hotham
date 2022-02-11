@@ -226,18 +226,6 @@ pub fn parse_ktx(
     ))
 }
 
-#[cfg(target_os = "android")]
-fn _get_ktx_file(path: &PathBuf) -> Result<Box<Cursor<Vec<u8>>>> {
-    use crate::util::get_asset_from_path;
-    let path = path
-        .to_str()
-        .ok_or(anyhow!("Unable to convert {:?} to string", path))?;
-    let asset = get_asset_from_path(path)?;
-
-    // delicious
-    Ok(Box::new(Cursor::new(asset)))
-}
-
 fn add_alpha_channel(image: &gltf::image::Data) -> Vec<u8> {
     let final_size = (image.height * image.width) * 4;
     let mut final_image = vec![0; final_size as _];
