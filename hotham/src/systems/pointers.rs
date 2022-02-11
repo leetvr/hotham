@@ -236,6 +236,7 @@ mod tests {
         world.spawn((collider,));
 
         let pointer_entity = world.spawn((
+            Visible {},
             Pointer {
                 handedness: Handedness::Left,
                 trigger_value: 0.0,
