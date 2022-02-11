@@ -1,9 +1,11 @@
-use std::{fs, path::Path, str};
+// Dummy function
+#[cfg(target_os = "android")]
+fn main() {}
 
-use shaderc::{Compiler, ShaderKind};
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(not(target_os = "android"))]
 fn main() {
+    use shaderc::{Compiler, ShaderKind};
+    use std::{fs, path::Path, str};
     println!("cargo:rerun-if-changed=build_input");
     // The bindgen::Builder is the main entry point
     // to bindgen, and lets you build up options for

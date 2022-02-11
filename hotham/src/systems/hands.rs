@@ -118,6 +118,7 @@ pub fn add_hand(
     }
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -116,15 +116,16 @@ pub fn apply_grip_offset(position: &mut Isometry3<f32>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hotham::{
-        components::{Transform, TransformMatrix},
-        nalgebra::{Quaternion, Translation3},
-        resources::{PhysicsContext, XrContext},
-        systems::update_rigid_body_transforms_system,
-    };
 
+    #[cfg(target_os = "windows")]
     #[test]
     fn test_sabers() {
+        use hotham::{
+            components::{Transform, TransformMatrix},
+            resources::{PhysicsContext, XrContext},
+            systems::update_rigid_body_transforms_system,
+        };
+
         let mut world = World::new();
         let path = std::path::Path::new("../../openxr_loader.dll");
         let (xr_context, _) = XrContext::new_from_path(path).unwrap();

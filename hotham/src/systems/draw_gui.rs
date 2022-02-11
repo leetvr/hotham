@@ -42,15 +42,16 @@ pub fn draw_gui_system(
     gui_context.hovered_last_frame = gui_context.hovered_this_frame;
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
     use ash::vk::{self, Handle};
     use egui::Pos2;
     use image::{jpeg::JpegEncoder, DynamicImage, RgbaImage};
     use nalgebra::UnitQuaternion;
     use openxr::{Fovf, Quaternionf, Vector3f};
-    use renderdoc::RenderDoc;
     use std::process::Command;
 
     use crate::{
@@ -91,10 +92,9 @@ mod tests {
             mut gui_context,
         ) = setup(resolution.clone());
 
-        let mut renderdoc: RenderDoc<renderdoc::V141> = RenderDoc::new().unwrap();
-
         // Begin. Use renderdoc in headless mode for debugging.
-        renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
+        let mut renderdoc = begin_renderdoc();
+
         let mut query = Default::default();
         schedule(
             &mut query,
@@ -148,17 +148,12 @@ mod tests {
         // Assert that NO haptic feedback has been requested.
         assert_eq!(haptic_context.right_hand_amplitude_this_frame, 0.);
 
-        renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
+        end_renderdoc(&mut renderdoc);
 
         // Get the image off the GPU
         write_image_to_disk(&vulkan_context, image, resolution);
 
-        if !renderdoc.is_target_control_connected() {
-            let _ = Command::new("explorer.exe")
-                .args(["..\\test_assets\\render_gui.jpg"])
-                .output()
-                .unwrap();
-        }
+        open_file(&mut renderdoc);
     }
 
     fn schedule(
@@ -168,7 +163,7 @@ mod tests {
         haptic_context: &mut HapticContext,
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
-    ) -> () {
+    ) {
         println!("[DRAW_GUI_TEST] Running schedule..");
         begin_frame(render_context, vulkan_context);
 
@@ -389,4 +384,53 @@ mod tests {
             gui_context,
         )
     }
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    use renderdoc::RenderDoc;
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    fn begin_renderdoc() -> Result<RenderDoc<renderdoc::V141>> {
+        let mut renderdoc = RenderDoc::<renderdoc::V141>::new()?;
+        renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
+        Ok(renderdoc)
+    }
+
+    #[cfg(target_os = "windows")]
+    fn open_file(renderdoc: &mut Result<RenderDoc<renderdoc::V141>>) {
+        if !renderdoc
+            .as_mut()
+            .map(|r| r.is_target_control_connected())
+            .unwrap_or(false)
+        {
+            let _ = Command::new("explorer.exe")
+                .args(["..\\test_assets\\render_gui.jpg"])
+                .output()
+                .unwrap();
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    fn open_file(_: &mut ()) {
+        let _ = Command::new("open")
+            .args(["../test_assets/render_gui.jpg"])
+            .output()
+            .unwrap();
+    }
+
+    // TODO: Support opening files on Linux
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    fn open_file(_: &mut Result<RenderDoc<renderdoc::V141>>) {}
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    fn begin_renderdoc() {}
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    fn end_renderdoc(renderdoc: &mut Result<RenderDoc<renderdoc::V141>>) {
+        let _ = renderdoc
+            .as_mut()
+            .map(|r| r.end_frame_capture(std::ptr::null(), std::ptr::null()));
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    fn end_renderdoc(_: &mut ()) {}
 }

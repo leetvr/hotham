@@ -14,9 +14,6 @@ use crate::{
     resources::{render_context::create_descriptor_set_layouts, VulkanContext},
 };
 
-use ash::vk;
-use std::marker::PhantomData;
-
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
     strings
         .iter()
@@ -95,7 +92,12 @@ pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     }
 }
 
+#[cfg(test)]
 use crate::buffer::Buffer;
+#[cfg(test)]
+use ash::vk;
+#[cfg(test)]
+use std::marker::PhantomData;
 
 #[cfg(test)]
 pub unsafe fn get_from_device_memory<'a, T: Sized>(
@@ -114,6 +116,7 @@ pub unsafe fn get_from_device_memory<'a, T: Sized>(
     std::slice::from_raw_parts(std::mem::transmute(memory), buffer.size as _)
 }
 
+#[cfg(test)]
 pub fn test_buffer<T>() -> Buffer<T> {
     Buffer {
         handle: vk::Buffer::null(),

@@ -279,7 +279,7 @@ impl XrContext {
     }
 }
 
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(not(target_os = "android"))]
 pub(crate) fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
@@ -412,6 +412,7 @@ pub(crate) fn create_xr_instance_from_path(
     Ok((instance, system))
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use super::XrContext;

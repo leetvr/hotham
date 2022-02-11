@@ -462,6 +462,7 @@ pub fn add_model_to_world(
     Some(new_root_entity)
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use super::*;

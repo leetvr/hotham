@@ -210,7 +210,9 @@ impl VulkanContext {
     pub fn testing() -> Result<Self> {
         let (instance, entry) = vulkan_init_test()?;
         let physical_device = get_test_physical_device(&instance);
-        let extension_names = Vec::new();
+        let mut extension_names = Vec::new();
+        add_device_extension_names(&mut extension_names);
+
         let (device, graphics_queue, queue_family_index) =
             create_vulkan_device(&extension_names, &instance, physical_device)?;
 
@@ -348,10 +350,10 @@ impl VulkanContext {
 
         println!(
             "[HOTHAM_VULKAN] Allocated {} bits of buffer memory: {:?}",
-            buffer_size, device_memory
+            device_memory_size, device_memory
         );
         unsafe { device.bind_buffer_memory(buffer, device_memory, 0) }?;
-        self.update_buffer(data, device_memory, device_memory_size, usage)?;
+        self.update_buffer(data, device_memory, buffer_size, usage)?;
 
         Ok((buffer, device_memory, device_memory_size))
     }
@@ -372,8 +374,8 @@ impl VulkanContext {
             )?;
 
             if usage == vk::BufferUsageFlags::UNIFORM_BUFFER {
-                let alignment = self.get_alignment::<T>();
-                let mut align = Align::new(dst, alignment, device_memory_size);
+                let (alignment, aligned_size) = self.get_alignment_info::<T>(device_memory_size);
+                let mut align = Align::new(dst, alignment, aligned_size);
                 align.copy_from_slice(data);
             } else {
                 copy(data.as_ptr(), dst as *mut _, data.len())
@@ -384,13 +386,19 @@ impl VulkanContext {
         Ok(())
     }
 
-    pub fn get_alignment<T: Sized>(&self) -> vk::DeviceSize {
-        max(
-            self.physical_device_properties
-                .limits
-                .min_uniform_buffer_offset_alignment,
-            std::mem::align_of::<T>() as vk::DeviceSize,
-        )
+    pub fn get_alignment_info<T: Sized>(
+        &self,
+        original_size: vk::DeviceSize,
+    ) -> (vk::DeviceSize, vk::DeviceSize) {
+        let min_alignment = self
+            .physical_device_properties
+            .limits
+            .min_uniform_buffer_offset_alignment;
+        let alignment = max(std::mem::align_of::<T>() as vk::DeviceSize, min_alignment);
+
+        let aligned_size = (original_size + min_alignment - 1) & !(min_alignment - 1);
+
+        (alignment, aligned_size)
     }
 
     pub fn find_memory_type(
@@ -998,6 +1006,17 @@ impl VulkanContext {
     }
 }
 
+#[allow(unused_variables)]
+fn add_device_extension_names(extension_names: &mut Vec<CString>) {
+    // Add Multiview extension
+    #[cfg(target_os = "android")]
+    extension_names.push(CString::new("VK_KHR_multiview").unwrap());
+
+    // If we're on macOS we've got to add portability
+    #[cfg(target_os = "macos")]
+    extension_names.push(CString::new("VK_KHR_portability_subset").unwrap());
+}
+
 fn create_command_pool(
     device: &Device,
     queue_family_index: u32,
@@ -1157,15 +1176,15 @@ pub fn create_vulkan_device_legacy(
 ) -> Result<(Device, vk::Queue, u32)> {
     println!("[HOTHAM_VULKAN] Creating logical device.. ");
 
-    unsafe {
-        let extension_names = xr_instance.vulkan_legacy_device_extensions(system)?;
-        let mut extension_names = extension_names
-            .split(' ')
-            .map(|x| CString::new(x).unwrap())
-            .collect::<Vec<_>>();
-        extension_names.push(CString::from_vec_unchecked(b"VK_KHR_multiview".to_vec()));
-        create_vulkan_device(&extension_names, vulkan_instance, physical_device)
-    }
+    let extension_names = xr_instance.vulkan_legacy_device_extensions(system)?;
+    let mut extension_names = extension_names
+        .split(' ')
+        .map(|x| CString::new(x).unwrap())
+        .collect::<Vec<_>>();
+
+    add_device_extension_names(&mut extension_names);
+
+    create_vulkan_device(&extension_names, vulkan_instance, physical_device)
 }
 
 fn create_vulkan_device(
@@ -1204,7 +1223,7 @@ fn create_vulkan_device(
 
     let queue_create_infos = [graphics_queue_create_info];
 
-    let physical_device_features = vk::PhysicalDeviceFeatures::builder().sampler_anisotropy(true);
+    let physical_device_features = get_physical_device_features();
     // TODO: Quest 2?
     // physical_device_features.shader_storage_image_multisample(true);
 
@@ -1227,6 +1246,12 @@ fn create_vulkan_device(
     println!("[HOTHAM_VULKAN] ..done");
 
     Ok((device, graphics_queue, graphics_family_index))
+}
+
+fn get_physical_device_features() -> vk::PhysicalDeviceFeatures {
+    vk::PhysicalDeviceFeatures::builder()
+        .sampler_anisotropy(true)
+        .build()
 }
 
 fn get_stage(

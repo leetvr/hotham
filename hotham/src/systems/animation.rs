@@ -26,6 +26,7 @@ pub fn animation_system(
     }
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use crate::{
