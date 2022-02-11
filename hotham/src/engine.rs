@@ -25,21 +25,33 @@ pub static ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(
 #[cfg(target_os = "android")]
 pub static ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
 
+/// The Hotham Engine
+/// A wrapper around the "external world" from the perspective of the engine, eg. renderer, XR, etc.
+/// **IMPORTANT**: make sure you call `update` each tick
 pub struct Engine {
     should_quit: Arc<AtomicBool>,
     #[allow(dead_code)]
     resumed: bool,
     event_data_buffer: EventDataBuffer,
+    /// OpenXR context
     pub xr_context: XrContext,
+    /// Vulkan context
     pub vulkan_context: VulkanContext,
+    /// Renderer context
     pub render_context: RenderContext,
+    /// Physics context
     pub physics_context: PhysicsContext,
+    /// Audio context
     pub audio_context: AudioContext,
+    /// GUI context
     pub gui_context: GuiContext,
+    /// Haptics context
     pub haptic_context: HapticContext,
 }
 
 impl Engine {
+    /// Create a new instance of the engine
+    /// NOTE: only one instance may be running at any one time
     pub fn new() -> Self {
         #[allow(unused_mut)] // Only Android mutates this.
         let mut resumed = false;
@@ -80,6 +92,7 @@ impl Engine {
         engine
     }
 
+    /// IMPORTANT: Call this function each tick to update the engine's running state with the underlying OS
     pub fn update(&mut self) -> HothamResult<(xr::SessionState, xr::SessionState)> {
         #[cfg(target_os = "android")]
         process_android_events(&mut self.resumed, &self.should_quit);

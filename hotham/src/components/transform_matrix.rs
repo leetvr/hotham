@@ -1,5 +1,6 @@
 use nalgebra::Matrix4;
 
+/// Component used to represent the world-space transform of the entity in the renderer
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TransformMatrix(pub Matrix4<f32>);
 

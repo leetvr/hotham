@@ -14,8 +14,10 @@ use itertools::{izip, Itertools};
 use nalgebra::{vector, Matrix4, Quaternion, UnitQuaternion};
 use std::collections::HashMap;
 
+/// Convenience type for models
 pub type Models = HashMap<String, World>;
 
+/// Load glTF models from a GLB file
 pub fn load_models_from_glb(
     glb_bufs: &Vec<&[u8]>,
     vulkan_context: &VulkanContext,
@@ -39,6 +41,7 @@ pub fn load_models_from_glb(
     Ok(models)
 }
 
+/// Load glTF models from a glTF document
 pub fn load_models_from_gltf_data(
     document: &gltf::Document,
     buffer: &[u8],
@@ -294,6 +297,7 @@ fn add_animations(
     }
 }
 
+/// Convenience function to add a glTF model to the world referenced by its node name
 pub fn add_model_to_world(
     name: &str,
     models: &Models,
