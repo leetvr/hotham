@@ -20,7 +20,5 @@ jobs:
           sudo apt-get update
           sudo apt-get install libasound2-dev
       - uses: actions/checkout@v2
-      - name: Build
-        run: cargo build -p hotham
       - name: Run tests
-        run: cargo test -p hotham
+        run: cargo test -p hotham --lib

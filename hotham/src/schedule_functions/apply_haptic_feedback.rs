@@ -10,11 +10,9 @@ static HAPTIC_DURATION: i64 = 1e+8 as _; // 100ms
 /// event which proprogates to the appropriate user input device.
 ///
 /// Basic usage:
-/// ```
+/// ```ignore
 /// fn tick (...) {
-/// ...
 ///    apply_haptic_feedback(xr_context, haptic_context)
-/// ...
 /// }
 /// ```
 pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
