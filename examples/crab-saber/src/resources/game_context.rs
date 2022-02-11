@@ -262,13 +262,13 @@ pub fn add_sound_effects(audio_context: &mut AudioContext, game_context: &mut Ga
     let hit_mp3 = include_bytes!("../../assets/Hit.mp3").to_vec();
     game_context.sound_effects.insert(
         "Hit".to_string(),
-        audio_context.create_audio_source(hit_mp3),
+        audio_context.create_sound_emitter(hit_mp3),
     );
 
     let miss_mp3 = include_bytes!("../../assets/Miss.mp3").to_vec();
     game_context.sound_effects.insert(
         "Miss".to_string(),
-        audio_context.create_audio_source(miss_mp3),
+        audio_context.create_sound_emitter(miss_mp3),
     );
 }
 

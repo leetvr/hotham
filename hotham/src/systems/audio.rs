@@ -7,6 +7,10 @@ use crate::{
     util::posef_to_isometry,
 };
 
+/// Audio system
+/// Walks through each SoundEmitter that has a RigidBody and:
+/// - updates its position in space
+/// - updates its playing state
 pub fn audio_system(
     query: &mut PreparedQuery<(&mut SoundEmitter, &RigidBody)>,
     world: &mut World,
@@ -111,7 +115,7 @@ mod tests {
             .build();
         let handle = physics_context.rigid_bodies.insert(rigid_body);
         let rigid_body = RigidBody { handle };
-        let sound_emitter = audio_context.create_audio_source(sound_effect);
+        let sound_emitter = audio_context.create_sound_emitter(sound_effect);
 
         // Create world
         let mut world = World::new();

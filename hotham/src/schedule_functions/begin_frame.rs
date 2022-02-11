@@ -5,6 +5,8 @@ use crate::{
     VIEW_TYPE,
 };
 
+/// Begin a frame
+/// Make sure to call this BEFORE beginning any renderpasses.
 pub fn begin_frame(
     xr_context: &mut XrContext,
     vulkan_context: &VulkanContext,

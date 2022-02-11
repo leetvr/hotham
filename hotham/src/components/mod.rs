@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod animation_controller;
 pub mod animation_target;
 pub mod collider;

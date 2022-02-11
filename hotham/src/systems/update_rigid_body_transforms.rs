@@ -6,6 +6,7 @@ use crate::{
     resources::PhysicsContext,
 };
 
+/// Walks through each pair of `RigidBody`s and `Transforms` and sets the `Transform` accordingly
 pub fn update_rigid_body_transforms_system(
     query: &mut PreparedQuery<(&RigidBody, &mut Transform)>,
     world: &mut World,

@@ -9,11 +9,15 @@ use crate::{
 };
 use std::mem::MaybeUninit;
 
+/// Uniform buffer used by the vertex shader for each entity
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct MeshUBO {
+    /// The transform of the entity, in world space
     pub transform: Matrix4<f32>,
+    /// Joint matrices for skinning
     pub joint_matrices: [Matrix4<f32>; 128],
+    /// The number of joints
     pub joint_count: f32,
 }
 
@@ -31,11 +35,17 @@ impl Default for MeshUBO {
     }
 }
 
+/// Component that encapsulates an Entity's geometry. Maps closesly to the [glTF spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#meshes)
+/// Usually automatically added by `gltf_loader`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Mesh {
+    /// The descriptor sets for the UBO
     pub descriptor_sets: [vk::DescriptorSet; 1],
+    /// UBO sent to the shader
     pub ubo_buffer: Buffer<MeshUBO>,
+    /// The actual contents of the UBO
     pub ubo_data: MeshUBO,
+    /// The primitives in this mesh (eg. actual geometry)
     pub primitives: Vec<Primitive>,
 }
 

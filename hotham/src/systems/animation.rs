@@ -1,6 +1,8 @@
 use crate::components::{animation_controller::AnimationController, AnimationTarget, Transform};
 use hecs::{PreparedQuery, World};
 
+/// Animation system
+/// Walks through each AnimationTarget and applies the appropriate animation
 pub fn animation_system(
     query: &mut PreparedQuery<(&mut AnimationTarget, &mut Transform)>,
     world: &mut World,

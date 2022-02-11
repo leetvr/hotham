@@ -7,6 +7,8 @@ use crate::{
 use hecs::{PreparedQuery, World};
 use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder};
 
+/// Hands system
+/// Used to allow users to interact with objects using their controllers as representations of their hands
 pub fn hands_system(
     query: &mut PreparedQuery<(&mut Hand, &mut AnimationController, &mut RigidBody)>,
     world: &mut World,
@@ -66,6 +68,7 @@ pub fn hands_system(
     }
 }
 
+/// Convenience function to add a Hand and corresponding Mesh to the world
 pub fn add_hand(
     models: &std::collections::HashMap<String, World>,
     handedness: Handedness,

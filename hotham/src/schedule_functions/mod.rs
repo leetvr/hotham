@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod apply_haptic_feedback;
 pub mod begin_frame;
 pub mod begin_pbr_renderpass;

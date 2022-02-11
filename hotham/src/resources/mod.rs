@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod audio_context;
 pub mod gui_context;
 pub mod haptic_context;

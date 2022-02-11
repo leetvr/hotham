@@ -35,6 +35,7 @@ pub(crate) unsafe fn parse_raw_string(
     return cstr.to_str();
 }
 
+/// Convenience function to get a world with hands
 pub fn get_world_with_hands() -> World {
     let vulkan_context = VulkanContext::testing().unwrap();
     let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
@@ -79,6 +80,7 @@ pub fn get_world_with_hands() -> World {
     world
 }
 
+/// Convert a `Posef` from OpenXR into a `nalgebra::Isometry3`
 pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
     let translation: Translation3<f32> = Translation3::from(translation);
@@ -128,6 +130,7 @@ pub fn test_buffer<T>() -> Buffer<T> {
     }
 }
 
+/// Check to see if the current XrSpace is valid
 pub fn is_space_valid(space: &SpaceLocation) -> bool {
     space
         .location_flags
@@ -137,6 +140,7 @@ pub fn is_space_valid(space: &SpaceLocation) -> bool {
             .contains(SpaceLocationFlags::ORIENTATION_VALID)
 }
 
+/// Check to see if the current Xr View is valid
 pub fn is_view_valid(view_flags: &ViewStateFlags) -> bool {
     view_flags.contains(ViewStateFlags::POSITION_VALID)
         && view_flags.contains(ViewStateFlags::ORIENTATION_VALID)

@@ -5,6 +5,9 @@ use hecs::{Entity, PreparedQuery, Without, World};
 
 use nalgebra::Matrix4;
 
+/// Updatee parent transform matrix system
+/// Walks through each entity that has a Parent and builds a heirarchy
+/// Then transforms each entity based on the heirarchy
 pub fn update_parent_transform_matrix_system(
     parent_query: &mut PreparedQuery<&Parent>,
     roots_query: &mut PreparedQuery<Without<Parent, &TransformMatrix>>,
