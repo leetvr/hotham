@@ -4,6 +4,20 @@ use crate::resources::{HapticContext, XrContext};
 static HAPTIC_FREQUENCY: f32 = 400.;
 static HAPTIC_DURATION: i64 = 1e+8 as _; // 100ms
 
+/// Triggers the application of vibrations to the appropriate user input device at prescribed amplitude, frequency, and duration given a Hothman::resources::XrContent and Hothman::resources::HapticContext.
+///
+/// During each tick of the Hotham engine, haptic feedback is applied to generate a HapticVibration
+/// event which proprogates to the appropriate user input device.
+///
+/// Basic usage:
+/// ```
+/// fn tick (...) {
+/// ...
+///    apply_haptic_feedback(xr_context, haptic_context)
+/// ...
+/// }
+/// ```
+
 pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
     let haptic_duration = Duration::from_nanos(HAPTIC_DURATION);
     if haptic_context.left_hand_amplitude_this_frame != 0. {
