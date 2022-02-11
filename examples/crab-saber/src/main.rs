@@ -1,4 +1,4 @@
-use beat_saber_example::real_main;
+use crab_saber::real_main;
 use hotham::HothamResult;
 
 fn main() -> HothamResult<()> {

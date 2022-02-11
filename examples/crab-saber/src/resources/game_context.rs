@@ -59,7 +59,7 @@ impl GameContext {
         let physics_context = &mut engine.physics_context;
         let gui_context = &engine.gui_context;
 
-        let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../../assets/beat_saber.glb")];
+        let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
         let models = gltf_loader::load_models_from_glb(
             &glb_bufs,
             &vulkan_context,

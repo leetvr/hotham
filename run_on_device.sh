@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -eux
 
-adb shell am force-stop rust.beat_saber_example
+adb shell am force-stop rust.crab_saber
 
-cd examples/beat-saber-clone
+cd examples/crab-saber
 cargo apk run --release
 
-adb logcat --pid="$(adb shell pidof rust.beat_saber_example)"
+adb logcat --pid="$(adb shell pidof rust.crab_saber)"

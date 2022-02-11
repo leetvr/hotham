@@ -14,7 +14,7 @@
 			"hotham",
 			"hotham-debug-server",
 			"hotham-simulator",
-			"beat-saber-clone",
+			"crab-saber",
 			"test_assets"
 		],
 		"jest.rootPath": "hotham_debug_frontend",

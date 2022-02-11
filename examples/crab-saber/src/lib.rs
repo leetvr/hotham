@@ -23,19 +23,19 @@ use resources::{
     game_context::{add_songs, add_sound_effects, GameState},
     GameContext,
 };
-use systems::{game::game_system, sabers_system, BeatSaberQueries};
+use systems::{game::game_system, sabers_system, CrabSaberQueries};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
-    println!("[BEAT_SABER_EXAMPLE] MAIN!");
-    real_main().expect("[BEAT_SABER_EXAMPLE] ERROR IN MAIN!");
+    println!("[CRAB_SABER] MAIN!");
+    real_main().expect("[CRAB_SABER] ERROR IN MAIN!");
 }
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
     let (mut world, mut game_context) = init(&mut engine)?;
     let mut hotham_queries = Default::default();
-    let mut beat_saber_queries = Default::default();
+    let mut crab_saber_queries = Default::default();
 
     while let Ok((previous_state, current_state)) = engine.update() {
         tick(
@@ -44,7 +44,7 @@ pub fn real_main() -> HothamResult<()> {
             &mut engine,
             &mut world,
             &mut hotham_queries,
-            &mut beat_saber_queries,
+            &mut crab_saber_queries,
             &mut game_context,
         );
     }
@@ -58,7 +58,7 @@ fn tick(
     engine: &mut Engine,
     world: &mut World,
     hotham_queries: &mut Queries,
-    beat_saber_queries: &mut BeatSaberQueries,
+    crab_saber_queries: &mut CrabSaberQueries,
     game_context: &mut GameContext,
 ) {
     let xr_context = &mut engine.xr_context;
@@ -90,7 +90,7 @@ fn tick(
     if current_state == xr::SessionState::FOCUSED {
         // Handle input
         sabers_system(
-            &mut beat_saber_queries.sabers_query,
+            &mut crab_saber_queries.sabers_query,
             world,
             xr_context,
             physics_context,
@@ -108,7 +108,7 @@ fn tick(
 
         // Game logic
         game_system(
-            beat_saber_queries,
+            crab_saber_queries,
             world,
             game_context,
             audio_context,

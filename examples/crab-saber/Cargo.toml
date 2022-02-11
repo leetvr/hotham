@@ -1,14 +1,14 @@
 [package]
 edition = "2018"
 license = "MIT OR Apache-2.0"
-name = "beat-saber-example"
+name = "crab-saber"
 version = "0.1.0"
 
 [lib]
 crate-type = ["lib", "cdylib"]
 
 [[bin]]
-name = "hotham_beat_saber_example"
+name = "hotham_crab_saber"
 path = "src/main.rs"
 
 [dependencies]

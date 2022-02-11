@@ -9,7 +9,7 @@ pub use sabers::sabers_system;
 use crate::components::{Colour, Cube, Saber};
 
 #[derive(Default)]
-pub struct BeatSaberQueries<'a> {
+pub struct CrabSaberQueries<'a> {
     pub sabers_query: PreparedQuery<With<Saber, (&'a Colour, &'a RigidBody)>>,
     pub live_cubes_query:
         PreparedQuery<With<Visible, With<Cube, (&'a Colour, &'a RigidBody, &'a Collider)>>>,

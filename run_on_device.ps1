@@ -1,11 +1,11 @@
-adb shell am force-stop rust.beat_saber_example
+adb shell am force-stop rust.crab_saber
 
-Set-Location examples\beat-saber-clone
+Set-Location examples\crab-saber
 cargo apk run --release
 
 if ($?) {
     Start-Sleep -Seconds 2
-    $processIdStr = (adb shell pidof rust.beat_saber_example) | Out-String
+    $processIdStr = (adb shell pidof rust.crab_saber) | Out-String
     Write-Output $processIdStr
     $processId = $processIdStr -as [int]
     Write-Output $processId

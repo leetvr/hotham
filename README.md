@@ -32,7 +32,7 @@ Hotham's development is only possible thanks to the support of the community. It
 - [x] [Text/UI support](https://github.com/leetvr/hotham/issues/93)
 
 # Current Demo
-![Beat Saber](https://user-images.githubusercontent.com/2022375/152466675-b6a28557-4cbb-4acc-8177-f2126179ef02.gif)
+![Crab Saber](https://user-images.githubusercontent.com/2022375/152466675-b6a28557-4cbb-4acc-8177-f2126179ef02.gif)
 
 # Future goals ✨
 - [ ] Visual editor
@@ -57,3 +57,6 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+## Disclaimer
+1. Trademarks are the property of their respective owners

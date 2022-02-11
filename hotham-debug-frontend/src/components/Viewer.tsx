@@ -102,7 +102,7 @@ function getModels(
 
 export function Viewer({ entities }: Props): JSX.Element {
   const [displays, setDisplays] = useState<DisplayOptions>({ models: true });
-  const gltf = useGLTF('/beat_saber.glb') as unknown as GLTFResult;
+  const gltf = useGLTF('/crab_saber.glb') as unknown as GLTFResult;
   const { nodes } = gltf;
   return (
     <OuterContainer>

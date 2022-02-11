@@ -8,7 +8,7 @@ use crate::{
     },
 };
 
-use super::BeatSaberQueries;
+use super::CrabSaberQueries;
 use hotham::{
     components::{
         hand::Handedness, panel::PanelButton, sound_emitter::SoundState, Collider, Info, Panel,
@@ -27,7 +27,7 @@ const CUBE_Y: f32 = 1.1;
 const CUBE_Z: f32 = -10.;
 
 pub fn game_system(
-    queries: &mut BeatSaberQueries,
+    queries: &mut CrabSaberQueries,
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
@@ -56,7 +56,7 @@ pub fn game_system(
 }
 
 fn transition(
-    queries: &mut BeatSaberQueries,
+    queries: &mut CrabSaberQueries,
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
@@ -168,16 +168,11 @@ fn transition(
         ),
     }
 
-    println!(
-        "[BEAT_SABER] TRANSITION {:?} -> {:?}",
-        current_state, next_state
-    );
-
     game_context.state = next_state;
 }
 
 fn run(
-    queries: &mut BeatSaberQueries,
+    queries: &mut CrabSaberQueries,
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
@@ -227,7 +222,7 @@ fn run(
 }
 
 fn spawn_cube(
-    queries: &mut BeatSaberQueries,
+    queries: &mut CrabSaberQueries,
     world: &mut World,
     physics_context: &mut PhysicsContext,
     song: &mut Song,
@@ -237,7 +232,6 @@ fn spawn_cube(
         return;
     }
 
-    println!("[BEAT_SABER] Spawning cube!");
     let colour = if random() { Colour::Red } else { Colour::Blue };
     let dead_cube = queries
         .dead_cubes_query
@@ -337,7 +331,6 @@ fn dispose_of_cubes(
     physics_context: &mut PhysicsContext,
 ) {
     for e in cubes_to_dispose.into_iter() {
-        println!("[BEAT_SABER] Disposing of cube {:?}", e);
         match world.get::<Collider>(e) {
             Ok(c) => {
                 let handle = c.handle;
@@ -380,7 +373,6 @@ fn revive_cube(
     physics_context: &mut PhysicsContext,
     song: &Song,
 ) {
-    println!("[BEAT_SABER] Reviving dead cube - {:?}", cube_entity);
     let mut rng = thread_rng();
     let translation_x = CUBE_X_OFFSETS[rng.gen_range(0..4)];
     let z_linvel = -CUBE_Z / (song.beat_length.as_secs_f32() * 4.); // distance / time for 4 beats
@@ -839,7 +831,6 @@ mod tests {
             RigidBody { handle: rigid_body },
             Collider::new(collider),
         ));
-        println!("[TEST] Adding dummy cube: {:?}", cube);
         world
             .get_mut::<Collider>(saber)
             .unwrap()
