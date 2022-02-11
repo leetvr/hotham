@@ -52,6 +52,7 @@
 			"args": [
 				"-p",
 				"hotham",
+				"--release",
 				"--",
 				"--test-threads",
 				"1"
