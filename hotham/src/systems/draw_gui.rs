@@ -42,9 +42,11 @@ pub fn draw_gui_system(
     gui_context.hovered_last_frame = gui_context.hovered_this_frame;
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Result;
     use ash::vk::{self, Handle};
     use egui::Pos2;
     use image::{jpeg::JpegEncoder, DynamicImage, RgbaImage};
@@ -387,15 +389,19 @@ mod tests {
     use renderdoc::RenderDoc;
 
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn begin_renderdoc() -> RenderDoc<renderdoc::V141> {
-        let mut renderdoc: RenderDoc<renderdoc::V141> = RenderDoc::new().unwrap();
+    fn begin_renderdoc() -> Result<RenderDoc<renderdoc::V141>> {
+        let mut renderdoc = RenderDoc::<renderdoc::V141>::new()?;
         renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
-        renderdoc
+        Ok(renderdoc)
     }
 
     #[cfg(target_os = "windows")]
-    fn open_file(renderdoc: &mut RenderDoc<renderdoc::V141>) {
-        if !renderdoc.is_target_control_connected() {
+    fn open_file(renderdoc: &mut Result<RenderDoc<renderdoc::V141>>) {
+        if !renderdoc
+            .as_mut()
+            .map(|r| r.is_target_control_connected())
+            .unwrap_or(false)
+        {
             let _ = Command::new("explorer.exe")
                 .args(["..\\test_assets\\render_gui.jpg"])
                 .output()
@@ -413,14 +419,16 @@ mod tests {
 
     // TODO: Support opening files on Linux
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    fn open_file(_: &mut RenderDoc<renderdoc::V141>) {}
+    fn open_file(_: &mut Result<RenderDoc<renderdoc::V141>>) {}
 
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn begin_renderdoc() {}
 
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn end_renderdoc(renderdoc: &mut RenderDoc<renderdoc::V141>) {
-        renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
+    fn end_renderdoc(renderdoc: &mut Result<RenderDoc<renderdoc::V141>>) {
+        let _ = renderdoc
+            .as_mut()
+            .map(|r| r.end_frame_capture(std::ptr::null(), std::ptr::null()));
     }
 
     #[cfg(any(target_os = "macos", target_os = "ios"))]

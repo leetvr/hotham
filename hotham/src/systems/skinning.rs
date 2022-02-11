@@ -39,6 +39,7 @@ pub fn skinning_system(
     }
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
 

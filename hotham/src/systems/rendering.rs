@@ -73,6 +73,7 @@ pub fn rendering_system(
     }
 }
 
+#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
