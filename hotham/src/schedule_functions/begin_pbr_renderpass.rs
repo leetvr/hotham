@@ -2,6 +2,8 @@ use crate::{
     resources::xr_context::XrContext, resources::RenderContext, resources::VulkanContext,
     util::is_view_valid,
 };
+/// Begin the PBR renderpass
+/// Make sure to only call this ONCE per frame and AFTER calling `begin_frame`, BEFORE calling `end_pbr_render_pass` and BEFORE calling `end_frame`
 pub fn begin_pbr_renderpass(
     xr_context: &mut XrContext,
     vulkan_context: &VulkanContext,

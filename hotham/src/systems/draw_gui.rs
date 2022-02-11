@@ -5,6 +5,10 @@ use crate::{
 use hecs::{PreparedQuery, World};
 static GUI_HAPTIC_AMPLITUDE: f32 = 0.5;
 
+/// GUI system
+/// Walks through each panel in the World and
+/// - draws the panel to a texture
+/// - updates any input state
 pub fn draw_gui_system(
     query: &mut PreparedQuery<&mut Panel>,
     world: &mut World,

@@ -1,4 +1,7 @@
 use ash::vk::{self, Handle};
+
+/// How much the GUI should be scaled by
+// TODO - this this necessary?
 pub const SCALE_FACTOR: f32 = 3.;
 
 use crate::{
@@ -10,18 +13,21 @@ use crate::{
 
 use super::{render_context::create_shader, RenderContext, VulkanContext};
 
+/// Encapsulates egui state
+/// Used by `update_gui_system`
 #[derive(Debug, Clone)]
 pub struct GuiContext {
-    pub render_pass: vk::RenderPass,
-    pub pipeline: vk::Pipeline,
-    pub pipeline_layout: vk::PipelineLayout,
-    pub font_texture_descriptor_sets: Vec<vk::DescriptorSet>,
-    pub font_texture_version: u64,
-    pub hovered_this_frame: bool,
-    pub hovered_last_frame: bool,
+    pub(crate) render_pass: vk::RenderPass,
+    pub(crate) pipeline: vk::Pipeline,
+    pub(crate) pipeline_layout: vk::PipelineLayout,
+    pub(crate) font_texture_descriptor_sets: Vec<vk::DescriptorSet>,
+    pub(crate) font_texture_version: u64,
+    pub(crate) hovered_this_frame: bool,
+    pub(crate) hovered_last_frame: bool,
 }
 
 impl GuiContext {
+    /// Create a new GuiContext
     pub fn new(vulkan_context: &VulkanContext) -> Self {
         let device = &vulkan_context.device;
 
@@ -255,7 +261,7 @@ impl GuiContext {
         }
     }
 
-    pub fn paint_gui(
+    pub(crate) fn paint_gui(
         &mut self,
         vulkan_context: &VulkanContext,
         render_context: &RenderContext,

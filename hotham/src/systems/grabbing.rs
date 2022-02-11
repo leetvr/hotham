@@ -6,6 +6,8 @@ use crate::{
     resources::PhysicsContext,
 };
 
+/// Grabbing system
+/// Used to allow a player to grab objects. Used in conjunction with `hands_system`
 pub fn grabbing_system(
     query: &mut PreparedQuery<(&mut Hand, &Collider)>,
     world: &mut World,

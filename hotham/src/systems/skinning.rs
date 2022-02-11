@@ -4,6 +4,8 @@ use std::collections::HashMap;
 
 use crate::components::{Info, Joint, Mesh, Skin, TransformMatrix};
 
+/// Skinning system
+/// Walks through each joint in the system and builds up the `joint_matrices` that will be sent to the vertex shader
 pub fn skinning_system(
     joints_query: &mut PreparedQuery<(&TransformMatrix, &Joint, &Info)>,
     meshes_query: &mut PreparedQuery<(&mut Mesh, &Skin)>,

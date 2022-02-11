@@ -3,6 +3,8 @@ use nalgebra::Matrix4;
 use crate::components::{Transform, TransformMatrix};
 use hecs::{PreparedQuery, World};
 
+/// Update transform matrix system
+/// Walks through each Transform and applies it to a 4x4 matrix used by the vertex shader
 pub fn update_transform_matrix_system(
     query: &mut PreparedQuery<(&Transform, &mut TransformMatrix)>,
     world: &mut World,

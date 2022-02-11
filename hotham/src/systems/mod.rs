@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 pub mod animation;
 pub mod audio;
 pub mod collision;
@@ -30,6 +31,7 @@ use crate::components::{
 };
 use hecs::{PreparedQuery, With, Without};
 
+/// Queries used by `system`s in Hotham
 #[derive(Default)]
 pub struct Queries<'a> {
     pub animation_query: PreparedQuery<(&'a mut AnimationTarget, &'a mut Transform)>,

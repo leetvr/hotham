@@ -1,6 +1,9 @@
 use crate::{components::Collider, resources::PhysicsContext};
 use hecs::{PreparedQuery, World};
 
+/// Collision system
+/// Walks through each collider and checks if it has collided with any other entity
+/// If collisions are detected they are added to `collisions_this_frame` for ease of reference.
 pub fn collision_system(
     query: &mut PreparedQuery<&mut Collider>,
     world: &World,

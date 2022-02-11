@@ -27,6 +27,8 @@ use crate::{
     util::{is_space_valid, posef_to_isometry},
 };
 
+/// Pointers system
+/// Allows users to interact with `Panel`s using their controllers
 pub fn pointers_system(
     query: &mut PreparedQuery<With<Visible, (&mut Pointer, &mut Transform)>>,
     world: &mut World,
@@ -111,7 +113,7 @@ pub fn pointers_system(
     }
 }
 
-pub fn apply_grip_offset(position: &mut Isometry3<f32>) {
+pub(crate) fn apply_grip_offset(position: &mut Isometry3<f32>) {
     let updated_rotation = position.rotation.quaternion() * ROTATION_OFFSET;
     let updated_translation = position.translation.vector
         - vector!(POSITION_OFFSET[0], POSITION_OFFSET[1], POSITION_OFFSET[2]);

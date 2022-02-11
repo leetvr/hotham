@@ -6,6 +6,8 @@ use crate::{
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
 
+/// Rendering system
+/// Walks through each Mesh that is Visible and renders it.
 pub fn rendering_system(
     query: &mut PreparedQuery<With<Visible, (&mut Mesh, &TransformMatrix)>>,
     world: &mut World,
