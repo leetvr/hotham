@@ -17,7 +17,6 @@ static HAPTIC_DURATION: i64 = 1e+8 as _; // 100ms
 /// ...
 /// }
 /// ```
-
 pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
     let haptic_duration = Duration::from_nanos(HAPTIC_DURATION);
     if haptic_context.left_hand_amplitude_this_frame != 0. {

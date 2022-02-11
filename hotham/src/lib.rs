@@ -1,3 +1,5 @@
+#![deny(missing_docs)]
+
 pub use ash::vk;
 pub use openxr as xr;
 
