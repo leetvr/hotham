@@ -1223,7 +1223,7 @@ fn create_vulkan_device(
 
     let queue_create_infos = [graphics_queue_create_info];
 
-    let physical_device_features = vk::PhysicalDeviceFeatures::builder().sampler_anisotropy(true);
+    let physical_device_features = get_physical_device_features();
     // TODO: Quest 2?
     // physical_device_features.shader_storage_image_multisample(true);
 
@@ -1246,6 +1246,12 @@ fn create_vulkan_device(
     println!("[HOTHAM_VULKAN] ..done");
 
     Ok((device, graphics_queue, graphics_family_index))
+}
+
+fn get_physical_device_features() -> vk::PhysicalDeviceFeatures {
+    vk::PhysicalDeviceFeatures::builder()
+        .sampler_anisotropy(true)
+        .build()
 }
 
 fn get_stage(
