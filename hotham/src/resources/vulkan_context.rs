@@ -1006,8 +1006,10 @@ impl VulkanContext {
     }
 }
 
+#[allow(unused_variables)]
 fn add_device_extension_names(extension_names: &mut Vec<CString>) {
     // Add Multiview extension
+    #[cfg(target_os = "android")]
     extension_names.push(CString::new("VK_KHR_multiview").unwrap());
 
     // If we're on macOS we've got to add portability
