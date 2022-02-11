@@ -11,15 +11,22 @@ use symphonia::core::{audio::SampleBuffer, io::MediaSourceStream, probe::Hint};
 type MusicTrackHandle = Handle<Stop<FramesSignal<[f32; 2]>>>;
 use generational_arena::{Arena, Index};
 
+/// Wrapper around `oddio` and `cpal` to represent the audio playing in an application
+/// Used by `audio_system`
 pub struct AudioContext {
+    /// Handle to the `oddio` scene
     pub scene_handle: oddio::Handle<SpatialScene>,
+    /// Handle to the `oddio` mixer
     pub mixer_handle: oddio::Handle<Mixer<[f32; 2]>>,
+    /// Handle to the `cpal` mixer
     pub stream: Arc<Mutex<Stream>>,
+    /// The currently playing music track
     pub current_music_track: Option<MusicTrack>,
     music_tracks_inner: Arena<Arc<Frames<[f32; 2]>>>,
     music_track_handle: Option<MusicTrackHandle>,
 }
 
+/// A music track
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub struct MusicTrack {
     index: Index,
@@ -90,12 +97,14 @@ impl Default for AudioContext {
 unsafe impl Send for AudioContext {}
 
 impl AudioContext {
-    pub fn create_audio_source(&mut self, mp3_bytes: Vec<u8>) -> SoundEmitter {
+    /// Convenience function to create a `SoundEmitter` from an MP3 file
+    pub fn create_sound_emitter(&mut self, mp3_bytes: Vec<u8>) -> SoundEmitter {
         let frames = get_frames_from_mp3(mp3_bytes);
 
         SoundEmitter::new(frames)
     }
 
+    /// Play a piece of audio
     pub fn play_audio(
         &mut self,
         sound_emitter: &mut SoundEmitter,
@@ -116,28 +125,31 @@ impl AudioContext {
         sound_emitter.handle = Some(handle);
     }
 
-    pub fn resume_audio(&mut self, audio_source: &mut SoundEmitter) {
-        audio_source
+    /// Resume a piece of audio
+    pub fn resume_audio(&mut self, sound_emitter: &mut SoundEmitter) {
+        sound_emitter
             .handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().resume());
     }
 
-    pub fn pause_audio(&mut self, audio_source: &mut SoundEmitter) {
-        audio_source
+    /// Pause a piece of audio
+    pub fn pause_audio(&mut self, sound_emitter: &mut SoundEmitter) {
+        sound_emitter
             .handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().pause());
     }
 
-    pub fn stop_audio(&mut self, audio_source: &mut SoundEmitter) {
-        audio_source
+    /// Stop a piece of audio
+    pub fn stop_audio(&mut self, sound_emitter: &mut SoundEmitter) {
+        sound_emitter
             .handle
             .take()
             .map(|mut h| h.control::<Stop<_>, _>().stop());
     }
 
-    pub fn update_motion(
+    pub(crate) fn update_motion(
         &mut self,
         audio_source: &mut SoundEmitter,
         position: mint::Point3<f32>,
@@ -149,6 +161,7 @@ impl AudioContext {
         });
     }
 
+    /// Add a music track
     pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> MusicTrack {
         println!("[AUDIO_CONTEXT] Decoding MP3..");
         let frames = get_stereo_frames_from_mp3(mp3_bytes);
@@ -159,6 +172,7 @@ impl AudioContext {
         track
     }
 
+    /// Play a music track
     pub fn play_music_track(&mut self, track: MusicTrack) {
         if let Some(mut handle) = self.music_track_handle.take() {
             handle.control::<Stop<_>, _>().stop();
@@ -170,18 +184,21 @@ impl AudioContext {
         self.current_music_track = Some(track.clone());
     }
 
+    /// Pause a music track
     pub fn pause_music_track(&mut self) {
         self.music_track_handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().pause());
     }
 
+    /// Resume a music track
     pub fn resume_music_track(&mut self) {
         self.music_track_handle
             .as_mut()
             .map(|h| h.control::<Stop<_>, _>().resume());
     }
 
+    /// Get the status of a music track
     pub fn music_track_status(&mut self) -> SoundState {
         if let Some(handle) = self.music_track_handle.as_mut() {
             let control = handle.control::<Stop<_>, _>();
@@ -197,6 +214,7 @@ impl AudioContext {
         }
     }
 
+    /// Create an empty MusicTrack. Useful for testing
     pub fn dummy_track(&mut self) -> MusicTrack {
         let frames = oddio::Frames::from_slice(0, &[]);
         MusicTrack {
@@ -204,6 +222,7 @@ impl AudioContext {
         }
     }
 
+    /// Create an empty SoundEmitter. Useful for testing
     pub fn dummy_sound_emitter(&mut self) -> SoundEmitter {
         let frames = oddio::Frames::from_slice(0, &[]);
         SoundEmitter::new(frames)

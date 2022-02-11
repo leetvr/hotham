@@ -111,7 +111,7 @@ mod tests {
             .build();
         let handle = physics_context.rigid_bodies.insert(rigid_body);
         let rigid_body = RigidBody { handle };
-        let sound_emitter = audio_context.create_audio_source(sound_effect);
+        let sound_emitter = audio_context.create_sound_emitter(sound_effect);
 
         // Create world
         let mut world = World::new();
