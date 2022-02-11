@@ -5,26 +5,44 @@ use nalgebra::{vector, Vector4};
 
 use crate::{resources::VulkanContext, texture::Texture};
 
+/// A component that instructs the renderer how an entity should look when rendered
+/// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
+/// added by default by the `gltf_loader`
 #[repr(C)]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Material {
+    /// The base colour of the material
     pub base_colour_factor: Vector4<f32>,
+    /// The color and intensity of the light being emitted by the material
     pub emmissive_factor: Vector4<f32>,
+    /// How diffuse is this material?
     pub diffuse_factor: Vector4<f32>,
+    /// How specular is this material?
     pub specular_factor: Vector4<f32>,
+    /// What workflow should be used - 0.0 for Metalic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
     pub workflow: f32,
+    /// The base color texture.
     pub base_color_texture_set: i32,
+    /// The metallic-roughness texture.
     pub metallic_roughness_texture_set: i32,
+    /// Normal texture
     pub normal_texture_set: i32,
+    /// Occlusion texture set
     pub occlusion_texture_set: i32,
+    /// Emissive texture set
     pub emissive_texture_set: i32,
+    /// The factor for the metalness of the material.
     pub metallic_factor: f32,
+    /// The factor for the roughness of the material.
     pub roughness_factor: f32,
+    /// Alpha mask - see fragment shader
     pub alpha_mask: f32,
+    /// Alpha mask cutoff - see fragment shader
     pub alpha_mask_cutoff: f32,
 }
 
 impl Material {
+    /// Load a material from a glTF document
     pub fn load(
         mesh_name: &str,
         set_layout: vk::DescriptorSetLayout,
