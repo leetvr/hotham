@@ -411,8 +411,9 @@ mod tests {
             .unwrap();
     }
 
+    // TODO: Support opening files on Linux
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    fn open_file(_: &mut ()) {}
+    fn open_file(_: &mut RenderDoc<renderdoc::V141>) {}
 
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn begin_renderdoc() {}
