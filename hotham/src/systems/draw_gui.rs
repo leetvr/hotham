@@ -412,7 +412,7 @@ mod tests {
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    fn open_file(_: ()) {}
+    fn open_file(_: &mut ()) {}
 
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     fn begin_renderdoc() {}
