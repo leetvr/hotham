@@ -2,8 +2,10 @@
 build = "build.rs"
 description = "A framework for creating incredible standalone VR experiences"
 edition = "2018"
+keywords = ["vr", "gamedev", "openxr", "vulkan"]
 license = "MIT OR Apache-2.0"
 name = "hotham"
+repository = "https://github.com/leetvr/hotham/"
 version = "0.1.0"
 
 [build-dependencies]
@@ -13,14 +15,14 @@ shaderc = "0.7"
 anyhow = "1.0"
 ash = "0.33.2"
 console = "0.14"
-cpal = {git = "https://github.com/RustAudio/cpal", rev = "f8b1ab53b46ef7a635c89c8758674cb36caea190"}
+cpal = "0.13.5"
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
 generational-arena = "0.2.8"
 gltf = {version = "0.16", features = ["KHR_materials_pbrSpecularGlossiness"]}
 hecs = "0.7.5"
-hotham-debug-server = {path = "../hotham-debug-server"}
+hotham-debug-server = {path = "../hotham-debug-server", version = "0.1"}
 image = "0.23"
 itertools = "0.10.0"
 libktx-rs = "0.2.3"
@@ -28,7 +30,7 @@ memoffset = "0.5.1"
 mint = "0.5.6"
 nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.29.0"}
 oddio = "0.5"
-openxr = {features = ["loaded", "mint"], git = "https://github.com/Ralith/openxrs", rev = "ca06a64557abc94559bdb30ceafb51b031e5ac9a"}
+openxr = {features = ["loaded", "mint"], version = "0.15.5"}
 rand = "0.8"
 rapier3d = "0.11.1"
 serde = {version = "1.0", features = ["derive"]}
@@ -45,7 +47,7 @@ approx = "0.5"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.18.0"
-ndk = "0.6.0"
+ndk = "=0.6.0"
 ndk-glue = "=0.6.0"
 
 [dev-dependencies.criterion]
