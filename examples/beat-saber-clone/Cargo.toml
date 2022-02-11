@@ -1,5 +1,6 @@
 [package]
 edition = "2018"
+license = "MIT OR Apache-2.0"
 name = "beat-saber-example"
 version = "0.1.0"
 
