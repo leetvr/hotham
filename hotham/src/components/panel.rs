@@ -22,32 +22,51 @@ use crate::{
 use crate::{vertex::Vertex, COLOR_FORMAT};
 
 use super::{Collider, Transform, TransformMatrix, Visible};
+
+/// A component added to an entity to display a 2D "panel" in space
+/// Used by `panels_system`
 #[derive(Clone)]
 pub struct Panel {
+    /// The text to be displayed
     pub text: String,
+    /// The dimensions of the panel
     pub extent: vk::Extent2D,
+    /// Framebuffer this panel will be written to
     pub framebuffer: vk::Framebuffer,
+    /// Vertices of the panel
     pub vertex_buffer: Buffer<EguiVertex>,
+    /// Indices of the panel
     pub index_buffer: Buffer<u32>,
+    /// Reference to egui context
     pub egui_context: CtxRef,
+    /// The raw input for this panel this frame
     pub raw_input: egui::RawInput,
+    /// Input received this frame
     pub input: Option<PanelInput>,
+    /// A list of buttons in this panel
     pub buttons: Vec<PanelButton>,
 }
 
+/// Input to a panel
 #[derive(Debug, Clone)]
 pub struct PanelInput {
+    /// Location of the cursor, in panel space
     pub cursor_location: Pos2,
+    /// Value of the controller trigger
     pub trigger_value: f32,
 }
 
+/// A button for a panel
 #[derive(Debug, Clone)]
 pub struct PanelButton {
+    /// Text to be displayed
     pub text: String,
+    /// Was this button clicked?
     pub clicked_this_frame: bool,
 }
 
 impl PanelButton {
+    /// Convenience function to create a new panel button
     pub fn new(text: &str) -> Self {
         PanelButton {
             text: text.to_string(),
@@ -56,6 +75,7 @@ impl PanelButton {
     }
 }
 
+/// Convenience function to create a panel and add it to a World
 pub fn add_panel_to_world(
     text: &str,
     width: u32,
@@ -247,6 +267,7 @@ fn create_mesh(
     }
 }
 
+/// Get the dimensions of a panel
 pub fn get_panel_dimensions(extent: &vk::Extent2D) -> (f32, f32) {
     let (width, height) = (extent.width as f32, extent.height as f32);
     let (half_width, half_height) = if height > width {
