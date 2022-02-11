@@ -36,6 +36,7 @@ pub(crate) unsafe fn parse_raw_string(
 }
 
 /// Convenience function to get a world with hands
+#[cfg(test)]
 pub fn get_world_with_hands() -> World {
     let vulkan_context = VulkanContext::testing().unwrap();
     let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
