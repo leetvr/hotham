@@ -3,8 +3,12 @@ use std::fs;
 use shaderc::{Compiler, ShaderKind};
 
 fn main() {
+    if std::env::var("DOCS_RS").is_ok() {
+        eprintln!("[HOTHAM BUILD] DOCS.RS DETECTED - NOT RUNNING BUILD SCRIPT!");
+        return;
+    }
     println!("cargo:rerun-if-changed=./src/shaders");
-    eprintln!("HOTHAM BUILD IS RUNNING");
+    eprintln!("[HOTHAM BUILD] Building shaders..");
 
     for path in fs::read_dir("./src/shaders").unwrap() {
         let path = path.unwrap().path();
@@ -21,13 +25,11 @@ fn main() {
             compile_shader(path, &mut compiler, ShaderKind::Vertex);
         }
     }
+
+    eprintln!("[HOTHAM BUILD] ..done!");
 }
 
-fn compile_shader(
-    path: std::path::PathBuf,
-    compiler: &mut Compiler,
-    shader_kind: ShaderKind,
-) {
+fn compile_shader(path: std::path::PathBuf, compiler: &mut Compiler, shader_kind: ShaderKind) {
     let artifact = {
         let input_file_name = path.file_name().unwrap().to_str().unwrap();
         let source_text = fs::read_to_string(&path).unwrap();
