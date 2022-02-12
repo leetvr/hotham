@@ -5,8 +5,9 @@ edition = "2018"
 keywords = ["vr", "gamedev", "openxr", "vulkan"]
 license = "MIT OR Apache-2.0"
 name = "hotham"
+readme = "../README.md"
 repository = "https://github.com/leetvr/hotham/"
-version = "0.1.0"
+version = "0.1.1"
 
 [build-dependencies]
 shaderc = "0.7"
