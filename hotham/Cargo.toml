@@ -49,11 +49,3 @@ approx = "0.5"
 jni = "0.18.0"
 ndk = "=0.6.0"
 ndk-glue = "=0.6.0"
-
-[dev-dependencies.criterion]
-features = ["html_reports"]
-version = "0.3"
-
-[[bench]]
-harness = false
-name = "transform_system"
