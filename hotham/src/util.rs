@@ -1,18 +1,9 @@
 #![allow(dead_code)]
 
 use anyhow::Result;
-use hecs::World;
-use nalgebra::{
-    vector, Isometry, Isometry3, Quaternion, Translation3, Unit, UnitQuaternion, Vector3,
-};
+use nalgebra::{Isometry, Isometry3, Quaternion, Translation3, Unit, UnitQuaternion, Vector3};
 use openxr::{Posef, SpaceLocation, SpaceLocationFlags, ViewStateFlags};
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
-
-use crate::{
-    components::Transform,
-    gltf_loader::{add_model_to_world, load_models_from_glb},
-    resources::{render_context::create_descriptor_set_layouts, VulkanContext},
-};
 
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
     strings
@@ -35,8 +26,21 @@ pub(crate) unsafe fn parse_raw_string(
     return cstr.to_str();
 }
 
+#[cfg(test)]
+use hecs::World;
+
+#[cfg(test)]
+use crate::resources::VulkanContext;
+
 /// Convenience function to get a world with hands
+#[cfg(test)]
 pub fn get_world_with_hands() -> World {
+    use crate::{
+        components::Transform,
+        gltf_loader::{add_model_to_world, load_models_from_glb},
+        resources::render_context::create_descriptor_set_layouts,
+    };
+
     let vulkan_context = VulkanContext::testing().unwrap();
     let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
 
@@ -60,7 +64,7 @@ pub fn get_world_with_hands() -> World {
     .unwrap();
     {
         let mut transform = world.get_mut::<Transform>(left_hand).unwrap();
-        transform.translation = vector![-0.2, 1.4, 0.0];
+        transform.translation = [-0.2, 1.4, 0.0].into();
     }
 
     let right_hand = add_model_to_world(
@@ -74,7 +78,7 @@ pub fn get_world_with_hands() -> World {
     .unwrap();
     {
         let mut transform = world.get_mut::<Transform>(right_hand).unwrap();
-        transform.translation = vector![0.2, 1.4, 0.0];
+        transform.translation = [0.2, 1.4, 0.0].into();
     }
 
     world
