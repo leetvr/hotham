@@ -30,7 +30,7 @@ memoffset = "0.5.1"
 mint = "0.5.6"
 nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.29.0"}
 oddio = "0.5"
-openxr = {features = ["loaded", "mint"], version = "0.15.5"}
+openxr = {features = ["loaded", "mint"], version = "0.16"}
 rand = "0.8"
 rapier3d = "0.11.1"
 serde = {version = "1.0", features = ["derive"]}
