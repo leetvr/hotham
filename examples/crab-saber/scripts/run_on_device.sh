@@ -3,7 +3,9 @@ set -eux
 
 adb shell am force-stop rust.crab_saber
 
-cd examples/crab-saber
+scriptdir=$(dirname -- "$(realpath -- "$0")")
+cd $scriptdir/..
+
 cargo apk run --release
 
 adb logcat --pid="$(adb shell pidof rust.crab_saber)"
