@@ -27,7 +27,7 @@ where
     ) -> Result<Self> {
         let size = std::mem::size_of_val(data) as vk::DeviceSize;
         let (handle, device_memory, device_memory_size) =
-            vulkan_context.create_buffer_with_data(&data, usage, size)?;
+            vulkan_context.create_buffer_with_data(data, usage, size)?;
 
         Ok(Self {
             handle,

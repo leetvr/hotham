@@ -6,23 +6,23 @@ use hecs::{Entity, PreparedQuery, Without, World};
 use nalgebra::Matrix4;
 
 /// Updatee parent transform matrix system
-/// Walks through each entity that has a Parent and builds a heirarchy
-/// Then transforms each entity based on the heirarchy
+/// Walks through each entity that has a Parent and builds a hierarchy
+/// Then transforms each entity based on the hierarchy
 pub fn update_parent_transform_matrix_system(
     parent_query: &mut PreparedQuery<&Parent>,
     roots_query: &mut PreparedQuery<Without<Parent, &TransformMatrix>>,
     world: &mut World,
-) -> () {
-    // Build heirarchy.
-    let mut heirarchy: HashMap<Entity, Vec<Entity>> = HashMap::new();
+) {
+    // Build hierarchy
+    let mut hierarchy: HashMap<Entity, Vec<Entity>> = HashMap::new();
     for (entity, parent) in parent_query.query_mut(world) {
-        let children = heirarchy.entry(parent.0).or_default();
+        let children = hierarchy.entry(parent.0).or_default();
         children.push(entity);
     }
 
     let mut roots = roots_query.query(world);
     for (root, root_matrix) in roots.iter() {
-        update_transform_matrix(&root_matrix.0, root, &heirarchy, world);
+        update_transform_matrix(&root_matrix.0, root, &hierarchy, world);
     }
 }
 

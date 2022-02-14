@@ -20,5 +20,5 @@ pub fn end_pbr_renderpass(
         return;
     }
 
-    render_context.end_pbr_render_pass(&vulkan_context, xr_context.frame_index);
+    render_context.end_pbr_render_pass(vulkan_context, xr_context.frame_index);
 }

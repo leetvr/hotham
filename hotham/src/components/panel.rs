@@ -76,6 +76,7 @@ impl PanelButton {
 }
 
 /// Convenience function to create a panel and add it to a World
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
 pub fn add_panel_to_world(
     text: &str,
     width: u32,
@@ -112,7 +113,7 @@ pub fn add_panel_to_world(
         sampler,
         descriptor,
     };
-    let mesh = create_mesh(&output_texture, &vulkan_context, &render_context, &extent);
+    let mesh = create_mesh(&output_texture, vulkan_context, render_context, &extent);
 
     let egui_context = CtxRef::default();
     let raw_input = egui::RawInput {
@@ -192,9 +193,8 @@ fn create_mesh(
     render_context: &RenderContext,
     extent: &vk::Extent2D,
 ) -> Mesh {
-    let (material, descriptor_set) =
-        get_material(&output_texture, &vulkan_context, &render_context);
-    let (half_width, half_height) = get_panel_dimensions(&extent);
+    let (material, descriptor_set) = get_material(output_texture, vulkan_context, render_context);
+    let (half_width, half_height) = get_panel_dimensions(extent);
 
     let positions = [
         vector![-half_width, half_height, 0.],  // v0
@@ -285,17 +285,19 @@ fn get_material(
     vulkan_context: &VulkanContext,
     render_context: &RenderContext,
 ) -> (Material, vk::DescriptorSet) {
-    let empty_texture = Texture::empty(&vulkan_context).unwrap();
+    let empty_texture = Texture::empty(vulkan_context).unwrap();
     // Descriptor set
     let descriptor_set = vulkan_context
         .create_textures_descriptor_sets(
             render_context.descriptor_set_layouts.textures_layout,
             "GUI Texture",
-            &output_texture,
-            &empty_texture,
-            &empty_texture,
-            &empty_texture,
-            &empty_texture,
+            &[
+                output_texture,
+                &empty_texture,
+                &empty_texture,
+                &empty_texture,
+                &empty_texture,
+            ],
         )
         .unwrap()[0];
 
@@ -327,14 +329,14 @@ fn create_mesh_buffers(vulkan_context: &VulkanContext) -> (Buffer<EguiVertex>, B
     let empty_index_buffer = [0; BUFFER_SIZE * 2];
 
     let vertex_buffer = Buffer::new(
-        &vulkan_context,
+        vulkan_context,
         &vertices,
         vk::BufferUsageFlags::VERTEX_BUFFER,
     )
     .expect("Unable to create font index buffer");
 
     let index_buffer = Buffer::new(
-        &vulkan_context,
+        vulkan_context,
         &empty_index_buffer,
         vk::BufferUsageFlags::INDEX_BUFFER,
     )

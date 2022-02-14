@@ -49,7 +49,7 @@ impl Material {
         material: MaterialData,
         vulkan_context: &VulkanContext,
         _buffer: &[u8],
-        images: &Vec<gltf::image::Data>,
+        images: &[gltf::image::Data],
     ) -> Result<(Self, vk::DescriptorSet)> {
         let material_name = format!(
             "Material {} for mesh {}",
@@ -75,7 +75,7 @@ impl Material {
                 )
             })
             .flatten()
-            .unwrap_or(empty_texture.clone());
+            .unwrap_or_else(|| empty_texture.clone());
         let base_colour_factor = Vector4::from(pbr_metallic_roughness.base_color_factor());
 
         // Metallic Roughness
@@ -92,7 +92,7 @@ impl Material {
                 )
             })
             .flatten()
-            .unwrap_or(empty_texture.clone());
+            .unwrap_or_else(|| empty_texture.clone());
 
         // Normal map
         let normal_texture_info = material.normal_texture();
@@ -110,7 +110,7 @@ impl Material {
                 )
             })
             .flatten()
-            .unwrap_or(empty_texture.clone());
+            .unwrap_or_else(|| empty_texture.clone());
 
         // Occlusion
         let occlusion_texture_info = material.occlusion_texture();
@@ -128,7 +128,7 @@ impl Material {
                 )
             })
             .flatten()
-            .unwrap_or(empty_texture.clone());
+            .unwrap_or_else(|| empty_texture.clone());
 
         // Emission
         let emissive_texture_info = material.emissive_texture();
@@ -143,7 +143,7 @@ impl Material {
                 )
             })
             .flatten()
-            .unwrap_or(empty_texture.clone());
+            .unwrap_or_else(|| empty_texture.clone());
         let emissive_texture_set = emissive_texture_info
             .map(|t| t.tex_coord() as i32)
             .unwrap_or(-1);
@@ -153,11 +153,11 @@ impl Material {
         let diffuse_factor = pbr_specular_glossiness
             .as_ref()
             .map(|p| Vector4::from(p.diffuse_factor()))
-            .unwrap_or(Vector4::zeros());
+            .unwrap_or_else(Vector4::zeros);
         let specular_factor = pbr_specular_glossiness
             .as_ref()
             .map(|p| arr_to_vec4(p.specular_factor()))
-            .unwrap_or(Vector4::zeros());
+            .unwrap_or_else(Vector4::zeros);
         let metallic_factor = pbr_metallic_roughness.metallic_factor();
         let roughness_factor = pbr_metallic_roughness.roughness_factor();
 
@@ -180,11 +180,13 @@ impl Material {
         let descriptor_set = vulkan_context.create_textures_descriptor_sets(
             set_layout,
             &material_name,
-            &base_color_texture,
-            &metallic_roughness_texture,
-            &normal_texture,
-            &occlusion_texture,
-            &emissive_texture,
+            &[
+                &base_color_texture,
+                &metallic_roughness_texture,
+                &normal_texture,
+                &occlusion_texture,
+                &emissive_texture,
+            ],
         )?[0];
 
         Ok((

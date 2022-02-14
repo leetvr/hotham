@@ -31,6 +31,8 @@ impl Vertex {
         }
     }
 
+    // Clippy warning suppressed for adjudication separately
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
     pub fn from_zip(
         t: (
             Vector3<f32>,

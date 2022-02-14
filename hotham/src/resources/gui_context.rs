@@ -155,7 +155,7 @@ impl GuiContext {
             let (vertex_shader, vertex_stage) = create_shader(
                 include_bytes!("../../shaders/gui.vert.spv"),
                 vk::ShaderStageFlags::VERTEX,
-                &vulkan_context,
+                vulkan_context,
             )
             .expect("Unable to create vertex shader");
 
@@ -163,7 +163,7 @@ impl GuiContext {
             let (fragment_shader, fragment_stage) = create_shader(
                 include_bytes!("../../shaders/gui.frag.spv"),
                 vk::ShaderStageFlags::FRAGMENT,
-                &vulkan_context,
+                vulkan_context,
             )
             .expect("Unable to create fragment shader");
 
@@ -286,7 +286,7 @@ impl GuiContext {
         );
 
         // GUI Layout
-        egui::CentralPanel::default().show(&egui_context, |ui| {
+        egui::CentralPanel::default().show(egui_context, |ui| {
             ui.with_layout(inner_layout, |ui| {
                 ui.heading(&text);
 
@@ -322,7 +322,7 @@ impl GuiContext {
         let texture = &egui_context.fonts().texture();
         if texture.version != self.font_texture_version {
             let _font_texture = update_font_texture(
-                &vulkan_context,
+                vulkan_context,
                 texture,
                 self.font_texture_descriptor_sets[0],
             );
@@ -402,11 +402,11 @@ impl GuiContext {
         for egui::ClippedMesh(rect, mesh) in &clipped_meshes {
             // Update vertex buffer
             vertex_buffer
-                .update(&vulkan_context, &mesh.vertices)
+                .update(vulkan_context, &mesh.vertices)
                 .unwrap();
 
             // Update index buffer
-            index_buffer.update(&vulkan_context, &mesh.indices).unwrap();
+            index_buffer.update(vulkan_context, &mesh.indices).unwrap();
 
             // record draw commands
             unsafe {
@@ -478,7 +478,7 @@ fn handle_panel_input(panel: &mut Panel) -> (egui::RawInput, Option<PanelInput>)
         raw_input.events.push(egui::Event::PointerGone);
     }
 
-    return (raw_input, panel_input);
+    (raw_input, panel_input)
 }
 
 fn update_font_texture(

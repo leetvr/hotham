@@ -42,7 +42,7 @@ impl Transform {
     /// Convenience function to convert the `Transform` into a `nalgebra::Isometry3`
     pub fn position(&self) -> Isometry3<f32> {
         Isometry3 {
-            rotation: self.rotation.clone(),
+            rotation: self.rotation,
             translation: self.translation.into(),
         }
     }
