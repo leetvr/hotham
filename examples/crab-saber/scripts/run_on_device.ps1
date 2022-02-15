@@ -1,6 +1,6 @@
 adb shell am force-stop rust.crab_saber
 
-Set-Location examples\crab-saber
+Set-Location $PSScriptRoot\..
 cargo apk run --release
 
 if ($?) {
