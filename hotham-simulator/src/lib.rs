@@ -1,28 +1,28 @@
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub mod openxr_loader;
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub mod simulator;
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub mod space_state;
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub mod state;
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 use crate::openxr_loader::{
     PFN_xrEnumerateInstanceExtensionProperties, PFN_xrGetInstanceProcAddr, PFN_xrVoidFunction,
     XrInstance_T, XrResult,
 };
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 use crate::simulator::*;
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 use openxr_sys::{pfn, Result};
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 type DummyFn = unsafe extern "system" fn() -> Result;
 
 #[no_mangle]
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub unsafe extern "C" fn get_instance_proc_addr(
     _instance: *mut XrInstance_T,
     name: *const i8,
@@ -156,12 +156,12 @@ pub unsafe extern "C" fn get_instance_proc_addr(
     Result::SUCCESS.into_raw()
 }
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 static GET_INSTANCE_PROC_ADDR: PFN_xrGetInstanceProcAddr = Some(get_instance_proc_addr);
 
 #[allow(non_snake_case)]
 #[no_mangle]
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub unsafe extern "system" fn xrNegotiateLoaderRuntimeInterface(
     _loader_info: *const openxr_loader::XrNegotiateLoaderInfo,
     runtime_request: *mut openxr_loader::XrNegotiateRuntimeRequest,

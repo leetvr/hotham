@@ -47,17 +47,20 @@ use std::{
 };
 use winit::event::{DeviceEvent, VirtualKeyCode};
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
-    platform::{
-        run_return::EventLoopExtRunReturn,
-        windows::{EventLoopExtWindows, WindowBuilderExtWindows},
-    },
+    platform::run_return::EventLoopExtRunReturn,
     window::WindowBuilder,
 };
+
+#[cfg(target_os = "windows")]
+use winit::platform::windows::{EventLoopExtWindows, WindowBuilderExtWindows};
+
+#[cfg(target_os = "linux")]
+use winit::platform::unix::EventLoopExtUnix;
 
 static SWAPCHAIN_COLOUR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 pub const NUM_VIEWS: usize = 2; // TODO: Make dynamic
@@ -121,7 +124,7 @@ pub unsafe extern "system" fn create_instance(
     Result::SUCCESS
 }
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub unsafe extern "system" fn create_vulkan_instance(
     _instance: Instance,
     create_info: *const VulkanInstanceCreateInfoKHR,
@@ -138,7 +141,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
 
     let event_loop: EventLoop<()> = EventLoop::new_any_thread();
     let window = WindowBuilder::new()
-        .with_drag_and_drop(false)
+        // .with_drag_and_drop(false)
         .with_visible(false)
         .build(&event_loop)
         .unwrap();
@@ -342,7 +345,7 @@ pub unsafe extern "system" fn get_vulkan_graphics_requirements(
     Result::SUCCESS
 }
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub unsafe extern "system" fn get_instance_properties(
     _instance: Instance,
     instance_properties: *mut InstanceProperties,
@@ -982,7 +985,7 @@ pub unsafe extern "system" fn enumerate_view_configuration_views(
     Result::SUCCESS
 }
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 pub unsafe extern "system" fn create_xr_swapchain(
     _session: Session,
     create_info: *const SwapchainCreateInfo,
@@ -1041,7 +1044,7 @@ fn create_multiview_image_views(
         .collect::<Vec<_>>()
 }
 
-#[cfg(target_os = "windows")]
+// #[cfg(target_os = "windows")]
 unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
     let entry = state.vulkan_entry.as_ref().unwrap().clone();
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
@@ -1064,7 +1067,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
             .with_inner_size(PhysicalSize::new(VIEWPORT_WIDTH, VIEWPORT_HEIGHT))
             .with_title("Hotham Simulator")
             .with_visible(visible)
-            .with_drag_and_drop(false)
+            // .with_drag_and_drop(false)
             .build(&event_loop)
             .unwrap();
         println!("WINDOW SCALE FACTOR, {:?}", window.scale_factor());
@@ -1776,7 +1779,7 @@ pub unsafe extern "system" fn get_vulkan_instance_extensions(
 ) -> Result {
     let event_loop: EventLoop<()> = EventLoop::new_any_thread();
     let window = WindowBuilder::new()
-        .with_drag_and_drop(false)
+        // .with_drag_and_drop(false)
         .with_visible(false)
         .build(&event_loop)
         .unwrap();
