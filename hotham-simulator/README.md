@@ -1,4 +1,4 @@
-## Introduction
-If you are trying to develop an OpenXR application, but you don't want to have to keep putting your headset on your head, this may be of interest to you.
+# Introduction
+To make VR development a little bit less painful (_because who really wants to keep taking their headset on and off all the time_), Hotham comes with a handy-dandy OpenXR simulator.
 
-If you think the above proposition is insane, you're a far more rational person than I.
+To get started with the simulator, follow the instructions over [here](https://github.com/leetvr/hotham/wiki/Adding-the-Hotham-Simulator-to-your-development-environment).
