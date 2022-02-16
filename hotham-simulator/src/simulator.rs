@@ -47,7 +47,7 @@ use std::{
 };
 use winit::event::{DeviceEvent, VirtualKeyCode};
 
-// #[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use winit::{
     dpi::PhysicalSize,
     event::{Event, WindowEvent},
@@ -124,7 +124,7 @@ pub unsafe extern "system" fn create_instance(
     Result::SUCCESS
 }
 
-// #[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub unsafe extern "system" fn create_vulkan_instance(
     _instance: Instance,
     create_info: *const VulkanInstanceCreateInfoKHR,
@@ -141,7 +141,6 @@ pub unsafe extern "system" fn create_vulkan_instance(
 
     let event_loop: EventLoop<()> = EventLoop::new_any_thread();
     let window = WindowBuilder::new()
-        // .with_drag_and_drop(false)
         .with_visible(false)
         .build(&event_loop)
         .unwrap();
@@ -985,7 +984,7 @@ pub unsafe extern "system" fn enumerate_view_configuration_views(
     Result::SUCCESS
 }
 
-// #[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub unsafe extern "system" fn create_xr_swapchain(
     _session: Session,
     create_info: *const SwapchainCreateInfo,
@@ -1044,7 +1043,7 @@ fn create_multiview_image_views(
         .collect::<Vec<_>>()
 }
 
-// #[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
     let entry = state.vulkan_entry.as_ref().unwrap().clone();
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
