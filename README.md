@@ -9,7 +9,7 @@
 # Introduction
 G'day, and welcome to Hotham! 👋
 
-Hotham is an attempt to create a lightweight, high performance game engine for mobile VR headsets. It's primarily aimed at small (1-5 person) teams of mostly technical folk who are looking to create games for devices like the Oculus Quest, but find existing tools cumbersome to work with. You can learn more about the project [in the FAQ](https://github.com/leetvr/hotham/wiki/FAQ).
+Hotham is an attempt to create a lightweight, high performance game engine for mobile VR headsets. It's primarily aimed at small (1-5 person) teams of mostly technical folk who are looking to create games for devices like the Oculus Quest, but find existing tools cumbersome to work with. You can learn more about the project [in the FAQ](https://github.com/leetvr/hotham/wiki/FAQ) or by checking out [our talk at the Rust Gamedev Meetup](https://youtu.be/adt63Gqt6yA?t=717).
 
 # Getting started
 Hotham is a complex project with many moving parts! Have no fear - we've written an easy to follow [Getting Started guide](https://github.com/leetvr/hotham/wiki/Getting-started) that will have you running our example application in no time. Head on over to [getting started](https://github.com/leetvr/hotham/wiki/Getting-started) to.. get.. started.
