@@ -186,11 +186,11 @@ fn handle_state_change(
             match game_context.state {
                 GameState::Init => {}
                 GameState::MainMenu | GameState::GameOver => {
-                    objects_to_show.push(game_context.pointer.clone());
+                    objects_to_show.push(game_context.pointer);
                 }
                 GameState::Playing(_) => {
-                    objects_to_show.push(game_context.blue_saber.clone());
-                    objects_to_show.push(game_context.red_saber.clone());
+                    objects_to_show.push(game_context.blue_saber);
+                    objects_to_show.push(game_context.red_saber);
                 }
             }
         }
@@ -199,11 +199,11 @@ fn handle_state_change(
             match game_context.state {
                 GameState::Init => {}
                 GameState::MainMenu | GameState::GameOver => {
-                    objects_to_hide.push(game_context.pointer.clone());
+                    objects_to_hide.push(game_context.pointer);
                 }
                 GameState::Playing(_) => {
-                    objects_to_hide.push(game_context.blue_saber.clone());
-                    objects_to_hide.push(game_context.red_saber.clone());
+                    objects_to_hide.push(game_context.blue_saber);
+                    objects_to_hide.push(game_context.red_saber);
                 }
             }
         }

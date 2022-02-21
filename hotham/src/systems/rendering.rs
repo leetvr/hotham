@@ -14,15 +14,15 @@ pub fn rendering_system(
     vulkan_context: &VulkanContext,
     swapchain_image_index: usize,
     render_context: &RenderContext,
-) -> () {
+) {
     for (_, (mesh, transform_matrix)) in query.query_mut(world) {
         let device = &vulkan_context.device;
         let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
 
         unsafe {
-            mesh.ubo_data.transform = transform_matrix.0.clone();
+            mesh.ubo_data.transform = transform_matrix.0;
             mesh.ubo_buffer
-                .update(&vulkan_context, &[mesh.ubo_data])
+                .update(vulkan_context, &[mesh.ubo_data])
                 .unwrap();
 
             // Bind mesh descriptor sets

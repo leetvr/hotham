@@ -34,7 +34,7 @@ pub fn begin_frame(
 
     // If the shouldRender flag is set, start rendering
     if xr_context.frame_state.should_render {
-        render_context.begin_frame(&vulkan_context, xr_context.frame_index);
+        render_context.begin_frame(vulkan_context, xr_context.frame_index);
     } else {
         println!(
             "[HOTHAM_BEGIN_FRAME] - Session is runing but shouldRender is false - not rendering"

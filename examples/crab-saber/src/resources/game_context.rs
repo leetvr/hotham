@@ -62,7 +62,7 @@ impl GameContext {
         let glb_bufs: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
         let models = gltf_loader::load_models_from_glb(
             &glb_bufs,
-            &vulkan_context,
+            vulkan_context,
             &render_context.descriptor_set_layouts,
         )
         .expect("Unable to load models!");
@@ -288,7 +288,7 @@ pub fn pre_spawn_cube(
 
     let cube = add_model_to_world(
         model_name,
-        &models,
+        models,
         world,
         None,
         vulkan_context,

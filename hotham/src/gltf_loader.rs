@@ -19,7 +19,7 @@ pub type Models = HashMap<String, World>;
 
 /// Load glTF models from a GLB file
 pub fn load_models_from_glb(
-    glb_bufs: &Vec<&[u8]>,
+    glb_bufs: &[&[u8]],
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
 ) -> Result<Models> {
@@ -31,7 +31,7 @@ pub fn load_models_from_glb(
             &document,
             &buffers[0],
             &images,
-            &vulkan_context,
+            vulkan_context,
             descriptor_set_layouts,
             &mut models,
         )
@@ -45,7 +45,7 @@ pub fn load_models_from_glb(
 pub fn load_models_from_gltf_data(
     document: &gltf::Document,
     buffer: &[u8],
-    images: &Vec<gltf::image::Data>,
+    images: &[gltf::image::Data],
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
     models: &mut Models,
@@ -71,10 +71,10 @@ pub fn load_models_from_gltf_data(
             &node_data,
             buffer,
             &mut world,
-            &vulkan_context,
+            vulkan_context,
             &mut node_entity_map,
         );
-        add_animations(&animations, &buffer, &mut world, &mut node_entity_map);
+        add_animations(&animations, buffer, &mut world, &mut node_entity_map);
 
         models.insert(
             node_data.name().expect("Node has no name!").to_string(),
@@ -85,6 +85,7 @@ pub fn load_models_from_gltf_data(
     Ok(())
 }
 
+#[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
 fn load_node(
     node_data: &gltf::Node,
     gltf_buffer: &[u8],
@@ -93,7 +94,7 @@ fn load_node(
     world: &mut World,
     node_entity_map: &mut HashMap<usize, Entity>,
     is_root: bool,
-    images: &Vec<gltf::image::Data>,
+    images: &[gltf::image::Data],
 ) -> Result<()> {
     let transform = Transform::load(node_data.transform());
     let transform_matrix = TransformMatrix(node_data.transform().matrix().into());
@@ -143,13 +144,13 @@ fn add_parents(
     node_data: &gltf::Node,
     world: &mut World,
     node_entity_map: &mut HashMap<usize, Entity>,
-) -> () {
+) {
     let this_entity = node_entity_map.get(&node_data.index()).unwrap();
     let parent = Parent(*this_entity);
     for child_node in node_data.children() {
         let child_id = child_node.index();
         let child_entity = node_entity_map.get(&child_id).unwrap();
-        world.insert_one(*child_entity, parent.clone()).unwrap();
+        world.insert_one(*child_entity, parent).unwrap();
         add_parents(&child_node, world, node_entity_map);
     }
 }
@@ -160,7 +161,7 @@ fn add_skins_and_joints(
     world: &mut World,
     vulkan_context: &VulkanContext,
     node_entity_map: &mut HashMap<usize, Entity>,
-) -> () {
+) {
     // Do we need to add a Skin?
     // TODO: Extract this to components::Skin
     if let Some(node_skin_data) = node_data.skin() {
@@ -179,7 +180,7 @@ fn add_skins_and_joints(
         {
             let joint = Joint {
                 skeleton_root: this_entity,
-                inverse_bind_matrix: inverse_bind_matrix.clone(),
+                inverse_bind_matrix: *inverse_bind_matrix,
             };
             joint_ids.push(joint_node.index());
             let joint_entity = node_entity_map.get(&joint_node.index()).unwrap();
@@ -200,11 +201,11 @@ fn add_skins_and_joints(
 }
 
 fn add_animations(
-    animations: &Vec<gltf::Animation>,
+    animations: &[gltf::Animation], // Clippy ptr_arg
     buffer: &[u8],
     world: &mut World,
     node_entity_map: &mut HashMap<usize, Entity>,
-) -> () {
+) {
     let (controller_entity, _) = world.query::<&Root>().iter().next().unwrap();
 
     for animation in animations.iter() {
@@ -278,7 +279,7 @@ fn add_animations(
                         .insert_one(
                             target_entity,
                             AnimationTarget {
-                                controller: controller_entity.clone(),
+                                controller: controller_entity,
                                 animations: vec![animation],
                             },
                         )
@@ -323,13 +324,13 @@ pub fn add_model_to_world(
     for (source_entity, destination_entity) in &entity_map {
         if let Ok(transform) = source_world.get_mut::<Transform>(*source_entity) {
             destination_world
-                .insert_one(*destination_entity, transform.clone())
+                .insert_one(*destination_entity, *transform)
                 .unwrap();
         }
 
         if let Ok(transform_matrix) = source_world.get_mut::<TransformMatrix>(*source_entity) {
             destination_world
-                .insert_one(*destination_entity, transform_matrix.clone())
+                .insert_one(*destination_entity, *transform_matrix)
                 .unwrap();
         }
 
@@ -359,7 +360,7 @@ pub fn add_model_to_world(
             let new_mesh = Mesh {
                 descriptor_sets: [descriptor_sets[0]],
                 ubo_buffer,
-                ubo_data: mesh.ubo_data.clone(),
+                ubo_data: mesh.ubo_data,
                 primitives: mesh.primitives.clone(),
             };
             destination_world
@@ -375,7 +376,7 @@ pub fn add_model_to_world(
 
         // If the source entity had a joint, clone it and set the skeleton root to the corresponding entity in the destination world.
         if let Ok(joint) = source_world.get_mut::<Joint>(*source_entity) {
-            let mut new_joint = joint.clone();
+            let mut new_joint = *joint;
             new_joint.skeleton_root = *entity_map.get(&joint.skeleton_root).unwrap();
             destination_world
                 .insert_one(*destination_entity, new_joint)
@@ -392,7 +393,7 @@ pub fn add_model_to_world(
 
         if let Ok(root) = source_world.get_mut::<Root>(*source_entity) {
             destination_world
-                .insert_one(*destination_entity, root.clone())
+                .insert_one(*destination_entity, *root)
                 .unwrap();
 
             // Set a parent for the root entity if one was specified.
@@ -428,7 +429,7 @@ pub fn add_model_to_world(
 
         if let Ok(visible) = source_world.get_mut::<Visible>(*source_entity) {
             destination_world
-                .insert_one(*destination_entity, visible.clone())
+                .insert_one(*destination_entity, *visible)
                 .unwrap();
         }
     }

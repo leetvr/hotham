@@ -10,7 +10,7 @@ pub fn skinning_system(
     joints_query: &mut PreparedQuery<(&TransformMatrix, &Joint, &Info)>,
     meshes_query: &mut PreparedQuery<(&mut Mesh, &Skin)>,
     world: &mut World,
-) -> () {
+) {
     let mut joint_matrices: HashMap<Entity, HashMap<usize, Matrix4<f32>>> = HashMap::new();
     for (_, (transform_matrix, joint, info)) in joints_query.query(world).iter() {
         let inverse_transform = world
@@ -29,13 +29,12 @@ pub fn skinning_system(
     }
 
     for (entity, (mesh, skin)) in meshes_query.query_mut(world) {
-        let mut matrices_map = joint_matrices.remove(&entity).expect(&format!(
-            "Unable to get joint_matrix for entity: {:?}",
-            entity
-        ));
+        let mut matrices_map = joint_matrices
+            .remove(&entity)
+            .unwrap_or_else(|| panic!("Unable to get joint_matrix for entity: {:?}", entity));
         let joint_matrices = &mut mesh.ubo_data.joint_matrices;
         for (i, joint_id) in skin.joint_ids.iter().enumerate() {
-            let joint_matrix = matrices_map.remove(&joint_id).unwrap();
+            let joint_matrix = matrices_map.remove(joint_id).unwrap();
             joint_matrices[i] = joint_matrix;
         }
     }

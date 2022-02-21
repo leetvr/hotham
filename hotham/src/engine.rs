@@ -98,7 +98,7 @@ impl Engine {
         process_android_events(&mut self.resumed, &self.should_quit);
 
         let (previous_state, current_state) = {
-            let previous_state = self.xr_context.session_state.clone();
+            let previous_state = self.xr_context.session_state;
             let current_state = self.xr_context.poll_xr_event(&mut self.event_data_buffer)?;
             (previous_state, current_state)
         };
@@ -129,6 +129,12 @@ impl Engine {
         }
 
         Ok((previous_state, current_state))
+    }
+}
+
+impl Default for Engine {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

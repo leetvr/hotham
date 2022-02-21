@@ -22,21 +22,21 @@ impl Texture {
     pub fn new(
         name: &str,
         vulkan_context: &VulkanContext,
-        image_buf: &Vec<u8>,
+        image_buf: &[u8],
         width: u32,
         height: u32,
         format: vk::Format,
     ) -> Result<Self> {
-        let (image, sampler) = vulkan_context.create_texture_image(
-            name,
-            image_buf,
-            width,
-            height,
+        let image_t = vulkan_context.create_image(
             format,
+            &vk::Extent2D { width, height },
+            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
             1,
             1,
-            vec![0],
         )?;
+
+        let (image, sampler) =
+            vulkan_context.create_texture_image(name, image_buf, 1, vec![0], image_t)?;
         let descriptor = vk::DescriptorImageInfo::builder()
             .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
             .image_view(image.view)
@@ -54,7 +54,7 @@ impl Texture {
         mesh_name: &str,
         texture: gltf::texture::Texture,
         vulkan_context: &VulkanContext,
-        images: &Vec<gltf::image::Data>,
+        images: &[gltf::image::Data],
     ) -> Option<Self> {
         let texture_name = &format!(
             "Texture {} for mesh {}",
@@ -63,12 +63,12 @@ impl Texture {
         );
         match texture.source().source() {
             gltf::image::Source::Uri { uri, .. } => {
-                let (buf, width, height) =
-                    parse_image(&uri).expect(&format!("Unable to load image! URI: {}", uri));
+                let (buf, width, height) = parse_image(uri)
+                    .unwrap_or_else(|_| panic!("Unable to load image! URI: {}", uri));
                 Some(
                     Texture::new(
                         texture_name,
-                        &vulkan_context,
+                        vulkan_context,
                         &buf,
                         width,
                         height,
@@ -82,10 +82,10 @@ impl Texture {
                 let index = texture.source().index();
                 let image = &images[index];
                 let texture = if image.format != Format::R8G8B8A8 {
-                    let pixels = add_alpha_channel(&image);
+                    let pixels = add_alpha_channel(image);
                     Texture::new(
                         texture_name,
-                        &vulkan_context,
+                        vulkan_context,
                         &pixels,
                         image.width,
                         image.height,
@@ -94,7 +94,7 @@ impl Texture {
                 } else {
                     Texture::new(
                         texture_name,
-                        &vulkan_context,
+                        vulkan_context,
                         &image.pixels,
                         image.width,
                         image.height,
@@ -123,22 +123,15 @@ impl Texture {
     pub fn from_ktx2(name: &str, buf: &[u8], vulkan_context: &VulkanContext) -> Result<Self> {
         let buf = Cursor::new(buf.to_vec());
         let buf = Box::new(buf);
-        let (buf, width, height, format, array_layers, mip_levels, offsets) = parse_ktx(buf)?;
+        let (buf, image_t, mip_levels, offsets) = parse_ktx(buf, vulkan_context)?;
         println!(
             "Creating texture image with format {:?}, array layers {} and mip_levels {}",
-            format, array_layers, mip_levels
+            image_t.format, image_t.layer_count, mip_levels
         );
 
-        let (image, sampler) = vulkan_context.create_texture_image(
-            name,
-            &buf,
-            width,
-            height,
-            format,
-            array_layers,
-            mip_levels,
-            offsets,
-        )?;
+        let (image, sampler) =
+            vulkan_context.create_texture_image(name, &buf, mip_levels, offsets, image_t)?;
+
         let descriptor = vk::DescriptorImageInfo::builder()
             .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
             .image_view(image.view)
@@ -160,7 +153,7 @@ fn parse_image(path: &str) -> Result<(Vec<u8>, u32, u32)> {
     let img = img.to_rgba8();
     let width = img.width();
     let height = img.height();
-    return Ok((img.into_raw(), width, height));
+    Ok((img.into_raw(), width, height))
 }
 
 #[cfg(target_os = "android")]
@@ -180,7 +173,8 @@ fn parse_image(path: &str) -> Result<(Vec<u8>, u32, u32)> {
 
 pub fn parse_ktx(
     buf: Box<Cursor<Vec<u8>>>,
-) -> Result<(Vec<u8>, u32, u32, vk::Format, u32, u32, Vec<vk::DeviceSize>)> {
+    vulkan_context: &VulkanContext,
+) -> Result<(Vec<u8>, Image, u32, Vec<vk::DeviceSize>)> {
     let stream = RustKtxStream::new(buf).map_err(|e| anyhow!("Couldn't create stream: {}", e))?;
     let source = Arc::new(Mutex::new(stream));
     let mut texture = StreamSource::new(source, TextureCreateFlags::LOAD_IMAGE_DATA)
@@ -189,7 +183,7 @@ pub fn parse_ktx(
 
     let image_buf = texture.data().to_vec();
     let mut offsets = Vec::new();
-    let (image_height, image_width, layer_count, mip_count) = unsafe {
+    let (height, width, layer_count, mip_count) = unsafe {
         let ktx_texture = &(*texture.handle());
         let layers = if ktx_texture.isCubemap {
             6
@@ -215,15 +209,15 @@ pub fn parse_ktx(
     let ktx2 = texture.ktx2().unwrap();
     let format = vk::Format::from_raw(ktx2.vk_format() as _);
 
-    Ok((
-        image_buf,
-        image_width,
-        image_height,
+    let image = vulkan_context.create_image(
         format,
+        &vk::Extent2D { width, height },
+        vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
         layer_count,
         mip_count,
-        offsets,
-    ))
+    )?;
+
+    Ok((image_buf, image, mip_count, offsets))
 }
 
 fn add_alpha_channel(image: &gltf::image::Data) -> Vec<u8> {
@@ -233,9 +227,8 @@ fn add_alpha_channel(image: &gltf::image::Data) -> Vec<u8> {
     let mut original_index = 0;
     let mut final_index = 0;
     while original_index < original_image.len() {
-        for i in 0..3 {
-            final_image[final_index + i] = original_image[original_index + i];
-        }
+        final_image[final_index..(3 + final_index)]
+            .clone_from_slice(&original_image[original_index..(3 + original_index)]);
         final_image[final_index + 3] = 1;
 
         original_index += 3;

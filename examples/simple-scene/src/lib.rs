@@ -48,7 +48,7 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     ];
     let models = gltf_loader::load_models_from_glb(
         &glb_bufs,
-        &vulkan_context,
+        vulkan_context,
         &render_context.descriptor_set_layouts,
     )?;
     add_helmet(

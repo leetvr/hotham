@@ -14,6 +14,7 @@ pub struct Image {
 }
 
 impl Image {
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
     pub fn new(
         handle: vk::Image,
         view: vk::ImageView,

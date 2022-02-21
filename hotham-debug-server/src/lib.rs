@@ -171,6 +171,12 @@ impl DebugServer {
     }
 }
 
+impl Default for DebugServer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 #[allow(unused_assignments)]
 mod tests {

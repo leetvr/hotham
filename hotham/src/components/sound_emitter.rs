@@ -56,9 +56,9 @@ impl SoundEmitter {
             if control.is_stopped() {
                 return SoundState::Stopped;
             }
-            return SoundState::Playing;
+            SoundState::Playing
         } else {
-            return SoundState::Stopped;
+            SoundState::Stopped
         }
     }
 

@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use crate::components::{sound_emitter::SoundState, SoundEmitter};
 use cpal::{
@@ -19,7 +19,7 @@ pub struct AudioContext {
     /// Handle to the `oddio` mixer
     pub mixer_handle: oddio::Handle<Mixer<[f32; 2]>>,
     /// Handle to the `cpal` mixer
-    pub stream: Arc<Mutex<Stream>>,
+    pub stream: Stream,
     /// The currently playing music track
     pub current_music_track: Option<MusicTrack>,
     music_tracks_inner: Arena<Arc<Frames<[f32; 2]>>>,
@@ -83,18 +83,13 @@ impl Default for AudioContext {
         Self {
             scene_handle,
             mixer_handle,
-            stream: Arc::new(Mutex::new(stream)),
+            stream,
             music_tracks_inner: Arena::new(),
             music_track_handle: None,
             current_music_track: None,
         }
     }
 }
-
-// SAFETY: I solemly promise to be good.
-// We have no intention to mutate `Stream`, we just have to hold
-// a reference onto it so that sound keeps playing.
-unsafe impl Send for AudioContext {}
 
 impl AudioContext {
     /// Convenience function to create a `SoundEmitter` from an MP3 file
@@ -127,26 +122,23 @@ impl AudioContext {
 
     /// Resume a piece of audio
     pub fn resume_audio(&mut self, sound_emitter: &mut SoundEmitter) {
-        sound_emitter
-            .handle
-            .as_mut()
-            .map(|h| h.control::<Stop<_>, _>().resume());
+        if let Some(h) = sound_emitter.handle.as_mut() {
+            h.control::<Stop<_>, _>().resume()
+        }
     }
 
     /// Pause a piece of audio
     pub fn pause_audio(&mut self, sound_emitter: &mut SoundEmitter) {
-        sound_emitter
-            .handle
-            .as_mut()
-            .map(|h| h.control::<Stop<_>, _>().pause());
+        if let Some(h) = sound_emitter.handle.as_mut() {
+            h.control::<Stop<_>, _>().pause()
+        }
     }
 
     /// Stop a piece of audio
     pub fn stop_audio(&mut self, sound_emitter: &mut SoundEmitter) {
-        sound_emitter
-            .handle
-            .take()
-            .map(|mut h| h.control::<Stop<_>, _>().stop());
+        if let Some(h) = sound_emitter.handle.as_mut() {
+            h.control::<Stop<_>, _>().stop()
+        }
     }
 
     pub(crate) fn update_motion(
@@ -155,10 +147,10 @@ impl AudioContext {
         position: mint::Point3<f32>,
         velocity: mint::Vector3<f32>,
     ) {
-        audio_source.handle.as_mut().map(|h| {
+        if let Some(h) = audio_source.handle.as_mut() {
             h.control::<SpatialBuffered<_>, _>()
                 .set_motion(position, velocity, false)
-        });
+        };
     }
 
     /// Add a music track
@@ -166,10 +158,9 @@ impl AudioContext {
         println!("[AUDIO_CONTEXT] Decoding MP3..");
         let frames = get_stereo_frames_from_mp3(mp3_bytes);
         println!("[AUDIO_CONTEXT] ..done!");
-        let track = MusicTrack {
+        MusicTrack {
             index: self.music_tracks_inner.insert(frames),
-        };
-        track
+        }
     }
 
     /// Play a music track
@@ -181,21 +172,21 @@ impl AudioContext {
         let frames = self.music_tracks_inner[track.index].clone();
         let signal = oddio::FramesSignal::from(frames);
         self.music_track_handle = Some(self.mixer_handle.control().play(signal));
-        self.current_music_track = Some(track.clone());
+        self.current_music_track = Some(track);
     }
 
     /// Pause a music track
     pub fn pause_music_track(&mut self) {
-        self.music_track_handle
-            .as_mut()
-            .map(|h| h.control::<Stop<_>, _>().pause());
+        if let Some(h) = self.music_track_handle.as_mut() {
+            h.control::<Stop<_>, _>().pause()
+        }
     }
 
     /// Resume a music track
     pub fn resume_music_track(&mut self) {
-        self.music_track_handle
-            .as_mut()
-            .map(|h| h.control::<Stop<_>, _>().resume());
+        if let Some(h) = self.music_track_handle.as_mut() {
+            h.control::<Stop<_>, _>().resume()
+        }
     }
 
     /// Get the status of a music track
@@ -208,7 +199,7 @@ impl AudioContext {
             if control.is_stopped() {
                 return SoundState::Stopped;
             }
-            return SoundState::Playing;
+            SoundState::Playing
         } else {
             SoundState::Stopped
         }
@@ -237,7 +228,7 @@ fn get_frames_from_mp3(mp3_bytes: Vec<u8>) -> Arc<Frames<f32>> {
 fn get_stereo_frames_from_mp3(mp3_bytes: Vec<u8>) -> Arc<Frames<[f32; 2]>> {
     let (mut samples, sample_rate) = decode_mp3(mp3_bytes);
     let stereo = oddio::frame_stereo(&mut samples);
-    oddio::Frames::from_slice(sample_rate, &stereo)
+    oddio::Frames::from_slice(sample_rate, stereo)
 }
 
 fn decode_mp3(mp3_bytes: Vec<u8>) -> (Vec<f32>, u32) {

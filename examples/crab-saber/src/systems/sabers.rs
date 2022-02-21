@@ -11,12 +11,14 @@ use hotham::{
 use crate::components::{Colour, Saber};
 
 const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
-const ROTATION_OFFSET: Quaternion<f32> = Quaternion::new(
+/* Original matrix
     -0.5581498959847122,
     0.8274912503663805,
     0.03413791007514528,
     -0.05061153302400824,
-);
+*/
+const ROTATION_OFFSET: Quaternion<f32> =
+    Quaternion::new(-0.558_149_8, 0.827_491_2, 0.034_137_9, -0.050_611_5);
 
 const SABER_HEIGHT: f32 = 0.8;
 const SABER_HALF_HEIGHT: f32 = SABER_HEIGHT / 2.;

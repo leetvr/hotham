@@ -23,7 +23,7 @@ pub(crate) unsafe fn parse_raw_string(
     raw_string: *const c_char,
 ) -> Result<&'static str, Utf8Error> {
     let cstr = CStr::from_ptr(raw_string);
-    return cstr.to_str();
+    cstr.to_str()
 }
 
 #[cfg(test)]
