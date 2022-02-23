@@ -1,3 +1,4 @@
+[![Build](https://github.com/leetvr/hotham/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/leetvr/hotham/actions/workflows/rust.yml)
 [![Documentation](https://docs.rs/hotham/badge.svg)](https://docs.rs/hotham/)
 [![Crates.io](https://img.shields.io/crates/v/hotham.svg)](https://crates.io/crates/hotham)
 [![Discord](https://img.shields.io/discord/930970630612979782?label=Hotham%20Discord)](https://discord.gg/SZEZUX6ZsQ)
