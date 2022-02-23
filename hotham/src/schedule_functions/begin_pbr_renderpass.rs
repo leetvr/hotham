@@ -26,13 +26,13 @@ pub fn begin_pbr_renderpass(
 
         // Update uniform buffers
         render_context
-            .update_scene_data(&views, &vulkan_context)
+            .update_scene_data(views, vulkan_context)
             .unwrap();
     }
 
     // TODO: This begs the question: what if we never get a valid view from OpenXR..?
 
     // Begin the renderpass.
-    render_context.begin_pbr_render_pass(&vulkan_context, xr_context.frame_index);
+    render_context.begin_pbr_render_pass(vulkan_context, xr_context.frame_index);
     // ..and we're off!
 }

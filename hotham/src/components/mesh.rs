@@ -7,7 +7,7 @@ use crate::{
     buffer::Buffer,
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
-use std::mem::MaybeUninit;
+use std::mem::{transmute, MaybeUninit};
 
 /// Uniform buffer used by the vertex shader for each entity
 #[repr(C)]
@@ -23,10 +23,17 @@ pub struct MeshUBO {
 
 impl Default for MeshUBO {
     fn default() -> Self {
-        // Most meshes don't have joints, so no point allocating.
-        let mut joint_matrices: [Matrix4<f32>; 128] =
-            unsafe { MaybeUninit::uninit().assume_init() };
-        joint_matrices[0] = Matrix4::identity();
+        let joint_matrices = {
+            // Most meshes don't have joints, so no point allocating.
+            let mut joint_matrices: [MaybeUninit<Matrix4<f32>>; 128] =
+                unsafe { MaybeUninit::uninit().assume_init() };
+            for elem in &mut joint_matrices[0..0] {
+                elem.write(Matrix4::identity());
+            }
+            unsafe { transmute::<_, [Matrix4<f32>; 128]>(joint_matrices) }
+            //joint_matrices[0] = Matrix4::identity();
+        };
+
         Self {
             transform: Default::default(),
             joint_count: Default::default(),
@@ -55,7 +62,7 @@ impl Mesh {
         buffer: &[u8],
         vulkan_context: &VulkanContext,
         descriptor_set_layouts: &DescriptorSetLayouts,
-        images: &Vec<gltf::image::Data>,
+        images: &[gltf::image::Data],
     ) -> Result<Mesh> {
         let name = mesh_data.name().unwrap_or("");
         let primitives = mesh_data

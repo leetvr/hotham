@@ -29,7 +29,7 @@ impl Primitive {
         primitive_data: gltf::Primitive,
         buffer: &[u8],
         vulkan_context: &VulkanContext,
-        images: &Vec<gltf::image::Data>,
+        images: &[gltf::image::Data],
     ) -> Result<Self> {
         let mut indices = Vec::new();
         let mut positions = Vec::new();
@@ -44,7 +44,7 @@ impl Primitive {
         // Positions
         for v in reader
             .read_positions()
-            .ok_or(anyhow!("Mesh {} has no positions!", mesh_name))?
+            .ok_or_else(|| anyhow!("Mesh {} has no positions!", mesh_name))?
         {
             positions.push(vector![v[0], v[1], v[2]]);
         }
@@ -130,15 +130,12 @@ impl Primitive {
 
         // Create buffers
         let vertex_buffer = Buffer::new(
-            &vulkan_context,
+            vulkan_context,
             &vertices,
             vk::BufferUsageFlags::VERTEX_BUFFER,
         )?;
-        let index_buffer = Buffer::new(
-            &vulkan_context,
-            &indices,
-            vk::BufferUsageFlags::INDEX_BUFFER,
-        )?;
+        let index_buffer =
+            Buffer::new(vulkan_context, &indices, vk::BufferUsageFlags::INDEX_BUFFER)?;
 
         Ok(Primitive {
             material,

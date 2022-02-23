@@ -16,8 +16,8 @@ pub fn sync_debug_server(
     physics_context: &PhysicsContext,
 ) {
     let debug_data = world_to_debug_data(
-        &world,
-        &physics_context,
+        world,
+        physics_context,
         debug_server.current_frame,
         debug_server.session_id,
     );
@@ -56,12 +56,12 @@ pub fn world_to_debug_data(
 
         entities.push(e);
     }
-    return DebugFrame {
+    DebugFrame {
         id: Uuid::new_v4(),
         frame_number: frame as _,
         entities,
         session_id,
-    };
+    }
 }
 
 fn parse_transform(transform: &Transform) -> DebugTransform {
@@ -69,11 +69,11 @@ fn parse_transform(transform: &Transform) -> DebugTransform {
     let r = transform.rotation.quaternion();
     let s = transform.scale;
 
-    return DebugTransform {
+    DebugTransform {
         translation: [t[0], t[1], t[2]],
         rotation: [r[0], r[1], r[2], r[3]],
         scale: [s[0], s[1], s[2]],
-    };
+    }
 }
 
 fn parse_collider(collider: &rapier3d::geometry::Collider) -> DebugCollider {

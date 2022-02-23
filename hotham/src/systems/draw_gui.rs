@@ -29,8 +29,8 @@ pub fn draw_gui_system(
         }
 
         gui_context.paint_gui(
-            &vulkan_context,
-            &render_context,
+            vulkan_context,
+            render_context,
             *swapchain_image_index,
             panel,
         );

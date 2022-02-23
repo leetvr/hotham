@@ -24,7 +24,8 @@ use crate::{
     scene_data::{SceneData, SceneParams},
     swapchain::Swapchain,
     texture::Texture,
-    vertex::Vertex, COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
+    vertex::Vertex,
+    COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::{
@@ -115,20 +116,19 @@ impl RenderContext {
             offset: vk::Offset2D::default(),
         };
 
-        let descriptor_set_layouts = create_descriptor_set_layouts(&vulkan_context)?;
+        let descriptor_set_layouts = create_descriptor_set_layouts(vulkan_context)?;
 
         // Pipeline, render pass
-        let render_pass = create_render_pass(&vulkan_context)?;
+        let render_pass = create_render_pass(vulkan_context)?;
         let pipeline_layout = create_pipeline_layout(
-            &vulkan_context,
+            vulkan_context,
             &[
                 descriptor_set_layouts.scene_data_layout,
                 descriptor_set_layouts.textures_layout,
                 descriptor_set_layouts.mesh_layout,
             ],
         )?;
-        let pipeline =
-            create_pipeline(&vulkan_context, pipeline_layout, &render_area, render_pass)?;
+        let pipeline = create_pipeline(vulkan_context, pipeline_layout, &render_area, render_pass)?;
 
         // Depth image, shared between frames
         let depth_image = vulkan_context.create_image(
@@ -150,9 +150,9 @@ impl RenderContext {
 
         // Create all the per-frame resources we need
         let frames = create_frames(
-            &vulkan_context,
+            vulkan_context,
             &render_pass,
-            &swapchain,
+            swapchain,
             &depth_image,
             &colour_image,
         )?;
@@ -160,14 +160,14 @@ impl RenderContext {
         println!("[HOTHAM_RENDERER] Creating UBO..");
         let scene_data = SceneData::default();
         let scene_data_buffer = Buffer::new(
-            &vulkan_context,
+            vulkan_context,
             &[scene_data],
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
 
         let scene_params = SceneParams::default();
         let scene_params_buffer = Buffer::new(
-            &vulkan_context,
+            vulkan_context,
             &[scene_params],
             vk::BufferUsageFlags::UNIFORM_BUFFER,
         )?;
@@ -225,10 +225,10 @@ impl RenderContext {
     // TODO: Make this update the scene data rather than creating a new one
     pub(crate) fn update_scene_data(
         &mut self,
-        views: &Vec<xr::View>,
+        views: &[xr::View],
         vulkan_context: &VulkanContext,
     ) -> Result<()> {
-        self.views = views.clone();
+        self.views = views.to_owned();
 
         // View (camera)
         let view_matrices = &self
@@ -276,16 +276,12 @@ impl RenderContext {
         };
 
         self.scene_data_buffer
-            .update(&vulkan_context, &[self.scene_data])?;
+            .update(vulkan_context, &[self.scene_data])?;
 
         Ok(())
     }
 
-    pub(crate) fn begin_frame(
-        &self,
-        vulkan_context: &VulkanContext,
-        swapchain_image_index: usize,
-    ) {
+    pub(crate) fn begin_frame(&self, vulkan_context: &VulkanContext, swapchain_image_index: usize) {
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];
@@ -393,7 +389,6 @@ impl RenderContext {
             device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
             device.reset_fences(&[fence]).unwrap();
         }
-
     }
 }
 
@@ -430,13 +425,18 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     let c2r3 = -1.0;
     let c3r3 = 0.0;
 
+    /*
     #[rustfmt::skip]
-    return Matrix4::from_column_slice(&[
-        c0r0, c0r1, c0r2, c0r3, 
-        c1r0, c1r1, c1r2, c1r3, 
-        c2r0, c2r1, c2r2, c2r3, 
+    Matrix4::from_column_slice(&[
+        c0r0, c0r1, c0r2, c0r3,
+        c1r0, c1r1, c1r2, c1r3,
+        c2r0, c2r1, c2r2, c2r3,
         c3r0, c3r1, c3r2, c3r3,
-    ]);
+    ]) */
+    Matrix4::from_column_slice(&[
+        c0r0, c0r1, c0r2, c0r3, c1r0, c1r1, c1r2, c1r3, c2r0, c2r1, c2r2, c2r3, c3r0, c3r1, c3r2,
+        c3r3,
+    ])
 }
 
 pub fn create_descriptor_set_layouts(
@@ -862,7 +862,7 @@ pub fn create_shader(
     }?;
     let shader_stage = vk::PipelineShaderStageCreateInfo::builder()
         .stage(stage)
-        .name(main.clone())
+        .name(<&std::ffi::CStr>::clone(&main))
         .module(shader_module)
         .build();
 
@@ -884,7 +884,7 @@ fn create_pipeline_layout(
     unsafe {
         vulkan_context
             .device
-            .create_pipeline_layout(&create_info, None)
+            .create_pipeline_layout(create_info, None)
     }
     .map_err(|e| e.into())
 }

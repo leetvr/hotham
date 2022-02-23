@@ -9,7 +9,7 @@ pub fn end_frame(
 ) {
     // Check if we should be rendering.
     if xr_context.frame_state.should_render {
-        render_context.end_frame(&vulkan_context, xr_context.frame_index);
+        render_context.end_frame(vulkan_context, xr_context.frame_index);
     } else {
         println!(
             "[HOTHAM_END_FRAME] - Session is runing but shouldRender is false - not rendering"

@@ -141,7 +141,7 @@ fn transition(
                 .live_cubes_query
                 .query(world)
                 .iter()
-                .map(|(e, _)| e.clone())
+                .map(|(e, _)| e)
                 .collect::<Vec<_>>();
             dispose_of_cubes(live_cubes, world, physics_context);
 
@@ -183,7 +183,7 @@ fn run(
         GameState::Init => return Some(GameState::MainMenu),
         GameState::MainMenu => {
             let panel = world.get::<Panel>(game_context.main_menu_panel).unwrap();
-            if let Some(button) = panel.buttons.iter().filter(|p| p.clicked_this_frame).next() {
+            if let Some(button) = panel.buttons.iter().find(|p| p.clicked_this_frame) {
                 let song = game_context.songs.get(&button.text).unwrap();
                 return Some(GameState::Playing(song.clone()));
             }
@@ -269,15 +269,15 @@ fn check_for_hits(
                 match *colour {
                     Colour::Red => {
                         game_context.current_score -= 1;
-                        pending_sound_effects.push((c.clone(), "Miss"));
+                        pending_sound_effects.push((*c, "Miss"));
                     }
                     Colour::Blue => {
                         game_context.current_score += 1;
-                        pending_sound_effects.push((c.clone(), "Hit"));
+                        pending_sound_effects.push((*c, "Hit"));
                     }
                 }
                 haptic_context.request_haptic_feedback(1., Handedness::Right);
-                cubes_to_dispose.push(c.clone());
+                cubes_to_dispose.push(*c);
             }
         }
 
@@ -291,15 +291,15 @@ fn check_for_hits(
                 match *colour {
                     Colour::Red => {
                         game_context.current_score += 1;
-                        pending_sound_effects.push((c.clone(), "Hit"));
+                        pending_sound_effects.push((*c, "Hit"));
                     }
                     Colour::Blue => {
                         game_context.current_score -= 1;
-                        pending_sound_effects.push((c.clone(), "Miss"));
+                        pending_sound_effects.push((*c, "Miss"));
                     }
                 }
                 haptic_context.request_haptic_feedback(1., Handedness::Left);
-                cubes_to_dispose.push(c.clone());
+                cubes_to_dispose.push(*c);
             }
         }
 
@@ -311,8 +311,8 @@ fn check_for_hits(
             };
             if e.get::<Cube>().is_some() {
                 game_context.current_score -= 1;
-                pending_sound_effects.push((c.clone(), "Miss"));
-                cubes_to_dispose.push(c.clone());
+                pending_sound_effects.push((*c, "Miss"));
+                cubes_to_dispose.push(*c);
             }
         }
     }

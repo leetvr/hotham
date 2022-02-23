@@ -11,13 +11,16 @@ use ash::{
     extensions::ext::DebugUtils,
     prelude::VkResult,
     util::Align,
-    vk::{self, DebugUtilsObjectNameInfoEXT, Handle, ObjectType},
+    vk::{self, Handle, ObjectType},
     Device, Entry, Instance as AshInstance,
 };
 use openxr as xr;
 use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy};
 
 type XrVulkan = xr::Vulkan;
+
+#[cfg(not(target_os = "android"))]
+use ash::vk::DebugUtilsObjectNameInfoEXT;
 
 #[derive(Clone)]
 pub struct VulkanContext {
@@ -467,25 +470,15 @@ impl VulkanContext {
     pub fn create_texture_image(
         &self,
         name: &str,
-        image_buf: &Vec<u8>,
-        width: u32,
-        height: u32,
-        format: vk::Format,
-        layer_count: u32,
+        image_buf: &[u8], // Clippy &Vec<u8>, ptr_arg for texture.rs
         mip_count: u32,
         offsets: Vec<vk::DeviceSize>,
+        texture_image: Image,
     ) -> Result<(Image, vk::Sampler)> {
         // Get the image's properties
-        let image_extent = vk::Extent2D { width, height };
+        let layer_count = texture_image.layer_count;
+        let format = texture_image.format;
 
-        // Create the destination image
-        let texture_image = self.create_image(
-            format,
-            &image_extent,
-            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
-            layer_count,
-            mip_count,
-        )?;
         self.set_debug_name(vk::ObjectType::IMAGE, texture_image.handle.as_raw(), name)?;
 
         // Create a staging buffer.
@@ -803,11 +796,7 @@ impl VulkanContext {
         &self,
         set_layout: vk::DescriptorSetLayout,
         material_name: &str,
-        base_colour_texture: &Texture,
-        metallic_roughness_texture: &Texture,
-        normal_map: &Texture,
-        ao_map: &Texture,
-        emissive_map: &Texture,
+        textures: &[&Texture; 5],
     ) -> VkResult<Vec<vk::DescriptorSet>> {
         println!("[HOTHAM_VULKAN] Allocating textures descriptor sets..");
         let descriptor_sets = unsafe {
@@ -826,56 +815,80 @@ impl VulkanContext {
         println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
 
         unsafe {
-            self.device.update_descriptor_sets(
-                &[
+            /*
+            let mut s = Vec::new();
+            for (i, texture) in textures.iter().enumerate() {
+                s.push(
                     *vk::WriteDescriptorSet::builder()
                         .dst_set(descriptor_sets[0])
-                        .dst_binding(0)
+                        .dst_binding(i as u32)
                         .dst_array_element(0)
                         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                         .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(base_colour_texture.image.view)
-                            .sampler(base_colour_texture.sampler)
+                            .image_view(texture.image.view)
+                            .sampler(texture.sampler)
                             .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                    *vk::WriteDescriptorSet::builder()
-                        .dst_set(descriptor_sets[0])
-                        .dst_binding(1)
-                        .dst_array_element(0)
-                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                        .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(metallic_roughness_texture.image.view)
-                            .sampler(metallic_roughness_texture.sampler)
-                            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                    *vk::WriteDescriptorSet::builder()
-                        .dst_set(descriptor_sets[0])
-                        .dst_binding(2)
-                        .dst_array_element(0)
-                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                        .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(normal_map.image.view)
-                            .sampler(normal_map.sampler)
-                            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                    *vk::WriteDescriptorSet::builder()
-                        .dst_set(descriptor_sets[0])
-                        .dst_binding(3)
-                        .dst_array_element(0)
-                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                        .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(ao_map.image.view)
-                            .sampler(ao_map.sampler)
-                            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                    *vk::WriteDescriptorSet::builder()
-                        .dst_set(descriptor_sets[0])
-                        .dst_binding(4)
-                        .dst_array_element(0)
-                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                        .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(emissive_map.image.view)
-                            .sampler(emissive_map.sampler)
-                            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                ],
-                &[],
-            )
+                );
+            }
+
+            self.device
+                .update_descriptor_sets(&[s[0], s[1], s[2], s[3], s[4]], &[]);
+            */
+
+            let base_colour_texture = &textures[0];
+            let metallic_roughness_texture = &textures[1];
+            let normal_map = &textures[2];
+            let ao_map = &textures[3];
+            let emissive_map = &textures[4];
+
+            let ds = &[
+                *vk::WriteDescriptorSet::builder()
+                    .dst_set(descriptor_sets[0])
+                    .dst_binding(0)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&[*vk::DescriptorImageInfo::builder()
+                        .image_view(base_colour_texture.image.view)
+                        .sampler(base_colour_texture.sampler)
+                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
+                *vk::WriteDescriptorSet::builder()
+                    .dst_set(descriptor_sets[0])
+                    .dst_binding(1)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&[*vk::DescriptorImageInfo::builder()
+                        .image_view(metallic_roughness_texture.image.view)
+                        .sampler(metallic_roughness_texture.sampler)
+                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
+                *vk::WriteDescriptorSet::builder()
+                    .dst_set(descriptor_sets[0])
+                    .dst_binding(2)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&[*vk::DescriptorImageInfo::builder()
+                        .image_view(normal_map.image.view)
+                        .sampler(normal_map.sampler)
+                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
+                *vk::WriteDescriptorSet::builder()
+                    .dst_set(descriptor_sets[0])
+                    .dst_binding(3)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&[*vk::DescriptorImageInfo::builder()
+                        .image_view(ao_map.image.view)
+                        .sampler(ao_map.sampler)
+                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
+                *vk::WriteDescriptorSet::builder()
+                    .dst_set(descriptor_sets[0])
+                    .dst_binding(4)
+                    .dst_array_element(0)
+                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                    .image_info(&[*vk::DescriptorImageInfo::builder()
+                        .image_view(emissive_map.image.view)
+                        .sampler(emissive_map.sampler)
+                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
+            ];
+            self.device.update_descriptor_sets(ds, &[]);
         }
         Ok(descriptor_sets)
     }
@@ -900,7 +913,7 @@ impl VulkanContext {
         self.set_debug_name(
             vk::ObjectType::DESCRIPTOR_SET,
             descriptor_sets[0].as_raw(),
-            &format!("Scene Data"),
+            &"Scene Data".to_string(),
         )?;
 
         self.update_buffer_descriptor_set(
@@ -959,7 +972,7 @@ impl VulkanContext {
         descriptor_set: vk::DescriptorSet,
         binding: usize,
         descriptor_type: vk::DescriptorType,
-    ) -> () {
+    ) {
         unsafe {
             self.device.update_descriptor_sets(
                 &[*vk::WriteDescriptorSet::builder()
@@ -1063,9 +1076,9 @@ fn create_descriptor_pool(device: &Device) -> Result<vk::DescriptorPool, anyhow:
 
 fn get_aspect_mask(format: vk::Format) -> vk::ImageAspectFlags {
     if format == DEPTH_FORMAT {
-        return vk::ImageAspectFlags::DEPTH;
+        vk::ImageAspectFlags::DEPTH
     } else {
-        return vk::ImageAspectFlags::COLOR;
+        vk::ImageAspectFlags::COLOR
     }
 }
 
@@ -1148,8 +1161,7 @@ fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
     println!("[HOTHAM_VULKAN] Trying to use layers: {:?}", unsafe {
         parse_raw_strings(&layer_names)
     });
-    let mut extensions = Vec::new();
-    extensions.push(vk::ExtDebugUtilsFn::name().to_owned());
+    let extensions = vec![(vk::ExtDebugUtilsFn::name().to_owned())];
 
     let extension_names = extensions.iter().map(|e| e.as_ptr()).collect::<Vec<_>>();
 
@@ -1188,7 +1200,7 @@ pub fn create_vulkan_device_legacy(
 }
 
 fn create_vulkan_device(
-    extension_names: &Vec<std::ffi::CString>,
+    extension_names: &[std::ffi::CString],
     vulkan_instance: &AshInstance,
     physical_device: vk::PhysicalDevice,
 ) -> Result<(Device, vk::Queue, u32)> {

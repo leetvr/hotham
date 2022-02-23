@@ -10,12 +10,15 @@ use rapier3d::{
 };
 
 const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
-const ROTATION_OFFSET: Quaternion<f32> = Quaternion::new(
+
+/* Original Precision
     -0.5581498959847122,
     0.8274912503663805,
     0.03413791007514528,
     -0.05061153302400824,
-);
+*/
+const ROTATION_OFFSET: Quaternion<f32> =
+    Quaternion::new(-0.558_149_8, 0.827_491_2, 0.034_137_9, -0.050_611_5);
 
 use crate::{
     components::{
@@ -139,7 +142,7 @@ fn get_cursor_location_for_panel(
     let x_points = x * panel_extent.width as f32 / SCALE_FACTOR;
     let y_points = y * panel_extent.height as f32 / SCALE_FACTOR;
 
-    return Pos2::new(x_points, y_points);
+    Pos2::new(x_points, y_points)
 }
 
 fn ray_to_panel_space(
@@ -148,7 +151,7 @@ fn ray_to_panel_space(
     panel_extent: &vk::Extent2D,
 ) -> Point3<f32> {
     // Translate the extents of the panel into world space, using the panel's translation.
-    let (extent_x, extent_y) = get_panel_dimensions(&panel_extent);
+    let (extent_x, extent_y) = get_panel_dimensions(panel_extent);
     let translated_extents = panel_transform * point![extent_x, extent_y, 0.];
 
     // Now build an orthographic matrix to project from world space into the panel's screen space
@@ -159,7 +162,7 @@ fn ray_to_panel_space(
     let panel_projection = Orthographic3::new(left, right, bottom, top, 0., 1.);
 
     // Project the ray's hit point into panel space
-    return panel_projection.project_point(hit_point);
+    panel_projection.project_point(hit_point)
 }
 
 #[cfg(test)]
