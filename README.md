@@ -20,6 +20,14 @@ Hotham is a complex project with many moving parts! Have no fear - we've written
 # Sponsoring
 Hotham's development is only possible thanks to the support of the community. It's currently being developed on full time by [@kanerogers](https://github.com/kanerogers) If you'd like to help make VR development in Rust possible, please [consider becoming a donor](https://github.com/sponsors/leetvr). 💗
 
+## Featured sponsors
+These generous people contribute $50p/m or more to support Hotham ❤️
+
+<p>
+   <a href="https://github.com/Sroka"><img src="https://github.com/Sroka.png" width="50px" alt="Sroka" />
+</p>
+
+
 # Progress 🔨
 - [x] Vulkan renderer
 - [x] OpenXR integration
