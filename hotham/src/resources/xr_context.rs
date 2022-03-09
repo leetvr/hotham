@@ -365,6 +365,7 @@ pub(crate) fn create_xr_instance() -> anyhow::Result<(xr::Instance, xr::SystemId
     let mut required_extensions = xr::ExtensionSet::default();
     // required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
     required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
+    required_extensions.fb_passthrough = true;
 
     #[cfg(target_os = "android")]
     {
