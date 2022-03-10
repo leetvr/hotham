@@ -162,22 +162,19 @@ mod tests {
 
     #[test]
     fn test_add_offset() {
+        #[allow(clippy::approx_constant)]
         let q1 = UnitQuaternion::from_quaternion(Quaternion::new(
-            4.329780281177467e-17,
-            0.7071067811865476,
-            4.329780281177466e-17,
-            0.7071067811865475,
+            4.329_780_3e-17,
+            0.707_106_77,
+            4.329_780_3e-17,
+            0.707_106_77,
         ));
         let t = Translation3::new(0.2, 1.4, 2.);
         let mut position = Isometry3::from_parts(t, q1);
         apply_grip_offset(&mut position);
 
-        let expected_rotation = Quaternion::new(
-            -0.5493369162990798,
-            -0.4188107240790279,
-            0.6209124327141259,
-            -0.3705324286596844,
-        );
+        let expected_rotation =
+            Quaternion::new(-0.549_336_9, -0.418_810_73, 0.620_912_43, -0.370_532_42);
         let expected_translation = Translation3::new(0.2, 1.328827, 2.066082);
 
         approx::assert_relative_eq!(position.rotation.quaternion(), &expected_rotation);

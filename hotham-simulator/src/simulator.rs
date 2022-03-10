@@ -132,7 +132,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
     vulkan_result: *mut VkResult,
 ) -> Result {
     let vulkan_create_info: &ash::vk::InstanceCreateInfo =
-        transmute((*create_info).vulkan_create_info);
+        transmute(&(*create_info).vulkan_create_info);
     let get_instance_proc_adddr = (*create_info).pfn_get_instance_proc_addr.unwrap();
     let vk_create_instance = CStr::from_bytes_with_nul_unchecked(b"vkCreateInstance\0").as_ptr();
     let create_instance: vk::PFN_vkCreateInstance =
@@ -194,6 +194,7 @@ pub unsafe extern "system" fn create_vulkan_device(
 ) -> Result {
     *vulkan_result = ash::vk::Result::SUCCESS.as_raw();
 
+    #[allow(clippy::transmute_ptr_to_ref)] // TODO We shouldn't get a `&mut` from a `*const`.
     let create_info: &mut DeviceCreateInfo = transmute((*create_info).vulkan_create_info);
     println!(
         "[HOTHAM_SIMULATOR] Create vulkan device called with: {:?}",
@@ -393,7 +394,7 @@ pub unsafe extern "system" fn create_session(
     *session = Session::from_raw(42);
     let mut state = STATE.lock().unwrap();
     if state.device.is_none() {
-        let graphics_binding: &GraphicsBindingVulkanKHR = transmute((*create_info).next);
+        let graphics_binding: &GraphicsBindingVulkanKHR = transmute(&(*create_info).next);
         let vk_device = graphics_binding.device;
         let instance = state.vulkan_instance.as_ref().unwrap();
         let device = ash::Device::load(instance.fp_v1_0(), transmute(vk_device));
@@ -648,8 +649,8 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
             .height(extent.height as _)
             // .width((extent.width / (NUM_VIEWS as u32)) as _)
             .width(extent.width as _)
-            .max_depth(1 as _)
-            .min_depth(0 as _)
+            .max_depth(1.)
+            .min_depth(0.)
             .build();
         let scissor = vk::Rect2D {
             extent,
@@ -740,11 +741,7 @@ pub unsafe extern "system" fn string_to_path(
                 "[HOTHAM_SIMULATOR] Created path {:?} for {}",
                 path_string, s
             );
-            STATE
-                .lock()
-                .unwrap()
-                .paths
-                .insert(path.clone(), s.to_string());
+            STATE.lock().unwrap().paths.insert(path, s.to_string());
             *path_out = path;
             Result::SUCCESS
         }
@@ -866,7 +863,7 @@ pub unsafe extern "system" fn poll_event(
     event_data: *mut EventDataBuffer,
 ) -> Result {
     let mut state = STATE.lock().unwrap();
-    let mut next_state = state.session_state.clone();
+    let mut next_state = state.session_state;
     if state.session_state == SessionState::UNKNOWN {
         next_state = SessionState::IDLE;
         state.has_event = true;
@@ -1103,10 +1100,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
             .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT);
 
         println!("[HOTHAM_SIMULATOR] About to create swapchain..");
-        let swapchain = swapchain_ext
-            .clone()
-            .create_swapchain(&create_info, None)
-            .unwrap();
+        let swapchain = swapchain_ext.create_swapchain(&create_info, None).unwrap();
         println!(
             "[HOTHAM_SIMULATOR] Created swapchain: {:?}. Sending..",
             swapchain
@@ -1127,12 +1121,10 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
             }
 
             match event {
-                Event::WindowEvent { event, window_id } if window_id == window.id() => {
-                    match event {
-                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                        _ => {}
-                    }
-                }
+                Event::WindowEvent {
+                    event: WindowEvent::CloseRequested,
+                    window_id,
+                } if window_id == window.id() => *control_flow = ControlFlow::Exit,
                 Event::LoopDestroyed => {}
                 Event::MainEventsCleared => {
                     window.request_redraw();
@@ -1496,7 +1488,7 @@ pub unsafe extern "system" fn locate_space(
     location_out: *mut SpaceLocation,
 ) -> Result {
     match STATE.lock().unwrap().spaces.get(&space.into_raw()) {
-        Some(ref space_state) => {
+        Some(space_state) => {
             let pose = Posef {
                 position: space_state.position,
                 orientation: space_state.orientation,
@@ -1557,9 +1549,10 @@ pub unsafe extern "system" fn locate_views(
     };
     let views = slice::from_raw_parts_mut(views, NUM_VIEWS);
     let state = STATE.lock().unwrap();
-    for i in 0..NUM_VIEWS {
+    #[allow(clippy::approx_constant)]
+    for (i, view) in views.iter_mut().enumerate() {
         let pose = state.view_poses[i];
-        views[i] = View {
+        *view = View {
             ty: StructureType::VIEW,
             next: null_mut(),
             pose,
@@ -1831,8 +1824,8 @@ pub unsafe extern "system" fn get_vulkan_device_extensions(
     Result::SUCCESS
 }
 
-fn str_to_fixed_bytes(string: &'static str) -> [i8; 128] {
-    let mut name = [0 as i8; 128];
+fn str_to_fixed_bytes(string: &str) -> [i8; 128] {
+    let mut name = [0i8; 128];
     string
         .bytes()
         .zip(name.iter_mut())

@@ -1,4 +1,6 @@
 #![deny(missing_docs)]
+// TODO Safety doc would be nice
+#![allow(clippy::missing_safety_doc)]
 
 //! G'day, and welcome to Hotham! 👋
 //!

@@ -42,7 +42,7 @@ mod tests {
         let entity = world.spawn((Transform::default(),));
         let mut rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
         let rotation = UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3);
-        let position = Isometry::from_parts(vector![1.0, 2.0, 3.0].into(), rotation.clone());
+        let position = Isometry::from_parts(vector![1.0, 2.0, 3.0].into(), rotation);
         rigid_body.set_next_kinematic_position(position);
 
         let handle = physics_context.rigid_bodies.insert(rigid_body);

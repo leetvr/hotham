@@ -45,166 +45,166 @@ pub const XR_MAX_ACTION_NAME_SIZE: u32 = 64;
 pub const XR_MAX_LOCALIZED_ACTION_NAME_SIZE: u32 = 128;
 pub const XR_KHR_composition_layer_cube: u32 = 1;
 pub const XR_KHR_composition_layer_cube_SPEC_VERSION: u32 = 8;
-pub const XR_KHR_COMPOSITION_LAYER_CUBE_EXTENSION_NAME: &'static [u8; 30usize] =
+pub const XR_KHR_COMPOSITION_LAYER_CUBE_EXTENSION_NAME: &[u8; 30usize] =
     b"XR_KHR_composition_layer_cube\0";
 pub const XR_KHR_composition_layer_depth: u32 = 1;
 pub const XR_KHR_composition_layer_depth_SPEC_VERSION: u32 = 5;
-pub const XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME: &'static [u8; 31usize] =
+pub const XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME: &[u8; 31usize] =
     b"XR_KHR_composition_layer_depth\0";
 pub const XR_KHR_composition_layer_cylinder: u32 = 1;
 pub const XR_KHR_composition_layer_cylinder_SPEC_VERSION: u32 = 4;
-pub const XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME: &'static [u8; 34usize] =
+pub const XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME: &[u8; 34usize] =
     b"XR_KHR_composition_layer_cylinder\0";
 pub const XR_KHR_composition_layer_equirect: u32 = 1;
 pub const XR_KHR_composition_layer_equirect_SPEC_VERSION: u32 = 3;
-pub const XR_KHR_COMPOSITION_LAYER_EQUIRECT_EXTENSION_NAME: &'static [u8; 34usize] =
+pub const XR_KHR_COMPOSITION_LAYER_EQUIRECT_EXTENSION_NAME: &[u8; 34usize] =
     b"XR_KHR_composition_layer_equirect\0";
 pub const XR_KHR_visibility_mask: u32 = 1;
 pub const XR_KHR_visibility_mask_SPEC_VERSION: u32 = 2;
-pub const XR_KHR_VISIBILITY_MASK_EXTENSION_NAME: &'static [u8; 23usize] =
+pub const XR_KHR_VISIBILITY_MASK_EXTENSION_NAME: &[u8; 23usize] =
     b"XR_KHR_visibility_mask\0";
 pub const XR_KHR_composition_layer_color_scale_bias: u32 = 1;
 pub const XR_KHR_composition_layer_color_scale_bias_SPEC_VERSION: u32 = 5;
-pub const XR_KHR_COMPOSITION_LAYER_COLOR_SCALE_BIAS_EXTENSION_NAME: &'static [u8; 42usize] =
+pub const XR_KHR_COMPOSITION_LAYER_COLOR_SCALE_BIAS_EXTENSION_NAME: &[u8; 42usize] =
     b"XR_KHR_composition_layer_color_scale_bias\0";
 pub const XR_KHR_loader_init: u32 = 1;
 pub const XR_KHR_loader_init_SPEC_VERSION: u32 = 1;
-pub const XR_KHR_LOADER_INIT_EXTENSION_NAME: &'static [u8; 19usize] = b"XR_KHR_loader_init\0";
+pub const XR_KHR_LOADER_INIT_EXTENSION_NAME: &[u8; 19usize] = b"XR_KHR_loader_init\0";
 pub const XR_KHR_composition_layer_equirect2: u32 = 1;
 pub const XR_KHR_composition_layer_equirect2_SPEC_VERSION: u32 = 1;
-pub const XR_KHR_COMPOSITION_LAYER_EQUIRECT2_EXTENSION_NAME: &'static [u8; 35usize] =
+pub const XR_KHR_COMPOSITION_LAYER_EQUIRECT2_EXTENSION_NAME: &[u8; 35usize] =
     b"XR_KHR_composition_layer_equirect2\0";
 pub const XR_KHR_binding_modification: u32 = 1;
 pub const XR_KHR_binding_modification_SPEC_VERSION: u32 = 1;
-pub const XR_KHR_BINDING_MODIFICATION_EXTENSION_NAME: &'static [u8; 28usize] =
+pub const XR_KHR_BINDING_MODIFICATION_EXTENSION_NAME: &[u8; 28usize] =
     b"XR_KHR_binding_modification\0";
 pub const XR_EXT_performance_settings: u32 = 1;
 pub const XR_EXT_performance_settings_SPEC_VERSION: u32 = 3;
-pub const XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME: &'static [u8; 28usize] =
+pub const XR_EXT_PERFORMANCE_SETTINGS_EXTENSION_NAME: &[u8; 28usize] =
     b"XR_EXT_performance_settings\0";
 pub const XR_EXT_thermal_query: u32 = 1;
 pub const XR_EXT_thermal_query_SPEC_VERSION: u32 = 2;
-pub const XR_EXT_THERMAL_QUERY_EXTENSION_NAME: &'static [u8; 21usize] = b"XR_EXT_thermal_query\0";
+pub const XR_EXT_THERMAL_QUERY_EXTENSION_NAME: &[u8; 21usize] = b"XR_EXT_thermal_query\0";
 pub const XR_EXT_debug_utils: u32 = 1;
 pub const XR_EXT_debug_utils_SPEC_VERSION: u32 = 4;
-pub const XR_EXT_DEBUG_UTILS_EXTENSION_NAME: &'static [u8; 19usize] = b"XR_EXT_debug_utils\0";
+pub const XR_EXT_DEBUG_UTILS_EXTENSION_NAME: &[u8; 19usize] = b"XR_EXT_debug_utils\0";
 pub const XR_EXT_eye_gaze_interaction: u32 = 1;
 pub const XR_EXT_eye_gaze_interaction_SPEC_VERSION: u32 = 1;
-pub const XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME: &'static [u8; 28usize] =
+pub const XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME: &[u8; 28usize] =
     b"XR_EXT_eye_gaze_interaction\0";
 pub const XR_EXTX_overlay: u32 = 1;
 pub const XR_EXTX_overlay_SPEC_VERSION: u32 = 5;
-pub const XR_EXTX_OVERLAY_EXTENSION_NAME: &'static [u8; 16usize] = b"XR_EXTX_overlay\0";
+pub const XR_EXTX_OVERLAY_EXTENSION_NAME: &[u8; 16usize] = b"XR_EXTX_overlay\0";
 pub const XR_VARJO_quad_views: u32 = 1;
 pub const XR_VARJO_quad_views_SPEC_VERSION: u32 = 1;
-pub const XR_VARJO_QUAD_VIEWS_EXTENSION_NAME: &'static [u8; 20usize] = b"XR_VARJO_quad_views\0";
+pub const XR_VARJO_QUAD_VIEWS_EXTENSION_NAME: &[u8; 20usize] = b"XR_VARJO_quad_views\0";
 pub const XR_MSFT_unbounded_reference_space: u32 = 1;
 pub const XR_MSFT_unbounded_reference_space_SPEC_VERSION: u32 = 1;
-pub const XR_MSFT_UNBOUNDED_REFERENCE_SPACE_EXTENSION_NAME: &'static [u8; 34usize] =
+pub const XR_MSFT_UNBOUNDED_REFERENCE_SPACE_EXTENSION_NAME: &[u8; 34usize] =
     b"XR_MSFT_unbounded_reference_space\0";
 pub const XR_MSFT_spatial_anchor: u32 = 1;
 pub const XR_MSFT_spatial_anchor_SPEC_VERSION: u32 = 1;
-pub const XR_MSFT_SPATIAL_ANCHOR_EXTENSION_NAME: &'static [u8; 23usize] =
+pub const XR_MSFT_SPATIAL_ANCHOR_EXTENSION_NAME: &[u8; 23usize] =
     b"XR_MSFT_spatial_anchor\0";
 pub const XR_MND_headless: u32 = 1;
 pub const XR_MND_headless_SPEC_VERSION: u32 = 2;
-pub const XR_MND_HEADLESS_EXTENSION_NAME: &'static [u8; 16usize] = b"XR_MND_headless\0";
+pub const XR_MND_HEADLESS_EXTENSION_NAME: &[u8; 16usize] = b"XR_MND_headless\0";
 pub const XR_OCULUS_android_session_state_enable: u32 = 1;
 pub const XR_OCULUS_android_session_state_enable_SPEC_VERSION: u32 = 1;
-pub const XR_OCULUS_ANDROID_SESSION_STATE_ENABLE_EXTENSION_NAME: &'static [u8; 39usize] =
+pub const XR_OCULUS_ANDROID_SESSION_STATE_ENABLE_EXTENSION_NAME: &[u8; 39usize] =
     b"XR_OCULUS_android_session_state_enable\0";
 pub const XR_EXT_view_configuration_depth_range: u32 = 1;
 pub const XR_EXT_view_configuration_depth_range_SPEC_VERSION: u32 = 1;
-pub const XR_EXT_VIEW_CONFIGURATION_DEPTH_RANGE_EXTENSION_NAME: &'static [u8; 38usize] =
+pub const XR_EXT_VIEW_CONFIGURATION_DEPTH_RANGE_EXTENSION_NAME: &[u8; 38usize] =
     b"XR_EXT_view_configuration_depth_range\0";
 pub const XR_EXT_conformance_automation: u32 = 1;
 pub const XR_EXT_conformance_automation_SPEC_VERSION: u32 = 3;
-pub const XR_EXT_CONFORMANCE_AUTOMATION_EXTENSION_NAME: &'static [u8; 30usize] =
+pub const XR_EXT_CONFORMANCE_AUTOMATION_EXTENSION_NAME: &[u8; 30usize] =
     b"XR_EXT_conformance_automation\0";
 pub const XR_MSFT_spatial_graph_bridge: u32 = 1;
 pub const XR_MSFT_spatial_graph_bridge_SPEC_VERSION: u32 = 1;
-pub const XR_MSFT_SPATIAL_GRAPH_BRIDGE_EXTENSION_NAME: &'static [u8; 29usize] =
+pub const XR_MSFT_SPATIAL_GRAPH_BRIDGE_EXTENSION_NAME: &[u8; 29usize] =
     b"XR_MSFT_spatial_graph_bridge\0";
 pub const XR_MSFT_hand_interaction: u32 = 1;
 pub const XR_MSFT_hand_interaction_SPEC_VERSION: u32 = 1;
-pub const XR_MSFT_HAND_INTERACTION_EXTENSION_NAME: &'static [u8; 25usize] =
+pub const XR_MSFT_HAND_INTERACTION_EXTENSION_NAME: &[u8; 25usize] =
     b"XR_MSFT_hand_interaction\0";
 pub const XR_EXT_hand_tracking: u32 = 1;
 pub const XR_HAND_JOINT_COUNT_EXT: u32 = 26;
 pub const XR_EXT_hand_tracking_SPEC_VERSION: u32 = 4;
-pub const XR_EXT_HAND_TRACKING_EXTENSION_NAME: &'static [u8; 21usize] = b"XR_EXT_hand_tracking\0";
+pub const XR_EXT_HAND_TRACKING_EXTENSION_NAME: &[u8; 21usize] = b"XR_EXT_hand_tracking\0";
 pub const XR_MSFT_hand_tracking_mesh: u32 = 1;
 pub const XR_MSFT_hand_tracking_mesh_SPEC_VERSION: u32 = 3;
-pub const XR_MSFT_HAND_TRACKING_MESH_EXTENSION_NAME: &'static [u8; 27usize] =
+pub const XR_MSFT_HAND_TRACKING_MESH_EXTENSION_NAME: &[u8; 27usize] =
     b"XR_MSFT_hand_tracking_mesh\0";
 pub const XR_MSFT_secondary_view_configuration: u32 = 1;
 pub const XR_MSFT_secondary_view_configuration_SPEC_VERSION: u32 = 1;
-pub const XR_MSFT_SECONDARY_VIEW_CONFIGURATION_EXTENSION_NAME: &'static [u8; 37usize] =
+pub const XR_MSFT_SECONDARY_VIEW_CONFIGURATION_EXTENSION_NAME: &[u8; 37usize] =
     b"XR_MSFT_secondary_view_configuration\0";
 pub const XR_MSFT_first_person_observer: u32 = 1;
 pub const XR_MSFT_first_person_observer_SPEC_VERSION: u32 = 1;
-pub const XR_MSFT_FIRST_PERSON_OBSERVER_EXTENSION_NAME: &'static [u8; 30usize] =
+pub const XR_MSFT_FIRST_PERSON_OBSERVER_EXTENSION_NAME: &[u8; 30usize] =
     b"XR_MSFT_first_person_observer\0";
 pub const XR_MSFT_controller_model: u32 = 1;
 pub const XR_NULL_CONTROLLER_MODEL_KEY_MSFT: u32 = 0;
 pub const XR_MSFT_controller_model_SPEC_VERSION: u32 = 2;
-pub const XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME: &'static [u8; 25usize] =
+pub const XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME: &[u8; 25usize] =
     b"XR_MSFT_controller_model\0";
 pub const XR_MAX_CONTROLLER_MODEL_NODE_NAME_SIZE_MSFT: u32 = 64;
 pub const XR_EXT_win32_appcontainer_compatible: u32 = 1;
 pub const XR_EXT_win32_appcontainer_compatible_SPEC_VERSION: u32 = 1;
-pub const XR_EXT_WIN32_APPCONTAINER_COMPATIBLE_EXTENSION_NAME: &'static [u8; 37usize] =
+pub const XR_EXT_WIN32_APPCONTAINER_COMPATIBLE_EXTENSION_NAME: &[u8; 37usize] =
     b"XR_EXT_win32_appcontainer_compatible\0";
 pub const XR_EPIC_view_configuration_fov: u32 = 1;
 pub const XR_EPIC_view_configuration_fov_SPEC_VERSION: u32 = 2;
-pub const XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME: &'static [u8; 31usize] =
+pub const XR_EPIC_VIEW_CONFIGURATION_FOV_EXTENSION_NAME: &[u8; 31usize] =
     b"XR_EPIC_view_configuration_fov\0";
 pub const XR_HUAWEI_controller_interaction: u32 = 1;
 pub const XR_HUAWEI_controller_interaction_SPEC_VERSION: u32 = 1;
-pub const XR_HUAWEI_CONTROLLER_INTERACTION_EXTENSION_NAME: &'static [u8; 33usize] =
+pub const XR_HUAWEI_CONTROLLER_INTERACTION_EXTENSION_NAME: &[u8; 33usize] =
     b"XR_HUAWEI_controller_interaction\0";
 pub const XR_VALVE_analog_threshold: u32 = 1;
 pub const XR_VALVE_analog_threshold_SPEC_VERSION: u32 = 1;
-pub const XR_VALVE_ANALOG_THRESHOLD_EXTENSION_NAME: &'static [u8; 26usize] =
+pub const XR_VALVE_ANALOG_THRESHOLD_EXTENSION_NAME: &[u8; 26usize] =
     b"XR_VALVE_analog_threshold\0";
 pub const XR_EXT_hand_joints_motion_range: u32 = 1;
 pub const XR_EXT_hand_joints_motion_range_SPEC_VERSION: u32 = 1;
-pub const XR_EXT_HAND_JOINTS_MOTION_RANGE_EXTENSION_NAME: &'static [u8; 32usize] =
+pub const XR_EXT_HAND_JOINTS_MOTION_RANGE_EXTENSION_NAME: &[u8; 32usize] =
     b"XR_EXT_hand_joints_motion_range\0";
 pub const XR_EXT_samsung_odyssey_controller: u32 = 1;
 pub const XR_EXT_samsung_odyssey_controller_SPEC_VERSION: u32 = 1;
-pub const XR_EXT_SAMSUNG_ODYSSEY_CONTROLLER_EXTENSION_NAME: &'static [u8; 34usize] =
+pub const XR_EXT_SAMSUNG_ODYSSEY_CONTROLLER_EXTENSION_NAME: &[u8; 34usize] =
     b"XR_EXT_samsung_odyssey_controller\0";
 pub const XR_EXT_hp_mixed_reality_controller: u32 = 1;
 pub const XR_EXT_hp_mixed_reality_controller_SPEC_VERSION: u32 = 1;
-pub const XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME: &'static [u8; 35usize] =
+pub const XR_EXT_HP_MIXED_REALITY_CONTROLLER_EXTENSION_NAME: &[u8; 35usize] =
     b"XR_EXT_hp_mixed_reality_controller\0";
 pub const XR_MND_swapchain_usage_input_attachment_bit: u32 = 1;
 pub const XR_MND_swapchain_usage_input_attachment_bit_SPEC_VERSION: u32 = 2;
-pub const XR_MND_SWAPCHAIN_USAGE_INPUT_ATTACHMENT_BIT_EXTENSION_NAME: &'static [u8; 44usize] =
+pub const XR_MND_SWAPCHAIN_USAGE_INPUT_ATTACHMENT_BIT_EXTENSION_NAME: &[u8; 44usize] =
     b"XR_MND_swapchain_usage_input_attachment_bit\0";
 pub const XR_FB_display_refresh_rate: u32 = 1;
 pub const XR_FB_display_refresh_rate_SPEC_VERSION: u32 = 1;
-pub const XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME: &'static [u8; 27usize] =
+pub const XR_FB_DISPLAY_REFRESH_RATE_EXTENSION_NAME: &[u8; 27usize] =
     b"XR_FB_display_refresh_rate\0";
 pub const XR_HTC_vive_cosmos_controller_interaction: u32 = 1;
 pub const XR_HTC_vive_cosmos_controller_interaction_SPEC_VERSION: u32 = 1;
-pub const XR_HTC_VIVE_COSMOS_CONTROLLER_INTERACTION_EXTENSION_NAME: &'static [u8; 42usize] =
+pub const XR_HTC_VIVE_COSMOS_CONTROLLER_INTERACTION_EXTENSION_NAME: &[u8; 42usize] =
     b"XR_HTC_vive_cosmos_controller_interaction\0";
 pub const XR_FB_color_space: u32 = 1;
 pub const XR_FB_color_space_SPEC_VERSION: u32 = 1;
-pub const XR_FB_COLOR_SPACE_EXTENSION_NAME: &'static [u8; 18usize] = b"XR_FB_color_space\0";
+pub const XR_FB_COLOR_SPACE_EXTENSION_NAME: &[u8; 18usize] = b"XR_FB_color_space\0";
 pub const XR_VARJO_foveated_rendering: u32 = 1;
 pub const XR_VARJO_foveated_rendering_SPEC_VERSION: u32 = 1;
-pub const XR_VARJO_FOVEATED_RENDERING_EXTENSION_NAME: &'static [u8; 28usize] =
+pub const XR_VARJO_FOVEATED_RENDERING_EXTENSION_NAME: &[u8; 28usize] =
     b"XR_VARJO_foveated_rendering\0";
 pub const XR_VARJO_composition_layer_depth_test: u32 = 1;
 pub const XR_VARJO_composition_layer_depth_test_SPEC_VERSION: u32 = 1;
-pub const XR_VARJO_COMPOSITION_LAYER_DEPTH_TEST_EXTENSION_NAME: &'static [u8; 38usize] =
+pub const XR_VARJO_COMPOSITION_LAYER_DEPTH_TEST_EXTENSION_NAME: &[u8; 38usize] =
     b"XR_VARJO_composition_layer_depth_test\0";
 pub const XR_VARJO_environment_depth_estimation: u32 = 1;
 pub const XR_VARJO_environment_depth_estimation_SPEC_VERSION: u32 = 1;
-pub const XR_VARJO_ENVIRONMENT_DEPTH_ESTIMATION_EXTENSION_NAME: &'static [u8; 38usize] =
+pub const XR_VARJO_ENVIRONMENT_DEPTH_ESTIMATION_EXTENSION_NAME: &[u8; 38usize] =
     b"XR_VARJO_environment_depth_estimation\0";
 pub const XR_CURRENT_LOADER_API_LAYER_VERSION: u32 = 1;
 pub const XR_CURRENT_LOADER_RUNTIME_VERSION: u32 = 1;

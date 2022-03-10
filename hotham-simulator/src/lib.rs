@@ -1,3 +1,6 @@
+// TODO Safety doc would be nice
+#![allow(clippy::missing_safety_doc)]
+
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub mod openxr_loader;
 #[cfg(any(target_os = "windows", target_os = "linux"))]

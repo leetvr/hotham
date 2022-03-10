@@ -63,9 +63,9 @@ mod tests {
         let parent_transform_matrix =
             TransformMatrix(Matrix4::new_translation(&vector![1.0, 1.0, 100.0]));
 
-        let parent = world.spawn((parent_transform_matrix.clone(),));
-        let child = world.spawn((parent_transform_matrix.clone(), Parent(parent)));
-        let grandchild = world.spawn((parent_transform_matrix.clone(), Parent(child)));
+        let parent = world.spawn((parent_transform_matrix,));
+        let child = world.spawn((parent_transform_matrix, Parent(parent)));
+        let grandchild = world.spawn((parent_transform_matrix, Parent(child)));
 
         schedule(&mut world);
 
@@ -102,8 +102,10 @@ mod tests {
                 name: format!("Node {}", n),
                 node_id: n,
             };
-            let mut transform = Transform::default();
-            transform.translation = vector![1.0, 1.0, 1.0];
+            let transform = Transform {
+                translation: vector![1.0, 1.0, 1.0],
+                ..Default::default()
+            };
             let matrix = TransformMatrix::default();
             let entity = world.spawn((info, transform, matrix));
             node_entity.insert(n, entity);
@@ -111,11 +113,11 @@ mod tests {
         }
 
         for (parent, children) in heirachy.iter() {
-            let parent_entity = node_entity.get(parent).unwrap().clone();
-            let parent = Parent(parent_entity);
+            let parent_entity = node_entity.get(parent).unwrap();
+            let parent = Parent(*parent_entity);
             for node_id in children {
                 let entity = node_entity.get(node_id).unwrap();
-                world.insert_one(*entity, parent.clone()).unwrap();
+                world.insert_one(*entity, parent).unwrap();
             }
         }
 
@@ -158,7 +160,7 @@ mod tests {
     fn get_expected_matrix(depth: usize) -> Matrix4<f32> {
         let mut transform = Matrix4::new_translation(&vector![100.0, 100.0, 100.0]);
         for _ in 0..depth {
-            transform = transform * Matrix4::new_translation(&vector![1.0, 1.0, 1.0]);
+            transform *= Matrix4::new_translation(&vector![1.0, 1.0, 1.0]);
         }
         transform
     }

@@ -913,7 +913,7 @@ impl VulkanContext {
         self.set_debug_name(
             vk::ObjectType::DESCRIPTOR_SET,
             descriptor_sets[0].as_raw(),
-            &"Scene Data".to_string(),
+            "Scene Data",
         )?;
 
         self.update_buffer_descriptor_set(

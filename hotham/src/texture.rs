@@ -113,7 +113,7 @@ impl Texture {
         Self::new(
             "Empty Texture",
             vulkan_context,
-            &EMPTY_KTX.to_vec(),
+            &EMPTY_KTX,
             1,
             1,
             TEXTURE_FORMAT,
