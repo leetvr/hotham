@@ -4,7 +4,7 @@ mod systems;
 
 use hotham::{
     components::Visible,
-    hecs::World,
+    hecs::{Entity, World},
     schedule_functions::{
         apply_haptic_feedback, begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass,
         physics_step,
@@ -177,20 +177,17 @@ fn handle_state_change(
     game_context: &mut GameContext,
     world: &mut World,
 ) {
-    let mut objects_to_hide = Vec::new();
-    let mut objects_to_show = Vec::new();
-
     match (previous_state, current_state) {
         (SessionState::VISIBLE, SessionState::FOCUSED) => {
             audio_context.resume_music_track();
             match game_context.state {
                 GameState::Init => {}
                 GameState::MainMenu | GameState::GameOver => {
-                    objects_to_show.push(game_context.pointer);
+                    show(world, game_context.pointer);
                 }
                 GameState::Playing(_) => {
-                    objects_to_show.push(game_context.blue_saber);
-                    objects_to_show.push(game_context.red_saber);
+                    show(world, game_context.blue_saber);
+                    show(world, game_context.red_saber);
                 }
             }
         }
@@ -199,28 +196,15 @@ fn handle_state_change(
             match game_context.state {
                 GameState::Init => {}
                 GameState::MainMenu | GameState::GameOver => {
-                    objects_to_hide.push(game_context.pointer);
+                    hide(world, game_context.pointer);
                 }
                 GameState::Playing(_) => {
-                    objects_to_hide.push(game_context.blue_saber);
-                    objects_to_hide.push(game_context.red_saber);
+                    hide(world, game_context.blue_saber);
+                    hide(world, game_context.red_saber);
                 }
             }
         }
         _ => {}
-    }
-
-    for e in objects_to_hide.drain(..) {
-        if world.remove_one::<Visible>(e).is_err() {
-            println!(
-                "[STATE_CHANGE] Tried to make {:?} hidden but it had no Visible component",
-                e
-            )
-        }
-    }
-
-    for e in objects_to_show.drain(..) {
-        world.insert_one(e, Visible {}).unwrap();
     }
 }
 
@@ -230,4 +214,17 @@ fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
     add_songs(&mut engine.audio_context, &mut game_context);
     add_sound_effects(&mut engine.audio_context, &mut game_context);
     Ok((world, game_context))
+}
+
+fn hide(world: &mut World, entity: Entity) {
+    if world.remove_one::<Visible>(entity).is_err() {
+        println!(
+            "[STATE_CHANGE] Tried to make {:?} hidden but it had no Visible component",
+            entity
+        )
+    }
+}
+
+fn show(world: &mut World, entity: Entity) {
+    world.insert_one(entity, Visible {}).unwrap();
 }
