@@ -66,7 +66,7 @@ impl Material {
         let base_color_texture_info = pbr_metallic_roughness.base_color_texture();
         let base_color_texture_set = get_texture_set(base_color_texture_info.as_ref());
         let base_color_texture = base_color_texture_info
-            .map(|i| {
+            .and_then(|i| {
                 Texture::load(
                     &format!("Base Colour texture for {}", mesh_name),
                     i.texture(),
@@ -74,7 +74,6 @@ impl Material {
                     images,
                 )
             })
-            .flatten()
             .unwrap_or_else(|| empty_texture.clone());
         let base_colour_factor = Vector4::from(pbr_metallic_roughness.base_color_factor());
 
@@ -83,7 +82,7 @@ impl Material {
         let metallic_roughness_texture_set =
             get_texture_set(metallic_roughness_texture_info.as_ref());
         let metallic_roughness_texture = metallic_roughness_texture_info
-            .map(|i| {
+            .and_then(|i| {
                 Texture::load(
                     &format!("Metallic Roughness texture for {}", mesh_name),
                     i.texture(),
@@ -91,7 +90,6 @@ impl Material {
                     images,
                 )
             })
-            .flatten()
             .unwrap_or_else(|| empty_texture.clone());
 
         // Normal map
@@ -101,7 +99,7 @@ impl Material {
             .map(|t| t.tex_coord() as i32)
             .unwrap_or(-1);
         let normal_texture = normal_texture_info
-            .map(|i| {
+            .and_then(|i| {
                 Texture::load(
                     &format!("Normal texture for {}", mesh_name),
                     i.texture(),
@@ -109,7 +107,6 @@ impl Material {
                     images,
                 )
             })
-            .flatten()
             .unwrap_or_else(|| empty_texture.clone());
 
         // Occlusion
@@ -119,7 +116,7 @@ impl Material {
             .map(|t| t.tex_coord() as i32)
             .unwrap_or(-1);
         let occlusion_texture = occlusion_texture_info
-            .map(|i| {
+            .and_then(|i| {
                 Texture::load(
                     &format!("Occlusion texture for {}", mesh_name),
                     i.texture(),
@@ -127,14 +124,13 @@ impl Material {
                     images,
                 )
             })
-            .flatten()
             .unwrap_or_else(|| empty_texture.clone());
 
         // Emission
         let emissive_texture_info = material.emissive_texture();
         let emissive_texture = emissive_texture_info
             .as_ref()
-            .map(|i| {
+            .and_then(|i| {
                 Texture::load(
                     &format!("Occlusion texture for {}", mesh_name),
                     i.texture(),
@@ -142,7 +138,6 @@ impl Material {
                     images,
                 )
             })
-            .flatten()
             .unwrap_or_else(|| empty_texture.clone());
         let emissive_texture_set = emissive_texture_info
             .map(|t| t.tex_coord() as i32)

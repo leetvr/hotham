@@ -42,9 +42,9 @@ mod tests {
 
         {
             let mut transform = world.get_mut::<Transform>(entity).unwrap();
-            transform.translation = test_translation.clone();
-            transform.rotation = test_rotation.clone();
-            transform.scale = test_translation.clone();
+            transform.translation = test_translation;
+            transform.rotation = test_rotation;
+            transform.scale = test_translation;
         }
 
         update_transform_matrix_system(&mut Default::default(), &mut world);

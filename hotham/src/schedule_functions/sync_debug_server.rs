@@ -41,9 +41,7 @@ pub fn world_to_debug_data(
     for (entity, info) in world.query::<&Info>().iter() {
         let transform = world.get_mut::<Transform>(entity).ok();
         let collider = world.get_mut::<Collider>(entity).ok();
-        let collider = collider
-            .map(|c| physics_context.colliders.get(c.handle))
-            .flatten();
+        let collider = collider.and_then(|c| physics_context.colliders.get(c.handle));
         let entity_id = entity.id() as _;
 
         let e = DebugEntity {
