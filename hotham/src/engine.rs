@@ -27,7 +27,6 @@ pub static ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32
 
 /// The Hotham Engine
 /// A wrapper around the "external world" from the perspective of the engine, eg. renderer, XR, etc.
-/// **IMPORTANT**: make sure you call `update` each tick
 pub struct Engine {
     should_quit: Arc<AtomicBool>,
     #[allow(dead_code)]
@@ -92,8 +91,47 @@ impl Engine {
         engine
     }
 
-    /// IMPORTANT: Call this function each tick to update the engine's running state with the underlying OS
-    pub fn update(&mut self) -> HothamResult<(xr::SessionState, xr::SessionState)> {
+    // TODO Implement a Tick trait, would allow for structs to be passed as a `&mut`.
+    // TODO Unit tests.
+    /// Run the engine, regularly triggering internal updates as well as the provided `tick`
+    /// function. The `tick` function must return either `TickResult::Continue` for the engine to
+    /// keep running, or `TickResult::Return(R)` to break the loop and return `Ok(R)`, where `R`
+    /// can be of any type.
+    ///
+    /// An empty tuple `()` is synonymous of `TickResult::Continue`. Booleans can also be used,
+    /// `true` meaning `TickResult::Continue` and `false` being `TickResult::Return(())`
+    ///
+    /// # Arguments
+    /// TODO
+    /// * `tick` -
+    ///
+    /// # Errors
+    ///
+    /// This method may return an error in various cases, including but not limited to:
+    /// * Hotham internal errors,
+    /// * third-party errors (OpenXR, Vulkan),
+    /// * IO errors.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // TODO
+    /// ```
+    pub fn run<F, T, R>(&mut self, mut tick: F) -> HothamResult<R>
+    where
+        F: FnMut(&mut Self, xr::SessionState, xr::SessionState) -> T,
+        T: Into<TickResult<R>>,
+    {
+        loop {
+            let (previous_state, current_state) = self.update()?;
+            if let TickResult::Return(result) = tick(self, previous_state, current_state).into() {
+                return Ok(result);
+            }
+        }
+    }
+
+    /// Update the engine's running state with the underlying OS
+    fn update(&mut self) -> HothamResult<(xr::SessionState, xr::SessionState)> {
         #[cfg(target_os = "android")]
         process_android_events(&mut self.resumed, &self.should_quit);
 
@@ -135,6 +173,36 @@ impl Engine {
 impl Default for Engine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// TODO Doc
+pub enum TickResult<R> {
+    Continue,
+    Return(R),
+}
+
+impl<R> Default for TickResult<R> {
+    fn default() -> Self {
+        TickResult::Continue
+    }
+}
+
+// TODO Doc
+impl From<()> for TickResult<()> {
+    fn from(_: ()) -> Self {
+        TickResult::default()
+    }
+}
+
+// TODO Doc
+impl From<bool> for TickResult<()> {
+    fn from(b: bool) -> Self {
+        if b {
+            TickResult::Continue
+        } else {
+            TickResult::Return(())
+        }
     }
 }
 

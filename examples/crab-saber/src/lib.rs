@@ -37,19 +37,17 @@ pub fn real_main() -> HothamResult<()> {
     let mut hotham_queries = Default::default();
     let mut crab_saber_queries = Default::default();
 
-    while let Ok((previous_state, current_state)) = engine.update() {
+    engine.run(|engine, previous_state, current_state| {
         tick(
             previous_state,
             current_state,
-            &mut engine,
+            engine,
             &mut world,
             &mut hotham_queries,
             &mut crab_saber_queries,
             &mut game_context,
-        );
-    }
-
-    Ok(())
+        )
+    })
 }
 
 fn tick(
