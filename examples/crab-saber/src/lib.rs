@@ -16,7 +16,7 @@ use hotham::{
     },
     systems::{pointers_system, Queries},
     xr::{self, SessionState},
-    Engine, HothamError, HothamResult,
+    Engine, HothamResult,
 };
 
 use resources::{
@@ -33,7 +33,7 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let (mut world, mut game_context) = init(&mut engine)?;
+    let (mut world, mut game_context) = init(&mut engine);
     let mut hotham_queries = Default::default();
     let mut crab_saber_queries = Default::default();
 
@@ -224,10 +224,10 @@ fn handle_state_change(
     }
 }
 
-fn init(engine: &mut Engine) -> Result<(World, GameContext), HothamError> {
+fn init(engine: &mut Engine) -> (World, GameContext) {
     let mut world = World::default();
     let mut game_context = GameContext::new(engine, &mut world);
     add_songs(&mut engine.audio_context, &mut game_context);
     add_sound_effects(&mut engine.audio_context, &mut game_context);
-    Ok((world, game_context))
+    (world, game_context)
 }
