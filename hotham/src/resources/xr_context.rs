@@ -9,6 +9,8 @@ use xr::{
     SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
 };
 
+use crate::xr::sys::{CompositionLayerPassthroughFB, PassthroughFB, PassthroughLayerFB};
+use crate::xr::{CompositionLayerBase, CompositionLayerFlags, PassthroughFlagsFB};
 use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
 
 pub struct XrContext {
@@ -35,6 +37,8 @@ pub struct XrContext {
     pub views: Vec<View>,
     pub view_state_flags: ViewStateFlags,
     pub frame_index: usize,
+    pub passthrough: PassthroughFB,
+    pub passthrough_layer: PassthroughLayerFB,
 }
 
 impl XrContext {
@@ -164,6 +168,10 @@ impl XrContext {
             should_render: false,
         };
 
+        let passthrough =
+            session.create_passthrough_fb(PassthroughFlagsFB::IS_RUNNING_AT_CREATION)?;
+        let passthrough_layer = session.create_passthrough_layer(passthrough)?;
+
         // Attach the action set to the session
         session.attach_action_sets(&[&action_set])?;
         let xr_context = XrContext {
@@ -190,6 +198,8 @@ impl XrContext {
             views: Vec::new(),
             view_state_flags: ViewStateFlags::EMPTY,
             frame_index: 0,
+            passthrough,
+            passthrough_layer,
         };
 
         Ok((xr_context, vulkan_context))
@@ -264,10 +274,21 @@ impl XrContext {
         ];
 
         let layer_projection = xr::CompositionLayerProjection::new()
+            .layer_flags(CompositionLayerFlags::BLEND_TEXTURE_SOURCE_ALPHA)
             .space(&self.reference_space)
             .views(&views);
 
-        let layers = [&*layer_projection];
+        // TODO Already created in `Self::new`
+        let passthrough_layer = self
+            .session
+            .new_passthrough_composition_layer(self.passthrough_layer);
+
+        let layers: &[&CompositionLayerBase<'_, Vulkan>] = &[
+            unsafe {
+                std::mem::transmute::<_, &CompositionLayerBase<'_, Vulkan>>(&passthrough_layer)
+            },
+            &*layer_projection as &CompositionLayerBase<'_, Vulkan>,
+        ];
         self.frame_stream.end(display_time, BLEND_MODE, &layers)
     }
 

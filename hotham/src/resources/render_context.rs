@@ -3,7 +3,8 @@ use std::{ffi::CStr, io::Cursor, mem::size_of, time::Instant};
 pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
         color: vk::ClearColorValue {
-            float32: [0.0, 0.0, 0.0, 1.0],
+            // TODO Check with passthrough disabled if there's anything different with alpha set to 0
+            float32: [0.0, 0.0, 0.0, 0.0],
         },
     },
     vk::ClearValue {
