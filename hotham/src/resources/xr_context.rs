@@ -5,11 +5,15 @@ use openxr::{
     SessionState, Space, Swapchain, Vulkan,
 };
 use xr::{
-    vulkan::SessionCreateInfo, Duration, FrameState, Haptic, ReferenceSpaceType,
-    SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
+    sys::{PassthroughFB, PassthroughLayerFB},
+    vulkan::SessionCreateInfo,
+    Duration, FrameState, Haptic, ReferenceSpaceType, SwapchainCreateFlags, SwapchainCreateInfo,
+    SwapchainUsageFlags, Time, View, ViewStateFlags,
 };
 
-use crate::xr::sys::{CompositionLayerPassthroughFB, PassthroughFB, PassthroughLayerFB};
+use crate::xr::passthrough::{
+    create_passthrough_fb, create_passthrough_layer, new_passthrough_composition_layer,
+};
 use crate::xr::{CompositionLayerBase, CompositionLayerFlags, PassthroughFlagsFB};
 use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
 
@@ -169,8 +173,8 @@ impl XrContext {
         };
 
         let passthrough =
-            session.create_passthrough_fb(PassthroughFlagsFB::IS_RUNNING_AT_CREATION)?;
-        let passthrough_layer = session.create_passthrough_layer(passthrough)?;
+            create_passthrough_fb(&session, PassthroughFlagsFB::IS_RUNNING_AT_CREATION)?;
+        let passthrough_layer = create_passthrough_layer(&session, passthrough)?;
 
         // Attach the action set to the session
         session.attach_action_sets(&[&action_set])?;
@@ -278,10 +282,7 @@ impl XrContext {
             .space(&self.reference_space)
             .views(&views);
 
-        // TODO Already created in `Self::new`
-        let passthrough_layer = self
-            .session
-            .new_passthrough_composition_layer(self.passthrough_layer);
+        let passthrough_layer = new_passthrough_composition_layer(self.passthrough_layer);
 
         let layers: &[&CompositionLayerBase<'_, Vulkan>] = &[
             unsafe {
