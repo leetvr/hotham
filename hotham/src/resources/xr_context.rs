@@ -5,16 +5,14 @@ use openxr::{
     SessionState, Space, Swapchain, Vulkan,
 };
 use xr::{
-    sys::{PassthroughFB, PassthroughLayerFB},
-    vulkan::SessionCreateInfo,
-    Duration, FrameState, Haptic, ReferenceSpaceType, SwapchainCreateFlags, SwapchainCreateInfo,
-    SwapchainUsageFlags, Time, View, ViewStateFlags,
+    vulkan::SessionCreateInfo, Duration, FrameState, Haptic, ReferenceSpaceType,
+    SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
 };
 
-use crate::xr::passthrough::{
-    create_passthrough_fb, create_passthrough_layer, new_passthrough_composition_layer,
+use crate::xr::{
+    CompositionLayerBase, CompositionLayerFlags, Passthrough, PassthroughFlagsFB, PassthroughLayer,
+    PassthroughLayerPurposeFB,
 };
-use crate::xr::{CompositionLayerBase, CompositionLayerFlags, PassthroughFlagsFB};
 use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
 
 pub struct XrContext {
@@ -41,8 +39,8 @@ pub struct XrContext {
     pub views: Vec<View>,
     pub view_state_flags: ViewStateFlags,
     pub frame_index: usize,
-    pub passthrough: PassthroughFB,
-    pub passthrough_layer: PassthroughLayerFB,
+    pub passthrough: Passthrough,
+    pub passthrough_layer: PassthroughLayer,
 }
 
 impl XrContext {
@@ -172,9 +170,12 @@ impl XrContext {
             should_render: false,
         };
 
-        let passthrough =
-            create_passthrough_fb(&session, PassthroughFlagsFB::IS_RUNNING_AT_CREATION)?;
-        let passthrough_layer = create_passthrough_layer(&session, passthrough)?;
+        let passthrough = session.create_passthrough(PassthroughFlagsFB::IS_RUNNING_AT_CREATION)?;
+        let passthrough_layer = session.create_passthrough_layer(
+            &passthrough,
+            PassthroughFlagsFB::IS_RUNNING_AT_CREATION,
+            PassthroughLayerPurposeFB::RECONSTRUCTION,
+        )?;
 
         // Attach the action set to the session
         session.attach_action_sets(&[&action_set])?;
@@ -282,7 +283,15 @@ impl XrContext {
             .space(&self.reference_space)
             .views(&views);
 
-        let passthrough_layer = new_passthrough_composition_layer(self.passthrough_layer);
+        // TODO Imports.
+        // TODO A builder should be generated. Use it instead.
+        let passthrough_layer = openxr::sys::CompositionLayerPassthroughFB {
+            ty: openxr::sys::CompositionLayerPassthroughFB::TYPE,
+            next: std::ptr::null(),
+            flags: CompositionLayerFlags::BLEND_TEXTURE_SOURCE_ALPHA,
+            space: openxr::sys::Space::NULL,
+            layer_handle: self.passthrough_layer.inner().clone(),
+        };
 
         let layers: &[&CompositionLayerBase<'_, Vulkan>] = &[
             unsafe {
