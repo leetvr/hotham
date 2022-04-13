@@ -290,7 +290,7 @@ impl XrContext {
             next: std::ptr::null(),
             flags: CompositionLayerFlags::BLEND_TEXTURE_SOURCE_ALPHA,
             space: openxr::sys::Space::NULL,
-            layer_handle: self.passthrough_layer.inner().clone(),
+            layer_handle: *self.passthrough_layer.inner(),
         };
 
         let layers: &[&CompositionLayerBase<'_, Vulkan>] = &[
@@ -299,7 +299,7 @@ impl XrContext {
             },
             &*layer_projection as &CompositionLayerBase<'_, Vulkan>,
         ];
-        self.frame_stream.end(display_time, BLEND_MODE, &layers)
+        self.frame_stream.end(display_time, BLEND_MODE, layers)
     }
 
     pub(crate) fn end_session(&mut self) -> anyhow::Result<()> {
