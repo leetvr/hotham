@@ -19,7 +19,7 @@ use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy};
 
 type XrVulkan = xr::Vulkan;
 
-#[cfg(not(target_os = "android"))]
+#[cfg(debug_assertions)]
 use ash::vk::DebugUtilsObjectNameInfoEXT;
 
 #[derive(Clone)]
