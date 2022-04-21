@@ -5,7 +5,7 @@ use ash::vk::{self, Handle};
 pub const SCALE_FACTOR: f32 = 3.;
 
 use crate::{
-    components::{panel::PanelInput, Panel},
+    components::{pane::PaneInput, Pane, Panel},
     resources::render_context::{create_push_constant, CLEAR_VALUES},
     texture::Texture,
     COLOR_FORMAT,
@@ -267,13 +267,14 @@ impl GuiContext {
         render_context: &RenderContext,
         current_swapchain_image_index: usize,
         panel: &mut Panel,
+        pane: &mut Pane,
     ) {
         let device = &vulkan_context.device;
         let frame = &render_context.frames[current_swapchain_image_index];
         let command_buffer = frame.command_buffer;
         let framebuffer = panel.framebuffer;
-        let extent = panel.extent;
-        let (raw_input, panel_input) = handle_panel_input(panel);
+        let extent = pane.resolution;
+        let (raw_input, pane_input) = handle_panel_input(panel, pane);
 
         let text = panel.text.clone();
         let mut updated_buttons = panel.buttons.clone();
@@ -302,11 +303,13 @@ impl GuiContext {
                     }
                 }
 
-                if let Some(panel_input) = panel_input {
-                    let position = ui
-                        .painter()
-                        .round_pos_to_pixels(panel_input.cursor_location);
-                    let cursor_colour = if panel_input.trigger_value > 0.9 {
+                if let Some(pane_input) = pane_input {
+                    let (x, y) = (
+                        pane_input.cursor_location.x / SCALE_FACTOR,
+                        pane_input.cursor_location.y / SCALE_FACTOR,
+                    );
+                    let position = ui.painter().round_pos_to_pixels((x, y).into());
+                    let cursor_colour = if pane_input.trigger_value > 0.9 {
                         egui::Color32::LIGHT_BLUE
                     } else {
                         egui::Color32::WHITE
@@ -460,11 +463,14 @@ impl GuiContext {
     }
 }
 
-fn handle_panel_input(panel: &mut Panel) -> (egui::RawInput, Option<PanelInput>) {
+fn handle_panel_input(panel: &mut Panel, pane: &mut Pane) -> (egui::RawInput, Option<PaneInput>) {
     let mut raw_input = panel.raw_input.clone();
-    let panel_input = panel.input.take();
-    if let Some(input) = &panel_input {
-        let pos = input.cursor_location;
+    let pane_input = pane.input.take();
+    if let Some(input) = &pane_input {
+        let pos = egui::Pos2 {
+            x: input.cursor_location.x / SCALE_FACTOR,
+            y: input.cursor_location.y / SCALE_FACTOR,
+        };
         raw_input.events.push(egui::Event::PointerMoved(pos));
         if input.trigger_value >= 0. {
             raw_input.events.push(egui::Event::PointerButton {
@@ -478,7 +484,7 @@ fn handle_panel_input(panel: &mut Panel) -> (egui::RawInput, Option<PanelInput>)
         raw_input.events.push(egui::Event::PointerGone);
     }
 
-    (raw_input, panel_input)
+    (raw_input, pane_input)
 }
 
 fn update_font_texture(

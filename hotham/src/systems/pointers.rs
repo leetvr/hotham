@@ -3,6 +3,7 @@ use egui::Pos2;
 use hecs::{PreparedQuery, With, World};
 use nalgebra::{
     point, vector, Isometry3, Orthographic3, Point3, Quaternion, Translation3, UnitQuaternion,
+    Vector2,
 };
 use rapier3d::{
     math::Point,
@@ -21,17 +22,13 @@ const ROTATION_OFFSET: Quaternion<f32> =
     Quaternion::new(-0.558_149_8, 0.827_491_2, 0.034_137_9, -0.050_611_5);
 
 use crate::{
-    components::{
-        hand::Handedness,
-        panel::{get_panel_dimensions, PanelInput},
-        Info, Panel, Pointer, Transform, Visible,
-    },
-    resources::{gui_context::SCALE_FACTOR, PhysicsContext, XrContext},
+    components::{hand::Handedness, pane::PaneInput, Info, Pane, Pointer, Transform, Visible},
+    resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
 
 /// Pointers system
-/// Allows users to interact with `Panel`s using their controllers
+/// Allows users to interact with `Pane`s using their controllers
 pub fn pointers_system(
     query: &mut PreparedQuery<With<Visible, (&mut Pointer, &mut Transform)>>,
     world: &mut World,
@@ -96,20 +93,23 @@ pub fn pointers_system(
             let hit_point = ray.point_at(toi); // Same as: `ray.origin + ray.dir * toi`
             let hit_collider = physics_context.colliders.get(handle).unwrap();
             let entity = unsafe { world.find_entity_from_id(hit_collider.user_data as _) };
-            match world.get_mut::<Panel>(entity) {
-                Ok(mut panel) => {
-                    let panel_extent = &panel.extent;
-                    let panel_transform = hit_collider.position();
-                    let cursor_location =
-                        get_cursor_location_for_panel(&hit_point, panel_transform, panel_extent);
-                    panel.input = Some(PanelInput {
+            match world.get_mut::<Pane>(entity) {
+                Ok(mut pane) => {
+                    let pane_transform = hit_collider.position();
+                    let cursor_location = get_cursor_location_for_pane(
+                        &hit_point,
+                        pane_transform,
+                        &pane.resolution,
+                        &pane.world_size,
+                    );
+                    pane.input = Some(PaneInput {
                         cursor_location,
                         trigger_value,
                     });
                 }
                 Err(_) => {
                     let info = world.get::<Info>(entity).map(|i| format!("{:?}", *i));
-                    println!("[HOTHAM_POINTERS] Ray collided with object that does not have a panel: {:?} - {:?}", entity, info);
+                    println!("[HOTHAM_POINTERS] Ray collided with object that does not have a pane: {:?} - {:?}", entity, info);
                 }
             }
         }
@@ -124,45 +124,46 @@ pub(crate) fn apply_grip_offset(position: &mut Isometry3<f32>) {
     position.translation = Translation3::from(updated_translation);
 }
 
-fn get_cursor_location_for_panel(
+fn get_cursor_location_for_pane(
     hit_point: &Point3<f32>,
-    panel_transform: &Isometry3<f32>,
-    panel_extent: &vk::Extent2D,
+    pane_transform: &Isometry3<f32>,
+    pane_extent: &vk::Extent2D,
+    pane_world_size: &Vector2<f32>,
 ) -> Pos2 {
-    let projected_hit_point = ray_to_panel_space(hit_point, panel_transform, panel_extent);
-    let transformed_hit_point = panel_transform
+    let projected_hit_point = ray_to_pane_space(hit_point, pane_transform, pane_world_size);
+    let transformed_hit_point = pane_transform
         .rotation
         .transform_point(&projected_hit_point);
 
-    // Adjust the point such that 0,0 is the panel's top left
+    // Adjust the point such that 0,0 is the pane's top left
     let x = (transformed_hit_point.x + 1.) * 0.5;
     let y = ((transformed_hit_point.y * -1.) * 0.5) + 0.5;
 
     // Convert to screen coordinates
-    let x_points = x * panel_extent.width as f32 / SCALE_FACTOR;
-    let y_points = y * panel_extent.height as f32 / SCALE_FACTOR;
+    let x_points = x * pane_extent.width as f32;
+    let y_points = y * pane_extent.height as f32;
 
     Pos2::new(x_points, y_points)
 }
 
-fn ray_to_panel_space(
+fn ray_to_pane_space(
     hit_point: &Point3<f32>,
-    panel_transform: &Isometry3<f32>,
-    panel_extent: &vk::Extent2D,
+    pane_transform: &Isometry3<f32>,
+    pane_world_size: &Vector2<f32>,
 ) -> Point3<f32> {
-    // Translate the extents of the panel into world space, using the panel's translation.
-    let (extent_x, extent_y) = get_panel_dimensions(panel_extent);
-    let translated_extents = panel_transform * point![extent_x, extent_y, 0.];
+    // Translate the extents of the pane into world space, using the pane's translation.
+    let (extent_x, extent_y) = (pane_world_size.x / 2., pane_world_size.y / 2.);
+    let translated_extents = pane_transform * point![extent_x, extent_y, 0.];
 
-    // Now build an orthographic matrix to project from world space into the panel's screen space
+    // Now build an orthographic matrix to project from world space into the pane's screen space
     let left = translated_extents.x - 1.;
     let right = translated_extents.x;
     let bottom = translated_extents.y - 1.;
     let top = translated_extents.y;
-    let panel_projection = Orthographic3::new(left, right, bottom, top, 0., 1.);
+    let pane_projection = Orthographic3::new(left, right, bottom, top, 0., 1.);
 
-    // Project the ray's hit point into panel space
-    panel_projection.project_point(hit_point)
+    // Project the ray's hit point into pane space
+    pane_projection.project_point(hit_point)
 }
 
 #[cfg(test)]
@@ -176,7 +177,7 @@ mod tests {
     #[test]
     pub fn test_pointers_system() {
         use crate::{
-            components::{Collider, Panel, Transform},
+            components::{Collider, Pane, Transform},
             resources::physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
             util::test_buffer,
         };
@@ -187,8 +188,8 @@ mod tests {
         let mut physics_context = PhysicsContext::default();
         let mut world = World::default();
 
-        let panel = Panel {
-            text: "Test Panel".to_string(),
+        let pane = Pane {
+            text: "Test Pane".to_string(),
             extent: vk::Extent2D {
                 width: 300,
                 height: 300,
@@ -201,9 +202,9 @@ mod tests {
             input: Default::default(),
             buttons: Vec::new(),
         };
-        let panel_entity = world.spawn((panel,));
+        let pane_entity = world.spawn((pane,));
 
-        // Place the panel *directly above* where the pointer will be located.
+        // Place the pane *directly above* where the pointer will be located.
         let collider = ColliderBuilder::cuboid(0.5, 0.5, 0.0)
             .sensor(true)
             .collision_groups(InteractionGroups::new(
@@ -212,14 +213,14 @@ mod tests {
             ))
             .translation(vector![-0.2, 2., -0.433918])
             .rotation(vector![(3. * std::f32::consts::PI) * 0.5, 0., 0.])
-            .user_data(panel_entity.id() as _)
+            .user_data(pane_entity.id() as _)
             .build();
         let handle = physics_context.colliders.insert(collider);
         let collider = Collider {
             collisions_this_frame: Vec::new(),
             handle,
         };
-        world.insert_one(panel_entity, collider).unwrap();
+        world.insert_one(pane_entity, collider).unwrap();
 
         // Add a decoy collider to ensure we're using collision groups correctly.
         let collider = ColliderBuilder::cuboid(0.1, 0.1, 0.1)
@@ -254,8 +255,8 @@ mod tests {
         // Assert that the pointer has moved
         assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
 
-        let panel = world.get_mut::<Panel>(panel_entity).unwrap();
-        let input = panel.input.clone().unwrap();
+        let pane = world.get_mut::<Pane>(pane_entity).unwrap();
+        let input = pane.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 50.);
         assert_relative_eq!(input.cursor_location.y, 29.491043);
         assert_eq!(input.trigger_value, 0.);
@@ -272,69 +273,87 @@ mod tests {
     }
 
     #[test]
-    pub fn test_get_cursor_location_for_panel() {
-        let panel_transform = Isometry3::new(nalgebra::zero(), nalgebra::zero());
-        let panel_extent = vk::Extent2D {
-            width: 100 * SCALE_FACTOR as u32,
-            height: 100 * SCALE_FACTOR as u32,
+    pub fn test_get_cursor_location_for_pane() {
+        let pane_transform = Isometry3::new(nalgebra::zero(), nalgebra::zero());
+        let pane_extent = vk::Extent2D {
+            width: 100,
+            height: 100,
         };
+        let pane_world_size = vector![1.0, 1.0];
 
-        // Trivial example. Panel and hit point at origin:
-        let result =
-            get_cursor_location_for_panel(&point![0., 0., 0.], &panel_transform, &panel_extent);
+        // Trivial example. Pane and hit point at origin:
+        let result = get_cursor_location_for_pane(
+            &point![0., 0., 0.],
+            &pane_transform,
+            &pane_extent,
+            &pane_world_size,
+        );
         assert_relative_eq!(result.x, 50.);
         assert_relative_eq!(result.y, 50.);
 
         // hit top left
-        let result =
-            get_cursor_location_for_panel(&point![-0.5, 0.5, 0.], &panel_transform, &panel_extent);
+        let result = get_cursor_location_for_pane(
+            &point![-0.5, 0.5, 0.],
+            &pane_transform,
+            &pane_extent,
+            &pane_world_size,
+        );
         assert_relative_eq!(result.x, 0.);
         assert_relative_eq!(result.y, 0.);
 
         // hit top right
-        let result =
-            get_cursor_location_for_panel(&point![0.5, 0.5, 0.], &panel_transform, &panel_extent);
+        let result = get_cursor_location_for_pane(
+            &point![0.5, 0.5, 0.],
+            &pane_transform,
+            &pane_extent,
+            &pane_world_size,
+        );
         assert_relative_eq!(result.x, 100.);
         assert_relative_eq!(result.y, 0.);
 
         // hit bottom right
-        let result =
-            get_cursor_location_for_panel(&point![0.5, -0.5, 0.], &panel_transform, &panel_extent);
+        let result = get_cursor_location_for_pane(
+            &point![0.5, -0.5, 0.],
+            &pane_transform,
+            &pane_extent,
+            &pane_world_size,
+        );
         assert_relative_eq!(result.x, 100.);
         assert_relative_eq!(result.y, 100.);
 
         // hit bottom left
-        let result =
-            get_cursor_location_for_panel(&point![-0.5, -0.5, 0.], &panel_transform, &panel_extent);
+        let result = get_cursor_location_for_pane(
+            &point![-0.5, -0.5, 0.],
+            &pane_transform,
+            &pane_extent,
+            &pane_world_size,
+        );
         assert_relative_eq!(result.x, 0.);
         assert_relative_eq!(result.y, 100.);
     }
 
     #[test]
-    pub fn test_ray_to_panel_space() {
-        let panel_transform = Isometry3::new(nalgebra::zero(), nalgebra::zero());
-        let panel_extent = vk::Extent2D {
-            width: 100,
-            height: 100,
-        };
+    pub fn test_ray_to_pane_space() {
+        let pane_transform = Isometry3::new(nalgebra::zero(), nalgebra::zero());
+        let pane_world_size = vector![1.0, 1.0];
 
-        let result = ray_to_panel_space(&point![0., 0., 0.], &panel_transform, &panel_extent);
+        let result = ray_to_pane_space(&point![0., 0., 0.], &pane_transform, &pane_world_size);
         assert_relative_eq!(result, point![0.0, 0.0, -1.0]);
 
         // hit top left
-        let result = ray_to_panel_space(&point![-0.5, 0.5, 0.], &panel_transform, &panel_extent);
+        let result = ray_to_pane_space(&point![-0.5, 0.5, 0.], &pane_transform, &pane_world_size);
         assert_relative_eq!(result, point![-1.0, 1.0, -1.0]);
 
         // hit top right
-        let result = ray_to_panel_space(&point![0.5, 0.5, 0.], &panel_transform, &panel_extent);
+        let result = ray_to_pane_space(&point![0.5, 0.5, 0.], &pane_transform, &pane_world_size);
         assert_relative_eq!(result, point![1.0, 1.0, -1.0]);
 
         // hit bottom right
-        let result = ray_to_panel_space(&point![0.5, -0.5, 0.], &panel_transform, &panel_extent);
+        let result = ray_to_pane_space(&point![0.5, -0.5, 0.], &pane_transform, &pane_world_size);
         assert_relative_eq!(result, point![1.0, -1.0, -1.0]);
 
         // hit bottom left
-        let result = ray_to_panel_space(&point![-0.5, -0.5, 0.], &panel_transform, &panel_extent);
+        let result = ray_to_pane_space(&point![-0.5, -0.5, 0.], &pane_transform, &pane_world_size);
         assert_relative_eq!(result, point![-1.0, -1.0, -1.0]);
     }
 }

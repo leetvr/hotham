@@ -1,5 +1,5 @@
 use crate::{
-    components::{hand::Handedness, Panel},
+    components::{hand::Handedness, Pane, Panel},
     resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
 };
 use hecs::{PreparedQuery, World};
@@ -10,7 +10,7 @@ static GUI_HAPTIC_AMPLITUDE: f32 = 0.5;
 /// - draws the panel to a texture
 /// - updates any input state
 pub fn draw_gui_system(
-    query: &mut PreparedQuery<&mut Panel>,
+    query: &mut PreparedQuery<(&mut Pane, &mut Panel)>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: &usize,
@@ -22,7 +22,7 @@ pub fn draw_gui_system(
     gui_context.hovered_this_frame = false;
 
     // Draw each panel
-    for (_, panel) in query.query_mut(world) {
+    for (_, (pane, panel)) in query.query_mut(world) {
         // Reset the button state
         for button in &mut panel.buttons {
             button.clicked_this_frame = false;
@@ -33,6 +33,7 @@ pub fn draw_gui_system(
             render_context,
             *swapchain_image_index,
             panel,
+            pane,
         );
     }
 
@@ -66,10 +67,7 @@ mod tests {
         },
         gltf_loader,
         image::Image,
-        resources::{
-            gui_context::SCALE_FACTOR, GuiContext, HapticContext, PhysicsContext, RenderContext,
-            VulkanContext,
-        },
+        resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         scene_data::SceneParams,
         swapchain::Swapchain,
         systems::{
@@ -264,7 +262,7 @@ mod tests {
     fn release_trigger(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
         let panel = query.query_mut(world).into_iter().next().unwrap().1;
         panel.input = Some(PanelInput {
-            cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.15 * (800. / SCALE_FACTOR)),
+            cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 0.2,
         });
     }
@@ -373,7 +371,7 @@ mod tests {
             &mut world,
         );
         world.get_mut::<Panel>(panel).unwrap().input = Some(PanelInput {
-            cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.15 * (800. / SCALE_FACTOR)),
+            cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 1.,
         });
 
