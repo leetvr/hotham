@@ -154,10 +154,6 @@ pub unsafe extern "system" fn create_vulkan_instance(
     for ext in &(*xr_extensions) {
         enabled_extensions.push(CStr::from_ptr(*ext));
     }
-    enabled_extensions.push(CStr::from_bytes_with_nul_unchecked(b"VK_EXT_debug_utils\0"));
-    create_info.pp_enabled_layer_names =
-        [CStr::from_bytes_with_nul_unchecked(b"VK_LAYER_KHRONOS_validation\0").as_ptr()].as_ptr();
-    create_info.enabled_layer_count = 1;
 
     let enabled_extensions = enabled_extensions
         .iter()
@@ -394,7 +390,7 @@ pub unsafe extern "system" fn create_session(
     *session = Session::from_raw(42);
     let mut state = STATE.lock().unwrap();
     if state.device.is_none() {
-        let graphics_binding: &GraphicsBindingVulkanKHR = transmute(&(*create_info).next);
+        let graphics_binding = &*((*create_info).next as *const GraphicsBindingVulkanKHR);
         let vk_device = graphics_binding.device;
         let instance = state.vulkan_instance.as_ref().unwrap();
         let device = ash::Device::load(instance.fp_v1_0(), transmute(vk_device));

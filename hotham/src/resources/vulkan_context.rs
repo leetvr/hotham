@@ -19,7 +19,7 @@ use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy};
 
 type XrVulkan = xr::Vulkan;
 
-#[cfg(not(target_os = "android"))]
+#[cfg(debug_assertions)]
 use ash::vk::DebugUtilsObjectNameInfoEXT;
 
 #[derive(Clone)]
@@ -1020,7 +1020,7 @@ impl VulkanContext {
 }
 
 #[allow(unused_variables)]
-fn add_device_extension_names(extension_names: &mut Vec<CString>) {
+fn add_device_extension_names(extension_names: &mut [CString]) {
     // Add Multiview extension
     #[cfg(target_os = "android")]
     extension_names.push(CString::new("VK_KHR_multiview").unwrap());
@@ -1101,7 +1101,15 @@ fn vulkan_init_legacy(
     unsafe {
         let app_name = CString::new("Hotham Asteroid")?;
         let entry = Entry::new()?;
+
+        #[cfg(debug_assertions)]
         let layers = vec!["VK_LAYER_KHRONOS_validation\0"];
+
+        #[cfg(not(debug_assertions))]
+        let layers = vec![];
+
+        println!("[HOTHAM_VULKAN] Requesting layers: {:?}", layers);
+
         let layer_names = get_raw_strings(layers);
         let mut vk_instance_exts = xr_instance
             .vulkan_legacy_instance_extensions(system)
@@ -1114,7 +1122,7 @@ fn vulkan_init_legacy(
         vk_instance_exts.push(vk::ExtDebugUtilsFn::name().to_owned());
 
         println!(
-            "Required Vulkan instance extensions: {:?}",
+            "[HOTHAM_VULKAN] Required Vulkan instance extensions: {:?}",
             vk_instance_exts
         );
         let vk_instance_ext_ptrs = vk_instance_exts
@@ -1126,15 +1134,12 @@ fn vulkan_init_legacy(
             .application_name(&app_name)
             .api_version(vk::make_api_version(0, 1, 2, 0));
 
-        let validation_features_enables = [
-            // vk::ValidationFeatureEnableEXT::BEST_PRACTICES,
-        ];
+        let validation_features_enables = [];
         let validation_features_disables = [];
         let mut validation_features = vk::ValidationFeaturesEXT::builder()
             .enabled_validation_features(&validation_features_enables)
             .disabled_validation_features(&validation_features_disables);
 
-        // TODO: Disable validation in release
         let instance = entry
             .create_instance(
                 &vk::InstanceCreateInfo::builder()
