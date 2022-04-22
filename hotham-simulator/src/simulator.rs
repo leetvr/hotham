@@ -154,10 +154,6 @@ pub unsafe extern "system" fn create_vulkan_instance(
     for ext in &(*xr_extensions) {
         enabled_extensions.push(CStr::from_ptr(*ext));
     }
-    enabled_extensions.push(CStr::from_bytes_with_nul_unchecked(b"VK_EXT_debug_utils\0"));
-    create_info.pp_enabled_layer_names =
-        [CStr::from_bytes_with_nul_unchecked(b"VK_LAYER_KHRONOS_validation\0").as_ptr()].as_ptr();
-    create_info.enabled_layer_count = 1;
 
     let enabled_extensions = enabled_extensions
         .iter()
