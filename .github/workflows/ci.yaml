@@ -1,9 +1,6 @@
 on:
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-  workflow_dispatch:
 
 name: CI
 
@@ -14,7 +11,7 @@ env:
 
 jobs:
   lints:
-    name: Run cargo fmt and cargo clippy
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - name: Install ALSA dev
@@ -43,7 +40,7 @@ jobs:
           command: clippy
           args: -- -D warnings
   test:
-    name: Run cargo test
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Install ALSA dev
