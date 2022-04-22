@@ -1,6 +1,6 @@
 use super::hand::Handedness;
 
-/// A component added to an entity to allow users to interact with `Panels` using their
+/// A component added to an entity to allow users to interact with `UIPanels` using their
 /// controllers.
 pub struct Pointer {
     /// Which hand is the pointer in?

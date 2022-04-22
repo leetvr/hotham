@@ -1,5 +1,5 @@
 use crate::{
-    components::{hand::Handedness, Pane, Panel},
+    components::{hand::Handedness, Panel, UIPanel},
     resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
 };
 use hecs::{PreparedQuery, World};
@@ -10,7 +10,7 @@ static GUI_HAPTIC_AMPLITUDE: f32 = 0.5;
 /// - draws the panel to a texture
 /// - updates any input state
 pub fn draw_gui_system(
-    query: &mut PreparedQuery<(&mut Pane, &mut Panel)>,
+    query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: &usize,
@@ -22,9 +22,9 @@ pub fn draw_gui_system(
     gui_context.hovered_this_frame = false;
 
     // Draw each panel
-    for (_, (pane, panel)) in query.query_mut(world) {
+    for (_, (panel, ui_panel)) in query.query_mut(world) {
         // Reset the button state
-        for button in &mut panel.buttons {
+        for button in &mut ui_panel.buttons {
             button.clicked_this_frame = false;
         }
 
@@ -32,8 +32,8 @@ pub fn draw_gui_system(
             vulkan_context,
             render_context,
             *swapchain_image_index,
+            ui_panel,
             panel,
-            pane,
         );
     }
 
@@ -62,8 +62,8 @@ mod tests {
     use crate::{
         buffer::Buffer,
         components::{
-            panel::{add_panel_to_world, PanelButton, PanelInput},
-            Panel,
+            panel::{add_panel_to_world, UIPanelButton, UIPanelInput},
+            UIPanel,
         },
         gltf_loader,
         image::Image,
@@ -159,7 +159,7 @@ mod tests {
     }
 
     fn schedule(
-        query: &mut PreparedQuery<&mut Panel>,
+        query: &mut PreparedQuery<&mut UIPanel>,
         world: &mut World,
         gui_context: &mut GuiContext,
         haptic_context: &mut HapticContext,
@@ -251,7 +251,7 @@ mod tests {
 
     fn button_was_clicked(world: &mut World) -> bool {
         let panel = world
-            .query_mut::<&mut Panel>()
+            .query_mut::<&mut UIPanel>()
             .into_iter()
             .next()
             .unwrap()
@@ -259,17 +259,17 @@ mod tests {
         return panel.buttons[0].clicked_this_frame;
     }
 
-    fn release_trigger(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
+    fn release_trigger(world: &mut World, query: &mut PreparedQuery<&mut UIPanel>) {
         let panel = query.query_mut(world).into_iter().next().unwrap().1;
-        panel.input = Some(PanelInput {
+        panel.input = Some(UIPanelInput {
             cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 0.2,
         });
     }
 
-    fn move_cursor_off_panel(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
+    fn move_cursor_off_panel(world: &mut World, query: &mut PreparedQuery<&mut UIPanel>) {
         let panel = query.query_mut(world).into_iter().next().unwrap().1;
-        panel.input = Some(PanelInput {
+        panel.input = Some(UIPanelInput {
             cursor_location: Pos2::new(0., 0.),
             trigger_value: 0.0,
         });
@@ -360,8 +360,8 @@ mod tests {
             800,
             800,
             vec![
-                PanelButton::new("Click me!"),
-                PanelButton::new("Don't click me!"),
+                UIPanelButton::new("Click me!"),
+                UIPanelButton::new("Don't click me!"),
             ],
             [-1.0, 0., 0.].into(),
             &vulkan_context,
@@ -370,7 +370,7 @@ mod tests {
             &mut physics_context,
             &mut world,
         );
-        world.get_mut::<Panel>(panel).unwrap().input = Some(PanelInput {
+        world.get_mut::<UIPanel>(panel).unwrap().input = Some(UIPanelInput {
             cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 1.,
         });

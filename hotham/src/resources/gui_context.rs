@@ -5,7 +5,7 @@ use ash::vk::{self, Handle};
 pub const SCALE_FACTOR: f32 = 3.;
 
 use crate::{
-    components::{pane::PaneInput, Pane, Panel},
+    components::{panel::PanelInput, Panel, UIPanel},
     resources::render_context::{create_push_constant, CLEAR_VALUES},
     texture::Texture,
     COLOR_FORMAT,
@@ -266,19 +266,19 @@ impl GuiContext {
         vulkan_context: &VulkanContext,
         render_context: &RenderContext,
         current_swapchain_image_index: usize,
+        ui_panel: &mut UIPanel,
         panel: &mut Panel,
-        pane: &mut Pane,
     ) {
         let device = &vulkan_context.device;
         let frame = &render_context.frames[current_swapchain_image_index];
         let command_buffer = frame.command_buffer;
-        let framebuffer = panel.framebuffer;
-        let extent = pane.resolution;
-        let (raw_input, pane_input) = handle_panel_input(panel, pane);
+        let framebuffer = ui_panel.framebuffer;
+        let extent = panel.resolution;
+        let (raw_input, panel_input) = handle_panel_input(ui_panel, panel);
 
-        let text = panel.text.clone();
-        let mut updated_buttons = panel.buttons.clone();
-        let egui_context = &mut panel.egui_context;
+        let text = ui_panel.text.clone();
+        let mut updated_buttons = ui_panel.buttons.clone();
+        let egui_context = &mut ui_panel.egui_context;
 
         egui_context.begin_frame(raw_input);
         let inner_layout = egui::Layout::from_main_dir_and_cross_align(
@@ -303,13 +303,13 @@ impl GuiContext {
                     }
                 }
 
-                if let Some(pane_input) = pane_input {
+                if let Some(panel_input) = panel_input {
                     let (x, y) = (
-                        pane_input.cursor_location.x / SCALE_FACTOR,
-                        pane_input.cursor_location.y / SCALE_FACTOR,
+                        panel_input.cursor_location.x / SCALE_FACTOR,
+                        panel_input.cursor_location.y / SCALE_FACTOR,
                     );
                     let position = ui.painter().round_pos_to_pixels((x, y).into());
-                    let cursor_colour = if pane_input.trigger_value > 0.9 {
+                    let cursor_colour = if panel_input.trigger_value > 0.9 {
                         egui::Color32::LIGHT_BLUE
                     } else {
                         egui::Color32::WHITE
@@ -333,9 +333,9 @@ impl GuiContext {
         }
 
         let clipped_meshes = egui_context.tessellate(shapes);
-        panel.buttons = updated_buttons;
-        let vertex_buffer = &panel.vertex_buffer;
-        let index_buffer = &panel.index_buffer;
+        ui_panel.buttons = updated_buttons;
+        let vertex_buffer = &ui_panel.vertex_buffer;
+        let index_buffer = &ui_panel.index_buffer;
 
         // begin render pass
         unsafe {
@@ -463,10 +463,13 @@ impl GuiContext {
     }
 }
 
-fn handle_panel_input(panel: &mut Panel, pane: &mut Pane) -> (egui::RawInput, Option<PaneInput>) {
-    let mut raw_input = panel.raw_input.clone();
-    let pane_input = pane.input.take();
-    if let Some(input) = &pane_input {
+fn handle_panel_input(
+    ui_panel: &mut UIPanel,
+    panel: &mut Panel,
+) -> (egui::RawInput, Option<PanelInput>) {
+    let mut raw_input = ui_panel.raw_input.clone();
+    let panel_input = panel.input.take();
+    if let Some(input) = &panel_input {
         let pos = egui::Pos2 {
             x: input.cursor_location.x / SCALE_FACTOR,
             y: input.cursor_location.y / SCALE_FACTOR,
@@ -484,7 +487,7 @@ fn handle_panel_input(panel: &mut Panel, pane: &mut Pane) -> (egui::RawInput, Op
         raw_input.events.push(egui::Event::PointerGone);
     }
 
-    (raw_input, pane_input)
+    (raw_input, panel_input)
 }
 
 fn update_font_texture(

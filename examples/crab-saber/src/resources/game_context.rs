@@ -6,7 +6,7 @@ use std::{
 
 use hotham::{
     components::{
-        hand::Handedness, panel::add_panel_to_world, Collider, Pointer, RigidBody, SoundEmitter,
+        hand::Handedness, ui_panel::add_panel_to_world, Collider, Pointer, RigidBody, SoundEmitter,
         Visible,
     },
     gltf_loader::{self, add_model_to_world},
