@@ -19,7 +19,7 @@ use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy};
 
 type XrVulkan = xr::Vulkan;
 
-#[cfg(not(target_os = "android"))]
+#[cfg(debug_assertions)]
 use ash::vk::DebugUtilsObjectNameInfoEXT;
 
 #[derive(Clone)]
@@ -1020,7 +1020,7 @@ impl VulkanContext {
 }
 
 #[allow(unused_variables)]
-fn add_device_extension_names(extension_names: &mut Vec<CString>) {
+fn add_device_extension_names(extension_names: &mut [CString]) {
     // Add Multiview extension
     #[cfg(target_os = "android")]
     extension_names.push(CString::new("VK_KHR_multiview").unwrap());

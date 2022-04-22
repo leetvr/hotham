@@ -394,7 +394,7 @@ pub unsafe extern "system" fn create_session(
     *session = Session::from_raw(42);
     let mut state = STATE.lock().unwrap();
     if state.device.is_none() {
-        let graphics_binding: &GraphicsBindingVulkanKHR = transmute(&(*create_info).next);
+        let graphics_binding = &*((*create_info).next as *const GraphicsBindingVulkanKHR);
         let vk_device = graphics_binding.device;
         let instance = state.vulkan_instance.as_ref().unwrap();
         let device = ash::Device::load(instance.fp_v1_0(), transmute(vk_device));
