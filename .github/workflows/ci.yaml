@@ -1,12 +1,6 @@
 on:
-  push:
-    paths-ignore:
-      - '**.md'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**.md'
-  workflow_dispatch:
 
 name: CI
 
@@ -17,7 +11,7 @@ env:
 
 jobs:
   lints:
-    name: Run cargo fmt and cargo clippy
+    name: Lint
     runs-on: ubuntu-latest
     steps:
       - name: Install ALSA dev
@@ -46,7 +40,7 @@ jobs:
           command: clippy
           args: -- -D warnings
   test:
-    name: Run cargo test
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - name: Install ALSA dev
@@ -67,12 +61,11 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: "--no-run"
+          args: '--no-run'
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         env:
           RUST_TEST_THREADS: 1
         with:
           command: test
-          args: "-p hotham --lib"
-
+          args: '-p hotham --lib'
