@@ -14,6 +14,8 @@ use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW
 #[derive(Default)]
 pub struct XrContextBuilder<'a> {
     path: Option<&'a std::path::Path>,
+    application_name: Option<&'a str>,
+    application_version: Option<u32>,
 }
 
 impl<'a> XrContextBuilder<'a> {
@@ -26,8 +28,19 @@ impl<'a> XrContextBuilder<'a> {
         self
     }
 
+    pub fn application_name(&mut self, name: Option<&'a str>) -> &mut Self {
+        self.application_name = name;
+        self
+    }
+
+    pub fn application_version(&mut self, version: Option<u32>) -> &mut Self {
+        self.application_version = version;
+        self
+    }
+
     pub fn build(&mut self) -> Result<(XrContext, VulkanContext)> {
-        let (instance, system) = create_xr_instance(self.path)?;
+        let (instance, system) =
+            create_xr_instance(self.path, self.application_name, self.application_version)?;
         XrContext::_new(instance, system)
     }
 }
@@ -375,6 +388,8 @@ pub(crate) fn create_xr_session(
 
 pub(crate) fn create_xr_instance(
     path: Option<&std::path::Path>,
+    application_name: Option<&str>,
+    application_version: Option<u32>,
 ) -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = if let Some(path) = path {
         xr::Entry::load_from(path)?
@@ -382,8 +397,8 @@ pub(crate) fn create_xr_instance(
         xr::Entry::load()?
     };
     let xr_app_info = openxr::ApplicationInfo {
-        application_name: "Hotham Asteroid",
-        application_version: 1,
+        application_name: application_name.unwrap_or("Hotham Asteroid"),
+        application_version: application_version.unwrap_or(1),
         engine_name: "Hotham",
         engine_version: 1,
     };

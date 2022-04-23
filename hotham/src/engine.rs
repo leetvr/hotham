@@ -1,7 +1,7 @@
 use crate::{
     resources::{
         AudioContext, GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext,
-        XrContext,
+        XrContext, XrContextBuilder,
     },
     HothamError, HothamResult, VIEW_TYPE,
 };
@@ -27,12 +27,27 @@ pub static ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32
 
 /// Builder for `Engine`.
 #[derive(Default)]
-pub struct EngineBuilder {}
+pub struct EngineBuilder<'a> {
+    application_name: Option<&'a str>,
+    application_version: Option<u32>,
+}
 
-impl EngineBuilder {
+impl<'a> EngineBuilder<'a> {
     /// Create an `EngineBuilder`
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Set the OpenXR application name
+    pub fn application_name(&mut self, name: Option<&'a str>) -> &mut Self {
+        self.application_name = name;
+        self
+    }
+
+    /// Set the OpenXR application version
+    pub fn application_version(&mut self, version: Option<u32>) -> &mut Self {
+        self.application_version = version;
+        self
     }
 
     /// Build the `Engine`
@@ -53,8 +68,11 @@ impl EngineBuilder {
         }
 
         // Now initialise the engine.
-        let (xr_context, vulkan_context) =
-            XrContext::new().expect("!!FATAL ERROR - Unable to initialise OpenXR!!");
+        let (xr_context, vulkan_context) = XrContextBuilder::new()
+            .application_name(self.application_name)
+            .application_version(self.application_version)
+            .build()
+            .expect("!!FATAL ERROR - Unable to initialise OpenXR!!");
         let render_context = RenderContext::new(&vulkan_context, &xr_context)
             .expect("!!FATAL ERROR - Unable to initialise renderer!");
         let gui_context = GuiContext::new(&vulkan_context);
