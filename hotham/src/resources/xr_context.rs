@@ -11,6 +11,27 @@ use xr::{
 
 use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
 
+#[derive(Default)]
+pub struct XrContextBuilder<'a> {
+    path: Option<&'a std::path::Path>,
+}
+
+impl<'a> XrContextBuilder<'a> {
+    pub fn new() -> Self {
+        XrContextBuilder::default()
+    }
+
+    pub fn path(&mut self, path: Option<&'a std::path::Path>) -> &mut Self {
+        self.path = path;
+        self
+    }
+
+    pub fn build(&mut self) -> Result<(XrContext, VulkanContext)> {
+        let (instance, system) = create_xr_instance(self.path)?;
+        XrContext::_new(instance, system)
+    }
+}
+
 pub struct XrContext {
     pub instance: openxr::Instance,
     pub session: Session<Vulkan>,
@@ -39,13 +60,11 @@ pub struct XrContext {
 
 impl XrContext {
     pub fn new() -> Result<(XrContext, VulkanContext)> {
-        let (instance, system) = create_xr_instance(None)?;
-        XrContext::_new(instance, system)
+        XrContextBuilder::new().build()
     }
 
     pub fn new_from_path(path: &std::path::Path) -> Result<(XrContext, VulkanContext)> {
-        let (instance, system) = create_xr_instance(Some(path))?;
-        XrContext::_new(instance, system)
+        XrContextBuilder::new().path(Some(path)).build()
     }
 
     fn _new(instance: xr::Instance, system: xr::SystemId) -> Result<(XrContext, VulkanContext)> {
