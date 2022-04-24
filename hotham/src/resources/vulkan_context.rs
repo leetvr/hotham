@@ -72,10 +72,13 @@ impl VulkanContext {
             unsafe { std::mem::transmute(entry.static_fn().get_instance_proc_addr) };
 
         let app_name = CString::new(application_name)?;
+        let engine_name = CString::new("Hotham")?;
         let app_info = vk::ApplicationInfo::builder()
             .api_version(vk::make_api_version(0, 1, 2, 0))
             .application_name(&app_name)
             .application_version(application_version)
+            .engine_name(&engine_name)
+            .engine_version(1)
             .build();
 
         let create_info = vk::InstanceCreateInfo::builder().application_info(&app_info);
@@ -1141,9 +1144,12 @@ fn vulkan_init_legacy(
             .collect::<Vec<_>>();
 
         let app_name = CString::new(application_name)?;
+        let engine_name = CString::new("Hotham")?;
         let app_info = vk::ApplicationInfo::builder()
             .application_name(&app_name)
             .application_version(application_version)
+            .engine_name(&engine_name)
+            .engine_version(1)
             .api_version(vk::make_api_version(0, 1, 2, 0));
 
         let validation_features_enables = [];
