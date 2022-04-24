@@ -58,7 +58,7 @@ impl UIPanelButton {
 
 /// Convenience function to create a panel and add it to a World
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
-pub fn add_panel_to_world(
+pub fn add_ui_panel_to_world(
     text: &str,
     resolution: vk::Extent2D,
     world_size: Vector2<f32>,

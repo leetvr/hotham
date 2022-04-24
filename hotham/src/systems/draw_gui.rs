@@ -62,7 +62,7 @@ mod tests {
     use crate::{
         buffer::Buffer,
         components::{
-            panel::{add_panel_to_world, UIPanelButton, UIPanelInput},
+            panel::{add_ui_panel_to_world, UIPanelButton, UIPanelInput},
             UIPanel,
         },
         gltf_loader,
@@ -355,7 +355,7 @@ mod tests {
         .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
-        let panel = add_panel_to_world(
+        let panel = add_ui_panel_to_world(
             "Hello..",
             800,
             800,

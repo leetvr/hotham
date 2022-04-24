@@ -6,8 +6,8 @@ use std::{
 
 use hotham::{
     components::{
-        hand::Handedness, ui_panel::add_panel_to_world, Collider, Pointer, RigidBody, SoundEmitter,
-        Visible,
+        hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, Pointer, RigidBody,
+        SoundEmitter, Visible,
     },
     gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
@@ -100,7 +100,7 @@ impl GameContext {
         let backstop = add_backstop(world, physics_context);
 
         // Add panels
-        let main_menu_panel = add_panel_to_world(
+        let main_menu_panel = add_ui_panel_to_world(
             "Main Menu",
             vk::Extent2D {
                 width: 800,
@@ -117,7 +117,7 @@ impl GameContext {
         );
 
         // Add panels
-        let score_panel = add_panel_to_world(
+        let score_panel = add_ui_panel_to_world(
             "Current Score: 0",
             vk::Extent2D {
                 width: 300,
