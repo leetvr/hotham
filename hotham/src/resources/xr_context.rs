@@ -16,6 +16,7 @@ pub struct XrContextBuilder<'a> {
     path: Option<&'a std::path::Path>,
     application_name: Option<&'a str>,
     application_version: Option<u32>,
+    required_extensions: Option<xr::ExtensionSet>,
 }
 
 impl<'a> XrContextBuilder<'a> {
@@ -38,9 +39,18 @@ impl<'a> XrContextBuilder<'a> {
         self
     }
 
+    pub fn required_extensions(&mut self, extensions: Option<xr::ExtensionSet>) -> &mut Self {
+        self.required_extensions = extensions;
+        self
+    }
+
     pub fn build(&mut self) -> Result<(XrContext, VulkanContext)> {
-        let (instance, system) =
-            create_xr_instance(self.path, self.application_name, self.application_version)?;
+        let (instance, system) = create_xr_instance(
+            self.path,
+            self.application_name,
+            self.application_version,
+            self.required_extensions.as_ref(),
+        )?;
         XrContext::_new(instance, system)
     }
 }
@@ -390,6 +400,7 @@ pub(crate) fn create_xr_instance(
     path: Option<&std::path::Path>,
     application_name: Option<&str>,
     application_version: Option<u32>,
+    required_extensions: Option<&xr::ExtensionSet>,
 ) -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = if let Some(path) = path {
         xr::Entry::load_from(path)?
@@ -402,7 +413,7 @@ pub(crate) fn create_xr_instance(
         engine_name: "Hotham",
         engine_version: 1,
     };
-    let mut required_extensions = xr::ExtensionSet::default();
+    let mut required_extensions = required_extensions.cloned().unwrap_or_default();
     // required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
     required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
 

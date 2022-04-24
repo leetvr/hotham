@@ -30,6 +30,7 @@ pub static ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32
 pub struct EngineBuilder<'a> {
     application_name: Option<&'a str>,
     application_version: Option<u32>,
+    openxr_extensions: Option<xr::ExtensionSet>,
 }
 
 impl<'a> EngineBuilder<'a> {
@@ -47,6 +48,12 @@ impl<'a> EngineBuilder<'a> {
     /// Set the OpenXR application version
     pub fn application_version(&mut self, version: Option<u32>) -> &mut Self {
         self.application_version = version;
+        self
+    }
+
+    /// Set the required OpenXR extensions
+    pub fn openxr_extensions(&mut self, extensions: Option<xr::ExtensionSet>) -> &mut Self {
+        self.openxr_extensions = extensions;
         self
     }
 
@@ -71,6 +78,7 @@ impl<'a> EngineBuilder<'a> {
         let (xr_context, vulkan_context) = XrContextBuilder::new()
             .application_name(self.application_name)
             .application_version(self.application_version)
+            .required_extensions(self.openxr_extensions)
             .build()
             .expect("!!FATAL ERROR - Unable to initialise OpenXR!!");
         let render_context = RenderContext::new(&vulkan_context, &xr_context)
