@@ -153,6 +153,14 @@ pub fn process_android_events(resumed: &mut bool, should_quit: &Arc<AtomicBool>)
         }
     }
 
+    if let Some(ref input_queue) = *ndk_glue::input_queue() {
+        while let Some(event) = input_queue.get_event() {
+            if let Some(event) = input_queue.pre_dispatch(event) {
+                input_queue.finish_event(event, false);
+            }
+        }
+    }
+
     false
 }
 
