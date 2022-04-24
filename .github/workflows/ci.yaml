@@ -25,8 +25,15 @@ jobs:
         with:
           profile: ${{ env.TOOLCHAIN_PROFILE }}
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+          target: aarch64-linux-android
           override: true
           components: rustfmt, clippy
+      - name: Install Android NDK
+        run: |
+          sudo apt-get install curl unzip
+          curl https://dl.google.com/android/repository/android-ndk-r22b-linux-x86_64.zip > /tmp/ndk.zip
+          sudo unzip -d /ndk /tmp/ndk.zip
+          echo /ndk/android-ndk-r22b/toolchains/llvm/prebuilt/linux-x86_64/bin >> $GITHUB_PATH
       - name: Cache
         uses: Swatinem/rust-cache@v1
       - name: Run cargo fmt
@@ -39,6 +46,12 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+      - name: Run cargo clippy (android)
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --target aarch64-linux-android
+
   test:
     name: Test
     runs-on: ubuntu-latest
