@@ -54,6 +54,8 @@ impl VulkanContext {
     pub fn create_from_xr_instance(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
+        application_name: &str,
+        application_version: u32,
     ) -> Result<Self> {
         println!("[HOTHAM_VULKAN] Creating VulkanContext..");
         let vk_target_version_xr = xr::Version::new(1, 2, 0);
@@ -69,8 +71,11 @@ impl VulkanContext {
         let get_instance_proc_addr =
             unsafe { std::mem::transmute(entry.static_fn().get_instance_proc_addr) };
 
+        let app_name = CString::new(application_name)?;
         let app_info = vk::ApplicationInfo::builder()
             .api_version(vk::make_api_version(0, 1, 2, 0))
+            .application_name(&app_name)
+            .application_version(application_version)
             .build();
 
         let create_info = vk::InstanceCreateInfo::builder().application_info(&app_info);
@@ -170,6 +175,8 @@ impl VulkanContext {
     pub fn create_from_xr_instance_legacy(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
+        application_name: &str,
+        application_version: u32,
     ) -> Result<Self> {
         let vk_target_version_xr = xr::Version::new(1, 2, 0);
 
@@ -180,7 +187,8 @@ impl VulkanContext {
             return Err(HothamError::UnsupportedVersionError.into());
         }
 
-        let (vulkan_instance, vulkan_entry) = vulkan_init_legacy(xr_instance, system)?;
+        let (vulkan_instance, vulkan_entry) =
+            vulkan_init_legacy(xr_instance, system, application_name, application_version)?;
         let physical_device = vk::PhysicalDevice::from_raw(
             xr_instance
                 .vulkan_graphics_device(system, vulkan_instance.handle().as_raw() as _)
@@ -1095,12 +1103,13 @@ impl Debug for VulkanContext {
 fn vulkan_init_legacy(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
+    application_name: &str,
+    application_version: u32,
 ) -> Result<(AshInstance, Entry)> {
     use crate::util::get_raw_strings;
 
     println!("[HOTHAM_VULKAN] Initialising Vulkan..");
     unsafe {
-        let app_name = CString::new("Hotham Asteroid")?;
         let entry = Entry::new()?;
 
         #[cfg(debug_assertions)]
@@ -1131,8 +1140,10 @@ fn vulkan_init_legacy(
             .map(|x| x.as_ptr())
             .collect::<Vec<_>>();
 
+        let app_name = CString::new(application_name)?;
         let app_info = vk::ApplicationInfo::builder()
             .application_name(&app_name)
+            .application_version(application_version)
             .api_version(vk::make_api_version(0, 1, 2, 0));
 
         let validation_features_enables = [];

@@ -45,13 +45,15 @@ impl<'a> XrContextBuilder<'a> {
     }
 
     pub fn build(&mut self) -> Result<(XrContext, VulkanContext)> {
+        let application_name = self.application_name.unwrap_or("Hotham Application");
+        let application_version = self.application_version.unwrap_or(1);
         let (instance, system) = create_xr_instance(
             self.path,
-            self.application_name,
-            self.application_version,
+            application_name,
+            application_version,
             self.required_extensions.as_ref(),
         )?;
-        XrContext::_new(instance, system)
+        XrContext::_new(instance, system, application_name, application_version)
     }
 }
 
@@ -90,8 +92,14 @@ impl XrContext {
         XrContextBuilder::new().path(Some(path)).build()
     }
 
-    fn _new(instance: xr::Instance, system: xr::SystemId) -> Result<(XrContext, VulkanContext)> {
-        let vulkan_context = create_vulkan_context(&instance, system)?;
+    fn _new(
+        instance: xr::Instance,
+        system: xr::SystemId,
+        application_name: &str,
+        application_version: u32,
+    ) -> Result<(XrContext, VulkanContext)> {
+        let vulkan_context =
+            create_vulkan_context(&instance, system, application_name, application_version)?;
         let (session, frame_waiter, frame_stream) =
             create_xr_session(&instance, system, &vulkan_context)?;
         let reference_space =
@@ -325,8 +333,15 @@ impl XrContext {
 pub(crate) fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
+    application_name: &str,
+    application_version: u32,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
-    let vulkan_context = VulkanContext::create_from_xr_instance_legacy(xr_instance, system)?;
+    let vulkan_context = VulkanContext::create_from_xr_instance_legacy(
+        xr_instance,
+        system,
+        application_name,
+        application_version,
+    )?;
     println!("[HOTHAM_VULKAN] - Vulkan Context created successfully");
     Ok(vulkan_context)
 }
@@ -335,8 +350,15 @@ pub(crate) fn create_vulkan_context(
 fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
+    application_name: &str,
+    application_version: u32,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
-    let vulkan_context = VulkanContext::create_from_xr_instance_legacy(xr_instance, system)?;
+    let vulkan_context = VulkanContext::create_from_xr_instance_legacy(
+        xr_instance,
+        system,
+        application_name,
+        application_version,
+    )?;
     println!("[HOTHAM_VULKAN] - Vulkan Context created successfully");
     Ok(vulkan_context)
 }
@@ -398,8 +420,8 @@ pub(crate) fn create_xr_session(
 
 pub(crate) fn create_xr_instance(
     path: Option<&std::path::Path>,
-    application_name: Option<&str>,
-    application_version: Option<u32>,
+    application_name: &str,
+    application_version: u32,
     required_extensions: Option<&xr::ExtensionSet>,
 ) -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = if let Some(path) = path {
@@ -408,8 +430,8 @@ pub(crate) fn create_xr_instance(
         xr::Entry::load()?
     };
     let xr_app_info = openxr::ApplicationInfo {
-        application_name: application_name.unwrap_or("Hotham Asteroid"),
-        application_version: application_version.unwrap_or(1),
+        application_name,
+        application_version,
         engine_name: "Hotham",
         engine_version: 1,
     };
