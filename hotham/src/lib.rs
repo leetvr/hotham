@@ -15,7 +15,7 @@
 pub use ash::vk;
 pub use openxr as xr;
 
-pub use engine::Engine;
+pub use engine::{Engine, EngineBuilder};
 pub use hecs;
 pub use hotham_error::HothamError;
 pub use nalgebra;

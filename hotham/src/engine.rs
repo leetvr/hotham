@@ -1,7 +1,7 @@
 use crate::{
     resources::{
         AudioContext, GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext,
-        XrContext,
+        XrContext, XrContextBuilder,
     },
     HothamError, HothamResult, VIEW_TYPE,
 };
@@ -25,6 +25,85 @@ pub static ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(
 #[cfg(target_os = "android")]
 pub static ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
 
+/// Builder for `Engine`.
+#[derive(Default)]
+pub struct EngineBuilder<'a> {
+    application_name: Option<&'a str>,
+    application_version: Option<u32>,
+    openxr_extensions: Option<xr::ExtensionSet>,
+}
+
+impl<'a> EngineBuilder<'a> {
+    /// Create an `EngineBuilder`
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Set the OpenXR application name
+    pub fn application_name(&mut self, name: Option<&'a str>) -> &mut Self {
+        self.application_name = name;
+        self
+    }
+
+    /// Set the OpenXR application version
+    pub fn application_version(&mut self, version: Option<u32>) -> &mut Self {
+        self.application_version = version;
+        self
+    }
+
+    /// Set the required OpenXR extensions
+    pub fn openxr_extensions(&mut self, extensions: Option<xr::ExtensionSet>) -> &mut Self {
+        self.openxr_extensions = extensions;
+        self
+    }
+
+    /// Build the `Engine`
+    pub fn build(self) -> Engine {
+        #[allow(unused_mut)] // Only Android mutates this.
+        let mut resumed = false;
+        let should_quit = Arc::new(AtomicBool::from(false));
+
+        // Before we do ANYTHING - we should process android events
+        #[cfg(target_os = "android")]
+        process_android_events(&mut resumed, &should_quit);
+
+        // On desktop, register a Ctrl-C handler.
+        #[cfg(not(target_os = "android"))]
+        {
+            let should_quit = should_quit.clone();
+            ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed)).unwrap();
+        }
+
+        // Now initialise the engine.
+        let (xr_context, vulkan_context) = XrContextBuilder::new()
+            .application_name(self.application_name)
+            .application_version(self.application_version)
+            .required_extensions(self.openxr_extensions)
+            .build()
+            .expect("!!FATAL ERROR - Unable to initialise OpenXR!!");
+        let render_context = RenderContext::new(&vulkan_context, &xr_context)
+            .expect("!!FATAL ERROR - Unable to initialise renderer!");
+        let gui_context = GuiContext::new(&vulkan_context);
+
+        let mut engine = Engine {
+            should_quit,
+            resumed,
+            event_data_buffer: Default::default(),
+
+            xr_context,
+            vulkan_context,
+            render_context,
+            physics_context: Default::default(),
+            audio_context: Default::default(),
+            gui_context,
+            haptic_context: Default::default(),
+        };
+
+        engine.update().unwrap();
+        engine
+    }
+}
+
 /// The Hotham Engine
 /// A wrapper around the "external world" from the perspective of the engine, eg. renderer, XR, etc.
 /// **IMPORTANT**: make sure you call `update` each tick
@@ -33,6 +112,7 @@ pub struct Engine {
     #[allow(dead_code)]
     resumed: bool,
     event_data_buffer: EventDataBuffer,
+
     /// OpenXR context
     pub xr_context: XrContext,
     /// Vulkan context
@@ -53,43 +133,7 @@ impl Engine {
     /// Create a new instance of the engine
     /// NOTE: only one instance may be running at any one time
     pub fn new() -> Self {
-        #[allow(unused_mut)] // Only Android mutates this.
-        let mut resumed = false;
-        let should_quit = Arc::new(AtomicBool::from(false));
-
-        // Before we do ANYTHING - we should process android events
-        #[cfg(target_os = "android")]
-        process_android_events(&mut resumed, &should_quit);
-
-        // On desktop, register a Ctrl-C handler.
-        #[cfg(not(target_os = "android"))]
-        {
-            let should_quit = should_quit.clone();
-            ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed)).unwrap();
-        }
-
-        // Now initialise the engine.
-        let (xr_context, vulkan_context) =
-            XrContext::new().expect("!!FATAL ERROR - Unable to initialise OpenXR!!");
-        let render_context = RenderContext::new(&vulkan_context, &xr_context)
-            .expect("!!FATAL ERROR - Unable to initialise renderer!");
-        let gui_context = GuiContext::new(&vulkan_context);
-
-        let mut engine = Self {
-            should_quit,
-            resumed,
-            event_data_buffer: Default::default(),
-            xr_context,
-            vulkan_context,
-            render_context,
-            physics_context: Default::default(),
-            audio_context: Default::default(),
-            gui_context,
-            haptic_context: Default::default(),
-        };
-
-        engine.update().unwrap();
-        engine
+        EngineBuilder::new().build()
     }
 
     /// IMPORTANT: Call this function each tick to update the engine's running state with the underlying OS

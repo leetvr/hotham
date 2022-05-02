@@ -13,4 +13,4 @@ pub use haptic_context::HapticContext;
 pub use physics_context::PhysicsContext;
 pub use render_context::RenderContext;
 pub(crate) use vulkan_context::VulkanContext;
-pub use xr_context::XrContext;
+pub use xr_context::{XrContext, XrContextBuilder};
