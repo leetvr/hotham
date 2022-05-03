@@ -15,7 +15,7 @@ path = "src/main.rs"
 hotham = {path = "../../hotham"}
 
 [target.'cfg(target_os = "android")'.dependencies]
-ndk-glue = "0.6.0"
+ndk-glue = "0.6"
 
 [package.metadata.android]
 apk_label = "Hotham Simple Scene Example"
