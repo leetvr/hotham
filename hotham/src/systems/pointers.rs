@@ -253,8 +253,8 @@ mod tests {
 
         let panel = world.get_mut::<Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
-        assert_relative_eq!(input.cursor_location.x, 50.);
-        assert_relative_eq!(input.cursor_location.y, 29.491043);
+        assert_relative_eq!(input.cursor_location.x, 150.);
+        assert_relative_eq!(input.cursor_location.y, 88.473129);
         assert_eq!(input.trigger_value, 0.);
     }
 
