@@ -179,28 +179,24 @@ mod tests {
         use crate::{
             components::{Collider, Panel, Transform},
             resources::physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
+            texture::Texture,
             util::test_buffer,
         };
         use nalgebra::vector;
         use rapier3d::prelude::ColliderBuilder;
 
-        let (mut xr_context, _) = XrContext::new().unwrap();
+        let (mut xr_context, mut vulkan_context) = XrContext::new().unwrap();
         let mut physics_context = PhysicsContext::default();
         let mut world = World::default();
 
         let panel = Panel {
-            text: "Test Panel".to_string(),
-            extent: vk::Extent2D {
+            resolution: vk::Extent2D {
                 width: 300,
                 height: 300,
             },
-            framebuffer: vk::Framebuffer::null(),
-            vertex_buffer: test_buffer(),
-            index_buffer: test_buffer(),
-            egui_context: Default::default(),
-            raw_input: Default::default(),
-            input: Default::default(),
-            buttons: Vec::new(),
+            world_size: [1.0, 1.0].into(),
+            texture: Texture::empty(&mut vulkan_context).unwrap(),
+            input: None,
         };
         let panel_entity = world.spawn((panel,));
 

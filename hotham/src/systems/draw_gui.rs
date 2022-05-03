@@ -62,7 +62,8 @@ mod tests {
     use crate::{
         buffer::Buffer,
         components::{
-            panel::{add_ui_panel_to_world, UIPanelButton, UIPanelInput},
+            panel::PanelInput,
+            ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
         gltf_loader,
@@ -159,7 +160,7 @@ mod tests {
     }
 
     fn schedule(
-        query: &mut PreparedQuery<&mut UIPanel>,
+        query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
         world: &mut World,
         gui_context: &mut GuiContext,
         haptic_context: &mut HapticContext,
@@ -259,17 +260,20 @@ mod tests {
         return panel.buttons[0].clicked_this_frame;
     }
 
-    fn release_trigger(world: &mut World, query: &mut PreparedQuery<&mut UIPanel>) {
-        let panel = query.query_mut(world).into_iter().next().unwrap().1;
-        panel.input = Some(UIPanelInput {
+    fn release_trigger(world: &mut World, query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>) {
+        let (panel, _ui_panel) = query.query_mut(world).into_iter().next().unwrap().1;
+        panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 0.2,
         });
     }
 
-    fn move_cursor_off_panel(world: &mut World, query: &mut PreparedQuery<&mut UIPanel>) {
-        let panel = query.query_mut(world).into_iter().next().unwrap().1;
-        panel.input = Some(UIPanelInput {
+    fn move_cursor_off_panel(
+        world: &mut World,
+        query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
+    ) {
+        let (panel, _ui_panel) = query.query_mut(world).into_iter().next().unwrap().1;
+        panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0., 0.),
             trigger_value: 0.0,
         });
@@ -357,20 +361,23 @@ mod tests {
 
         let panel = add_ui_panel_to_world(
             "Hello..",
-            800,
-            800,
+            vk::Extent2D {
+                width: 800,
+                height: 800,
+            },
+            [1., 1.].into(),
+            [-1.0, 0., 0.].into(),
             vec![
                 UIPanelButton::new("Click me!"),
                 UIPanelButton::new("Don't click me!"),
             ],
-            [-1.0, 0., 0.].into(),
             &vulkan_context,
             &render_context,
             &gui_context,
             &mut physics_context,
             &mut world,
         );
-        world.get_mut::<UIPanel>(panel).unwrap().input = Some(UIPanelInput {
+        world.get_mut::<Panel>(panel).unwrap().input = Some(PanelInput {
             cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 1.,
         });
