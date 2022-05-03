@@ -11,8 +11,8 @@ use crate::{
 use super::CrabSaberQueries;
 use hotham::{
     components::{
-        hand::Handedness, panel::PanelButton, sound_emitter::SoundState, Collider, Info, Panel,
-        RigidBody, Visible,
+        hand::Handedness, sound_emitter::SoundState, ui_panel::UIPanelButton, Collider, Info,
+        RigidBody, UIPanel, Visible,
     },
     hecs::{Entity, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
@@ -83,7 +83,7 @@ fn transition(
 
             // Set panel text
             let mut panel = world
-                .get_mut::<Panel>(game_context.main_menu_panel)
+                .get_mut::<UIPanel>(game_context.main_menu_panel)
                 .unwrap();
 
             panel.text = "CRAB SABER".to_string();
@@ -92,7 +92,7 @@ fn transition(
                 .iter()
                 .filter_map(|(title, song)| {
                     if song.beat_length.as_millis() > 0 {
-                        Some(PanelButton::new(title))
+                        Some(UIPanelButton::new(title))
                     } else {
                         None
                     }
@@ -156,11 +156,11 @@ fn transition(
                 "YOU FAILED!"
             };
             let mut panel = world
-                .get_mut::<Panel>(game_context.main_menu_panel)
+                .get_mut::<UIPanel>(game_context.main_menu_panel)
                 .unwrap();
 
             panel.text = format!("Game Over\n{}", message);
-            panel.buttons = vec![PanelButton::new("Back to main menu")];
+            panel.buttons = vec![UIPanelButton::new("Back to main menu")];
         }
         _ => panic!(
             "Invalid state transition {:?} -> {:?}",
@@ -182,7 +182,7 @@ fn run(
     match &mut game_context.state {
         GameState::Init => return Some(GameState::MainMenu),
         GameState::MainMenu => {
-            let panel = world.get::<Panel>(game_context.main_menu_panel).unwrap();
+            let panel = world.get::<UIPanel>(game_context.main_menu_panel).unwrap();
             if let Some(button) = panel.buttons.iter().find(|p| p.clicked_this_frame) {
                 let song = game_context.songs.get(&button.text).unwrap();
                 return Some(GameState::Playing(song.clone()));
@@ -208,7 +208,7 @@ fn run(
         }
         GameState::GameOver => {
             if world
-                .get::<Panel>(game_context.main_menu_panel)
+                .get::<UIPanel>(game_context.main_menu_panel)
                 .unwrap()
                 .buttons[0]
                 .clicked_this_frame
@@ -244,7 +244,7 @@ fn spawn_cube(
 
 fn update_panel_text(world: &mut World, game_context: &mut GameContext) {
     world
-        .get_mut::<Panel>(game_context.score_panel)
+        .get_mut::<UIPanel>(game_context.score_panel)
         .unwrap()
         .text = format!("Score: {}", game_context.current_score);
 }
@@ -496,7 +496,7 @@ mod tests {
         // MAIN_MENU -> PLAYING
         {
             let mut panel = world
-                .get_mut::<Panel>(game_context.main_menu_panel)
+                .get_mut::<UIPanel>(game_context.main_menu_panel)
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
@@ -711,7 +711,7 @@ mod tests {
             assert_eq!(num_cubes(world), 0);
 
             let mut panel = world
-                .get_mut::<Panel>(game_context.main_menu_panel)
+                .get_mut::<UIPanel>(game_context.main_menu_panel)
                 .unwrap();
             assert_eq!(panel.text, "Game Over\nYOU FAILED!",);
             assert_eq!(panel.buttons[0].text, "Back to main menu",);
@@ -740,14 +740,14 @@ mod tests {
             );
             assert_eq!(
                 &world
-                    .get::<Panel>(game_context.main_menu_panel)
+                    .get::<UIPanel>(game_context.main_menu_panel)
                     .unwrap()
                     .text,
                 "Main Menu",
             );
             assert_eq!(
                 &world
-                    .get::<Panel>(game_context.main_menu_panel)
+                    .get::<UIPanel>(game_context.main_menu_panel)
                     .unwrap()
                     .buttons[0]
                     .text,
@@ -758,7 +758,7 @@ mod tests {
         // MAIN_MENU -> PLAYING
         {
             let mut panel = world
-                .get_mut::<Panel>(game_context.main_menu_panel)
+                .get_mut::<UIPanel>(game_context.main_menu_panel)
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
@@ -883,7 +883,7 @@ mod tests {
     pub fn assert_score_is(world: &mut World, game_context: &mut GameContext, score: i32) {
         assert_eq!(game_context.current_score, score);
         assert_eq!(
-            world.get::<Panel>(game_context.score_panel).unwrap().text,
+            world.get::<UIPanel>(game_context.score_panel).unwrap().text,
             format!("Score: {}", score)
         );
     }

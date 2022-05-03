@@ -1,5 +1,5 @@
 use crate::{
-    components::{hand::Handedness, Panel},
+    components::{hand::Handedness, Panel, UIPanel},
     resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
 };
 use hecs::{PreparedQuery, World};
@@ -10,7 +10,7 @@ static GUI_HAPTIC_AMPLITUDE: f32 = 0.5;
 /// - draws the panel to a texture
 /// - updates any input state
 pub fn draw_gui_system(
-    query: &mut PreparedQuery<&mut Panel>,
+    query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: &usize,
@@ -22,9 +22,9 @@ pub fn draw_gui_system(
     gui_context.hovered_this_frame = false;
 
     // Draw each panel
-    for (_, panel) in query.query_mut(world) {
+    for (_, (panel, ui_panel)) in query.query_mut(world) {
         // Reset the button state
-        for button in &mut panel.buttons {
+        for button in &mut ui_panel.buttons {
             button.clicked_this_frame = false;
         }
 
@@ -32,6 +32,7 @@ pub fn draw_gui_system(
             vulkan_context,
             render_context,
             *swapchain_image_index,
+            ui_panel,
             panel,
         );
     }
@@ -61,15 +62,13 @@ mod tests {
     use crate::{
         buffer::Buffer,
         components::{
-            panel::{add_panel_to_world, PanelButton, PanelInput},
-            Panel,
+            panel::PanelInput,
+            ui_panel::{add_ui_panel_to_world, UIPanelButton},
+            UIPanel,
         },
         gltf_loader,
         image::Image,
-        resources::{
-            gui_context::SCALE_FACTOR, GuiContext, HapticContext, PhysicsContext, RenderContext,
-            VulkanContext,
-        },
+        resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         scene_data::SceneParams,
         swapchain::Swapchain,
         systems::{
@@ -161,7 +160,7 @@ mod tests {
     }
 
     fn schedule(
-        query: &mut PreparedQuery<&mut Panel>,
+        query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
         world: &mut World,
         gui_context: &mut GuiContext,
         haptic_context: &mut HapticContext,
@@ -253,7 +252,7 @@ mod tests {
 
     fn button_was_clicked(world: &mut World) -> bool {
         let panel = world
-            .query_mut::<&mut Panel>()
+            .query_mut::<&mut UIPanel>()
             .into_iter()
             .next()
             .unwrap()
@@ -261,16 +260,19 @@ mod tests {
         return panel.buttons[0].clicked_this_frame;
     }
 
-    fn release_trigger(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
-        let panel = query.query_mut(world).into_iter().next().unwrap().1;
+    fn release_trigger(world: &mut World, query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>) {
+        let (panel, _ui_panel) = query.query_mut(world).into_iter().next().unwrap().1;
         panel.input = Some(PanelInput {
-            cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.15 * (800. / SCALE_FACTOR)),
+            cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 0.2,
         });
     }
 
-    fn move_cursor_off_panel(world: &mut World, query: &mut PreparedQuery<&mut Panel>) {
-        let panel = query.query_mut(world).into_iter().next().unwrap().1;
+    fn move_cursor_off_panel(
+        world: &mut World,
+        query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
+    ) {
+        let (panel, _ui_panel) = query.query_mut(world).into_iter().next().unwrap().1;
         panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0., 0.),
             trigger_value: 0.0,
@@ -357,15 +359,18 @@ mod tests {
         .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
-        let panel = add_panel_to_world(
+        let panel = add_ui_panel_to_world(
             "Hello..",
-            800,
-            800,
-            vec![
-                PanelButton::new("Click me!"),
-                PanelButton::new("Don't click me!"),
-            ],
+            vk::Extent2D {
+                width: 800,
+                height: 800,
+            },
+            [1., 1.].into(),
             [-1.0, 0., 0.].into(),
+            vec![
+                UIPanelButton::new("Click me!"),
+                UIPanelButton::new("Don't click me!"),
+            ],
             &vulkan_context,
             &render_context,
             &gui_context,
@@ -373,7 +378,7 @@ mod tests {
             &mut world,
         );
         world.get_mut::<Panel>(panel).unwrap().input = Some(PanelInput {
-            cursor_location: Pos2::new(0.5 * (800. / SCALE_FACTOR), 0.15 * (800. / SCALE_FACTOR)),
+            cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 1.,
         });
 

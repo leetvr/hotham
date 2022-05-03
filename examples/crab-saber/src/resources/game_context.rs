@@ -6,8 +6,8 @@ use std::{
 
 use hotham::{
     components::{
-        hand::Handedness, panel::add_panel_to_world, Collider, Pointer, RigidBody, SoundEmitter,
-        Visible,
+        hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, Pointer, RigidBody,
+        SoundEmitter, Visible,
     },
     gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
@@ -18,7 +18,7 @@ use hotham::{
         audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP,
         vulkan_context::VulkanContext, AudioContext, PhysicsContext, RenderContext,
     },
-    Engine,
+    vk, Engine,
 };
 use rand::prelude::*;
 
@@ -100,12 +100,15 @@ impl GameContext {
         let backstop = add_backstop(world, physics_context);
 
         // Add panels
-        let main_menu_panel = add_panel_to_world(
+        let main_menu_panel = add_ui_panel_to_world(
             "Main Menu",
-            800,
-            800,
-            vec![],
+            vk::Extent2D {
+                width: 800,
+                height: 800,
+            },
+            [1.0, 1.0].into(),
             [0., 1., -1.].into(),
+            vec![],
             vulkan_context,
             render_context,
             gui_context,
@@ -114,12 +117,15 @@ impl GameContext {
         );
 
         // Add panels
-        let score_panel = add_panel_to_world(
+        let score_panel = add_ui_panel_to_world(
             "Current Score: 0",
-            300,
-            600,
-            vec![],
+            vk::Extent2D {
+                width: 300,
+                height: 600,
+            },
+            [0.5, 1.0].into(),
             [-1.25, 1., -2.].into(),
+            vec![],
             vulkan_context,
             render_context,
             gui_context,

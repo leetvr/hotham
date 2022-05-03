@@ -17,6 +17,7 @@ pub mod skin;
 pub mod sound_emitter;
 pub mod transform;
 pub mod transform_matrix;
+pub mod ui_panel;
 pub mod visible;
 
 pub use animation_controller::AnimationController;
@@ -37,4 +38,5 @@ pub use skin::Skin;
 pub use sound_emitter::SoundEmitter;
 pub use transform::Transform;
 pub use transform_matrix::TransformMatrix;
+pub use ui_panel::UIPanel;
 pub use visible::Visible;

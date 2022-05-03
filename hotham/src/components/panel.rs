@@ -1,200 +1,80 @@
 use ash::vk::{self};
-use egui::emath::vec2;
-use egui::epaint::Vertex as EguiVertex;
-use egui::{CtxRef, Pos2};
-use hecs::{Entity, World};
+use egui::Pos2;
 use itertools::izip;
-use nalgebra::{vector, Vector3, Vector4};
-use rapier3d::prelude::{ColliderBuilder, InteractionGroups};
-
-const BUFFER_SIZE: usize = 1024;
+use nalgebra::{vector, Vector2, Vector4};
 
 use crate::buffer::Buffer;
 use crate::components::mesh::MeshUBO;
 use crate::components::{Material, Mesh, Primitive};
-use crate::resources::gui_context::SCALE_FACTOR;
-use crate::resources::physics_context::PANEL_COLLISION_GROUP;
-use crate::resources::{GuiContext, PhysicsContext};
+use crate::hotham_error::HothamError;
 use crate::{
     resources::{RenderContext, VulkanContext},
     texture::Texture,
 };
 use crate::{vertex::Vertex, COLOR_FORMAT};
 
-use super::{Collider, Transform, TransformMatrix, Visible};
-
-/// A component added to an entity to display a 2D "panel" in space
-/// Used by `panels_system`
-#[derive(Clone)]
 pub struct Panel {
-    /// The text to be displayed
-    pub text: String,
-    /// The dimensions of the panel
-    pub extent: vk::Extent2D,
-    /// Framebuffer this panel will be written to
-    pub framebuffer: vk::Framebuffer,
-    /// Vertices of the panel
-    pub vertex_buffer: Buffer<EguiVertex>,
-    /// Indices of the panel
-    pub index_buffer: Buffer<u32>,
-    /// Reference to egui context
-    pub egui_context: CtxRef,
-    /// The raw input for this panel this frame
-    pub raw_input: egui::RawInput,
+    /// The resolution of the Panel
+    pub resolution: vk::Extent2D,
+    /// The world-size of the Panel
+    pub world_size: Vector2<f32>,
+    /// Texture backing the Panel
+    pub texture: Texture,
     /// Input received this frame
     pub input: Option<PanelInput>,
-    /// A list of buttons in this panel
-    pub buttons: Vec<PanelButton>,
 }
 
-/// Input to a panel
-#[derive(Debug, Clone)]
-pub struct PanelInput {
-    /// Location of the cursor, in panel space
-    pub cursor_location: Pos2,
-    /// Value of the controller trigger
-    pub trigger_value: f32,
-}
-
-/// A button for a panel
-#[derive(Debug, Clone)]
-pub struct PanelButton {
-    /// Text to be displayed
-    pub text: String,
-    /// Was this button clicked?
-    pub clicked_this_frame: bool,
-}
-
-impl PanelButton {
-    /// Convenience function to create a new panel button
-    pub fn new(text: &str) -> Self {
-        PanelButton {
-            text: text.to_string(),
-            clicked_this_frame: false,
-        }
-    }
-}
-
-/// Convenience function to create a panel and add it to a World
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
-pub fn add_panel_to_world(
-    text: &str,
-    width: u32,
-    height: u32,
-    buttons: Vec<PanelButton>,
-    translation: Vector3<f32>,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
-    gui_context: &GuiContext,
-    physics_context: &mut PhysicsContext,
-    world: &mut World,
-) -> Entity {
-    println!("[PANEL] Adding panel with text {}", text);
-    let extent = vk::Extent2D { width, height };
-    let output_image = vulkan_context
-        .create_image(
-            COLOR_FORMAT,
-            &extent,
-            vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
-            1,
-            1,
-        )
-        .unwrap();
-    let sampler = vulkan_context
-        .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
-        .unwrap();
-    let descriptor = vk::DescriptorImageInfo::builder()
-        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        .image_view(output_image.view)
-        .sampler(sampler)
-        .build();
-    let output_texture = Texture {
-        image: output_image,
-        sampler,
-        descriptor,
-    };
-    let mesh = create_mesh(&output_texture, vulkan_context, render_context, &extent);
-
-    let egui_context = CtxRef::default();
-    let raw_input = egui::RawInput {
-        screen_rect: Some(egui::Rect::from_min_size(
-            Default::default(),
-            vec2(extent.width as f32, extent.height as f32) / SCALE_FACTOR,
-        )),
-        pixels_per_point: Some(SCALE_FACTOR),
-        time: Some(0.0),
-        ..Default::default()
-    };
-
-    let framebuffer = unsafe {
-        let attachments = &[output_texture.image.view];
-        vulkan_context
-            .device
-            .create_framebuffer(
-                &vk::FramebufferCreateInfo::builder()
-                    .render_pass(gui_context.render_pass)
-                    .attachments(attachments)
-                    .width(extent.width)
-                    .height(extent.height)
-                    .layers(1),
-                None,
+impl Panel {
+    pub fn create(
+        vulkan_context: &VulkanContext,
+        render_context: &RenderContext,
+        resolution: vk::Extent2D,
+        world_size: Vector2<f32>,
+    ) -> Result<(Panel, Mesh), HothamError> {
+        let output_image = vulkan_context
+            .create_image(
+                COLOR_FORMAT,
+                &resolution,
+                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
+                1,
+                1,
             )
-            .expect("Failed to create framebuffer.")
-    };
+            .unwrap();
+        let sampler = vulkan_context
+            .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
+            .unwrap();
+        let descriptor = vk::DescriptorImageInfo::builder()
+            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+            .image_view(output_image.view)
+            .sampler(sampler)
+            .build();
+        let texture = Texture {
+            image: output_image,
+            sampler,
+            descriptor,
+        };
+        let mesh = create_mesh(&texture, vulkan_context, render_context, world_size);
 
-    let (vertex_buffer, index_buffer) = create_mesh_buffers(vulkan_context);
-
-    let components = (
-        Panel {
-            text: text.to_string(),
-            extent,
-            framebuffer,
-            vertex_buffer,
-            index_buffer,
-            egui_context,
-            raw_input,
-            input: Default::default(),
-            buttons,
-        },
-        mesh,
-        output_texture,
-        Transform {
-            translation,
-            ..Default::default()
-        },
-        TransformMatrix::default(),
-        Visible {},
-    );
-
-    let panel_entity = world.spawn(components);
-    let (half_width, half_height) = get_panel_dimensions(&extent);
-    let collider = ColliderBuilder::cuboid(half_width, half_height, 0.0)
-        .sensor(true)
-        .collision_groups(InteractionGroups::new(
-            PANEL_COLLISION_GROUP,
-            PANEL_COLLISION_GROUP,
+        Ok((
+            Panel {
+                resolution,
+                world_size,
+                texture,
+                input: Default::default(),
+            },
+            mesh,
         ))
-        .translation(translation)
-        .user_data(panel_entity.id() as _)
-        .build();
-    let handle = physics_context.colliders.insert(collider);
-    let collider = Collider {
-        collisions_this_frame: Vec::new(),
-        handle,
-    };
-    world.insert_one(panel_entity, collider).unwrap();
-    println!("[PANEL] ..done! {:?}", panel_entity);
-    panel_entity
+    }
 }
 
 fn create_mesh(
     output_texture: &Texture,
     vulkan_context: &VulkanContext,
     render_context: &RenderContext,
-    extent: &vk::Extent2D,
+    world_size: Vector2<f32>,
 ) -> Mesh {
     let (material, descriptor_set) = get_material(output_texture, vulkan_context, render_context);
-    let (half_width, half_height) = get_panel_dimensions(extent);
+    let (half_width, half_height) = (world_size.x / 2., world_size.y / 2.);
 
     let positions = [
         vector![-half_width, half_height, 0.],  // v0
@@ -267,19 +147,6 @@ fn create_mesh(
     }
 }
 
-/// Get the dimensions of a panel
-pub fn get_panel_dimensions(extent: &vk::Extent2D) -> (f32, f32) {
-    let (width, height) = (extent.width as f32, extent.height as f32);
-    let (half_width, half_height) = if height > width {
-        let half_width = (width / height) * 0.5;
-        (half_width, 0.5)
-    } else {
-        let half_height = (height / width) * 0.5;
-        (0.5, half_height)
-    };
-    (half_width, half_height)
-}
-
 fn get_material(
     output_texture: &Texture,
     vulkan_context: &VulkanContext,
@@ -321,28 +188,11 @@ fn get_material(
     (material, descriptor_set)
 }
 
-fn create_mesh_buffers(vulkan_context: &VulkanContext) -> (Buffer<EguiVertex>, Buffer<u32>) {
-    println!("[HOTHAM_DRAW_GUI] Creating mesh buffers..");
-    let vertices = (0..BUFFER_SIZE)
-        .map(|_| Default::default())
-        .collect::<Vec<_>>();
-    let empty_index_buffer = [0; BUFFER_SIZE * 2];
-
-    let vertex_buffer = Buffer::new(
-        vulkan_context,
-        &vertices,
-        vk::BufferUsageFlags::VERTEX_BUFFER,
-    )
-    .expect("Unable to create font index buffer");
-
-    let index_buffer = Buffer::new(
-        vulkan_context,
-        &empty_index_buffer,
-        vk::BufferUsageFlags::INDEX_BUFFER,
-    )
-    .expect("Unable to create font index buffer");
-
-    println!("[HOTHAM_DRAW_GUI] ..done!");
-
-    (vertex_buffer, index_buffer)
+/// Input to a panel
+#[derive(Debug, Clone)]
+pub struct PanelInput {
+    /// Location of the cursor, in panel space
+    pub cursor_location: Pos2,
+    /// Value of the controller trigger
+    pub trigger_value: f32,
 }
