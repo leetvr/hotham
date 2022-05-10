@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 name = "hotham"
 readme = "../README.md"
 repository = "https://github.com/leetvr/hotham/"
-version = "0.1.1"
+version = "0.2.0"
 
 [build-dependencies]
 shaderc = "0.7"
@@ -23,7 +23,7 @@ egui = "0.15"
 generational-arena = "0.2.8"
 gltf = {version = "0.16", features = ["KHR_materials_pbrSpecularGlossiness"]}
 hecs = "0.7.5"
-hotham-debug-server = {path = "../hotham-debug-server", version = "0.1"}
+hotham-debug-server = {path = "../hotham-debug-server", version = "0.2"}
 image = "0.23"
 itertools = "0.10.0"
 libktx-rs = "0.2.3"
