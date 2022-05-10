@@ -1124,6 +1124,8 @@ fn vulkan_init_legacy(
         println!("[HOTHAM_VULKAN] Requesting layers: {:?}", layers);
 
         let layer_names = get_raw_strings(layers);
+
+        #[allow(unused_mut)]
         let mut vk_instance_exts = xr_instance
             .vulkan_legacy_instance_extensions(system)
             .unwrap()
