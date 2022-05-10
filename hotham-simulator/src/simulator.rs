@@ -57,7 +57,7 @@ use winit::{
 };
 
 #[cfg(target_os = "windows")]
-use winit::platform::windows::{EventLoopExtWindows, WindowBuilderExtWindows};
+use winit::platform::windows::EventLoopExtWindows;
 
 #[cfg(target_os = "linux")]
 use winit::platform::unix::EventLoopExtUnix;

@@ -180,7 +180,6 @@ mod tests {
             components::{Collider, Panel, Transform},
             resources::physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
             texture::Texture,
-            util::test_buffer,
         };
         use nalgebra::vector;
         use rapier3d::prelude::ColliderBuilder;

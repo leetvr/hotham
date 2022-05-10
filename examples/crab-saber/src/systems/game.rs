@@ -73,7 +73,7 @@ fn transition(
                 .unwrap();
 
             // Remove visibility
-            // let _ = world.remove_one::<Visible>(game_context.score_panel);
+            let _ = world.remove_one::<Visible>(game_context.score_panel);
             let _ = world.remove_one::<Visible>(game_context.blue_saber);
             let _ = world.remove_one::<Visible>(game_context.red_saber);
 
@@ -743,7 +743,7 @@ mod tests {
                     .get::<UIPanel>(game_context.main_menu_panel)
                     .unwrap()
                     .text,
-                "Main Menu",
+                "CRAB SABER",
             );
             assert_eq!(
                 &world

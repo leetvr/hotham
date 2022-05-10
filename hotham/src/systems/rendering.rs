@@ -183,7 +183,7 @@ mod tests {
         vulkan_context: &VulkanContext,
         image: crate::image::Image,
         name: &str,
-    ) -> (u64, u64) {
+    ) {
         let size = (resolution.height * resolution.width * 4) as usize;
         let image_data = vec![0; size];
         let buffer = Buffer::new(
@@ -221,9 +221,7 @@ mod tests {
 
         //  TODO: Fix this on non-windows platforms.
         #[cfg(target_os = "windows")]
-        assert_eq!(output_hash, known_good_hash);
-
-        (output_hash, known_good_hash)
+        assert_eq!(output_hash, known_good_hash, "Bad render: {}", name);
     }
 
     fn schedule(
