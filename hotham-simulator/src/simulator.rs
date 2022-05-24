@@ -62,7 +62,7 @@ use winit::platform::windows::EventLoopExtWindows;
 #[cfg(target_os = "linux")]
 use winit::platform::unix::EventLoopExtUnix;
 
-static SWAPCHAIN_COLOUR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
+static SWAPCHAIN_COLOR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 pub const NUM_VIEWS: usize = 2; // TODO: Make dynamic
 pub const VIEWPORT_HEIGHT: u32 = 1000;
 pub const VIEWPORT_WIDTH: u32 = 1000;
@@ -419,7 +419,7 @@ unsafe fn create_render_pass(state: &MutexGuard<State>) -> vk::RenderPass {
     let device = state.device.as_ref().unwrap();
 
     let color_attachment = vk::AttachmentDescription::builder()
-        .format(SWAPCHAIN_COLOUR_FORMAT)
+        .format(SWAPCHAIN_COLOR_FORMAT)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::STORE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -1083,7 +1083,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
         let create_info = vk::SwapchainCreateInfoKHR::builder()
             .min_image_count(3)
             .surface(surface)
-            .image_format(SWAPCHAIN_COLOUR_FORMAT)
+            .image_format(SWAPCHAIN_COLOR_FORMAT)
             .image_color_space(vk::ColorSpaceKHR::SRGB_NONLINEAR)
             .image_array_layers(1)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -1296,7 +1296,7 @@ fn create_swapchain_image_views(state: &mut MutexGuard<State>) -> Vec<vk::ImageV
             let create_info = vk::ImageViewCreateInfo::builder()
                 .image(*image)
                 .view_type(vk::ImageViewType::TYPE_2D)
-                .format(SWAPCHAIN_COLOUR_FORMAT)
+                .format(SWAPCHAIN_COLOR_FORMAT)
                 .subresource_range(subresource_range);
 
             unsafe {
@@ -1713,7 +1713,7 @@ pub unsafe extern "system" fn enumerate_swapchain_formats(
         return Result::SUCCESS;
     }
 
-    *formats = SWAPCHAIN_COLOUR_FORMAT.as_raw() as i64;
+    *formats = SWAPCHAIN_COLOR_FORMAT.as_raw() as i64;
 
     Result::SUCCESS
 }

@@ -169,7 +169,7 @@ fn get_material(
         .unwrap()[0];
 
     let material = Material {
-        base_colour_factor: vector![1., 1., 1., 1.],
+        base_color_factor: vector![1., 1., 1., 1.],
         emmissive_factor: Vector4::zeros(),
         diffuse_factor: Vector4::zeros(),
         specular_factor: Vector4::zeros(),

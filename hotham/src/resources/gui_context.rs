@@ -309,12 +309,12 @@ impl GuiContext {
                         panel_input.cursor_location.y / SCALE_FACTOR,
                     );
                     let position = ui.painter().round_pos_to_pixels((x, y).into());
-                    let cursor_colour = if panel_input.trigger_value > 0.9 {
+                    let cursor_color = if panel_input.trigger_value > 0.9 {
                         egui::Color32::LIGHT_BLUE
                     } else {
                         egui::Color32::WHITE
                     };
-                    ui.painter().circle_filled(position, 4.00, cursor_colour);
+                    ui.painter().circle_filled(position, 4.00, cursor_color);
                 }
                 ui.allocate_space(ui.available_size())
             })

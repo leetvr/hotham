@@ -23,7 +23,7 @@ use hotham::{
 use rand::prelude::*;
 
 use crate::{
-    components::{Colour, Cube},
+    components::{Color, Cube},
     systems::sabers::add_saber,
 };
 
@@ -71,9 +71,9 @@ impl GameContext {
         add_environment(&models, world, vulkan_context, render_context);
 
         // Add sabers
-        let sabers = [Colour::Blue, Colour::Red].map(|colour| {
+        let sabers = [Color::Blue, Color::Red].map(|color| {
             add_saber(
-                colour,
+                color,
                 &models,
                 world,
                 vulkan_context,
@@ -285,11 +285,11 @@ pub fn pre_spawn_cube(
     render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
-    // Set the colour randomly
-    let colour = if random() { Colour::Red } else { Colour::Blue };
-    let model_name = match colour {
-        Colour::Red => "Red Cube",
-        Colour::Blue => "Blue Cube",
+    // Set the color randomly
+    let color = if random() { Color::Red } else { Color::Blue };
+    let model_name = match color {
+        Color::Red => "Red Cube",
+        Color::Blue => "Blue Cube",
     };
 
     let cube = add_model_to_world(
@@ -307,7 +307,7 @@ pub fn pre_spawn_cube(
 
     world.remove_one::<Visible>(cube).unwrap();
     world
-        .insert(cube, (Cube {}, colour, RigidBody { handle }))
+        .insert(cube, (Cube {}, color, RigidBody { handle }))
         .unwrap();
 }
 
