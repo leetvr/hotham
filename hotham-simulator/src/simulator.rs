@@ -305,7 +305,7 @@ pub unsafe extern "system" fn get_vulkan_physical_device(
     // Create an instance wrapping the instance we were passed
     let ash_instance = AshInstance::load(entry.static_fn(), transmute(vk_instance));
 
-    // Create the device and asign it
+    // Create the device and assign it
     let physical_device = ash_instance
         .enumerate_physical_devices()
         .unwrap()
@@ -1187,7 +1187,7 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
                 .build(),
             None,
         )
-        .expect("Unable to create desctiptor pool");
+        .expect("Unable to create descriptor pool");
 
     println!(
         "[HOTHAM_SIMULATOR] Created descriptor pool {:?}",

@@ -373,7 +373,7 @@ impl GuiContext {
                     .build()],
             );
 
-            // Set push contants
+            // Set push constants
             let width_points = extent.width as f32 / SCALE_FACTOR;
             let height_points = extent.height as f32 / SCALE_FACTOR;
             device.cmd_push_constants(

@@ -89,7 +89,7 @@ pub fn pointers_system(
             filter,
         ) {
             // The first collider hit has the handle `handle` and it hit after
-            // the ray travelled a distance equal to `ray.dir * toi`.
+            // the ray traveled a distance equal to `ray.dir * toi`.
             let hit_point = ray.point_at(toi); // Same as: `ray.origin + ray.dir * toi`
             let hit_collider = physics_context.colliders.get(handle).unwrap();
             let entity = unsafe { world.find_entity_from_id(hit_collider.user_data as _) };

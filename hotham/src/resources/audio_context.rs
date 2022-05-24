@@ -51,13 +51,13 @@ impl Default for AudioContext {
         };
         println!("[HOTHAM_AUDIO_CONTEXT] cpal AudioConfig: {:?}", config);
 
-        // Create a spatialised audio scene
+        // Create a spatialized audio scene
         let (scene_handle, scene) = oddio::split(oddio::SpatialScene::new(sample_rate.0, 0.1));
 
         // Create a mixer
         let (mut mixer_handle, mixer) = oddio::split(oddio::Mixer::new());
 
-        // Pipe the spatialised scene to the mixer
+        // Pipe the spatialized scene to the mixer
         let _ = mixer_handle.control().play(scene);
 
         // Pipe the mixer to the audio hardware.
