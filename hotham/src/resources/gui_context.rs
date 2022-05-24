@@ -22,8 +22,6 @@ pub struct GuiContext {
     pub(crate) pipeline_layout: vk::PipelineLayout,
     pub(crate) font_texture_descriptor_sets: Vec<vk::DescriptorSet>,
     pub(crate) font_texture_version: u64,
-    pub(crate) hovered_this_frame: bool,
-    pub(crate) hovered_last_frame: bool,
 }
 
 impl GuiContext {
@@ -256,8 +254,6 @@ impl GuiContext {
             pipeline_layout,
             font_texture_descriptor_sets,
             font_texture_version: 0,
-            hovered_last_frame: false,
-            hovered_this_frame: false,
         }
     }
 
@@ -295,7 +291,7 @@ impl GuiContext {
                     let response = ui.button(&button.text);
 
                     if response.hovered() {
-                        self.hovered_this_frame = true;
+                        button.hovered_this_frame = true;
                     }
 
                     if response.clicked() {
