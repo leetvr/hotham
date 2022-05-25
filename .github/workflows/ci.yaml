@@ -51,6 +51,8 @@ jobs:
         with:
           command: check
           args: --target aarch64-linux-android
+      - name: Spellcheck
+        uses: streetsidesoftware/cspell-action@v2
 
   test:
     name: Test
