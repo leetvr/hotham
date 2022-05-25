@@ -346,7 +346,7 @@ impl VulkanContext {
         ))
     }
 
-    /// Create a Vukan buffer filled with the contents of `data`.
+    /// Create a Vulkan buffer filled with the contents of `data`.
     pub fn create_buffer_with_data<T: Sized + Copy>(
         &self,
         data: &[T],
@@ -1111,7 +1111,7 @@ fn vulkan_init_legacy(
 ) -> Result<(AshInstance, Entry)> {
     use crate::util::get_raw_strings;
 
-    println!("[HOTHAM_VULKAN] Initialising Vulkan..");
+    println!("[HOTHAM_VULKAN] Initializing Vulkan..");
     unsafe {
         let entry = Entry::new()?;
 
@@ -1140,7 +1140,7 @@ fn vulkan_init_legacy(
             "[HOTHAM_VULKAN] Required Vulkan instance extensions: {:?}",
             vk_instance_exts
         );
-        let vk_instance_ext_ptrs = vk_instance_exts
+        let vk_instance_ext_pointers = vk_instance_exts
             .iter()
             .map(|x| x.as_ptr())
             .collect::<Vec<_>>();
@@ -1164,7 +1164,7 @@ fn vulkan_init_legacy(
             .create_instance(
                 &vk::InstanceCreateInfo::builder()
                     .application_info(&app_info)
-                    .enabled_extension_names(&vk_instance_ext_ptrs)
+                    .enabled_extension_names(&vk_instance_ext_pointers)
                     .enabled_layer_names(&layer_names)
                     .push_next(&mut validation_features),
                 None,
@@ -1178,7 +1178,7 @@ fn vulkan_init_legacy(
 fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
     use crate::util::{get_raw_strings, parse_raw_strings};
 
-    println!("[HOTHAM_VULKAN] Initialising Vulkan..");
+    println!("[HOTHAM_VULKAN] Initializing Vulkan..");
     let app_name = CString::new("Hotham Testing")?;
     let entry = unsafe { Entry::new()? };
     let layers = vec!["VK_LAYER_KHRONOS_validation\0"];

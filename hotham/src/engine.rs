@@ -74,15 +74,15 @@ impl<'a> EngineBuilder<'a> {
             ctrlc::set_handler(move || should_quit.store(true, Ordering::Relaxed)).unwrap();
         }
 
-        // Now initialise the engine.
+        // Now initialize the engine.
         let (xr_context, vulkan_context) = XrContextBuilder::new()
             .application_name(self.application_name)
             .application_version(self.application_version)
             .required_extensions(self.openxr_extensions)
             .build()
-            .expect("!!FATAL ERROR - Unable to initialise OpenXR!!");
+            .expect("!!FATAL ERROR - Unable to initialize OpenXR!!");
         let render_context = RenderContext::new(&vulkan_context, &xr_context)
-            .expect("!!FATAL ERROR - Unable to initialise renderer!");
+            .expect("!!FATAL ERROR - Unable to initialize renderer!");
         let gui_context = GuiContext::new(&vulkan_context);
 
         let mut engine = Engine {

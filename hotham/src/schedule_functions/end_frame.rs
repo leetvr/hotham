@@ -12,7 +12,7 @@ pub fn end_frame(
         render_context.end_frame(vulkan_context, xr_context.frame_index);
     } else {
         println!(
-            "[HOTHAM_END_FRAME] - Session is runing but shouldRender is false - not rendering"
+            "[HOTHAM_END_FRAME] - Session is running but shouldRender is false - not rendering"
         );
     }
     xr_context.end_frame().unwrap();

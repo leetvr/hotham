@@ -15,7 +15,7 @@ pub struct Primitive {
     /// Buffer for the vertices
     pub vertex_buffer: Buffer<Vertex>,
     /// Number of vertices
-    pub indicies_count: u32,
+    pub indices_count: u32,
     /// Material used
     pub material: Material,
     /// Texture descriptor set
@@ -141,7 +141,7 @@ impl Primitive {
             material,
             index_buffer,
             vertex_buffer,
-            indicies_count: indices.len() as _,
+            indices_count: indices.len() as _,
             texture_descriptor_set,
         })
     }

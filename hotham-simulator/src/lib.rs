@@ -152,7 +152,7 @@ pub unsafe extern "C" fn get_instance_proc_addr(
     } else {
         let _name = String::from_utf8_unchecked(name.to_vec());
         unsafe extern "system" fn bang() -> Result {
-            panic!("BAD BADB ADB ADB BAD");
+            panic!("BAD BAD ADB ADB BAD");
         }
         *function = transmute::<DummyFn, _>(bang);
         // return Result::ERROR_HANDLE_INVALID.into_raw();

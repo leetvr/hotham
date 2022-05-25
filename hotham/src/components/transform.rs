@@ -3,7 +3,7 @@ use nalgebra::{vector, Isometry3, Quaternion, Unit, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
 /// Component that represents the transform of the entity in world space
-/// Added automatically by `gltf_loader`, will be overriden if the entity also contains a `rigid_body` and
+/// Added automatically by `gltf_loader`, will be overridden if the entity also contains a `rigid_body` and
 /// `update_rigid_body_transforms_system` is running
 #[derive(Clone, PartialEq, Debug, Copy, Deserialize, Serialize)]
 pub struct Transform {

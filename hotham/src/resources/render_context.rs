@@ -199,7 +199,7 @@ impl RenderContext {
 
         println!("[HOTHAM_RENDERER] ..done! {:?}", scene_data_buffer);
 
-        println!("[HOTHAM_RENDERER] Done! Renderer initialised!");
+        println!("[HOTHAM_RENDERER] Done! Renderer initialized!");
 
         Ok(Self {
             frames,
