@@ -52,6 +52,13 @@ jobs:
           command: check
           args: --target aarch64-linux-android
 
+  spellcheck:
+    name: CSpell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: streetsidesoftware/cspell-action@v2
+
   test:
     name: Test
     runs-on: ubuntu-latest

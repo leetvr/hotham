@@ -5,7 +5,7 @@ use hecs::{Entity, PreparedQuery, Without, World};
 
 use nalgebra::Matrix4;
 
-/// Updatee parent transform matrix system
+/// Update parent transform matrix system
 /// Walks through each entity that has a Parent and builds a hierarchy
 /// Then transforms each entity based on the hierarchy
 pub fn update_parent_transform_matrix_system(
@@ -29,17 +29,17 @@ pub fn update_parent_transform_matrix_system(
 fn update_transform_matrix(
     parent_matrix: &Matrix4<f32>,
     entity: Entity,
-    heirarchy: &HashMap<Entity, Vec<Entity>>,
+    hierarchy: &HashMap<Entity, Vec<Entity>>,
     world: &World,
 ) {
-    if let Some(children) = heirarchy.get(&entity) {
+    if let Some(children) = hierarchy.get(&entity) {
         for child in children {
             {
                 let child_matrix = &mut world.get_mut::<TransformMatrix>(*child).unwrap().0;
                 *child_matrix = parent_matrix * *child_matrix;
             }
             let child_matrix = world.get::<TransformMatrix>(*child).unwrap().0;
-            update_transform_matrix(&child_matrix, *child, heirarchy, world);
+            update_transform_matrix(&child_matrix, *child, hierarchy, world);
         }
     }
 }
@@ -85,17 +85,17 @@ mod tests {
     #[test]
     pub fn test_transform_system_extensive() {
         let mut world = World::new();
-        let mut heirachy: HashMap<usize, Vec<usize>> = HashMap::new();
+        let mut hierarchy: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut node_entity: HashMap<usize, Entity> = HashMap::new();
         let mut entity_node: HashMap<Entity, usize> = HashMap::new();
-        heirachy.insert(0, vec![1, 2, 3, 4]);
-        heirachy.insert(1, vec![5, 6, 7, 8]);
-        heirachy.insert(2, vec![9, 10, 11, 12]);
-        heirachy.insert(3, vec![13, 14, 15, 16]);
-        heirachy.insert(5, vec![17, 18, 19, 20]);
-        heirachy.insert(14, vec![21, 22, 23, 24]);
-        heirachy.insert(22, vec![25, 26, 27, 28]);
-        heirachy.insert(17, vec![29, 30, 31, 32]);
+        hierarchy.insert(0, vec![1, 2, 3, 4]);
+        hierarchy.insert(1, vec![5, 6, 7, 8]);
+        hierarchy.insert(2, vec![9, 10, 11, 12]);
+        hierarchy.insert(3, vec![13, 14, 15, 16]);
+        hierarchy.insert(5, vec![17, 18, 19, 20]);
+        hierarchy.insert(14, vec![21, 22, 23, 24]);
+        hierarchy.insert(22, vec![25, 26, 27, 28]);
+        hierarchy.insert(17, vec![29, 30, 31, 32]);
 
         for n in 0..=32 {
             let info = Info {
@@ -112,7 +112,7 @@ mod tests {
             entity_node.insert(entity, n);
         }
 
-        for (parent, children) in heirachy.iter() {
+        for (parent, children) in hierarchy.iter() {
             let parent_entity = node_entity.get(parent).unwrap();
             let parent = Parent(*parent_entity);
             for node_id in children {

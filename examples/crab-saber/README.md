@@ -4,7 +4,7 @@ This example is a clone of the popular VR game, [Beat Saber](https://beatsaber.c
 # Running the example
 ## Pre-requisites
 1. [Git LFS](https://git-lfs.github.com/) needs to be enabled for this repo. You'll have a _real_ bad time if you don't.
-1. Install [Rust](https://www.rust-lang.org/tools/install), [cargo apk](https://crates.io/crates/cargo-apk) and the [Android SDK and Android NDK](https://developer.android.com/studio). _Note: only the Android NDK and SDK are required - if Android Studio is not your cup of tea, you can certainly install those seperately_
+1. Install [Rust](https://www.rust-lang.org/tools/install), [cargo apk](https://crates.io/crates/cargo-apk) and the [Android SDK and Android NDK](https://developer.android.com/studio). _Note: only the Android NDK and SDK are required - if Android Studio is not your cup of tea, you can certainly install those separately_
 1. An Oculus developer account is required & [developer mode](https://developer.oculus.com/documentation/native/android/mobile-device-setup/) needs to be enabled.
 
 With all that done, you should now be able to see your device from ADB:
