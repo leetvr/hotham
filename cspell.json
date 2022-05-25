@@ -38,6 +38,7 @@
         "Lhand",
         "libasound",
         "libktx",
+        "libovr",
         "linvel",
         "Luckey",
         "memoffset",
@@ -62,12 +63,15 @@
         "rasterization",
         "rasterizer",
         "renderdoc",
+        "renderpass",
         "renderpasses",
         "repr",
+        "rezural",
         "rustfmt",
         "Sascha",
         "SFLOAT",
         "shaderc",
+        "sinoth",
         "slerp",
         "socio",
         "spatialized",
@@ -90,6 +94,8 @@
         "viewdisplay",
         "viewports",
         "vulkan",
+        "wbrickner",
+        "Willems",
         "winit"
     ]
 }

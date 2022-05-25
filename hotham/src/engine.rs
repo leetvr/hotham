@@ -152,7 +152,7 @@ impl Engine {
                 // Do nothing so we can process further events.
             }
             (_, SessionState::IDLE) => {
-                sleep(Duration::from_millis(100)); // Sleep to avoid thrasing the CPU
+                sleep(Duration::from_millis(100)); // Sleep to avoid thrashing the CPU
             }
             (SessionState::IDLE, SessionState::READY) => {
                 self.xr_context.session.begin(VIEW_TYPE)?;
