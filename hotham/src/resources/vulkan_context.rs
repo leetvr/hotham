@@ -846,7 +846,7 @@ impl VulkanContext {
                 .update_descriptor_sets(&[s[0], s[1], s[2], s[3], s[4]], &[]);
             */
 
-            let base_colour_texture = &textures[0];
+            let base_color_texture = &textures[0];
             let metallic_roughness_texture = &textures[1];
             let normal_map = &textures[2];
             let ao_map = &textures[3];
@@ -859,8 +859,8 @@ impl VulkanContext {
                     .dst_array_element(0)
                     .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                     .image_info(&[*vk::DescriptorImageInfo::builder()
-                        .image_view(base_colour_texture.image.view)
-                        .sampler(base_colour_texture.sampler)
+                        .image_view(base_color_texture.image.view)
+                        .sampler(base_color_texture.sampler)
                         .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
                 *vk::WriteDescriptorSet::builder()
                     .dst_set(descriptor_sets[0])

@@ -8,7 +8,7 @@ use hotham::{
     util::{is_space_valid, posef_to_isometry},
 };
 
-use crate::components::{Colour, Saber};
+use crate::components::{Color, Saber};
 
 const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
 /* Original matrix
@@ -26,20 +26,20 @@ const SABER_WIDTH: f32 = 0.02;
 const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 
 pub fn sabers_system(
-    query: &mut PreparedQuery<With<Saber, (&Colour, &RigidBody)>>,
+    query: &mut PreparedQuery<With<Saber, (&Color, &RigidBody)>>,
     world: &mut World,
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
-    for (_, (colour, rigid_body)) in query.query_mut(world) {
+    for (_, (color, rigid_body)) in query.query_mut(world) {
         // Get our the space and path of the hand.
         let time = xr_context.frame_state.predicted_display_time;
-        let (space, _) = match colour {
-            Colour::Red => (
+        let (space, _) = match color {
+            Color::Red => (
                 &xr_context.left_hand_space,
                 xr_context.left_hand_subaction_path,
             ),
-            Colour::Blue => (
+            Color::Blue => (
                 &xr_context.right_hand_space,
                 xr_context.right_hand_subaction_path,
             ),
@@ -67,16 +67,16 @@ pub fn sabers_system(
 }
 
 pub fn add_saber(
-    colour: Colour,
+    color: Color,
     models: &Models,
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
 ) -> Entity {
-    let model_name = match colour {
-        Colour::Blue => "Blue Saber",
-        Colour::Red => "Red Saber",
+    let model_name = match color {
+        Color::Blue => "Blue Saber",
+        Color::Red => "Red Saber",
     };
     let saber = add_model_to_world(
         model_name,
@@ -88,7 +88,7 @@ pub fn add_saber(
     )
     .unwrap();
     add_saber_physics(world, physics_context, saber);
-    world.insert(saber, (Saber {}, colour)).unwrap();
+    world.insert(saber, (Saber {}, color)).unwrap();
     saber
 }
 
@@ -133,7 +133,7 @@ mod tests {
         let (xr_context, _) = XrContext::new_from_path(path).unwrap();
         let mut physics_context = PhysicsContext::default();
         let saber = world.spawn((
-            Colour::Red,
+            Color::Red,
             Saber {},
             Transform::default(),
             TransformMatrix::default(),

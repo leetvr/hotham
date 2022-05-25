@@ -1,7 +1,7 @@
-mod colour;
+mod color;
 mod cube;
 mod saber;
 
-pub use colour::Colour;
+pub use color::Color;
 pub use cube::Cube;
 pub use saber::Saber;

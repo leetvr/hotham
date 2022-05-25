@@ -48,7 +48,7 @@ mod vertex;
 /// Hotham result type
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
 
-/// Format used for colour textures
+/// Format used for color textures
 pub const COLOR_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB;
 /// Format used for depth textures
 pub const DEPTH_FORMAT: vk::Format = vk::Format::D32_SFLOAT;
