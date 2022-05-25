@@ -53,6 +53,7 @@ jobs:
           args: --target aarch64-linux-android
 
   spellcheck:
+    name: CSpell
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
