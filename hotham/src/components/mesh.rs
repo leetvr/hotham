@@ -42,7 +42,7 @@ impl Default for MeshUBO {
     }
 }
 
-/// Component that encapsulates an Entity's geometry. Maps closesly to the [glTF spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#meshes)
+/// Component that encapsulates an Entity's geometry. Maps closely to the [glTF spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#meshes)
 /// Usually automatically added by `gltf_loader`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Mesh {

@@ -19,13 +19,13 @@ pub type Models = HashMap<String, World>;
 
 /// Load glTF models from a GLB file
 pub fn load_models_from_glb(
-    glb_bufs: &[&[u8]],
+    glb_buffers: &[&[u8]],
     vulkan_context: &VulkanContext,
     descriptor_set_layouts: &DescriptorSetLayouts,
 ) -> Result<Models> {
     let mut models = HashMap::new();
 
-    for glb_buf in glb_bufs {
+    for glb_buf in glb_buffers {
         let (document, buffers, images) = gltf::import_slice(glb_buf).unwrap();
         load_models_from_gltf_data(
             &document,

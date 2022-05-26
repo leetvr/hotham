@@ -9,7 +9,7 @@ type AudioHandle = oddio::Handle<oddio::SpatialBuffered<oddio::Stop<oddio::Frame
 pub struct SoundEmitter {
     /// The actual sound data
     pub frames: Arc<Frames<f32>>,
-    /// Handle into the `oddio` spatialiser
+    /// Handle into the `oddio` spatializer
     pub handle: Option<AudioHandle>,
     /// Used to indicate that the emitter wants to change its state
     pub next_state: Option<SoundState>,
@@ -28,7 +28,7 @@ impl Clone for SoundEmitter {
 /// State of a sound
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SoundState {
-    /// The sound has stopped permenantly
+    /// The sound has stopped permanently
     Stopped,
     /// The sound is playing
     Playing,

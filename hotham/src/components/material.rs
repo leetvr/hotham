@@ -14,12 +14,12 @@ pub struct Material {
     /// The base color of the material
     pub base_color_factor: Vector4<f32>,
     /// The color and intensity of the light being emitted by the material
-    pub emmissive_factor: Vector4<f32>,
+    pub emissive_factor: Vector4<f32>,
     /// How diffuse is this material?
     pub diffuse_factor: Vector4<f32>,
     /// How specular is this material?
     pub specular_factor: Vector4<f32>,
-    /// What workflow should be used - 0.0 for Metalic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
+    /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
     pub workflow: f32,
     /// The base color texture.
     pub base_color_texture_set: i32,
@@ -144,7 +144,7 @@ impl Material {
             .unwrap_or(-1);
 
         // Factors
-        let emmissive_factor = vector![0., 0., 0., 0.];
+        let emissive_factor = vector![0., 0., 0., 0.];
         let diffuse_factor = pbr_specular_glossiness
             .as_ref()
             .map(|p| Vector4::from(p.diffuse_factor()))
@@ -187,7 +187,7 @@ impl Material {
         Ok((
             Material {
                 base_color_factor,
-                emmissive_factor,
+                emissive_factor,
                 diffuse_factor,
                 specular_factor,
                 workflow,

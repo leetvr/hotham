@@ -133,10 +133,10 @@ pub unsafe extern "system" fn create_vulkan_instance(
 ) -> Result {
     let vulkan_create_info: &ash::vk::InstanceCreateInfo =
         transmute(&(*create_info).vulkan_create_info);
-    let get_instance_proc_adddr = (*create_info).pfn_get_instance_proc_addr.unwrap();
+    let get_instance_proc_addr = (*create_info).pfn_get_instance_proc_addr.unwrap();
     let vk_create_instance = CStr::from_bytes_with_nul_unchecked(b"vkCreateInstance\0").as_ptr();
     let create_instance: vk::PFN_vkCreateInstance =
-        transmute(get_instance_proc_adddr(ptr::null(), vk_create_instance));
+        transmute(get_instance_proc_addr(ptr::null(), vk_create_instance));
     let mut instance = vk::Instance::null();
 
     let event_loop: EventLoop<()> = EventLoop::new_any_thread();
@@ -169,7 +169,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
         return Result::ERROR_VALIDATION_FAILURE;
     }
     let static_fn = vk::StaticFn {
-        get_instance_proc_addr: transmute(get_instance_proc_adddr),
+        get_instance_proc_addr: transmute(get_instance_proc_addr),
     };
     let ash_instance = AshInstance::load(&static_fn, instance);
 

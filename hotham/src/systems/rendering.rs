@@ -69,7 +69,7 @@ pub fn rendering_system(
                     0,
                     material_push_constant,
                 );
-                device.cmd_draw_indexed(command_buffer, primitive.indicies_count, 1, 0, 0, 1);
+                device.cmd_draw_indexed(command_buffer, primitive.indices_count, 1, 0, 0, 1);
             }
         }
     }

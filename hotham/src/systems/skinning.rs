@@ -83,7 +83,7 @@ mod tests {
             _phantom: PhantomData,
         };
 
-        // Store the invese matrices for our test
+        // Store the inverse matrices for our test
         let joint_matrices = vec![inverse.clone(), inverse];
 
         // Create a Mesh
