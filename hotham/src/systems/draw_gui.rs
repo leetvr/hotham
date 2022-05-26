@@ -18,13 +18,13 @@ pub fn draw_gui_system(
     gui_context: &mut GuiContext,
     haptic_context: &mut HapticContext,
 ) {
-    // Reset hovered_this_frame
-    gui_context.hovered_this_frame = false;
+    let mut new_hover = false;
 
     // Draw each panel
     for (_, (panel, ui_panel)) in query.query_mut(world) {
         // Reset the button state
         for button in &mut ui_panel.buttons {
+            button.hovered_this_frame = false;
             button.clicked_this_frame = false;
         }
 
@@ -35,16 +35,21 @@ pub fn draw_gui_system(
             ui_panel,
             panel,
         );
+
+        for button in &mut ui_panel.buttons {
+            if !button.hovered_last_frame && button.hovered_this_frame {
+                new_hover = true;
+            }
+            // Stash the value for the next frame.
+            button.hovered_last_frame = button.hovered_this_frame;
+        }
     }
 
     // Did we hover over a button in this frame? If so request haptic feedback.
-    if !gui_context.hovered_last_frame && gui_context.hovered_this_frame {
+    if new_hover {
         // TODO - We should really have two pointer hands..
         haptic_context.request_haptic_feedback(GUI_HAPTIC_AMPLITUDE, Handedness::Right);
     }
-
-    // Stash the value for the next frame.
-    gui_context.hovered_last_frame = gui_context.hovered_this_frame;
 }
 
 #[cfg(target_os = "windows")]

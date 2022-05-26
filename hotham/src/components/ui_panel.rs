@@ -42,6 +42,9 @@ pub struct UIPanel {
 pub struct UIPanelButton {
     /// Text to be displayed
     pub text: String,
+    /// Was this button hovered?
+    pub hovered_last_frame: bool,
+    pub hovered_this_frame: bool,
     /// Was this button clicked?
     pub clicked_this_frame: bool,
 }
@@ -51,6 +54,8 @@ impl UIPanelButton {
     pub fn new(text: &str) -> Self {
         UIPanelButton {
             text: text.to_string(),
+            hovered_last_frame: false,
+            hovered_this_frame: false,
             clicked_this_frame: false,
         }
     }
