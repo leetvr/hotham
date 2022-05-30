@@ -25,7 +25,7 @@ fn main() {
     //     .write_to_file("src/bindings.rs")
     //     .expect("Couldn't write bindings!");
 
-    let mut compiler = Compiler::new().expect("Unable to instantiate compiler");
+    let compiler = Compiler::new().expect("Unable to instantiate compiler");
 
     let input_file = Path::new("./build_input/viewdisplay.vert").to_path_buf();
     let source_text = fs::read(&input_file).expect("Unable to read string");

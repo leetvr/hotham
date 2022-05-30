@@ -19,4 +19,4 @@ winit = "0.25"
 
 [build-dependencies]
 bindgen = "*"
-shaderc = "0.7.2"
+shaderc = "0.8"

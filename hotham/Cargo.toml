@@ -10,7 +10,7 @@ repository = "https://github.com/leetvr/hotham/"
 version = "0.1.1"
 
 [build-dependencies]
-shaderc = "0.7"
+shaderc = "0.8"
 
 [dependencies]
 anyhow = "1.0"
