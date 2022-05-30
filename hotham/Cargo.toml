@@ -15,7 +15,7 @@ shaderc = "0.8"
 [dependencies]
 anyhow = "1.0"
 ash = "0.33.2"
-console = "0.14"
+console = "0.15"
 cpal = "0.13.5"
 crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
