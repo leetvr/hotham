@@ -37,7 +37,7 @@ symphonia = {version = "0.5", features = ["mp3"]}
 thiserror = "1.0"
 uuid = {version = "1.1", features = ["serde", "v4"]}
 
-[target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dependencies]
+[target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dev-dependencies]
 renderdoc = "0.10"
 
 [dev-dependencies]
