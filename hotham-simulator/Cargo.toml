@@ -11,12 +11,11 @@ crate-type = ["cdylib"]
 [dependencies]
 ash = "0.33.2"
 ash-window = "0.7"
-cgmath = "0.18"
 lazy_static = "1.4.0"
 openxr-sys = "0.9"
 rand = "0.8"
-winit = "0.25"
+winit = "0.26"
 
 [build-dependencies]
 bindgen = "*"
-shaderc = "0.7.2"
+shaderc = "0.8"
