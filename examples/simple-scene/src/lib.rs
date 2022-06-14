@@ -13,7 +13,7 @@ use hotham::{
         update_parent_transform_matrix_system, update_rigid_body_transforms_system,
         update_transform_matrix_system, Queries,
     },
-    Engine, HothamResult,
+    xr, Engine, HothamResult,
 };
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -28,8 +28,14 @@ pub fn real_main() -> HothamResult<()> {
     let mut world = init(&mut engine)?;
     let mut queries = Default::default();
 
-    while let Ok((_, _)) = engine.update() {
-        tick(&mut engine, &mut world, &mut queries);
+    while let Ok((previous_state, current_state)) = engine.update() {
+        tick(
+            previous_state,
+            current_state,
+            &mut engine,
+            &mut world,
+            &mut queries,
+        );
     }
 
     Ok(())
@@ -106,38 +112,57 @@ fn add_helmet(
     world.insert(helmet, components).unwrap();
 }
 
-fn tick(engine: &mut Engine, world: &mut World, queries: &mut Queries) {
+fn tick(
+    _previous_state: xr::SessionState,
+    current_state: xr::SessionState,
+    engine: &mut Engine,
+    world: &mut World,
+    queries: &mut Queries,
+) {
+    // If we're not in a session, don't run the frame loop.
+    match current_state {
+        xr::SessionState::IDLE | xr::SessionState::EXITING | xr::SessionState::STOPPING => return,
+        _ => {}
+    }
+
     let xr_context = &mut engine.xr_context;
     let vulkan_context = &engine.vulkan_context;
     let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
 
     begin_frame(xr_context, vulkan_context, render_context);
-    hands_system(&mut queries.hands_query, world, xr_context, physics_context);
-    physics_step(physics_context);
-    collision_system(&mut queries.collision_query, world, physics_context);
-    grabbing_system(&mut queries.grabbing_query, world, physics_context);
-    update_rigid_body_transforms_system(
-        &mut queries.update_rigid_body_transforms_query,
-        world,
-        physics_context,
-    );
-    animation_system(&mut queries.animation_query, world);
-    update_transform_matrix_system(&mut queries.update_transform_matrix_query, world);
-    update_parent_transform_matrix_system(
-        &mut queries.parent_query,
-        &mut queries.roots_query,
-        world,
-    );
-    skinning_system(&mut queries.joints_query, &mut queries.meshes_query, world);
-    begin_pbr_renderpass(xr_context, vulkan_context, render_context);
-    rendering_system(
-        &mut queries.rendering_query,
-        world,
-        vulkan_context,
-        xr_context.frame_index,
-        render_context,
-    );
-    end_pbr_renderpass(xr_context, vulkan_context, render_context);
+
+    if current_state == xr::SessionState::FOCUSED {
+        hands_system(&mut queries.hands_query, world, xr_context, physics_context);
+        grabbing_system(&mut queries.grabbing_query, world, physics_context);
+        physics_step(physics_context);
+        collision_system(&mut queries.collision_query, world, physics_context);
+        update_rigid_body_transforms_system(
+            &mut queries.update_rigid_body_transforms_query,
+            world,
+            physics_context,
+        );
+        animation_system(&mut queries.animation_query, world);
+        update_transform_matrix_system(&mut queries.update_transform_matrix_query, world);
+        update_parent_transform_matrix_system(
+            &mut queries.parent_query,
+            &mut queries.roots_query,
+            world,
+        );
+        skinning_system(&mut queries.joints_query, &mut queries.meshes_query, world);
+    }
+
+    if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
+        begin_pbr_renderpass(xr_context, vulkan_context, render_context);
+        rendering_system(
+            &mut queries.rendering_query,
+            world,
+            vulkan_context,
+            xr_context.frame_index,
+            render_context,
+        );
+        end_pbr_renderpass(xr_context, vulkan_context, render_context);
+    }
+
     end_frame(xr_context, vulkan_context, render_context);
 }
