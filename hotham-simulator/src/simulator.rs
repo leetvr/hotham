@@ -62,7 +62,7 @@ use winit::platform::windows::EventLoopExtWindows;
 #[cfg(target_os = "linux")]
 use winit::platform::unix::EventLoopExtUnix;
 
-static SWAPCHAIN_COLOUR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
+static SWAPCHAIN_COLOR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 pub const NUM_VIEWS: usize = 2; // TODO: Make dynamic
 pub const VIEWPORT_HEIGHT: u32 = 1000;
 pub const VIEWPORT_WIDTH: u32 = 1000;
@@ -133,10 +133,10 @@ pub unsafe extern "system" fn create_vulkan_instance(
 ) -> Result {
     let vulkan_create_info: &ash::vk::InstanceCreateInfo =
         transmute(&(*create_info).vulkan_create_info);
-    let get_instance_proc_adddr = (*create_info).pfn_get_instance_proc_addr.unwrap();
+    let get_instance_proc_addr = (*create_info).pfn_get_instance_proc_addr.unwrap();
     let vk_create_instance = CStr::from_bytes_with_nul_unchecked(b"vkCreateInstance\0").as_ptr();
     let create_instance: vk::PFN_vkCreateInstance =
-        transmute(get_instance_proc_adddr(ptr::null(), vk_create_instance));
+        transmute(get_instance_proc_addr(ptr::null(), vk_create_instance));
     let mut instance = vk::Instance::null();
 
     let event_loop: EventLoop<()> = EventLoop::new_any_thread();
@@ -169,7 +169,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
         return Result::ERROR_VALIDATION_FAILURE;
     }
     let static_fn = vk::StaticFn {
-        get_instance_proc_addr: transmute(get_instance_proc_adddr),
+        get_instance_proc_addr: transmute(get_instance_proc_addr),
     };
     let ash_instance = AshInstance::load(&static_fn, instance);
 
@@ -305,7 +305,7 @@ pub unsafe extern "system" fn get_vulkan_physical_device(
     // Create an instance wrapping the instance we were passed
     let ash_instance = AshInstance::load(entry.static_fn(), transmute(vk_instance));
 
-    // Create the device and asign it
+    // Create the device and assign it
     let physical_device = ash_instance
         .enumerate_physical_devices()
         .unwrap()
@@ -419,7 +419,7 @@ unsafe fn create_render_pass(state: &MutexGuard<State>) -> vk::RenderPass {
     let device = state.device.as_ref().unwrap();
 
     let color_attachment = vk::AttachmentDescription::builder()
-        .format(SWAPCHAIN_COLOUR_FORMAT)
+        .format(SWAPCHAIN_COLOR_FORMAT)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::STORE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -1083,7 +1083,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
         let create_info = vk::SwapchainCreateInfoKHR::builder()
             .min_image_count(3)
             .surface(surface)
-            .image_format(SWAPCHAIN_COLOUR_FORMAT)
+            .image_format(SWAPCHAIN_COLOR_FORMAT)
             .image_color_space(vk::ColorSpaceKHR::SRGB_NONLINEAR)
             .image_array_layers(1)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -1187,7 +1187,7 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
                 .build(),
             None,
         )
-        .expect("Unable to create desctiptor pool");
+        .expect("Unable to create descriptor pool");
 
     println!(
         "[HOTHAM_SIMULATOR] Created descriptor pool {:?}",
@@ -1296,7 +1296,7 @@ fn create_swapchain_image_views(state: &mut MutexGuard<State>) -> Vec<vk::ImageV
             let create_info = vk::ImageViewCreateInfo::builder()
                 .image(*image)
                 .view_type(vk::ImageViewType::TYPE_2D)
-                .format(SWAPCHAIN_COLOUR_FORMAT)
+                .format(SWAPCHAIN_COLOR_FORMAT)
                 .subresource_range(subresource_range);
 
             unsafe {
@@ -1713,7 +1713,7 @@ pub unsafe extern "system" fn enumerate_swapchain_formats(
         return Result::SUCCESS;
     }
 
-    *formats = SWAPCHAIN_COLOUR_FORMAT.as_raw() as i64;
+    *formats = SWAPCHAIN_COLOR_FORMAT.as_raw() as i64;
 
     Result::SUCCESS
 }

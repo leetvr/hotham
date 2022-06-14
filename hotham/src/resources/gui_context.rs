@@ -22,8 +22,6 @@ pub struct GuiContext {
     pub(crate) pipeline_layout: vk::PipelineLayout,
     pub(crate) font_texture_descriptor_sets: Vec<vk::DescriptorSet>,
     pub(crate) font_texture_version: u64,
-    pub(crate) hovered_this_frame: bool,
-    pub(crate) hovered_last_frame: bool,
 }
 
 impl GuiContext {
@@ -256,8 +254,6 @@ impl GuiContext {
             pipeline_layout,
             font_texture_descriptor_sets,
             font_texture_version: 0,
-            hovered_last_frame: false,
-            hovered_this_frame: false,
         }
     }
 
@@ -295,7 +291,7 @@ impl GuiContext {
                     let response = ui.button(&button.text);
 
                     if response.hovered() {
-                        self.hovered_this_frame = true;
+                        button.hovered_this_frame = true;
                     }
 
                     if response.clicked() {
@@ -309,12 +305,12 @@ impl GuiContext {
                         panel_input.cursor_location.y / SCALE_FACTOR,
                     );
                     let position = ui.painter().round_pos_to_pixels((x, y).into());
-                    let cursor_colour = if panel_input.trigger_value > 0.9 {
+                    let cursor_color = if panel_input.trigger_value > 0.9 {
                         egui::Color32::LIGHT_BLUE
                     } else {
                         egui::Color32::WHITE
                     };
-                    ui.painter().circle_filled(position, 4.00, cursor_colour);
+                    ui.painter().circle_filled(position, 4.00, cursor_color);
                 }
                 ui.allocate_space(ui.available_size())
             })
@@ -373,7 +369,7 @@ impl GuiContext {
                     .build()],
             );
 
-            // Set push contants
+            // Set push constants
             let width_points = extent.width as f32 / SCALE_FACTOR;
             let height_points = extent.height as f32 / SCALE_FACTOR;
             device.cmd_push_constants(

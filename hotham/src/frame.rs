@@ -19,7 +19,7 @@ impl Frame {
         swapchain_resolution: vk::Extent2D,
         swapchain_image_view: vk::ImageView,
         depth_image_view: vk::ImageView,
-        colour_image_view: vk::ImageView,
+        color_image_view: vk::ImageView,
     ) -> Result<Self> {
         let device = &vulkan_context.device;
         let command_pool = vulkan_context.command_pool;
@@ -42,7 +42,7 @@ impl Frame {
         .pop()
         .ok_or(HothamError::EmptyListError)?;
 
-        let attachments = [colour_image_view, depth_image_view, swapchain_image_view];
+        let attachments = [color_image_view, depth_image_view, swapchain_image_view];
 
         let frame_buffer_create_info = vk::FramebufferCreateInfo::builder()
             .render_pass(render_pass)

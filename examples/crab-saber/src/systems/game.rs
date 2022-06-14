@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use crate::{
-    components::{Colour, Cube},
+    components::{Color, Cube},
     resources::{
         game_context::{GameState, Song},
         GameContext,
@@ -232,11 +232,11 @@ fn spawn_cube(
         return;
     }
 
-    let colour = if random() { Colour::Red } else { Colour::Blue };
+    let color = if random() { Color::Red } else { Color::Blue };
     let dead_cube = queries
         .dead_cubes_query
         .query_mut(world)
-        .find_map(|(e, c)| if c == &colour { Some(e) } else { None })
+        .find_map(|(e, c)| if c == &color { Some(e) } else { None })
         .unwrap();
     revive_cube(dead_cube, world, physics_context, song);
     *last_spawn_time = Instant::now();
@@ -265,13 +265,13 @@ fn check_for_hits(
             if !is_cube(e) {
                 continue;
             };
-            if let Some(colour) = e.get::<Colour>() {
-                match *colour {
-                    Colour::Red => {
+            if let Some(color) = e.get::<Color>() {
+                match *color {
+                    Color::Red => {
                         game_context.current_score -= 1;
                         pending_sound_effects.push((*c, "Miss"));
                     }
-                    Colour::Blue => {
+                    Color::Blue => {
                         game_context.current_score += 1;
                         pending_sound_effects.push((*c, "Hit"));
                     }
@@ -287,13 +287,13 @@ fn check_for_hits(
             if !is_cube(e) {
                 continue;
             };
-            if let Some(colour) = e.get::<Colour>() {
-                match *colour {
-                    Colour::Red => {
+            if let Some(color) = e.get::<Color>() {
+                match *color {
+                    Color::Red => {
                         game_context.current_score += 1;
                         pending_sound_effects.push((*c, "Hit"));
                     }
-                    Colour::Blue => {
+                    Color::Blue => {
                         game_context.current_score -= 1;
                         pending_sound_effects.push((*c, "Miss"));
                     }
@@ -563,12 +563,7 @@ mod tests {
             assert_score_is(world, game_context, 0);
 
             // Simulate blue saber hitting blue cube - increase score
-            hit_cube(
-                game_context.blue_saber,
-                Colour::Blue,
-                world,
-                physics_context,
-            );
+            hit_cube(game_context.blue_saber, Color::Blue, world, physics_context);
         }
 
         // PLAYING - TICK THREE
@@ -586,7 +581,7 @@ mod tests {
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 1);
             // Simulate blue saber hitting red cube - decrease score
-            hit_cube(game_context.blue_saber, Colour::Red, world, physics_context);
+            hit_cube(game_context.blue_saber, Color::Red, world, physics_context);
             // Reset spawn timer.
             game_context.last_spawn_time =
                 Instant::now() - beside_you.beat_length - Duration::from_millis(1);
@@ -608,12 +603,7 @@ mod tests {
             assert_eq!(num_cubes(world), 2);
 
             // Simulate blue saber hitting blue cube - increase score
-            hit_cube(
-                game_context.blue_saber,
-                Colour::Blue,
-                world,
-                physics_context,
-            );
+            hit_cube(game_context.blue_saber, Color::Blue, world, physics_context);
 
             // Make the sabers collide
             collide_sabers(game_context, world);
@@ -633,7 +623,7 @@ mod tests {
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 1);
             // Simulate blue cube hitting the backstop - decrease score
-            hit_cube(game_context.backstop, Colour::Blue, world, physics_context);
+            hit_cube(game_context.backstop, Color::Blue, world, physics_context);
         }
 
         // PLAYING - TICK SIX
@@ -651,7 +641,7 @@ mod tests {
             assert_score_is(world, game_context, 0);
 
             // Add a red cube to the red saber - increase score
-            hit_cube(game_context.red_saber, Colour::Red, world, physics_context);
+            hit_cube(game_context.red_saber, Color::Red, world, physics_context);
         }
 
         // PLAYING - TICK SEVEN
@@ -668,7 +658,7 @@ mod tests {
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 1);
             // Add a blue cube to the red saber - decrease score
-            hit_cube(game_context.red_saber, Colour::Blue, world, physics_context);
+            hit_cube(game_context.red_saber, Color::Blue, world, physics_context);
         }
 
         // PLAYING - TICK EIGHT
@@ -685,7 +675,7 @@ mod tests {
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 0);
             // Add a blue cube to the red saber - decrease score
-            hit_cube(game_context.red_saber, Colour::Blue, world, physics_context);
+            hit_cube(game_context.red_saber, Color::Blue, world, physics_context);
         }
 
         // PLAYING - TICK NINE -> GAME OVER
@@ -807,14 +797,14 @@ mod tests {
 
     fn num_cubes(world: &mut World) -> usize {
         world
-            .query::<(&Colour, &Cube, &Visible, &RigidBody, &Collider)>()
+            .query::<(&Color, &Cube, &Visible, &RigidBody, &Collider)>()
             .iter()
             .len()
     }
 
     fn hit_cube(
         saber: Entity,
-        colour: Colour,
+        color: Color,
         world: &mut World,
         physics_context: &mut PhysicsContext,
     ) {
@@ -825,7 +815,7 @@ mod tests {
             .colliders
             .insert(ColliderBuilder::cuboid(0., 0., 0.).build());
         let cube = world.spawn((
-            colour,
+            color,
             Cube {},
             Visible {},
             RigidBody { handle: rigid_body },
@@ -846,10 +836,10 @@ mod tests {
         assert!(!hit_cube.has::<Visible>());
         assert!(!hit_cube.has::<Collider>());
 
-        if let Ok(c) = world.get::<Colour>(saber) {
+        if let Ok(c) = world.get::<Color>(saber) {
             match *c {
-                Colour::Red => assert_eq!(haptic_context.left_hand_amplitude_this_frame, 1.),
-                Colour::Blue => assert_eq!(haptic_context.right_hand_amplitude_this_frame, 1.),
+                Color::Red => assert_eq!(haptic_context.left_hand_amplitude_this_frame, 1.),
+                Color::Blue => assert_eq!(haptic_context.right_hand_amplitude_this_frame, 1.),
             }
         }
     }

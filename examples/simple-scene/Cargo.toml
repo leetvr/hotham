@@ -8,7 +8,7 @@ version = "0.2.0"
 crate-type = ["lib", "cdylib"]
 
 [[bin]]
-name = "simple_scene_example"
+name = "hotham_simple_scene_example"
 path = "src/main.rs"
 
 [dependencies]

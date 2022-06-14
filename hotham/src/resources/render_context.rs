@@ -50,7 +50,7 @@ pub struct RenderContext {
     pub pipeline: vk::Pipeline,
     pub render_pass: vk::RenderPass,
     pub depth_image: Image,
-    pub colour_image: Image,
+    pub color_image: Image,
     pub render_area: vk::Rect2D,
     pub scene_data: SceneData,
     pub scene_data_buffer: Buffer<SceneData>,
@@ -139,8 +139,8 @@ impl RenderContext {
             1,
         )?;
 
-        // Colour image, used for MSAA.
-        let colour_image = vulkan_context.create_image(
+        // Color image, used for MSAA.
+        let color_image = vulkan_context.create_image(
             COLOR_FORMAT,
             &swapchain.resolution,
             vk::ImageUsageFlags::TRANSIENT_ATTACHMENT | vk::ImageUsageFlags::COLOR_ATTACHMENT,
@@ -154,7 +154,7 @@ impl RenderContext {
             &render_pass,
             swapchain,
             &depth_image,
-            &colour_image,
+            &color_image,
         )?;
 
         println!("[HOTHAM_RENDERER] Creating UBO..");
@@ -199,7 +199,7 @@ impl RenderContext {
 
         println!("[HOTHAM_RENDERER] ..done! {:?}", scene_data_buffer);
 
-        println!("[HOTHAM_RENDERER] Done! Renderer initialised!");
+        println!("[HOTHAM_RENDERER] Done! Renderer initialized!");
 
         Ok(Self {
             frames,
@@ -209,7 +209,7 @@ impl RenderContext {
             render_pass,
             frame_index: 0,
             depth_image,
-            colour_image,
+            color_image,
             render_area,
             scene_data,
             scene_data_buffer,
@@ -571,7 +571,7 @@ fn create_frames(
     render_pass: &vk::RenderPass,
     swapchain: &Swapchain,
     depth_image: &Image,
-    colour_image: &Image,
+    color_image: &Image,
 ) -> Result<Vec<Frame>> {
     print!("[HOTHAM_INIT] Creating frames..");
     let frames = swapchain
@@ -593,7 +593,7 @@ fn create_frames(
                 swapchain.resolution,
                 i,
                 depth_image.view,
-                colour_image.view,
+                color_image.view,
             )
         })
         .collect::<Result<Vec<Frame>>>()?;
@@ -604,7 +604,7 @@ fn create_frames(
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     print!("[HOTHAM_INIT] Creating render pass..");
     // Attachment used for MSAA
-    let colour_attachment = vk::AttachmentDescription::builder()
+    let color_attachment = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
         .samples(vk::SampleCountFlags::TYPE_4)
         .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -615,7 +615,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
     // Final attachment to be presented
-    let colour_attachment_resolve = vk::AttachmentDescription::builder()
+    let color_attachment_resolve = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
         .samples(vk::SampleCountFlags::TYPE_1)
         .load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -683,9 +683,9 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .correlation_masks(&view_masks);
 
     let attachments = [
-        *colour_attachment,
+        *color_attachment,
         *depth_attachment,
-        *colour_attachment_resolve,
+        *color_attachment_resolve,
     ];
 
     let render_pass = unsafe {

@@ -41,13 +41,13 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let physics_context = &mut engine.physics_context;
     let mut world = World::default();
 
-    let glb_bufs: Vec<&[u8]> = vec![
+    let glb_buffers: Vec<&[u8]> = vec![
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
         include_bytes!("../../../test_assets/damaged_helmet.glb"),
     ];
     let models = gltf_loader::load_models_from_glb(
-        &glb_bufs,
+        &glb_buffers,
         vulkan_context,
         &render_context.descriptor_set_layouts,
     )?;

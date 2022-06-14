@@ -6,13 +6,13 @@ use hotham::{
 };
 pub use sabers::sabers_system;
 
-use crate::components::{Colour, Cube, Saber};
+use crate::components::{Color, Cube, Saber};
 
 #[derive(Default)]
 pub struct CrabSaberQueries<'a> {
-    pub sabers_query: PreparedQuery<With<Saber, (&'a Colour, &'a RigidBody)>>,
+    pub sabers_query: PreparedQuery<With<Saber, (&'a Color, &'a RigidBody)>>,
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
     pub live_cubes_query:
-        PreparedQuery<With<Visible, With<Cube, (&'a Colour, &'a RigidBody, &'a Collider)>>>,
-    pub dead_cubes_query: PreparedQuery<Without<Visible, With<Cube, &'a Colour>>>,
+        PreparedQuery<With<Visible, With<Cube, (&'a Color, &'a RigidBody, &'a Collider)>>>,
+    pub dead_cubes_query: PreparedQuery<Without<Visible, With<Cube, &'a Color>>>,
 }
