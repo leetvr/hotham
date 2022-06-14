@@ -4,3 +4,6 @@ target
 
 # Ignore test assets
 sponza* 
+
+# Ignore logs
+*.log
