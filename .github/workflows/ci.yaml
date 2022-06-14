@@ -60,7 +60,7 @@ jobs:
       - uses: streetsidesoftware/cspell-action@v2
         with:
           files: |
-            "**/*/md"
+            "**/*.md"
 
   test:
     name: Test
