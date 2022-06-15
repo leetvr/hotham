@@ -6,13 +6,20 @@ use ash::vk;
 use crate::resources::VulkanContext;
 
 // TODO: Let Buffer<T> own the data
+/// A thin wrapper around `vk::Buffer`
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub struct Buffer<T> {
+    /// Handle to the underlying buffer
     pub handle: vk::Buffer,
+    /// Handle to the underlying memory
     pub device_memory: vk::DeviceMemory,
+    /// Marker for the type
     pub _phantom: PhantomData<T>,
+    /// Size of the data
     pub size: vk::DeviceSize,
+    /// Size of the underlying buffer
     pub device_memory_size: vk::DeviceSize,
+    /// Usage flags for the buffer
     pub usage: vk::BufferUsageFlags,
 }
 
@@ -20,6 +27,7 @@ impl<T> Buffer<T>
 where
     T: Sized + Copy,
 {
+    /// Create a new buffer from a slice of data.
     pub fn new(
         vulkan_context: &VulkanContext,
         data: &[T],

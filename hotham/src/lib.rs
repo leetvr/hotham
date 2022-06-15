@@ -21,7 +21,8 @@ pub use hotham_error::HothamError;
 pub use nalgebra;
 pub use rapier3d;
 
-mod buffer;
+/// Buffers are used to transfer data to the GPU
+pub mod buffer;
 mod camera;
 /// Components are data that are used to update the simulation and interact with the external world
 pub mod components;
@@ -40,10 +41,13 @@ pub mod schedule_functions;
 mod swapchain;
 /// Systems are functions called each frame to update either the external state or the current simulation
 pub mod systems;
-mod texture;
+
+/// Functionality for adding textures (images) to meshes
+pub mod texture;
 /// Kitchen sink utility functions
 pub mod util;
-mod vertex;
+/// Vertex representation
+pub mod vertex;
 
 /// Hotham result type
 pub type HothamResult<T> = std::result::Result<T, HothamError>;
