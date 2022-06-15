@@ -227,8 +227,8 @@ fn subdivide_mesh_system(world: &mut World, vulkan_context: &VulkanContext, time
     }
 
     let mesh = world.query_mut::<&mut Mesh>().into_iter().next().unwrap().1;
-    let step = timer.total_time().as_secs() as _;
-    let (vertices, indices) = generate_vertices(step);
+    let step = timer.total_time().as_secs() * 10;
+    let (vertices, indices) = generate_vertices(step as _);
     let primitive = &mut mesh.primitives[0];
     primitive.indices_count = indices.len() as _;
     primitive
@@ -300,7 +300,7 @@ fn create_mesh(
 ) -> Result<(), hotham::HothamError> {
     let mesh_layout = render_context.descriptor_set_layouts.mesh_layout;
     let mesh_ubo = MeshUBO::default();
-    let num_vertices = 100_000;
+    let num_vertices = 1_000_000;
     let mut vertices = Vec::with_capacity(num_vertices);
     let mut indices = Vec::with_capacity(num_vertices);
 
@@ -379,25 +379,29 @@ fn generate_vertices(step: usize) -> (Vec<Vertex>, Vec<u32>) {
 
     let vertex_offset = 1.0 / step as f32;
 
-    for n in 0..step {
-        {
-            let n = n as f32;
-            vertices.push(vertex(n * vertex_offset, n * vertex_offset + vertex_offset));
-            vertices.push(vertex(n * vertex_offset, n * vertex_offset));
-            vertices.push(vertex(n * vertex_offset + vertex_offset, n * vertex_offset));
-            vertices.push(vertex(
-                n * vertex_offset + vertex_offset,
-                n * vertex_offset + vertex_offset,
-            ));
-        }
+    let mut n = 0;
+    for row in 0..step {
+        for column in 0..step {
+            {
+                let row = row as f32;
+                let col = column as f32;
+                let x = col * vertex_offset;
+                let y = row * vertex_offset;
+                vertices.push(vertex(x, y + vertex_offset));
+                vertices.push(vertex(x, y));
+                vertices.push(vertex(x + vertex_offset, y));
+                vertices.push(vertex(x + vertex_offset, y + vertex_offset));
+            }
 
-        let index_offset = (n * 4) as u32;
-        indices.push(index_offset + 0);
-        indices.push(index_offset + 1);
-        indices.push(index_offset + 2);
-        indices.push(index_offset + 0);
-        indices.push(index_offset + 2);
-        indices.push(index_offset + 3);
+            let index_offset = (n * 4) as u32;
+            indices.push(index_offset + 0);
+            indices.push(index_offset + 1);
+            indices.push(index_offset + 2);
+            indices.push(index_offset + 0);
+            indices.push(index_offset + 2);
+            indices.push(index_offset + 3);
+            n += 1;
+        }
     }
 
     (vertices, indices)
