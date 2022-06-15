@@ -90,6 +90,7 @@ impl Timer {
     }
 }
 
+#[allow(dead_code)]
 enum StressTest {
     ManyObjects,
     ManyVertices,
@@ -318,17 +319,15 @@ fn create_mesh(
     let index_buffer =
         Buffer::new(vulkan_context, &indices, vk::BufferUsageFlags::INDEX_BUFFER).unwrap();
 
-    let empty_texture = Texture::empty(vulkan_context)?;
-
     let texture_descriptor_set = vulkan_context.create_textures_descriptor_sets(
         render_context.descriptor_set_layouts.textures_layout,
         "Empty Material",
         &[
-            &empty_texture.clone(),
-            &empty_texture.clone(),
-            &empty_texture.clone(),
-            &empty_texture.clone(),
-            &empty_texture.clone(),
+            &Texture::empty(vulkan_context)?,
+            &Texture::empty(vulkan_context)?,
+            &Texture::empty(vulkan_context)?,
+            &Texture::empty(vulkan_context)?,
+            &Texture::empty(vulkan_context)?,
         ],
     )?[0];
     let material = Material::default();
@@ -366,8 +365,10 @@ fn create_mesh(
         primitives,
     };
 
-    let mut transform = Transform::default();
-    transform.translation = [0., 1., -1.].into();
+    let transform = Transform {
+        translation: [0., 1., -1.].into(),
+        ..Default::default()
+    };
 
     world.spawn((Visible {}, mesh, transform, TransformMatrix::default()));
     Ok(())
@@ -394,10 +395,10 @@ fn generate_vertices(step: usize) -> (Vec<Vertex>, Vec<u32>) {
             }
 
             let index_offset = (n * 4) as u32;
-            indices.push(index_offset + 0);
+            indices.push(index_offset);
             indices.push(index_offset + 1);
             indices.push(index_offset + 2);
-            indices.push(index_offset + 0);
+            indices.push(index_offset);
             indices.push(index_offset + 2);
             indices.push(index_offset + 3);
             n += 1;
@@ -408,7 +409,8 @@ fn generate_vertices(step: usize) -> (Vec<Vertex>, Vec<u32>) {
 }
 
 fn vertex(x: f32, y: f32) -> Vertex {
-    let mut v = Vertex::default();
-    v.position = [x, y, 0.].into();
-    v
+    Vertex {
+        position: [x, y, -1.0].into(),
+        ..Default::default()
+    }
 }
