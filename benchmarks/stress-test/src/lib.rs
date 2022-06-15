@@ -33,7 +33,7 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let test = StressTest::ManyVertices;
+    let test = StressTest::ManyCubes;
     let (world, models) = init(&mut engine, &test)?;
     let queries = Default::default();
     let timer = Default::default();
@@ -92,7 +92,7 @@ impl Timer {
 
 #[allow(dead_code)]
 enum StressTest {
-    ManyObjects,
+    ManyCubes,
     ManyVertices,
     Sponza,
 }
@@ -106,7 +106,7 @@ fn init(
     let mut world = World::default();
 
     let models = match test {
-        StressTest::ManyObjects => {
+        StressTest::ManyCubes => {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/cube.glb")];
             let models = gltf_loader::load_models_from_glb(
                 &glb_buffers,
@@ -121,7 +121,26 @@ fn init(
             create_mesh(render_context, vulkan_context, &mut world)?;
             Default::default()
         }
-        StressTest::Sponza => todo!(),
+        StressTest::Sponza => {
+            let file = std::fs::read("test_assets/sponza.glb").unwrap();
+            let glb_buffers: Vec<&[u8]> = vec![&file];
+            let models = gltf_loader::load_models_from_glb(
+                &glb_buffers,
+                vulkan_context,
+                &render_context.descriptor_set_layouts,
+            )?;
+            for name in models.keys() {
+                add_model_to_world(
+                    name,
+                    &models,
+                    &mut world,
+                    None,
+                    vulkan_context,
+                    &render_context.descriptor_set_layouts,
+                );
+            }
+            models
+        }
     };
 
     Ok((world, models))
@@ -190,11 +209,11 @@ fn tick(
         );
 
         match tick_props.test {
-            StressTest::ManyObjects => {
+            StressTest::ManyCubes => {
                 cube_system(world, models, vulkan_context, render_context, timer)
             }
             StressTest::ManyVertices => subdivide_mesh_system(world, vulkan_context, timer),
-            StressTest::Sponza => todo!(),
+            StressTest::Sponza => {}
         }
 
         animation_system(&mut queries.animation_query, world);

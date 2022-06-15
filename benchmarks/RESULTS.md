@@ -24,3 +24,14 @@
 - **FPS at time of crash**: 16
 - **OVR stats at time of crash**: `FPS=16/72,Prd=83ms,Tear=2,Early=2,Stale=56,VSnc=0,Lat=-1,Fov=0,CPU4/GPU=4/3,1478/490MHz,OC=FF,TA=0/0/0,SP=N/N/N,Mem=1353MHz,Free=3200MB,PLS=0,Temp=31.0C/0.0C,TW=8.91ms,App=11.80ms,GD=0.00ms,CPU&GPU=58.12ms,LCnt=1,GPU%=1.00,CPU%=0.02(W0.05),DSF=1.00`
 - **Highest vertex count at 72 FPS**: 144,400
+
+## Sponza
+### Methodology
+- Download the [new Sponza scene](https://www.intel.com/content/www/us/en/developer/topic-technology/graphics-research/samples.html)
+- Export the glTF file into a GLB file with Blender
+- Place the glTF file in the `test_assets` directory.
+- Record the FPS if the scene loads
+
+### Hotham 0.2
+- **Result**: Crash - `ERROR_OUT_OF_POOL_MEMORY`
+- **Note**: Was unable to run in simulator so did not attempt to run in headset. Will require further investigation to load the GLB from the device's internal storage as it is too large to either include in the binary or the APK.
