@@ -77,7 +77,7 @@ impl Timer {
             return true;
         }
 
-        return false;
+        false
     }
 
     pub fn total_time(&self) -> Duration {
