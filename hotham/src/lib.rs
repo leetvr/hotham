@@ -21,33 +21,24 @@ pub use hotham_error::HothamError;
 pub use nalgebra;
 pub use rapier3d;
 
-/// Buffers are used to transfer data to the GPU
-pub mod buffer;
-mod camera;
 /// Components are data that are used to update the simulation and interact with the external world
 pub mod components;
 mod engine;
-mod frame;
 
 /// A tool to import models from glTF files into Hotham
 pub mod gltf_loader;
 mod hotham_error;
-mod image;
 /// Resources are wrappers around some external state that the engine will interact with
 pub mod resources;
-/// Data used in the fragment shader
-pub mod scene_data;
 pub mod schedule_functions;
-mod swapchain;
 /// Systems are functions called each frame to update either the external state or the current simulation
 pub mod systems;
 
-/// Functionality for adding textures (images) to meshes
-pub mod texture;
 /// Kitchen sink utility functions
 pub mod util;
-/// Vertex representation
-pub mod vertex;
+
+/// Functionality used by the rendering engine
+pub mod rendering;
 
 /// Hotham result type
 pub type HothamResult<T> = std::result::Result<T, HothamError>;

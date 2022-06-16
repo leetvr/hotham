@@ -99,7 +99,7 @@ pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
 }
 
 #[cfg(test)]
-use crate::buffer::Buffer;
+use crate::rendering::buffer::Buffer;
 #[cfg(test)]
 use ash::vk;
 #[cfg(test)]

@@ -4,7 +4,7 @@ use nalgebra::Matrix4;
 
 use super::primitive::Primitive;
 use crate::{
-    buffer::Buffer,
+    rendering::buffer::Buffer,
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
 use std::mem::{transmute, MaybeUninit};

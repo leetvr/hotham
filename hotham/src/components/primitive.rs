@@ -1,4 +1,4 @@
-use crate::{buffer::Buffer, resources::VulkanContext, vertex::Vertex};
+use crate::{rendering::buffer::Buffer, rendering::vertex::Vertex, resources::VulkanContext};
 use anyhow::{anyhow, Result};
 use ash::vk;
 use itertools::izip;

@@ -6,8 +6,8 @@ pub const SCALE_FACTOR: f32 = 3.;
 
 use crate::{
     components::{panel::PanelInput, Panel, UIPanel},
+    rendering::texture::Texture,
     resources::render_context::{create_push_constant, CLEAR_VALUES},
-    texture::Texture,
     COLOR_FORMAT,
 };
 

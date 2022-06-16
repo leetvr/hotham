@@ -4,11 +4,11 @@ use std::{
 };
 
 use hotham::{
-    buffer::Buffer,
     components::{mesh::MeshUBO, Material, Mesh, Primitive, Transform, TransformMatrix, Visible},
     gltf_loader::{self, add_model_to_world},
     hecs::{With, World},
     nalgebra::Vector3,
+    rendering::{buffer::Buffer, texture::Texture, vertex::Vertex},
     resources::{vulkan_context::VulkanContext, RenderContext},
     schedule_functions::{
         begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass, physics_step,
@@ -19,8 +19,6 @@ use hotham::{
         update_parent_transform_matrix_system, update_rigid_body_transforms_system,
         update_transform_matrix_system, Queries,
     },
-    texture::Texture,
-    vertex::Vertex,
     vk, xr, Engine, HothamResult,
 };
 

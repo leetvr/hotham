@@ -15,16 +15,18 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 ];
 
 use crate::{
-    buffer::Buffer,
-    camera::Camera,
     components::Material,
-    frame::Frame,
-    image::Image,
+    rendering::{
+        buffer::Buffer,
+        camera::Camera,
+        frame::Frame,
+        image::Image,
+        scene_data::{SceneData, SceneParams},
+        swapchain::Swapchain,
+        texture::Texture,
+        vertex::Vertex,
+    },
     resources::{VulkanContext, XrContext},
-    scene_data::{SceneData, SceneParams},
-    swapchain::Swapchain,
-    texture::Texture,
-    vertex::Vertex,
     COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
@@ -61,39 +63,7 @@ pub struct RenderContext {
     pub views: Vec<xr::View>,
     pub last_frame_time: Instant,
     pub frame_index: usize,
-}
-
-impl Drop for RenderContext {
-    fn drop(&mut self) {
-        // TODO: fix
-
-        // unsafe {
-        // self.vulkan_context
-        //     .device
-        //     .queue_wait_idle(self.vulkan_context.graphics_queue)
-        //     .expect("Unable to wait for queue to become idle!");
-
-        // // for layout in &self.descriptor_set_layouts {
-        // //     self.vulkan_context
-        // //         .device
-        // //         .destroy_descriptor_set_layout(*layout, None);
-        // // }
-        // self.depth_image.destroy(&self.vulkan_context);
-        // self.uniform_buffer.destroy(&self.vulkan_context);
-        // for frame in self.frames.drain(..) {
-        //     frame.destroy(&self.vulkan_context);
-        // }
-        // self.vulkan_context
-        //     .device
-        //     .destroy_pipeline_layout(self.pipeline_layout, None);
-        // self.vulkan_context
-        //     .device
-        //     .destroy_render_pass(self.render_pass, None);
-        // self.vulkan_context
-        //     .device
-        //     .destroy_pipeline(self.pipeline, None);
-        // }
-    }
+    pub descriptors: Descriptors,
 }
 
 impl RenderContext {
@@ -116,6 +86,7 @@ impl RenderContext {
             offset: vk::Offset2D::default(),
         };
 
+        let descriptors = unsafe { Descriptors::new(vulkan_context) };
         let descriptor_set_layouts = create_descriptor_set_layouts(vulkan_context)?;
 
         // Pipeline, render pass
@@ -219,6 +190,7 @@ impl RenderContext {
             cameras: vec![Default::default(); 2],
             views: Vec::new(),
             last_frame_time: Instant::now(),
+            descriptors,
         })
     }
 
@@ -887,4 +859,138 @@ fn create_pipeline_layout(
             .create_pipeline_layout(create_info, None)
     }
     .map_err(|e| e.into())
+}
+
+/// A wrapper around all the various bits of descriptor functionality
+#[derive(Clone, Debug)]
+pub struct Descriptors {
+    pub layout: vk::DescriptorSetLayout,
+    pub set: vk::DescriptorSet,
+    pub pool: vk::DescriptorPool,
+}
+
+impl Descriptors {
+    pub unsafe fn new(vulkan_context: &VulkanContext) -> Self {
+        // First, create a pool.
+        let pool = create_descriptor_pool(&vulkan_context.device);
+
+        // Then create a layout.
+        let layout = create_descriptor_layouts(&vulkan_context.device);
+
+        // Finally, allocate the shared descriptor set.
+        let set = allocate_descriptor_set(vulkan_context, pool, layout);
+
+        Self { layout, set, pool }
+    }
+}
+
+unsafe fn allocate_descriptor_set(
+    vulkan_context: &VulkanContext,
+    pool: vk::DescriptorPool,
+    layout: vk::DescriptorSetLayout,
+) -> vk::DescriptorSet {
+    let mut descriptor_counts =
+        vk::DescriptorSetVariableDescriptorCountAllocateInfo::builder().descriptor_counts(&[1000]);
+    let set = vulkan_context
+        .device
+        .allocate_descriptor_sets(
+            &vk::DescriptorSetAllocateInfo::builder()
+                .descriptor_pool(pool)
+                .set_layouts(std::slice::from_ref(&layout))
+                .push_next(&mut descriptor_counts),
+        )
+        .unwrap()[0];
+    set
+}
+
+unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLayout {
+    let bindings = [
+        // Draw Data
+        vk::DescriptorSetLayoutBinding {
+            binding: 0,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::COMPUTE,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+        // Models
+        vk::DescriptorSetLayoutBinding {
+            binding: 1,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::COMPUTE,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+        // Materials
+        vk::DescriptorSetLayoutBinding {
+            binding: 2,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            stage_flags: vk::ShaderStageFlags::FRAGMENT,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+        // Draw Calls
+        vk::DescriptorSetLayoutBinding {
+            binding: 3,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            stage_flags: vk::ShaderStageFlags::COMPUTE,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+        // Textures
+        vk::DescriptorSetLayoutBinding {
+            binding: 4,
+            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            stage_flags: vk::ShaderStageFlags::FRAGMENT,
+            descriptor_count: 1000,
+            ..Default::default()
+        },
+    ];
+
+    let flags = vk::DescriptorBindingFlags::PARTIALLY_BOUND
+        | vk::DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT
+        | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
+    let descriptor_flags = [
+        vk::DescriptorBindingFlags::empty(),
+        vk::DescriptorBindingFlags::empty(),
+        vk::DescriptorBindingFlags::empty(),
+        vk::DescriptorBindingFlags::empty(),
+        flags,
+    ];
+    let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
+        .binding_flags(&descriptor_flags);
+
+    let shared_layout = device
+        .create_descriptor_set_layout(
+            &vk::DescriptorSetLayoutCreateInfo::builder()
+                .bindings(&bindings)
+                .push_next(&mut binding_flags)
+                .flags(vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL),
+            None,
+        )
+        .unwrap();
+
+    shared_layout
+}
+
+unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
+    let pool_sizes = [
+        vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::STORAGE_BUFFER,
+            descriptor_count: 100,
+        },
+        vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            descriptor_count: 10_000,
+        },
+    ];
+    device
+        .create_descriptor_pool(
+            &vk::DescriptorPoolCreateInfo::builder()
+                .pool_sizes(&pool_sizes)
+                .max_sets(1000)
+                .flags(vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND),
+            None,
+        )
+        .unwrap()
 }

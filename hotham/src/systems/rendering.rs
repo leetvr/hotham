@@ -87,11 +87,9 @@ mod tests {
     use openxr::{Fovf, Quaternionf, Vector3f};
 
     use crate::{
-        buffer::Buffer,
         gltf_loader,
+        rendering::{buffer::Buffer, image::Image, scene_data::SceneParams, swapchain::Swapchain},
         resources::RenderContext,
-        scene_data::SceneParams,
-        swapchain::Swapchain,
         systems::{update_parent_transform_matrix_system, update_transform_matrix_system},
         util::get_from_device_memory,
         COLOR_FORMAT,
@@ -166,7 +164,7 @@ mod tests {
         render_context: &mut RenderContext,
         world: &mut World,
         resolution: vk::Extent2D,
-        image: crate::image::Image,
+        image: Image,
         name: &str,
         debug_view_equation: f32,
     ) {
@@ -181,7 +179,7 @@ mod tests {
     fn save_image_to_disk(
         resolution: vk::Extent2D,
         vulkan_context: &VulkanContext,
-        image: crate::image::Image,
+        image: Image,
         name: &str,
     ) {
         let size = (resolution.height * resolution.width * 4) as usize;

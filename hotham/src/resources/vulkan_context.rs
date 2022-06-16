@@ -1,9 +1,9 @@
 use crate::{
-    buffer::Buffer,
     hotham_error::HothamError,
-    image::Image,
-    scene_data::{SceneData, SceneParams},
-    texture::Texture,
+    rendering::buffer::Buffer,
+    rendering::image::Image,
+    rendering::scene_data::{SceneData, SceneParams},
+    rendering::texture::Texture,
     DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
 };
 use anyhow::{anyhow, Result};

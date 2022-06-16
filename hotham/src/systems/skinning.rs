@@ -47,8 +47,8 @@ mod tests {
     use std::{io::Write, marker::PhantomData};
 
     use crate::{
-        buffer::Buffer,
         components::{mesh::MeshUBO, Joint, Parent, Skin},
+        rendering::buffer::Buffer,
         resources::VulkanContext,
         systems::skinning_system,
         util::{get_from_device_memory, get_world_with_hands},

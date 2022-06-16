@@ -65,17 +65,14 @@ mod tests {
     use std::process::Command;
 
     use crate::{
-        buffer::Buffer,
         components::{
             panel::PanelInput,
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
         gltf_loader,
-        image::Image,
+        rendering::{buffer::Buffer, image::Image, scene_data::SceneParams, swapchain::Swapchain},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
-        scene_data::SceneParams,
-        swapchain::Swapchain,
         systems::{
             rendering_system, update_parent_transform_matrix_system, update_transform_matrix_system,
         },

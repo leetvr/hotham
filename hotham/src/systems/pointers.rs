@@ -178,8 +178,8 @@ mod tests {
     pub fn test_pointers_system() {
         use crate::{
             components::{Collider, Panel, Transform},
+            rendering::texture::Texture,
             resources::physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
-            texture::Texture,
         };
         use nalgebra::vector;
         use rapier3d::prelude::ColliderBuilder;

@@ -1,4 +1,4 @@
-use crate::{image::Image, resources::VulkanContext};
+use crate::{rendering::image::Image, resources::VulkanContext};
 use anyhow::{anyhow, Result};
 use ash::vk;
 use gltf::image::Format;

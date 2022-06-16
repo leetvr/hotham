@@ -3,15 +3,15 @@ use egui::Pos2;
 use itertools::izip;
 use nalgebra::{vector, Vector2, Vector4};
 
-use crate::buffer::Buffer;
 use crate::components::mesh::MeshUBO;
 use crate::components::{Material, Mesh, Primitive};
 use crate::hotham_error::HothamError;
+use crate::rendering::buffer::Buffer;
 use crate::{
+    rendering::texture::Texture,
     resources::{RenderContext, VulkanContext},
-    texture::Texture,
 };
-use crate::{vertex::Vertex, COLOR_FORMAT};
+use crate::{rendering::vertex::Vertex, COLOR_FORMAT};
 
 pub struct Panel {
     /// The resolution of the Panel

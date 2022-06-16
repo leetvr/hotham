@@ -1,9 +1,9 @@
 use crate::{
-    buffer::Buffer,
     components::{
         animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
         Root, Skin, Transform, TransformMatrix, Visible,
     },
+    rendering::buffer::Buffer,
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
 use anyhow::Result;

@@ -3,7 +3,7 @@ use ash::vk;
 use gltf::{texture::Info, Material as MaterialData};
 use nalgebra::{vector, Vector4};
 
-use crate::{resources::VulkanContext, texture::Texture};
+use crate::{rendering::texture::Texture, resources::VulkanContext};
 
 /// A component that instructs the renderer how an entity should look when rendered
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
