@@ -21,3 +21,6 @@ pub mod texture;
 
 /// Vertex representation
 pub mod vertex;
+
+/// A wrapper for all Descriptor related functionality
+pub(crate) mod descriptors;
