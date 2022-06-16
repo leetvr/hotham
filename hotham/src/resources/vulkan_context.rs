@@ -15,7 +15,7 @@ use ash::{
     Device, Entry, Instance as AshInstance,
 };
 use openxr as xr;
-use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy};
+use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy, slice::from_ref as slice_from_ref};
 
 type XrVulkan = xr::Vulkan;
 
@@ -34,18 +34,6 @@ pub struct VulkanContext {
     pub descriptor_pool: vk::DescriptorPool,
     pub debug_utils: DebugUtils,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
-}
-
-// NOTE: OpenXR created the instance / device etc. and is therefore the owner. We'll let it do the cleanup.
-impl Drop for VulkanContext {
-    fn drop(&mut self) {
-        // TODO: Currently we have a bug where if VulkanContext is cloned, each clone will try and cleanup.
-        // Let's fix this.
-
-        // self.device
-        //     .destroy_descriptor_pool(self.descriptor_pool, None);
-        // self.device.destroy_command_pool(self.command_pool, None);
-    }
 }
 
 impl VulkanContext {
@@ -1033,6 +1021,8 @@ impl VulkanContext {
 #[allow(unused_variables)]
 #[allow(clippy::ptr_arg)] // https://github.com/rust-lang/rust-clippy/issues/8388
 fn add_device_extension_names(extension_names: &mut Vec<CString>) {
+    extension_names.push(vk::KhrShaderDrawParametersFn::name().to_owned());
+
     // Add Multiview extension
     #[cfg(target_os = "android")]
     extension_names.push(CString::new("VK_KHR_multiview").unwrap());
@@ -1220,7 +1210,6 @@ pub fn create_vulkan_device_legacy(
         .collect::<Vec<_>>();
 
     add_device_extension_names(&mut extension_names);
-
     create_vulkan_device(&extension_names, vulkan_instance, physical_device)
 }
 
@@ -1233,10 +1222,12 @@ fn create_vulkan_device(
         "[HOTHAM_VULKAN] Using device extensions: {:?}",
         extension_names
     );
+
     let extension_names = extension_names
         .iter()
         .map(|e| e.as_ptr())
         .collect::<Vec<_>>();
+
     let queue_priorities = [1.0];
     let graphics_family_index = unsafe {
         vulkan_instance
@@ -1253,27 +1244,38 @@ fn create_vulkan_device(
             .ok_or(HothamError::EmptyListError)?
     };
 
-    let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
+    let queue_create_info = vk::DeviceQueueCreateInfo::builder()
         .queue_priorities(&queue_priorities)
         .queue_family_index(graphics_family_index)
         .build();
 
-    let queue_create_infos = [graphics_queue_create_info];
+    // We use a *whole bunch* of different features, and somewhat annoyingly they're all enabled in different ways.
+    let enabled_features = vk::PhysicalDeviceFeatures::builder()
+        .multi_draw_indirect(true)
+        .sampler_anisotropy(true)
+        .build();
 
-    let physical_device_features = get_physical_device_features();
-    // TODO: Quest 2?
-    // physical_device_features.shader_storage_image_multisample(true);
+    let mut physical_device_features = vk::PhysicalDeviceVulkan11Features::builder()
+        .multiview(true)
+        .shader_draw_parameters(true);
 
-    let multiview = &mut vk::PhysicalDeviceVulkan11Features {
-        multiview: vk::TRUE,
-        ..Default::default()
-    };
+    let mut descriptor_indexing_features = vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
+        .shader_sampled_image_array_non_uniform_indexing(true)
+        .descriptor_binding_partially_bound(true)
+        .descriptor_binding_variable_descriptor_count(true)
+        .descriptor_binding_sampled_image_update_after_bind(true)
+        .runtime_descriptor_array(true);
+
+    let mut robust_features =
+        vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
 
     let device_create_info = vk::DeviceCreateInfo::builder()
-        .queue_create_infos(&queue_create_infos)
+        .queue_create_infos(slice_from_ref(&queue_create_info))
         .enabled_extension_names(&extension_names)
-        .enabled_features(&physical_device_features)
-        .push_next(multiview);
+        .enabled_features(&enabled_features)
+        .push_next(&mut physical_device_features)
+        .push_next(&mut descriptor_indexing_features)
+        .push_next(&mut robust_features);
 
     let device =
         unsafe { vulkan_instance.create_device(physical_device, &device_create_info, None) }?;
@@ -1283,12 +1285,6 @@ fn create_vulkan_device(
     println!("[HOTHAM_VULKAN] ..done");
 
     Ok((device, graphics_queue, graphics_family_index))
-}
-
-fn get_physical_device_features() -> vk::PhysicalDeviceFeatures {
-    vk::PhysicalDeviceFeatures::builder()
-        .sampler_anisotropy(true)
-        .build()
 }
 
 fn get_stage(
@@ -1349,3 +1345,13 @@ pub const EMPTY_KTX: [u8; 104] = [
     0x6F, 0x6E, 0x00, 0x53, 0x3D, 0x72, 0x2C, 0x54, 0x3D, 0x64, 0x2C, 0x52, 0x3D, 0x69, 0x00, 0x00,
     0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF,
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::vulkan_init_test;
+
+    #[test]
+    pub fn test_vulkan_init_smoke_test() {
+        vulkan_init_test().unwrap();
+    }
+}

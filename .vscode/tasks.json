@@ -61,11 +61,27 @@
 			"problemMatcher": [
 				"$rustc"
 			],
+			"label": "rust: cargo test"
+		},
+		{
+			"type": "cargo",
+			"command": "test",
+			"args": [
+				"-p",
+				"hotham",
+				"vulkan_init_test"
+			],
+			"env": {
+				"RUST_BACKTRACE": "1"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
 			"group": {
 				"kind": "test",
 				"isDefault": true
 			},
-			"label": "rust: cargo test"
+			"label": "rust: vulkan smoke test"
 		},
 		{
 			"type": "cargo",
