@@ -91,9 +91,13 @@ impl Timer {
 }
 
 #[allow(dead_code)]
-enum StressTest {
+/// Used to select which test to run
+pub enum StressTest {
+    /// Generate one cube per second
     ManyCubes,
+    /// Create a dynamic mesh and increase the number of vertices each second
     ManyVertices,
+    /// Load the New Sponza scene into the engine
     Sponza,
 }
 
