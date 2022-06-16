@@ -10,15 +10,20 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
+/// A texture that can be accessed in a fragment shader on the GPU
 pub struct Texture {
+    /// Handle to the underlying image
     pub image: Image,
+    /// Handle to the underlying sampler
     pub sampler: vk::Sampler,
+    /// Handle to the underlying descriptor
     pub descriptor: vk::DescriptorImageInfo,
 }
 
 const TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 
 impl Texture {
+    /// Creates a new texture
     pub fn new(
         name: &str,
         vulkan_context: &VulkanContext,
@@ -50,6 +55,7 @@ impl Texture {
         })
     }
 
+    /// Load a texture from a glTF document
     pub fn load(
         mesh_name: &str,
         texture: gltf::texture::Texture,
@@ -109,6 +115,7 @@ impl Texture {
         }
     }
 
+    /// Load an empty texture. Useful for materials that are missing some part of the PBR material.
     pub fn empty(vulkan_context: &VulkanContext) -> Result<Self> {
         Self::new(
             "Empty Texture",
@@ -120,6 +127,7 @@ impl Texture {
         )
     }
 
+    /// Load a texture from a KTX2 buffer
     pub fn from_ktx2(name: &str, buf: &[u8], vulkan_context: &VulkanContext) -> Result<Self> {
         let buf = Cursor::new(buf.to_vec());
         let buf = Box::new(buf);
@@ -171,6 +179,7 @@ fn parse_image(path: &str) -> Result<(Vec<u8>, u32, u32)> {
     return Ok((img.into_raw(), width, height));
 }
 
+/// Parse the contents of a KTX2 buffer
 pub fn parse_ktx(
     buf: Box<Cursor<Vec<u8>>>,
     vulkan_context: &VulkanContext,

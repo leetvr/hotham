@@ -1,18 +1,26 @@
 use ash::vk;
 use nalgebra::{Vector2, Vector3, Vector4};
 
+/// Representation of a single vertex, usually imported from a glTF file.
 #[repr(C)]
 #[derive(Clone, Debug, Copy, PartialEq, Default)]
 pub struct Vertex {
+    /// Position in model space
     pub position: Vector3<f32>,
+    /// Normal in model space
     pub normal: Vector3<f32>,
+    /// First set of texture coordinates
     pub texture_coords_0: Vector2<f32>,
+    /// Second set of texture coordinates
     pub texture_coords_1: Vector2<f32>,
+    /// Joint indices (for skinning)
     pub joint_indices: Vector4<f32>,
+    /// Joint weights (for skinning)
     pub joint_weights: Vector4<f32>,
 }
 
 impl Vertex {
+    /// Create a new vertex
     pub fn new(
         position: Vector3<f32>,
         normal: Vector3<f32>,
@@ -31,6 +39,7 @@ impl Vertex {
         }
     }
 
+    /// Create a new vertex from a zip - useful when importing from glTF
     // Clippy warning suppressed for adjudication separately
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
     pub fn from_zip(
@@ -48,6 +57,7 @@ impl Vertex {
 }
 
 impl Vertex {
+    /// Get the vertex attributes to be used in the Vertex Shader
     pub fn attribute_descriptions() -> Vec<vk::VertexInputAttributeDescription> {
         let position = vk::VertexInputAttributeDescription::builder()
             .binding(0)

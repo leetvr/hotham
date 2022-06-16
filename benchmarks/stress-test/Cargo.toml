@@ -8,7 +8,7 @@ version = "0.2.0"
 crate-type = ["lib", "cdylib"]
 
 [[bin]]
-name = "hotham_stress_test_windows"
+name = "hotham_stress_test_desktop"
 path = "src/main.rs"
 
 [dependencies]
