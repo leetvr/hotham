@@ -37,6 +37,7 @@ pub struct Resources {
 }
 
 impl Resources {
+    /// Create all the buffers required and update the relevant descriptor sets.
     pub(crate) unsafe fn new(vulkan_context: &VulkanContext, descriptors: &Descriptors) -> Self {
         let vertex_buffer = Buffer::new(
             vulkan_context,
@@ -70,6 +71,47 @@ impl Resources {
             MATERIAL_BUFFER_SIZE,
         );
         draw_indirect_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 2);
+
+        Self {
+            vertex_buffer,
+            index_buffer,
+            draw_data_buffer,
+            materials_buffer,
+            draw_indirect_buffer,
+        }
+    }
+
+    /// Same as the standard `new` function, except without the convenience of descriptors already being updated
+    pub(crate) unsafe fn new_without_descriptors(vulkan_context: &VulkanContext) -> Self {
+        let vertex_buffer = Buffer::new(
+            vulkan_context,
+            vk::BufferUsageFlags::VERTEX_BUFFER,
+            VERTEX_BUFFER_SIZE,
+        );
+
+        let index_buffer = Buffer::new(
+            vulkan_context,
+            vk::BufferUsageFlags::INDEX_BUFFER,
+            VERTEX_BUFFER_SIZE,
+        );
+
+        let draw_data_buffer = Buffer::new(
+            vulkan_context,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            DRAW_DATA_BUFFER_SIZE,
+        );
+
+        let materials_buffer = Buffer::new(
+            vulkan_context,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            MATERIAL_BUFFER_SIZE,
+        );
+
+        let draw_indirect_buffer = Buffer::new(
+            vulkan_context,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            MATERIAL_BUFFER_SIZE,
+        );
 
         Self {
             vertex_buffer,

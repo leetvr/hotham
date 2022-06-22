@@ -356,7 +356,7 @@ mod tests {
         let mut models = asset_importer::load_models_from_glb(
             &gltf_data,
             &vulkan_context,
-            &render_context.descriptor_set_layouts,
+            &render_context.resources,
         )
         .unwrap();
         let (_, mut world) = models.drain().next().unwrap();

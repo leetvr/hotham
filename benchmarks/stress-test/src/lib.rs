@@ -109,7 +109,7 @@ fn init(
             let models = asset_importer::load_models_from_glb(
                 &glb_buffers,
                 vulkan_context,
-                &render_context.descriptor_set_layouts,
+                &render_context.resources,
             )?;
 
             add_cube(&models, &mut world, vulkan_context, render_context);
@@ -125,7 +125,7 @@ fn init(
             let models = asset_importer::load_models_from_glb(
                 &glb_buffers,
                 vulkan_context,
-                &render_context.descriptor_set_layouts,
+                &render_context.resources,
             )?;
             for name in models.keys() {
                 add_model_to_world(
@@ -134,7 +134,7 @@ fn init(
                     &mut world,
                     None,
                     vulkan_context,
-                    &render_context.descriptor_set_layouts,
+                    &render_context.resources,
                 );
             }
             models
@@ -156,7 +156,7 @@ fn add_cube(
         world,
         None,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     )
     .expect("Could not find cube?");
     world.insert_one(cube, Cube {}).unwrap();

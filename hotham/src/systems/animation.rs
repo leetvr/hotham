@@ -33,6 +33,7 @@ pub fn animation_system(
 mod tests {
     use crate::{
         asset_importer::{add_model_to_world, load_models_from_glb},
+        rendering::resources::Resources,
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
     };
 
@@ -40,10 +41,10 @@ mod tests {
     #[test]
     pub fn animation_test() {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
+        let resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
-        let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &resources).unwrap();
         let mut query = PreparedQuery::<(&mut AnimationTarget, &mut Transform)>::default();
         let mut world = World::new();
 
@@ -54,7 +55,7 @@ mod tests {
             &mut world,
             None,
             &vulkan_context,
-            &set_layouts,
+            &resources,
         )
         .unwrap();
         {

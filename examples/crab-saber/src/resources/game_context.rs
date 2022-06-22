@@ -63,7 +63,7 @@ impl GameContext {
         let models = asset_importer::load_models_from_glb(
             &glb_buffers,
             vulkan_context,
-            &render_context.descriptor_set_layouts,
+            &render_context.resources,
         )
         .expect("Unable to load models!");
 
@@ -182,7 +182,7 @@ fn add_pointer(
         world,
         None,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     )
     .unwrap();
 
@@ -211,7 +211,7 @@ fn add_environment(
         world,
         None,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     );
 
     add_model_to_world(
@@ -220,7 +220,7 @@ fn add_environment(
         world,
         None,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     );
 }
 
@@ -298,7 +298,7 @@ pub fn pre_spawn_cube(
         world,
         None,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     )
     .unwrap();
 

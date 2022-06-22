@@ -87,7 +87,7 @@ pub fn add_hand(
         world,
         None,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     )
     .unwrap();
     {

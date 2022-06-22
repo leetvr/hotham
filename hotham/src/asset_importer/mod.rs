@@ -3,11 +3,11 @@ use crate::{
         animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
         Root, Skin, Transform, TransformMatrix, Visible,
     },
-    rendering::buffer::Buffer,
+    rendering::resources::Resources,
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
 use anyhow::Result;
-use ash::vk;
+
 use gltf::animation::util::ReadOutputs;
 use hecs::{Entity, World};
 use itertools::{izip, Itertools};
@@ -21,7 +21,7 @@ pub type Models = HashMap<String, World>;
 pub fn load_models_from_glb(
     glb_buffers: &[&[u8]],
     vulkan_context: &VulkanContext,
-    descriptor_set_layouts: &DescriptorSetLayouts,
+    resources: &Resources,
 ) -> Result<Models> {
     let mut models = HashMap::new();
 
@@ -32,7 +32,7 @@ pub fn load_models_from_glb(
             &buffers[0],
             &images,
             vulkan_context,
-            descriptor_set_layouts,
+            resources,
             &mut models,
         )
         .unwrap();
@@ -47,7 +47,7 @@ pub fn load_models_from_gltf_data(
     buffer: &[u8],
     images: &[gltf::image::Data],
     vulkan_context: &VulkanContext,
-    descriptor_set_layouts: &DescriptorSetLayouts,
+    resources: &Resources,
     models: &mut Models,
 ) -> Result<()> {
     let root_scene = document.scenes().next().unwrap(); // safe as there is always one scene
@@ -56,16 +56,16 @@ pub fn load_models_from_gltf_data(
 
     for node_data in root_scene.nodes() {
         let mut world = World::default();
-        load_node(
-            &node_data,
-            buffer,
-            vulkan_context,
-            descriptor_set_layouts,
-            &mut world,
-            &mut node_entity_map,
-            true,
-            images,
-        )?;
+        // load_node(
+        //     &node_data,
+        //     buffer,
+        //     vulkan_context,
+        //     resources,
+        //     &mut world,
+        //     &mut node_entity_map,
+        //     true,
+        //     images,
+        // )?;
         add_parents(&node_data, &mut world, &mut node_entity_map);
         add_skins_and_joints(
             &node_data,
@@ -305,7 +305,7 @@ pub fn add_model_to_world(
     destination_world: &mut World,
     parent: Option<Entity>,
     vulkan_context: &VulkanContext,
-    descriptor_set_layouts: &DescriptorSetLayouts,
+    resources: &Resources,
 ) -> Option<Entity> {
     let source_world = models.get(name)?;
     let source_entities = source_world.iter();
@@ -338,34 +338,34 @@ pub fn add_model_to_world(
         if let Ok(mesh) = source_world.get_mut::<Mesh>(*source_entity) {
             let info = source_world.get_mut::<Info>(*source_entity).unwrap();
 
-            // Create new description sets
-            let descriptor_sets = vulkan_context
-                .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
-                .unwrap();
+            // // Create new description sets
+            // let descriptor_sets = vulkan_context
+            //     .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
+            //     .unwrap();
 
-            // Create a new buffer
-            let ubo_buffer = Buffer::new(
-                vulkan_context,
-                &[mesh.ubo_data],
-                vk::BufferUsageFlags::UNIFORM_BUFFER,
-            )
-            .unwrap();
-            vulkan_context.update_buffer_descriptor_set(
-                &ubo_buffer,
-                mesh.descriptor_sets[0],
-                0,
-                vk::DescriptorType::UNIFORM_BUFFER,
-            );
+            // // Create a new buffer
+            // let ubo_buffer = Buffer::new(
+            //     vulkan_context,
+            //     &[mesh.ubo_data],
+            //     vk::BufferUsageFlags::UNIFORM_BUFFER,
+            // )
+            // .unwrap();
+            // vulkan_context.update_buffer_descriptor_set(
+            //     &ubo_buffer,
+            //     mesh.descriptor_sets[0],
+            //     0,
+            //     vk::DescriptorType::UNIFORM_BUFFER,
+            // );
 
-            let new_mesh = Mesh {
-                descriptor_sets: [descriptor_sets[0]],
-                ubo_buffer,
-                ubo_data: mesh.ubo_data,
-                primitives: mesh.primitives.clone(),
-            };
-            destination_world
-                .insert_one(*destination_entity, new_mesh)
-                .unwrap();
+            // let new_mesh = Mesh {
+            //     descriptor_sets: [descriptor_sets[0]],
+            //     ubo_buffer,
+            //     ubo_data: mesh.ubo_data,
+            //     primitives: mesh.primitives.clone(),
+            // };
+            // destination_world
+            //     .insert_one(*destination_entity, new_mesh)
+            //     .unwrap();
         }
 
         if let Ok(skin) = source_world.get_mut::<Skin>(*source_entity) {
@@ -442,26 +442,26 @@ pub fn add_model_to_world(
 
     // We'll also need to fix up any meshes
     for (_, (info, mesh)) in destination_world.query_mut::<(&Info, &mut Mesh)>() {
-        // Create new description sets
-        let new_descriptor_sets = vulkan_context
-            .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
-            .unwrap();
-        mesh.descriptor_sets = [new_descriptor_sets[0]];
+        // // Create new description sets
+        // let new_descriptor_sets = vulkan_context
+        //     .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
+        //     .unwrap();
+        // mesh.descriptor_sets = [new_descriptor_sets[0]];
 
-        // Create a new buffer
-        let new_ubo_buffer = Buffer::new(
-            vulkan_context,
-            &[mesh.ubo_data],
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-        )
-        .unwrap();
-        vulkan_context.update_buffer_descriptor_set(
-            &new_ubo_buffer,
-            mesh.descriptor_sets[0],
-            0,
-            vk::DescriptorType::UNIFORM_BUFFER,
-        );
-        mesh.ubo_buffer = new_ubo_buffer;
+        // // Create a new buffer
+        // let new_ubo_buffer = Buffer::new(
+        //     vulkan_context,
+        //     &[mesh.ubo_data],
+        //     vk::BufferUsageFlags::UNIFORM_BUFFER,
+        // )
+        // .unwrap();
+        // vulkan_context.update_buffer_descriptor_set(
+        //     &new_ubo_buffer,
+        //     mesh.descriptor_sets[0],
+        //     0,
+        //     vk::DescriptorType::UNIFORM_BUFFER,
+        // );
+        // mesh.ubo_buffer = new_ubo_buffer;
     }
 
     Some(new_root_entity)
@@ -480,13 +480,13 @@ mod tests {
     #[test]
     pub fn test_load_models() {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
+        let resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
 
         let data: Vec<&[u8]> = vec![
             include_bytes!("../../../test_assets/damaged_helmet.glb"),
             include_bytes!("../../../test_assets/asteroid.glb"),
         ];
-        let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &resources).unwrap();
         let test_data = vec![
             (
                 "Asteroid",
@@ -524,7 +524,7 @@ mod tests {
                 &mut world,
                 None,
                 &vulkan_context,
-                &set_layouts,
+                &resources,
             );
             assert!(model.is_some(), "Model {} could not be added", name);
 
@@ -559,10 +559,10 @@ mod tests {
     #[test]
     pub fn test_hand() {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let set_layouts = create_descriptor_set_layouts(&vulkan_context).unwrap();
+        let resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
-        let models = load_models_from_glb(&data, &vulkan_context, &set_layouts).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &resources).unwrap();
 
         let mut world = World::default();
         let _hand = add_model_to_world(
@@ -571,7 +571,7 @@ mod tests {
             &mut world,
             None,
             &vulkan_context,
-            &set_layouts,
+            &resources,
         );
 
         // Make sure there is only one root

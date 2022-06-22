@@ -55,7 +55,7 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let models = asset_importer::load_models_from_glb(
         &glb_buffers,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     )?;
     add_helmet(
         &models,
@@ -97,7 +97,7 @@ fn add_helmet(
         world,
         None,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     )
     .expect("Could not find Damaged Helmet");
     let transform = world.get::<Transform>(helmet).unwrap();

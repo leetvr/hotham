@@ -84,7 +84,7 @@ pub fn add_saber(
         world,
         None,
         vulkan_context,
-        &render_context.descriptor_set_layouts,
+        &render_context.resources,
     )
     .unwrap();
     add_saber_physics(world, physics_context, saber);
