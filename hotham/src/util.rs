@@ -36,8 +36,8 @@ use crate::resources::VulkanContext;
 #[cfg(test)]
 pub fn get_world_with_hands() -> World {
     use crate::{
+        asset_importer::{add_model_to_world, load_models_from_glb},
         components::Transform,
-        gltf_loader::{add_model_to_world, load_models_from_glb},
         resources::render_context::create_descriptor_set_layouts,
     };
 

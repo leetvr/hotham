@@ -4,8 +4,8 @@ use std::{
 };
 
 use hotham::{
+    asset_importer::{self, add_model_to_world},
     components::{mesh::MeshUBO, Material, Mesh, Primitive, Transform, TransformMatrix, Visible},
-    gltf_loader::{self, add_model_to_world},
     hecs::{With, World},
     nalgebra::Vector3,
     rendering::{buffer::Buffer, texture::Texture, vertex::Vertex},
@@ -106,7 +106,7 @@ fn init(
     let models = match test {
         StressTest::ManyCubes => {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/cube.glb")];
-            let models = gltf_loader::load_models_from_glb(
+            let models = asset_importer::load_models_from_glb(
                 &glb_buffers,
                 vulkan_context,
                 &render_context.descriptor_set_layouts,
@@ -122,7 +122,7 @@ fn init(
         StressTest::Sponza => {
             let file = std::fs::read("test_assets/sponza.glb").unwrap();
             let glb_buffers: Vec<&[u8]> = vec![&file];
-            let models = gltf_loader::load_models_from_glb(
+            let models = asset_importer::load_models_from_glb(
                 &glb_buffers,
                 vulkan_context,
                 &render_context.descriptor_set_layouts,

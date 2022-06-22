@@ -65,12 +65,12 @@ mod tests {
     use std::process::Command;
 
     use crate::{
+        asset_importer,
         components::{
             panel::PanelInput,
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
-        gltf_loader,
         rendering::{buffer::Buffer, image::Image, scene_data::SceneParams, swapchain::Swapchain},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
@@ -353,7 +353,7 @@ mod tests {
         let gltf_data: Vec<&[u8]> = vec![include_bytes!(
             "../../../test_assets/ferris-the-crab/source/ferris.glb"
         )];
-        let mut models = gltf_loader::load_models_from_glb(
+        let mut models = asset_importer::load_models_from_glb(
             &gltf_data,
             &vulkan_context,
             &render_context.descriptor_set_layouts,

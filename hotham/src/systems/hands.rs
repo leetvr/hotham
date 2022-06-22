@@ -1,6 +1,6 @@
 use crate::{
+    asset_importer::add_model_to_world,
     components::{hand::Handedness, AnimationController, Hand, RigidBody},
-    gltf_loader::add_model_to_world,
     resources::{PhysicsContext, RenderContext, VulkanContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };

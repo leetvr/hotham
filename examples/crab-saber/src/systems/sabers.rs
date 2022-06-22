@@ -1,7 +1,7 @@
 use hotham::nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
 use hotham::{
+    asset_importer::{add_model_to_world, Models},
     components::RigidBody,
-    gltf_loader::{add_model_to_world, Models},
     hecs::{Entity, PreparedQuery, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext, XrContext},

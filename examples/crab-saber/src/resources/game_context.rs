@@ -5,11 +5,11 @@ use std::{
 };
 
 use hotham::{
+    asset_importer::{self, add_model_to_world},
     components::{
         hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, Pointer, RigidBody,
         SoundEmitter, Visible,
     },
-    gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
@@ -60,7 +60,7 @@ impl GameContext {
         let gui_context = &engine.gui_context;
 
         let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
-        let models = gltf_loader::load_models_from_glb(
+        let models = asset_importer::load_models_from_glb(
             &glb_buffers,
             vulkan_context,
             &render_context.descriptor_set_layouts,

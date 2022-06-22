@@ -26,7 +26,7 @@ pub mod components;
 mod engine;
 
 /// A tool to import models from glTF files into Hotham
-pub mod gltf_loader;
+pub mod asset_importer;
 mod hotham_error;
 /// Resources are wrappers around some external state that the engine will interact with
 pub mod resources;

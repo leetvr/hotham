@@ -1,6 +1,6 @@
 use hotham::{
+    asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, Transform},
-    gltf_loader::{self, add_model_to_world},
     hecs::World,
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext},
@@ -52,7 +52,7 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
         include_bytes!("../../../test_assets/right_hand.glb"),
         include_bytes!("../../../test_assets/damaged_helmet.glb"),
     ];
-    let models = gltf_loader::load_models_from_glb(
+    let models = asset_importer::load_models_from_glb(
         &glb_buffers,
         vulkan_context,
         &render_context.descriptor_set_layouts,

@@ -45,12 +45,8 @@ impl<T: Sized> GambierBuffer<T> {
         let flags = vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
         let device_memory = allocate_memory(vulkan_context, memory_requirements, flags);
 
-        println!("..done! Binding..");
-
         // Bind memory
         device.bind_buffer_memory(buffer, device_memory, 0).unwrap();
-
-        println!("..done!");
 
         // Map memory
         let memory_address = device
@@ -102,11 +98,6 @@ impl<T: Sized> GambierBuffer<T> {
     /// Get the buffer's underlying data as a slice
     pub unsafe fn as_slice(&self) -> &[T] {
         std::slice::from_raw_parts(self.memory_address.as_ptr(), self.len)
-    }
-
-    /// Get the buffer's underlying data as a slice
-    pub unsafe fn as_mut_slice(&self) -> &mut [T] {
-        std::slice::from_raw_parts_mut(self.memory_address.as_ptr(), self.len)
     }
 
     /// safety: After calling this function the buffer will be in an UNUSABLE state

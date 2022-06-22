@@ -87,7 +87,7 @@ mod tests {
     use openxr::{Fovf, Quaternionf, Vector3f};
 
     use crate::{
-        gltf_loader,
+        asset_importer,
         rendering::{buffer::Buffer, image::Image, scene_data::SceneParams, swapchain::Swapchain},
         resources::RenderContext,
         systems::{update_parent_transform_matrix_system, update_transform_matrix_system},
@@ -130,7 +130,7 @@ mod tests {
         //     include_bytes!("../../../test_assets/Sponza.bin"),
         // )];
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-        let mut models = gltf_loader::load_models_from_glb(
+        let mut models = asset_importer::load_models_from_glb(
             &gltf_data,
             &vulkan_context,
             &render_context.descriptor_set_layouts,

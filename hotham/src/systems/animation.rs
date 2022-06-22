@@ -32,7 +32,7 @@ pub fn animation_system(
 #[cfg(test)]
 mod tests {
     use crate::{
-        gltf_loader::{add_model_to_world, load_models_from_glb},
+        asset_importer::{add_model_to_world, load_models_from_glb},
         resources::{render_context::create_descriptor_set_layouts, VulkanContext},
     };
 
