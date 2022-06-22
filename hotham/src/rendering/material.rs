@@ -7,6 +7,13 @@ use crate::{
     rendering::texture::{Texture, NO_TEXTURE},
 };
 
+/// Tells the fragment shader to use the PBR Metalic Roughness workflow
+pub static METALIC_ROUGHNESS_WORKFLOW: u32 = 0;
+/// Tells the fragment shader to use the PBR Specular Glossy workflow
+pub static SPECULAR_GLOSSINESS_WORKFLOW: u32 = 1;
+/// Tells the fragment shader to use the unlit workflow
+pub static UNLIT_WORKFLOW: u32 = 2;
+
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
 #[repr(C)]
@@ -21,17 +28,17 @@ pub struct Material {
     /// How specular is this material?
     pub specular_factor: Vector4<f32>,
     /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
-    pub workflow: f32,
+    pub workflow: u32,
     /// The base color texture.
-    pub base_color_texture_set: usize,
+    pub base_color_texture_set: u32,
     /// The metallic-roughness texture.
-    pub metallic_roughness_texture_set: usize,
+    pub metallic_roughness_texture_set: u32,
     /// Normal texture
-    pub normal_texture_set: usize,
+    pub normal_texture_set: u32,
     /// Occlusion texture set
-    pub occlusion_texture_set: usize,
+    pub occlusion_texture_set: u32,
     /// Emissive texture set
-    pub emissive_texture_set: usize,
+    pub emissive_texture_set: u32,
     /// The factor for the metalness of the material.
     pub metallic_factor: f32,
     /// The factor for the roughness of the material.
@@ -104,11 +111,12 @@ impl Material {
 
         // Workflow
         let workflow = if pbr_specular_glossiness.is_some() {
-            1.
+            SPECULAR_GLOSSINESS_WORKFLOW
         } else {
-            0.
+            METALIC_ROUGHNESS_WORKFLOW
         };
 
+        // Collect the material properties.
         let material = Material {
             base_color_factor,
             emissive_factor,
@@ -126,6 +134,14 @@ impl Material {
             alpha_mask_cutoff,
         };
 
+        unsafe {
+            import_context
+                .render_context
+                .resources
+                .materials_buffer
+                .push(&material)
+        }
+
         Ok(())
     }
 
@@ -133,7 +149,7 @@ impl Material {
     pub fn unlit_white() -> Material {
         Material {
             base_color_factor: vector![1., 1., 1., 1.],
-            workflow: 2.,
+            workflow: UNLIT_WORKFLOW,
             ..Default::default()
         }
     }

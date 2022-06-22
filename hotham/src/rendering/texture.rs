@@ -23,7 +23,7 @@ pub struct Texture {
 const TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 
 /// Texture index to indicate to the shader that this material does not have a texture of the given type
-pub static NO_TEXTURE: usize = std::usize::MAX;
+pub static NO_TEXTURE: u32 = std::u32::MAX;
 
 impl Texture {
     /// Creates a new texture
@@ -59,10 +59,7 @@ impl Texture {
     }
 
     /// Load a texture from a glTF document. Returns the texture ID
-    pub(crate) fn load(
-        texture: gltf::texture::Texture,
-        import_context: &mut ImportContext,
-    ) -> usize {
+    pub(crate) fn load(texture: gltf::texture::Texture, import_context: &mut ImportContext) -> u32 {
         let texture_name = &format!("Texture {}", texture.name().unwrap_or(""));
         match texture.source().source() {
             gltf::image::Source::Uri { uri, .. } => {

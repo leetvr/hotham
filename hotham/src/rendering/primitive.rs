@@ -1,7 +1,4 @@
-use crate::{
-    asset_importer::ImportContext,
-    rendering::vertex::{self, Vertex},
-};
+use crate::{asset_importer::ImportContext, rendering::vertex::Vertex};
 use itertools::izip;
 use nalgebra::vector;
 
@@ -10,9 +7,9 @@ use nalgebra::vector;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Primitive {
     /// Offset into the index buffer
-    pub index_buffer_offset: usize,
+    pub index_buffer_offset: u32,
     /// Offset into vertex buffer
-    pub vertex_buffer_offset: usize,
+    pub vertex_buffer_offset: u32,
     /// Number of vertices
     pub indices_count: u32,
     /// Material used
@@ -113,11 +110,11 @@ impl Primitive {
         .map(Vertex::from_zip)
         .collect();
 
-        // Grab the offsets
+        // Grab the offsets - note that we want to do this BEFORE we add these vertices to the buffer.
         let vertex_buffer = &mut import_context.render_context.resources.vertex_buffer;
         let index_buffer = &mut import_context.render_context.resources.index_buffer;
-        let vertex_buffer_offset = vertex_buffer.len;
-        let index_buffer_offset = index_buffer.len;
+        let vertex_buffer_offset = vertex_buffer.len as _;
+        let index_buffer_offset = index_buffer.len as _;
 
         // Update the buffers
         unsafe {
@@ -125,6 +122,9 @@ impl Primitive {
             index_buffer.append(&indices);
         }
 
+        // All the materials in this glTF file will be imported into the material buffer, so all we need
+        // to do is grab the index of this material and add it to the running offset. If we don't do this,
+        // importing multiple glTF files will result in sadness, misery, and really ugly looking scenes.
         let material_id = primitive_data
             .material()
             .index()

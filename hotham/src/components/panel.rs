@@ -103,8 +103,8 @@ fn create_mesh(
     let primitive = Primitive {
         indices_count: 6,
         material_id,
-        index_buffer_offset: render_context.resources.index_buffer.len,
-        vertex_buffer_offset: render_context.resources.vertex_buffer.len,
+        index_buffer_offset: render_context.resources.index_buffer.len as _,
+        vertex_buffer_offset: render_context.resources.vertex_buffer.len as _,
     };
 
     unsafe {
