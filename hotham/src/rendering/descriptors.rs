@@ -54,25 +54,17 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
             descriptor_count: 1,
             ..Default::default()
         },
-        // Models
-        vk::DescriptorSetLayoutBinding {
-            binding: 1,
-            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::COMPUTE,
-            descriptor_count: 1,
-            ..Default::default()
-        },
         // Materials
         vk::DescriptorSetLayoutBinding {
-            binding: 2,
+            binding: 1,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1,
             ..Default::default()
         },
-        // Draw Calls
+        // Draw Indirect Buffer
         vk::DescriptorSetLayoutBinding {
-            binding: 3,
+            binding: 2,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
             stage_flags: vk::ShaderStageFlags::COMPUTE,
             descriptor_count: 1,
@@ -80,7 +72,7 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         },
         // Textures
         vk::DescriptorSetLayoutBinding {
-            binding: 4,
+            binding: 3,
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1000,
@@ -91,6 +83,7 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
     let flags = vk::DescriptorBindingFlags::PARTIALLY_BOUND
         | vk::DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT
         | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
+
     let descriptor_flags = [
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),

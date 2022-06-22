@@ -22,6 +22,7 @@ use crate::{
         descriptors::Descriptors,
         frame::Frame,
         image::Image,
+        resources::Resources,
         scene_data::{SceneData, SceneParams},
         swapchain::Swapchain,
         texture::Texture,
@@ -45,7 +46,6 @@ pub struct DescriptorSetLayouts {
     pub mesh_layout: vk::DescriptorSetLayout,
 }
 
-#[derive(Clone)]
 pub struct RenderContext {
     pub frames: Vec<Frame>,
     pub descriptor_set_layouts: DescriptorSetLayouts,
@@ -64,6 +64,7 @@ pub struct RenderContext {
     pub views: Vec<xr::View>,
     pub last_frame_time: Instant,
     pub frame_index: usize,
+    pub resources: Resources,
     pub(crate) descriptors: Descriptors,
 }
 
@@ -88,6 +89,7 @@ impl RenderContext {
         };
 
         let descriptors = unsafe { Descriptors::new(vulkan_context) };
+        let resources = unsafe { Resources::new(vulkan_context, &descriptors) };
         let descriptor_set_layouts = create_descriptor_set_layouts(vulkan_context)?;
 
         // Pipeline, render pass
@@ -192,6 +194,7 @@ impl RenderContext {
             views: Vec::new(),
             last_frame_time: Instant::now(),
             descriptors,
+            resources,
         })
     }
 
