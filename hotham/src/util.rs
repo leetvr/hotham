@@ -42,13 +42,13 @@ pub fn get_world_with_hands() -> World {
     };
 
     let vulkan_context = VulkanContext::testing().unwrap();
-    let resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
+    let mut resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
 
     let data: Vec<&[u8]> = vec![
         include_bytes!("../../test_assets/left_hand.glb"),
         include_bytes!("../../test_assets/right_hand.glb"),
     ];
-    let models = load_models_from_glb(&data, &vulkan_context, &resources).unwrap();
+    let models = load_models_from_glb(&data, &vulkan_context, &mut resources).unwrap();
 
     let mut world = World::new();
 

@@ -27,7 +27,7 @@ pub struct Panel {
 impl Panel {
     pub fn create(
         vulkan_context: &VulkanContext,
-        render_context: &RenderContext,
+        render_context: &mut RenderContext,
         resolution: vk::Extent2D,
         world_size: Vector2<f32>,
     ) -> Result<(Panel, Mesh), HothamError> {
@@ -70,10 +70,10 @@ impl Panel {
 fn create_mesh(
     output_texture: &Texture,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     world_size: Vector2<f32>,
 ) -> Mesh {
-    let (material, descriptor_set) = get_material(output_texture, vulkan_context, render_context);
+    let material_id = add_material(output_texture, vulkan_context, render_context);
     let (half_width, half_height) = (world_size.x / 2., world_size.y / 2.);
 
     let positions = [
@@ -97,61 +97,30 @@ fn create_mesh(
         })
         .collect();
 
-    let vertex_buffer = Buffer::new(
-        vulkan_context,
-        &vertices,
-        vk::BufferUsageFlags::VERTEX_BUFFER,
-    )
-    .unwrap();
-
-    let index_buffer = Buffer::new(
-        vulkan_context,
-        &[0, 1, 2, 0, 3, 1],
-        vk::BufferUsageFlags::INDEX_BUFFER,
-    )
-    .unwrap();
+    let indices = [0, 1, 2, 0, 3, 1];
 
     let primitive = Primitive {
-        index_buffer,
-        vertex_buffer,
         indices_count: 6,
-        material,
-        texture_descriptor_set: descriptor_set,
+        material_id,
+        index_buffer_offset: render_context.resources.index_buffer.len,
+        vertex_buffer_offset: render_context.resources.vertex_buffer.len,
     };
 
-    // Create descriptor sets
-    let descriptor_sets = vulkan_context
-        .create_mesh_descriptor_sets(render_context.descriptor_set_layouts.mesh_layout, "GUI")
-        .unwrap();
-    let descriptor_sets = [descriptor_sets[0]];
-
-    let mesh_ubo = MeshUBO::default();
-    let ubo_buffer = Buffer::new(
-        vulkan_context,
-        &[mesh_ubo],
-        vk::BufferUsageFlags::UNIFORM_BUFFER,
-    )
-    .unwrap();
-    vulkan_context.update_buffer_descriptor_set(
-        &ubo_buffer,
-        descriptor_sets[0],
-        0,
-        vk::DescriptorType::UNIFORM_BUFFER,
-    );
+    unsafe {
+        render_context.resources.index_buffer.append(&indices);
+        render_context.resources.vertex_buffer.append(&vertices);
+    }
 
     Mesh {
-        descriptor_sets,
-        ubo_buffer,
-        ubo_data: mesh_ubo,
         primitives: vec![primitive],
     }
 }
 
-fn get_material(
+fn add_material(
     output_texture: &Texture,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
-) -> (Material, vk::DescriptorSet) {
+    render_context: &mut RenderContext,
+) -> u32 {
     let empty_texture = Texture::empty(vulkan_context).unwrap();
     // Descriptor set
     let descriptor_set = vulkan_context
@@ -185,7 +154,11 @@ fn get_material(
         alpha_mask_cutoff: 1.,
     };
 
-    (material, descriptor_set)
+    unsafe {
+        render_context.resources.materials_buffer.push(&material);
+    }
+
+    render_context.resources.materials_buffer.len as _
 }
 
 /// Input to a panel

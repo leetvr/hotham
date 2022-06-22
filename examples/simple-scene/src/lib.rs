@@ -55,7 +55,7 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let models = asset_importer::load_models_from_glb(
         &glb_buffers,
         vulkan_context,
-        &render_context.resources,
+        &mut render_context.resources,
     )?;
     add_helmet(
         &models,

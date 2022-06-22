@@ -23,6 +23,7 @@ generational-arena = "0.2.8"
 gltf = {version = "1.0", features = ["KHR_materials_pbrSpecularGlossiness"]}
 hecs = "0.7.5"
 hotham-debug-server = {path = "../hotham-debug-server", version = "0.2"}
+id-arena = "2.2.1"
 image = "0.23"
 itertools = "0.10.0"
 libktx-rs = "0.2.3"

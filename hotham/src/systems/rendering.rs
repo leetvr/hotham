@@ -20,57 +20,42 @@ pub fn rendering_system(
         let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
 
         unsafe {
-            mesh.ubo_data.transform = transform_matrix.0;
-            mesh.ubo_buffer
-                .update(vulkan_context, &[mesh.ubo_data])
-                .unwrap();
+            // for primitive in &mesh.primitives {
+            //     // Bind vertex and index buffers
+            //     device.cmd_bind_vertex_buffers(
+            //         command_buffer,
+            //         0,
+            //         &[primitive.vertex_buffer.handle],
+            //         &[0],
+            //     );
+            //     device.cmd_bind_index_buffer(
+            //         command_buffer,
+            //         primitive.index_buffer.handle,
+            //         0,
+            //         vk::IndexType::UINT32,
+            //     );
 
-            // Bind mesh descriptor sets
-            device.cmd_bind_descriptor_sets(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                render_context.pipeline_layout,
-                2,
-                &mesh.descriptor_sets,
-                &[],
-            );
+            //     // Bind texture descriptor sets
+            //     device.cmd_bind_descriptor_sets(
+            //         command_buffer,
+            //         vk::PipelineBindPoint::GRAPHICS,
+            //         render_context.pipeline_layout,
+            //         1,
+            //         &[primitive.texture_descriptor_set],
+            //         &[],
+            //     );
 
-            for primitive in &mesh.primitives {
-                // Bind vertex and index buffers
-                device.cmd_bind_vertex_buffers(
-                    command_buffer,
-                    0,
-                    &[primitive.vertex_buffer.handle],
-                    &[0],
-                );
-                device.cmd_bind_index_buffer(
-                    command_buffer,
-                    primitive.index_buffer.handle,
-                    0,
-                    vk::IndexType::UINT32,
-                );
-
-                // Bind texture descriptor sets
-                device.cmd_bind_descriptor_sets(
-                    command_buffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    render_context.pipeline_layout,
-                    1,
-                    &[primitive.texture_descriptor_set],
-                    &[],
-                );
-
-                // Push constants
-                let material_push_constant = create_push_constant(&primitive.material);
-                device.cmd_push_constants(
-                    command_buffer,
-                    render_context.pipeline_layout,
-                    vk::ShaderStageFlags::FRAGMENT,
-                    0,
-                    material_push_constant,
-                );
-                device.cmd_draw_indexed(command_buffer, primitive.indices_count, 1, 0, 0, 1);
-            }
+            //     // Push constants
+            //     let material_push_constant = create_push_constant(&primitive.material);
+            //     device.cmd_push_constants(
+            //         command_buffer,
+            //         render_context.pipeline_layout,
+            //         vk::ShaderStageFlags::FRAGMENT,
+            //         0,
+            //         material_push_constant,
+            //     );
+            //     device.cmd_draw_indexed(command_buffer, primitive.indices_count, 1, 0, 0, 1);
+            // }
         }
     }
 }
@@ -133,7 +118,7 @@ mod tests {
         let mut models = asset_importer::load_models_from_glb(
             &gltf_data,
             &vulkan_context,
-            &render_context.resources,
+            &mut render_context.resources,
         )
         .unwrap();
         let (_, mut world) = models.drain().next().unwrap();

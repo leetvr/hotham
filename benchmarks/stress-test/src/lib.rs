@@ -99,7 +99,7 @@ fn init(
     engine: &mut Engine,
     test: &StressTest,
 ) -> Result<(World, HashMap<String, World>), hotham::HothamError> {
-    let render_context = &mut engine.render_context;
+    let mut render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let mut world = World::default();
 
@@ -109,7 +109,7 @@ fn init(
             let models = asset_importer::load_models_from_glb(
                 &glb_buffers,
                 vulkan_context,
-                &render_context.resources,
+                &mut render_context.resources,
             )?;
 
             add_cube(&models, &mut world, vulkan_context, render_context);
@@ -125,7 +125,7 @@ fn init(
             let models = asset_importer::load_models_from_glb(
                 &glb_buffers,
                 vulkan_context,
-                &render_context.resources,
+                &mut render_context.resources,
             )?;
             for name in models.keys() {
                 add_model_to_world(
@@ -134,7 +134,7 @@ fn init(
                     &mut world,
                     None,
                     vulkan_context,
-                    &render_context.resources,
+                    &mut render_context.resources,
                 );
             }
             models
@@ -240,29 +240,30 @@ fn tick(
 }
 
 fn subdivide_mesh_system(world: &mut World, vulkan_context: &VulkanContext, timer: &mut Timer) {
-    if !timer.tick() {
-        return;
-    }
+    todo!()
+    // if !timer.tick() {
+    //     return;
+    // }
 
-    let mesh = world.query_mut::<&mut Mesh>().into_iter().next().unwrap().1;
-    let step = timer.total_time().as_secs() * 10;
-    let (vertices, indices) = generate_vertices(step as _);
-    let primitive = &mut mesh.primitives[0];
-    primitive.indices_count = indices.len() as _;
-    primitive
-        .index_buffer
-        .update(vulkan_context, &indices)
-        .unwrap();
-    primitive
-        .vertex_buffer
-        .update(vulkan_context, &vertices)
-        .unwrap();
+    // let mesh = world.query_mut::<&mut Mesh>().into_iter().next().unwrap().1;
+    // let step = timer.total_time().as_secs() * 10;
+    // let (vertices, indices) = generate_vertices(step as _);
+    // let primitive = &mut mesh.primitives[0];
+    // primitive.indices_count = indices.len() as _;
+    // primitive
+    //     .index_buffer
+    //     .update(vulkan_context, &indices)
+    //     .unwrap();
+    // primitive
+    //     .vertex_buffer
+    //     .update(vulkan_context, &vertices)
+    //     .unwrap();
 
-    println!(
-        "There are now {} vertices and {} indices",
-        vertices.len(),
-        indices.len()
-    );
+    // println!(
+    //     "There are now {} vertices and {} indices",
+    //     vertices.len(),
+    //     indices.len()
+    // );
 }
 
 struct Cube;
@@ -349,45 +350,14 @@ fn create_mesh(
     )?[0];
     let material = Material::default();
 
-    let primitives = vec![Primitive {
-        index_buffer,
-        vertex_buffer,
-        indices_count: 0,
-        material,
-        texture_descriptor_set,
-    }];
-
-    // Vomit
-    let descriptor_sets = [vulkan_context
-        .create_mesh_descriptor_sets(mesh_layout, "Dynamic Mesh")
-        .unwrap()[0]];
-
-    let ubo_buffer = Buffer::new(
-        vulkan_context,
-        &[mesh_ubo],
-        vk::BufferUsageFlags::UNIFORM_BUFFER,
-    )
-    .unwrap();
-
-    vulkan_context.update_buffer_descriptor_set(
-        &ubo_buffer,
-        descriptor_sets[0],
-        0,
-        vk::DescriptorType::UNIFORM_BUFFER,
-    );
-    let mesh = Mesh {
-        descriptor_sets,
-        ubo_data: mesh_ubo,
-        ubo_buffer,
-        primitives,
-    };
+    todo!();
 
     let transform = Transform {
         translation: [0., 1., -1.].into(),
         ..Default::default()
     };
 
-    world.spawn((Visible {}, mesh, transform, TransformMatrix::default()));
+    // world.spawn((Visible {}, mesh, transform, TransformMatrix::default()));
     Ok(())
 }
 

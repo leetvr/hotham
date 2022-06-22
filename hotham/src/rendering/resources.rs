@@ -1,9 +1,10 @@
 use ash::vk;
+use id_arena::Arena;
 use nalgebra::{Matrix4, Vector3, Vector4};
 use vulkan_context::VulkanContext;
 
 use crate::{
-    components::{Material, Primitive},
+    components::{Material, Mesh, Primitive},
     resources::vulkan_context,
 };
 
@@ -34,6 +35,9 @@ pub struct Resources {
 
     /// The actual draw calls for this frame.
     pub draw_indirect_buffer: Buffer<vk::DrawIndexedIndirectCommand>,
+
+    /// Mesh data used to generate DrawData
+    pub mesh_data: Arena<Mesh>,
 }
 
 impl Resources {
@@ -78,6 +82,7 @@ impl Resources {
             draw_data_buffer,
             materials_buffer,
             draw_indirect_buffer,
+            mesh_data: Default::default(),
         }
     }
 
@@ -119,6 +124,7 @@ impl Resources {
             draw_data_buffer,
             materials_buffer,
             draw_indirect_buffer,
+            mesh_data: Default::default(),
         }
     }
 }

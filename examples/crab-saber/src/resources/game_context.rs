@@ -54,7 +54,7 @@ impl Debug for GameContext {
 
 impl GameContext {
     pub fn new(engine: &mut Engine, world: &mut World) -> Self {
-        let render_context = &mut engine.render_context;
+        let mut render_context = &mut engine.render_context;
         let vulkan_context = &engine.vulkan_context;
         let physics_context = &mut engine.physics_context;
         let gui_context = &engine.gui_context;
@@ -63,7 +63,7 @@ impl GameContext {
         let models = asset_importer::load_models_from_glb(
             &glb_buffers,
             vulkan_context,
-            &render_context.resources,
+            &mut render_context.resources,
         )
         .expect("Unable to load models!");
 

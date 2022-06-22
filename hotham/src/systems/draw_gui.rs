@@ -346,7 +346,7 @@ mod tests {
             resolution,
         };
 
-        let render_context =
+        let mut render_context =
             RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap();
         let gui_context = GuiContext::new(&vulkan_context);
 
@@ -356,7 +356,7 @@ mod tests {
         let mut models = asset_importer::load_models_from_glb(
             &gltf_data,
             &vulkan_context,
-            &render_context.resources,
+            &mut render_context.resources,
         )
         .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
@@ -374,7 +374,7 @@ mod tests {
                 UIPanelButton::new("Don't click me!"),
             ],
             &vulkan_context,
-            &render_context,
+            &mut render_context,
             &gui_context,
             &mut physics_context,
             &mut world,

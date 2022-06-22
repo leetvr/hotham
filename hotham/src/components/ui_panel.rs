@@ -70,7 +70,7 @@ pub fn add_ui_panel_to_world(
     translation: Vector3<f32>,
     buttons: Vec<UIPanelButton>,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     gui_context: &GuiContext,
     physics_context: &mut PhysicsContext,
     world: &mut World,

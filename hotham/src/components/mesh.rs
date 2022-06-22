@@ -4,6 +4,7 @@ use nalgebra::Matrix4;
 
 use super::primitive::Primitive;
 use crate::{
+    asset_importer::ImportContext,
     rendering::buffer::Buffer,
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
@@ -46,68 +47,22 @@ impl Default for MeshUBO {
 /// Usually automatically added by `gltf_loader`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Mesh {
-    /// The descriptor sets for the UBO
-    pub descriptor_sets: [vk::DescriptorSet; 1],
-    /// UBO sent to the shader
-    pub ubo_buffer: Buffer<MeshUBO>,
-    /// The actual contents of the UBO
-    pub ubo_data: MeshUBO,
     /// The primitives in this mesh (eg. actual geometry)
     pub primitives: Vec<Primitive>,
 }
 
 impl Mesh {
-    pub(crate) fn load(
-        mesh_data: &gltf::Mesh,
-        buffer: &[u8],
-        vulkan_context: &VulkanContext,
-        descriptor_set_layouts: &DescriptorSetLayouts,
-        images: &[gltf::image::Data],
-    ) -> Result<Mesh> {
-        let name = mesh_data.name().unwrap_or("");
+    pub(crate) fn load(mesh_data: gltf::Mesh, import_context: &mut ImportContext) {
+        let mesh_name = mesh_data
+            .name()
+            .map(|s| s.to_string())
+            .unwrap_or(format!("Mesh {}", mesh_data.index()));
+
         let primitives = mesh_data
             .primitives()
-            .map(|p| {
-                Primitive::load(
-                    descriptor_set_layouts.textures_layout,
-                    name,
-                    p,
-                    buffer,
-                    vulkan_context,
-                    images,
-                )
-            })
-            .collect::<Result<Vec<_>>>()?;
+            .map(|p| Primitive::load(p, import_context, &mesh_name))
+            .collect::<Vec<_>>();
 
-        // Create descriptor sets
-        println!("[HOTHAM_MODEL] Creating descriptor sets for {}", name);
-        let descriptor_sets = vulkan_context.create_mesh_descriptor_sets(
-            descriptor_set_layouts.mesh_layout,
-            mesh_data
-                .name()
-                .unwrap_or(&format!("Mesh {}", mesh_data.index())),
-        )?;
-        let descriptor_sets = [descriptor_sets[0]];
-        println!("[HOTHAM_MODEL] ..done!");
-
-        let mesh_ubo = MeshUBO::default();
-        let ubo_buffer = Buffer::new(
-            vulkan_context,
-            &[mesh_ubo],
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-        )?;
-        vulkan_context.update_buffer_descriptor_set(
-            &ubo_buffer,
-            descriptor_sets[0],
-            0,
-            vk::DescriptorType::UNIFORM_BUFFER,
-        );
-
-        Ok(Mesh {
-            ubo_buffer,
-            ubo_data: mesh_ubo,
-            descriptor_sets,
-            primitives,
-        })
+        let mesh = Mesh { primitives };
     }
 }

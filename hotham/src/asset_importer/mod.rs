@@ -8,8 +8,10 @@ use crate::{
 };
 use anyhow::Result;
 
-use gltf::animation::util::ReadOutputs;
+use generational_arena::Index;
+use gltf::{animation::util::ReadOutputs, Document};
 use hecs::{Entity, World};
+use id_arena::Id;
 use itertools::{izip, Itertools};
 use nalgebra::{vector, Matrix4, Quaternion, UnitQuaternion};
 use std::collections::HashMap;
@@ -17,69 +19,89 @@ use std::collections::HashMap;
 /// Convenience type for models
 pub type Models = HashMap<String, World>;
 
+/// Convenience struct to hold all the necessary bits and pieces during the import of a single glTF file
+pub(crate) struct ImportContext<'a> {
+    pub vulkan_context: &'a VulkanContext,
+    pub resources: &'a mut Resources,
+    pub models: &'a mut Models,
+    pub node_entity_map: HashMap<usize, Entity>,
+    pub mesh_map: HashMap<usize, Id<Mesh>>,
+    pub document: Document,
+    pub buffer: gltf::buffer::Data,
+    pub images: Vec<gltf::image::Data>,
+    pub material_buffer_offset: u32,
+}
+
+impl<'a> ImportContext<'a> {
+    fn new(
+        vulkan_context: &'a VulkanContext,
+        resources: &'a mut Resources,
+        glb_buffer: &'a [u8],
+        models: &'a mut Models,
+    ) -> Self {
+        let (document, mut buffers, images) = gltf::import_slice(glb_buffer).unwrap();
+
+        let material_buffer_offset = resources.materials_buffer.len as _;
+        Self {
+            vulkan_context,
+            resources,
+            models,
+            node_entity_map: Default::default(),
+            mesh_map: Default::default(),
+            document,
+            buffer: buffers.pop().unwrap(),
+            images,
+            material_buffer_offset,
+        }
+    }
+}
+
 /// Load glTF models from a GLB file
 pub fn load_models_from_glb(
     glb_buffers: &[&[u8]],
     vulkan_context: &VulkanContext,
-    resources: &Resources,
+    resources: &mut Resources,
 ) -> Result<Models> {
     let mut models = HashMap::new();
 
-    for glb_buf in glb_buffers {
-        let (document, buffers, images) = gltf::import_slice(glb_buf).unwrap();
-        load_models_from_gltf_data(
-            &document,
-            &buffers[0],
-            &images,
-            vulkan_context,
-            resources,
-            &mut models,
-        )
-        .unwrap();
+    for glb_buffer in glb_buffers {
+        let mut import_context =
+            ImportContext::new(vulkan_context, resources, glb_buffer, &mut models);
+        load_models_from_gltf_data(&mut import_context).unwrap();
     }
 
     Ok(models)
 }
 
 /// Load glTF models from a glTF document
-pub fn load_models_from_gltf_data(
-    document: &gltf::Document,
-    buffer: &[u8],
-    images: &[gltf::image::Data],
-    vulkan_context: &VulkanContext,
-    resources: &Resources,
-    models: &mut Models,
-) -> Result<()> {
-    let root_scene = document.scenes().next().unwrap(); // safe as there is always one scene
-    let mut node_entity_map = HashMap::new();
-    let animations = document.animations().collect_vec();
+fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> {
+    // A bit lazy, but whatever.
+    let document = import_context.document.clone();
 
-    for node_data in root_scene.nodes() {
+    // Previously, we assumed nodes were the centre of the universe. That is untrue.
+    // Instead, we'll import each resource type individually, updating references as we go.
+    for mesh in document.meshes() {
+        Mesh::load(mesh, import_context);
+    }
+
+    for node_data in document.scenes().next().unwrap().nodes() {
         let mut world = World::default();
-        // load_node(
+
+        // load_node(&mut import_context, &node_data, &mut world, true)?;
+        // add_parents(&node_data, &mut world, &mut node_entity_map);
+        // add_skins_and_joints(
         //     &node_data,
         //     buffer,
-        //     vulkan_context,
-        //     resources,
         //     &mut world,
+        //     vulkan_context,
         //     &mut node_entity_map,
-        //     true,
-        //     images,
-        // )?;
-        add_parents(&node_data, &mut world, &mut node_entity_map);
-        add_skins_and_joints(
-            &node_data,
-            buffer,
-            &mut world,
-            vulkan_context,
-            &mut node_entity_map,
-        );
-        add_animations(&animations, buffer, &mut world, &mut node_entity_map);
+        // );
+        // add_animations(&animations, buffer, &mut world, &mut node_entity_map);
 
-        models.insert(
-            node_data.name().expect("Node has no name!").to_string(),
-            world,
-        );
+        // models.insert(
+        //     node_data.name().expect("Node has no name!").to_string(),
+        //     world,
+        // );
     }
 
     Ok(())
@@ -107,18 +129,6 @@ fn load_node(
     };
     let this_entity = world.spawn((transform, transform_matrix, info));
     node_entity_map.insert(node_data.index(), this_entity);
-
-    if let Some(mesh) = node_data.mesh() {
-        let mesh = Mesh::load(
-            &mesh,
-            gltf_buffer,
-            vulkan_context,
-            descriptor_set_layouts,
-            images,
-        )?;
-
-        world.insert(this_entity, (mesh, Visible {})).unwrap();
-    }
 
     if is_root {
         world.insert_one(this_entity, Root {}).unwrap();
@@ -155,50 +165,50 @@ fn add_parents(
     }
 }
 
-fn add_skins_and_joints(
-    node_data: &gltf::Node,
-    buffer: &[u8],
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    node_entity_map: &mut HashMap<usize, Entity>,
-) {
-    // Do we need to add a Skin?
-    // TODO: Extract this to components::Skin
-    if let Some(node_skin_data) = node_data.skin() {
-        println!("[HOTHAM_GLTF] Adding a skin to {}", node_data.index());
-        let this_entity = *node_entity_map.get(&node_data.index()).unwrap();
-        let mut joint_matrices = Vec::new();
-        let reader = node_skin_data.reader(|_| Some(buffer));
-        let matrices = reader.read_inverse_bind_matrices().unwrap();
-        for m in matrices {
-            let m = Matrix4::from(m);
-            joint_matrices.push(m);
-        }
-        let mut joint_ids = Vec::new();
+// fn add_skins_and_joints(
+//     node_data: &gltf::Node,
+//     buffer: &[u8],
+//     world: &mut World,
+//     vulkan_context: &VulkanContext,
+//     node_entity_map: &mut HashMap<usize, Entity>,
+// ) {
+//     // Do we need to add a Skin?
+//     // TODO: Extract this to components::Skin
+//     if let Some(node_skin_data) = node_data.skin() {
+//         println!("[HOTHAM_GLTF] Adding a skin to {}", node_data.index());
+//         let this_entity = *node_entity_map.get(&node_data.index()).unwrap();
+//         let mut joint_matrices = Vec::new();
+//         let reader = node_skin_data.reader(|_| Some(buffer));
+//         let matrices = reader.read_inverse_bind_matrices().unwrap();
+//         for m in matrices {
+//             let m = Matrix4::from(m);
+//             joint_matrices.push(m);
+//         }
+//         let mut joint_ids = Vec::new();
 
-        for (joint_node, inverse_bind_matrix) in node_skin_data.joints().zip(joint_matrices.iter())
-        {
-            let joint = Joint {
-                skeleton_root: this_entity,
-                inverse_bind_matrix: *inverse_bind_matrix,
-            };
-            joint_ids.push(joint_node.index());
-            let joint_entity = node_entity_map.get(&joint_node.index()).unwrap();
-            world.insert_one(*joint_entity, joint).unwrap();
-        }
+//         for (joint_node, inverse_bind_matrix) in node_skin_data.joints().zip(joint_matrices.iter())
+//         {
+//             let joint = Joint {
+//                 skeleton_root: this_entity,
+//                 inverse_bind_matrix: *inverse_bind_matrix,
+//             };
+//             joint_ids.push(joint_node.index());
+//             let joint_entity = node_entity_map.get(&joint_node.index()).unwrap();
+//             world.insert_one(*joint_entity, joint).unwrap();
+//         }
 
-        // Add a Skin to the entity.
-        world.insert_one(this_entity, Skin { joint_ids }).unwrap();
+//         // Add a Skin to the entity.
+//         world.insert_one(this_entity, Skin { joint_ids }).unwrap();
 
-        // Tell the vertex shader how many joints we have
-        let mut mesh = world.get_mut::<Mesh>(this_entity).unwrap();
-        mesh.ubo_data.joint_count = joint_matrices.len() as f32;
-    }
+//         // Tell the vertex shader how many joints we have
+//         let mut mesh = world.get_mut::<Mesh>(this_entity).unwrap();
+//         mesh.ubo_data.joint_count = joint_matrices.len() as f32;
+//     }
 
-    for child in node_data.children() {
-        add_skins_and_joints(&child, buffer, world, vulkan_context, node_entity_map);
-    }
-}
+//     for child in node_data.children() {
+//         add_skins_and_joints(&child, buffer, world, vulkan_context, node_entity_map);
+//     }
+// }
 
 fn add_animations(
     animations: &[gltf::Animation], // Clippy ptr_arg
@@ -480,13 +490,13 @@ mod tests {
     #[test]
     pub fn test_load_models() {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
+        let mut resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
 
         let data: Vec<&[u8]> = vec![
             include_bytes!("../../../test_assets/damaged_helmet.glb"),
             include_bytes!("../../../test_assets/asteroid.glb"),
         ];
-        let models = load_models_from_glb(&data, &vulkan_context, &resources).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut resources).unwrap();
         let test_data = vec![
             (
                 "Asteroid",
@@ -545,24 +555,16 @@ mod tests {
             );
             assert_eq!(&info.name, *name);
             assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
-
-            // Get mesh's initial buffer handle
-            let mut original_mesh =
-                model_world.query::<(&Mesh, &Transform, &TransformMatrix, &Info)>();
-            let original_mesh = original_mesh.iter().next().unwrap().1 .0;
-            let initial_buffer = original_mesh.ubo_buffer.handle;
-            let new_buffer = mesh.ubo_buffer.handle;
-            assert_ne!(initial_buffer, new_buffer);
         }
     }
 
     #[test]
     pub fn test_hand() {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
+        let mut resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
-        let models = load_models_from_glb(&data, &vulkan_context, &resources).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut resources).unwrap();
 
         let mut world = World::default();
         let _hand = add_model_to_world(
