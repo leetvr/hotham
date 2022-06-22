@@ -43,11 +43,11 @@ layout (push_constant) uniform Material {
 	vec4 diffuseFactor;
 	vec4 specularFactor;
 	float workflow;
-	int baseColorTextureSet;
-	int physicalDescriptorTextureSet;
-	int normalTextureSet;	
-	int occlusionTextureSet;
-	int emissiveTextureSet;
+	uint baseColorTextureSet;
+	uint physicalDescriptorTextureSet;
+	uint normalTextureSet;	
+	uint occlusionTextureSet;
+	uint emissiveTextureSet;
 	float metallicFactor;	
 	float roughnessFactor;	
 	float alphaMask;	

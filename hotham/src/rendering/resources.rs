@@ -39,8 +39,11 @@ pub struct Resources {
     /// Mesh data used to generate DrawData
     pub mesh_data: Arena<Mesh>,
 
+    /// Shared sampler
+    pub sampler: vk::Sampler,
+
     /// Texture descriptor information
-    pub texture_count: u32,
+    texture_count: u32,
 }
 
 impl Resources {
@@ -79,6 +82,10 @@ impl Resources {
         );
         draw_indirect_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 2);
 
+        let sampler = vulkan_context
+            .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
+            .unwrap();
+
         Self {
             vertex_buffer,
             index_buffer,
@@ -87,6 +94,7 @@ impl Resources {
             draw_indirect_buffer,
             mesh_data: Default::default(),
             texture_count: 0,
+            sampler,
         }
     }
 }

@@ -3,7 +3,10 @@ use ash::vk;
 use gltf::{texture::Info, Material as MaterialData};
 use nalgebra::{vector, Vector4};
 
-use crate::{asset_importer::ImportContext, rendering::texture::Texture, resources::VulkanContext};
+use crate::{
+    asset_importer::ImportContext,
+    rendering::texture::{Texture, NO_TEXTURE},
+};
 
 /// A component that instructs the renderer how an entity should look when rendered
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
@@ -22,15 +25,15 @@ pub struct Material {
     /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
     pub workflow: f32,
     /// The base color texture.
-    pub base_color_texture_set: i32,
+    pub base_color_texture_set: usize,
     /// The metallic-roughness texture.
-    pub metallic_roughness_texture_set: i32,
+    pub metallic_roughness_texture_set: usize,
     /// Normal texture
-    pub normal_texture_set: i32,
+    pub normal_texture_set: usize,
     /// Occlusion texture set
-    pub occlusion_texture_set: i32,
+    pub occlusion_texture_set: usize,
     /// Emissive texture set
-    pub emissive_texture_set: i32,
+    pub emissive_texture_set: usize,
     /// The factor for the metalness of the material.
     pub metallic_factor: f32,
     /// The factor for the roughness of the material.
@@ -45,56 +48,40 @@ impl Material {
     /// Load a material from a glTF document
     pub(crate) fn load(material: MaterialData, import_context: &mut ImportContext) -> Result<()> {
         let material_name = material.name().unwrap_or("<unnamed>");
-        let empty_texture = Texture::empty(&import_context.vulkan_context)?;
 
         let pbr_metallic_roughness = material.pbr_metallic_roughness();
         let pbr_specular_glossiness = material.pbr_specular_glossiness();
 
         // Base Color
         let base_color_texture_info = pbr_metallic_roughness.base_color_texture();
-        let base_color_texture_set = get_texture_set(base_color_texture_info.as_ref());
-        let base_color_texture = base_color_texture_info
-            .and_then(|i| Texture::load(i.texture(), import_context))
-            .unwrap_or_else(|| empty_texture.clone());
+        let base_color_texture_set = base_color_texture_info
+            .map(|i| Texture::load(i.texture(), import_context))
+            .unwrap_or(NO_TEXTURE);
         let base_color_factor = Vector4::from(pbr_metallic_roughness.base_color_factor());
 
         // Metallic Roughness
         let metallic_roughness_texture_info = pbr_metallic_roughness.metallic_roughness_texture();
-        let metallic_roughness_texture_set =
-            get_texture_set(metallic_roughness_texture_info.as_ref());
-        let metallic_roughness_texture = metallic_roughness_texture_info
-            .and_then(|i| Texture::load(i.texture(), import_context))
-            .unwrap_or_else(|| empty_texture.clone());
+        let metallic_roughness_texture_set = metallic_roughness_texture_info
+            .map(|i| Texture::load(i.texture(), import_context))
+            .unwrap_or(NO_TEXTURE);
 
         // Normal map
         let normal_texture_info = material.normal_texture();
         let normal_texture_set = normal_texture_info
-            .as_ref()
-            .map(|t| t.tex_coord() as i32)
-            .unwrap_or(-1);
-        let normal_texture = normal_texture_info
-            .and_then(|i| Texture::load(i.texture(), import_context))
-            .unwrap_or_else(|| empty_texture.clone());
+            .map(|i| Texture::load(i.texture(), import_context))
+            .unwrap_or(NO_TEXTURE);
 
         // Occlusion
         let occlusion_texture_info = material.occlusion_texture();
         let occlusion_texture_set = occlusion_texture_info
-            .as_ref()
-            .map(|t| t.tex_coord() as i32)
-            .unwrap_or(-1);
-        let occlusion_texture = occlusion_texture_info
-            .and_then(|i| Texture::load(i.texture(), import_context))
-            .unwrap_or_else(|| empty_texture.clone());
+            .map(|i| Texture::load(i.texture(), import_context))
+            .unwrap_or(NO_TEXTURE);
 
         // Emission
         let emissive_texture_info = material.emissive_texture();
-        let emissive_texture = emissive_texture_info
-            .as_ref()
-            .and_then(|i| Texture::load(i.texture(), import_context))
-            .unwrap_or_else(|| empty_texture.clone());
         let emissive_texture_set = emissive_texture_info
-            .map(|t| t.tex_coord() as i32)
-            .unwrap_or(-1);
+            .map(|i| Texture::load(i.texture(), import_context))
+            .unwrap_or(NO_TEXTURE);
 
         // Factors
         let emissive_factor = vector![0., 0., 0., 0.];
@@ -143,12 +130,16 @@ impl Material {
 
         Ok(())
     }
+
+    pub fn unlit_white() -> Material {
+        Material {
+            base_color_factor: vector![1., 1., 1., 1.],
+            workflow: 2.,
+            ..Default::default()
+        }
+    }
 }
 
 fn arr_to_vec4(vec3: [f32; 3]) -> Vector4<f32> {
     vector![vec3[0], vec3[1], vec3[2], 0.]
-}
-
-fn get_texture_set(info: Option<&Info>) -> i32 {
-    info.map(|t| t.tex_coord() as i32).unwrap_or(-1)
 }

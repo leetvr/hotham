@@ -53,6 +53,7 @@ impl Panel {
             sampler,
             descriptor,
         };
+        todo!();
         let mesh = create_mesh(&texture, vulkan_context, render_context, world_size);
 
         Ok((
@@ -121,43 +122,10 @@ fn add_material(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) -> u32 {
-    let empty_texture = Texture::empty(vulkan_context).unwrap();
-    // Descriptor set
-    let descriptor_set = vulkan_context
-        .create_textures_descriptor_sets(
-            render_context.descriptor_set_layouts.textures_layout,
-            "GUI Texture",
-            &[
-                output_texture,
-                &empty_texture,
-                &empty_texture,
-                &empty_texture,
-                &empty_texture,
-            ],
-        )
-        .unwrap()[0];
-
-    let material = Material {
-        base_color_factor: vector![1., 1., 1., 1.],
-        emissive_factor: Vector4::zeros(),
-        diffuse_factor: Vector4::zeros(),
-        specular_factor: Vector4::zeros(),
-        workflow: 2.,
-        base_color_texture_set: 0,
-        metallic_roughness_texture_set: -1,
-        normal_texture_set: -1,
-        occlusion_texture_set: -1,
-        emissive_texture_set: -1,
-        metallic_factor: 0.,
-        roughness_factor: 0.,
-        alpha_mask: 0.,
-        alpha_mask_cutoff: 1.,
-    };
-
+    let material = Material::unlit_white();
     unsafe {
         render_context.resources.materials_buffer.push(&material);
     }
-
     render_context.resources.materials_buffer.len as _
 }
 

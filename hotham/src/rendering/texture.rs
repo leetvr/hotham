@@ -22,6 +22,9 @@ pub struct Texture {
 
 const TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 
+/// Texture index to indicate to the shader that this material does not have a texture of the given type
+pub static NO_TEXTURE: usize = std::usize::MAX;
+
 impl Texture {
     /// Creates a new texture
     pub fn new(
@@ -55,27 +58,25 @@ impl Texture {
         })
     }
 
-    /// Load a texture from a glTF document
+    /// Load a texture from a glTF document. Returns the texture ID
     pub(crate) fn load(
         texture: gltf::texture::Texture,
         import_context: &mut ImportContext,
-    ) -> Option<Self> {
+    ) -> usize {
         let texture_name = &format!("Texture {}", texture.name().unwrap_or(""));
         match texture.source().source() {
             gltf::image::Source::Uri { uri, .. } => {
                 let (buf, width, height) = parse_image(uri)
                     .unwrap_or_else(|_| panic!("Unable to load image! URI: {}", uri));
-                Some(
-                    Texture::new(
-                        texture_name,
-                        &import_context.vulkan_context,
-                        &buf,
-                        width,
-                        height,
-                        TEXTURE_FORMAT,
-                    )
-                    .unwrap(),
+                Texture::new(
+                    texture_name,
+                    &import_context.vulkan_context,
+                    &buf,
+                    width,
+                    height,
+                    TEXTURE_FORMAT,
                 )
+                .unwrap();
             }
             // TODO: Fix this
             gltf::image::Source::View { .. } => {
@@ -101,12 +102,10 @@ impl Texture {
                         TEXTURE_FORMAT,
                     )
                 };
-
-                texture
-                    .map_err(|e| eprintln!("Failed to load texture {} - {:?}", index, e))
-                    .ok()
             }
-        }
+        };
+
+        0
     }
 
     /// Load an empty texture. Useful for materials that are missing some part of the PBR material.
