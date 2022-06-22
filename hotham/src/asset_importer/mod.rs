@@ -1,9 +1,9 @@
 use crate::{
     components::{
-        animation_controller::AnimationController, AnimationTarget, Info, Joint, Material, Mesh,
-        Parent, Root, Skin, Transform, TransformMatrix, Visible,
+        animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
+        Root, Skin, Transform, TransformMatrix, Visible,
     },
-    rendering::resources::Resources,
+    rendering::{material::Material, resources::Resources},
     resources::{render_context::DescriptorSetLayouts, RenderContext, VulkanContext},
 };
 use anyhow::Result;

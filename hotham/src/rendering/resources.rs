@@ -3,14 +3,12 @@ use id_arena::Arena;
 use nalgebra::{Matrix4, Vector3, Vector4};
 use vulkan_context::VulkanContext;
 
-use crate::{
-    components::{Material, Mesh, Primitive},
-    resources::vulkan_context,
-};
+use crate::{components::Mesh, resources::vulkan_context};
 
 use super::{
     descriptors::{self, Descriptors},
     gambier_buffer::GambierBuffer as Buffer,
+    material::Material,
     texture::Texture,
     vertex::Vertex,
 };

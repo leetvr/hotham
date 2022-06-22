@@ -3,10 +3,10 @@ use egui::Pos2;
 use itertools::izip;
 use nalgebra::{vector, Vector2, Vector4};
 
-use crate::components::mesh::MeshUBO;
-use crate::components::{Material, Mesh, Primitive};
+use crate::components::Mesh;
 use crate::hotham_error::HothamError;
-use crate::rendering::buffer::Buffer;
+use crate::rendering::material::Material;
+use crate::rendering::primitive::Primitive;
 use crate::{
     rendering::texture::Texture,
     resources::{RenderContext, VulkanContext},

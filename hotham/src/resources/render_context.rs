@@ -15,13 +15,13 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 ];
 
 use crate::{
-    components::Material,
     rendering::{
         buffer::Buffer,
         camera::Camera,
         descriptors::Descriptors,
         frame::Frame,
         image::Image,
+        material::Material,
         resources::Resources,
         scene_data::{SceneData, SceneParams},
         swapchain::Swapchain,

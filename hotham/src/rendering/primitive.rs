@@ -125,10 +125,17 @@ impl Primitive {
             index_buffer.append(&indices);
         }
 
+        let material_id = primitive_data
+            .material()
+            .index()
+            .expect("Primitives without materials are not yet supported!")
+            as u32
+            + import_context.material_buffer_offset;
+
         Primitive {
             vertex_buffer_offset,
             index_buffer_offset,
-            material_id: primitive_data.material().index().unwrap() as _,
+            material_id,
             indices_count: indices.len() as _,
         }
     }

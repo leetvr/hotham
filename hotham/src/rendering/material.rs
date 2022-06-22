@@ -1,6 +1,5 @@
 use anyhow::{Ok, Result};
-use ash::vk;
-use gltf::{texture::Info, Material as MaterialData};
+use gltf::Material as MaterialData;
 use nalgebra::{vector, Vector4};
 
 use crate::{
@@ -8,7 +7,6 @@ use crate::{
     rendering::texture::{Texture, NO_TEXTURE},
 };
 
-/// A component that instructs the renderer how an entity should look when rendered
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
 #[repr(C)]
@@ -131,6 +129,7 @@ impl Material {
         Ok(())
     }
 
+    /// Create a simple, unlit, white coloured material.
     pub fn unlit_white() -> Material {
         Material {
             base_color_factor: vector![1., 1., 1., 1.],

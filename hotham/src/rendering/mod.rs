@@ -22,6 +22,9 @@ pub mod scene_data;
 /// Helper wrapper for interacting with the swapchain
 pub mod swapchain;
 
+/// Geometry
+pub mod primitive;
+
 /// Functionality for adding textures (images) to meshes
 pub mod texture;
 
@@ -33,3 +36,6 @@ pub(crate) mod descriptors;
 
 /// Container for all the resources used to render objects
 pub mod resources;
+
+/// Data to instruct the renderer how a primitive should look
+pub mod material;

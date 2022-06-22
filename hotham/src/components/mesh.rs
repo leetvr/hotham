@@ -2,10 +2,9 @@ use anyhow::Result;
 use ash::vk;
 use nalgebra::Matrix4;
 
-use super::primitive::Primitive;
 use crate::{
     asset_importer::ImportContext,
-    rendering::buffer::Buffer,
+    rendering::{buffer::Buffer, primitive::Primitive},
     resources::{render_context::DescriptorSetLayouts, VulkanContext},
 };
 use std::mem::{transmute, MaybeUninit};
