@@ -353,12 +353,9 @@ mod tests {
         let gltf_data: Vec<&[u8]> = vec![include_bytes!(
             "../../../test_assets/ferris-the-crab/source/ferris.glb"
         )];
-        let mut models = asset_importer::load_models_from_glb(
-            &gltf_data,
-            &vulkan_context,
-            &mut render_context.resources,
-        )
-        .unwrap();
+        let mut models =
+            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
+                .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
         let panel = add_ui_panel_to_world(

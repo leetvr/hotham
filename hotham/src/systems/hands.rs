@@ -74,7 +74,7 @@ pub fn add_hand(
     handedness: Handedness,
     world: &mut World,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
     let model_name = match handedness {
@@ -87,7 +87,7 @@ pub fn add_hand(
         world,
         None,
         vulkan_context,
-        &render_context.resources,
+        render_context,
     )
     .unwrap();
     {

@@ -1,4 +1,7 @@
-use crate::{asset_importer::ImportContext, rendering::vertex::Vertex};
+use crate::{
+    asset_importer::ImportContext,
+    rendering::vertex::{self, Vertex},
+};
 use itertools::izip;
 use nalgebra::vector;
 
@@ -111,13 +114,15 @@ impl Primitive {
         .collect();
 
         // Grab the offsets
-        let vertex_buffer_offset = import_context.resources.vertex_buffer.len;
-        let index_buffer_offset = import_context.resources.index_buffer.len;
+        let vertex_buffer = &mut import_context.render_context.resources.vertex_buffer;
+        let index_buffer = &mut import_context.render_context.resources.index_buffer;
+        let vertex_buffer_offset = vertex_buffer.len;
+        let index_buffer_offset = index_buffer.len;
 
         // Update the buffers
         unsafe {
-            import_context.resources.vertex_buffer.append(&vertices);
-            import_context.resources.index_buffer.append(&indices);
+            vertex_buffer.append(&vertices);
+            index_buffer.append(&indices);
         }
 
         Primitive {

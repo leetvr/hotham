@@ -1,9 +1,9 @@
-use anyhow::Result;
+use anyhow::{Ok, Result};
 use ash::vk;
 use gltf::{texture::Info, Material as MaterialData};
 use nalgebra::{vector, Vector4};
 
-use crate::{rendering::texture::Texture, resources::VulkanContext};
+use crate::{asset_importer::ImportContext, rendering::texture::Texture, resources::VulkanContext};
 
 /// A component that instructs the renderer how an entity should look when rendered
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
@@ -43,21 +43,9 @@ pub struct Material {
 
 impl Material {
     /// Load a material from a glTF document
-    pub fn load(
-        mesh_name: &str,
-        set_layout: vk::DescriptorSetLayout,
-        material: MaterialData,
-        vulkan_context: &VulkanContext,
-        _buffer: &[u8],
-        images: &[gltf::image::Data],
-    ) -> Result<(Self, vk::DescriptorSet)> {
-        let material_name = format!(
-            "Material {} for mesh {}",
-            material.name().unwrap_or("<unnamed>"),
-            mesh_name
-        );
-
-        let empty_texture = Texture::empty(vulkan_context)?;
+    pub(crate) fn load(material: MaterialData, import_context: &mut ImportContext) -> Result<()> {
+        let material_name = material.name().unwrap_or("<unnamed>");
+        let empty_texture = Texture::empty(&import_context.vulkan_context)?;
 
         let pbr_metallic_roughness = material.pbr_metallic_roughness();
         let pbr_specular_glossiness = material.pbr_specular_glossiness();
@@ -66,14 +54,7 @@ impl Material {
         let base_color_texture_info = pbr_metallic_roughness.base_color_texture();
         let base_color_texture_set = get_texture_set(base_color_texture_info.as_ref());
         let base_color_texture = base_color_texture_info
-            .and_then(|i| {
-                Texture::load(
-                    &format!("Base Color texture for {}", mesh_name),
-                    i.texture(),
-                    vulkan_context,
-                    images,
-                )
-            })
+            .and_then(|i| Texture::load(i.texture(), import_context))
             .unwrap_or_else(|| empty_texture.clone());
         let base_color_factor = Vector4::from(pbr_metallic_roughness.base_color_factor());
 
@@ -82,14 +63,7 @@ impl Material {
         let metallic_roughness_texture_set =
             get_texture_set(metallic_roughness_texture_info.as_ref());
         let metallic_roughness_texture = metallic_roughness_texture_info
-            .and_then(|i| {
-                Texture::load(
-                    &format!("Metallic Roughness texture for {}", mesh_name),
-                    i.texture(),
-                    vulkan_context,
-                    images,
-                )
-            })
+            .and_then(|i| Texture::load(i.texture(), import_context))
             .unwrap_or_else(|| empty_texture.clone());
 
         // Normal map
@@ -99,14 +73,7 @@ impl Material {
             .map(|t| t.tex_coord() as i32)
             .unwrap_or(-1);
         let normal_texture = normal_texture_info
-            .and_then(|i| {
-                Texture::load(
-                    &format!("Normal texture for {}", mesh_name),
-                    i.texture(),
-                    vulkan_context,
-                    images,
-                )
-            })
+            .and_then(|i| Texture::load(i.texture(), import_context))
             .unwrap_or_else(|| empty_texture.clone());
 
         // Occlusion
@@ -116,28 +83,14 @@ impl Material {
             .map(|t| t.tex_coord() as i32)
             .unwrap_or(-1);
         let occlusion_texture = occlusion_texture_info
-            .and_then(|i| {
-                Texture::load(
-                    &format!("Occlusion texture for {}", mesh_name),
-                    i.texture(),
-                    vulkan_context,
-                    images,
-                )
-            })
+            .and_then(|i| Texture::load(i.texture(), import_context))
             .unwrap_or_else(|| empty_texture.clone());
 
         // Emission
         let emissive_texture_info = material.emissive_texture();
         let emissive_texture = emissive_texture_info
             .as_ref()
-            .and_then(|i| {
-                Texture::load(
-                    &format!("Occlusion texture for {}", mesh_name),
-                    i.texture(),
-                    vulkan_context,
-                    images,
-                )
-            })
+            .and_then(|i| Texture::load(i.texture(), import_context))
             .unwrap_or_else(|| empty_texture.clone());
         let emissive_texture_set = emissive_texture_info
             .map(|t| t.tex_coord() as i32)
@@ -171,38 +124,24 @@ impl Material {
             0.
         };
 
-        // Descriptor set
-        let descriptor_set = vulkan_context.create_textures_descriptor_sets(
-            set_layout,
-            &material_name,
-            &[
-                &base_color_texture,
-                &metallic_roughness_texture,
-                &normal_texture,
-                &occlusion_texture,
-                &emissive_texture,
-            ],
-        )?[0];
+        let material = Material {
+            base_color_factor,
+            emissive_factor,
+            diffuse_factor,
+            specular_factor,
+            workflow,
+            base_color_texture_set,
+            metallic_roughness_texture_set,
+            normal_texture_set,
+            occlusion_texture_set,
+            emissive_texture_set,
+            metallic_factor,
+            roughness_factor,
+            alpha_mask,
+            alpha_mask_cutoff,
+        };
 
-        Ok((
-            Material {
-                base_color_factor,
-                emissive_factor,
-                diffuse_factor,
-                specular_factor,
-                workflow,
-                base_color_texture_set,
-                metallic_roughness_texture_set,
-                normal_texture_set,
-                occlusion_texture_set,
-                emissive_texture_set,
-                metallic_factor,
-                roughness_factor,
-                alpha_mask,
-                alpha_mask_cutoff,
-            },
-            descriptor_set,
-        ))
+        Ok(())
     }
 }
 

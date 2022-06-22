@@ -1,10 +1,10 @@
 use crate::{
     components::{
-        animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
-        Root, Skin, Transform, TransformMatrix, Visible,
+        animation_controller::AnimationController, AnimationTarget, Info, Joint, Material, Mesh,
+        Parent, Root, Skin, Transform, TransformMatrix, Visible,
     },
     rendering::resources::Resources,
-    resources::{render_context::DescriptorSetLayouts, VulkanContext},
+    resources::{render_context::DescriptorSetLayouts, RenderContext, VulkanContext},
 };
 use anyhow::Result;
 
@@ -22,7 +22,7 @@ pub type Models = HashMap<String, World>;
 /// Convenience struct to hold all the necessary bits and pieces during the import of a single glTF file
 pub(crate) struct ImportContext<'a> {
     pub vulkan_context: &'a VulkanContext,
-    pub resources: &'a mut Resources,
+    pub render_context: &'a mut RenderContext,
     pub models: &'a mut Models,
     pub node_entity_map: HashMap<usize, Entity>,
     pub mesh_map: HashMap<usize, Id<Mesh>>,
@@ -35,16 +35,16 @@ pub(crate) struct ImportContext<'a> {
 impl<'a> ImportContext<'a> {
     fn new(
         vulkan_context: &'a VulkanContext,
-        resources: &'a mut Resources,
+        render_context: &'a mut RenderContext,
         glb_buffer: &'a [u8],
         models: &'a mut Models,
     ) -> Self {
         let (document, mut buffers, images) = gltf::import_slice(glb_buffer).unwrap();
 
-        let material_buffer_offset = resources.materials_buffer.len as _;
+        let material_buffer_offset = render_context.resources.materials_buffer.len as _;
         Self {
             vulkan_context,
-            resources,
+            render_context,
             models,
             node_entity_map: Default::default(),
             mesh_map: Default::default(),
@@ -60,13 +60,13 @@ impl<'a> ImportContext<'a> {
 pub fn load_models_from_glb(
     glb_buffers: &[&[u8]],
     vulkan_context: &VulkanContext,
-    resources: &mut Resources,
+    render_context: &mut RenderContext,
 ) -> Result<Models> {
     let mut models = HashMap::new();
 
     for glb_buffer in glb_buffers {
         let mut import_context =
-            ImportContext::new(vulkan_context, resources, glb_buffer, &mut models);
+            ImportContext::new(vulkan_context, render_context, glb_buffer, &mut models);
         load_models_from_gltf_data(&mut import_context).unwrap();
     }
 
@@ -82,6 +82,10 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     // Instead, we'll import each resource type individually, updating references as we go.
     for mesh in document.meshes() {
         Mesh::load(mesh, import_context);
+    }
+
+    for material in document.materials() {
+        Material::load(material, import_context);
     }
 
     for node_data in document.scenes().next().unwrap().nodes() {
@@ -315,7 +319,7 @@ pub fn add_model_to_world(
     destination_world: &mut World,
     parent: Option<Entity>,
     vulkan_context: &VulkanContext,
-    resources: &Resources,
+    render_context: &mut RenderContext,
 ) -> Option<Entity> {
     let source_world = models.get(name)?;
     let source_entities = source_world.iter();
@@ -483,20 +487,19 @@ mod tests {
     use super::*;
     use crate::{
         components::{Root, Transform},
-        resources::{render_context::create_descriptor_set_layouts, VulkanContext},
+        resources::{render_context::create_descriptor_set_layouts, vulkan_context, VulkanContext},
     };
     use approx::assert_relative_eq;
 
     #[test]
     pub fn test_load_models() {
-        let vulkan_context = VulkanContext::testing().unwrap();
-        let mut resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
+        let (mut render_context, vulkan_context) = RenderContext::testing();
 
         let data: Vec<&[u8]> = vec![
             include_bytes!("../../../test_assets/damaged_helmet.glb"),
             include_bytes!("../../../test_assets/asteroid.glb"),
         ];
-        let models = load_models_from_glb(&data, &vulkan_context, &mut resources).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
         let test_data = vec![
             (
                 "Asteroid",
@@ -534,7 +537,7 @@ mod tests {
                 &mut world,
                 None,
                 &vulkan_context,
-                &resources,
+                &mut render_context,
             );
             assert!(model.is_some(), "Model {} could not be added", name);
 
@@ -560,11 +563,10 @@ mod tests {
 
     #[test]
     pub fn test_hand() {
-        let vulkan_context = VulkanContext::testing().unwrap();
-        let mut resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
+        let (mut render_context, vulkan_context) = RenderContext::testing();
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
-        let models = load_models_from_glb(&data, &vulkan_context, &mut resources).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
 
         let mut world = World::default();
         let _hand = add_model_to_world(
@@ -573,7 +575,7 @@ mod tests {
             &mut world,
             None,
             &vulkan_context,
-            &resources,
+            &mut render_context,
         );
 
         // Make sure there is only one root

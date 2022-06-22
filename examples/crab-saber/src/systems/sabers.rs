@@ -71,7 +71,7 @@ pub fn add_saber(
     models: &Models,
     world: &mut World,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     physics_context: &mut PhysicsContext,
 ) -> Entity {
     let model_name = match color {
@@ -84,7 +84,7 @@ pub fn add_saber(
         world,
         None,
         vulkan_context,
-        &render_context.resources,
+        render_context,
     )
     .unwrap();
     add_saber_physics(world, physics_context, saber);

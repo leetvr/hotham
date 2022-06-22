@@ -109,7 +109,7 @@ fn init(
             let models = asset_importer::load_models_from_glb(
                 &glb_buffers,
                 vulkan_context,
-                &mut render_context.resources,
+                &mut render_context,
             )?;
 
             add_cube(&models, &mut world, vulkan_context, render_context);
@@ -125,7 +125,7 @@ fn init(
             let models = asset_importer::load_models_from_glb(
                 &glb_buffers,
                 vulkan_context,
-                &mut render_context.resources,
+                &mut render_context,
             )?;
             for name in models.keys() {
                 add_model_to_world(
@@ -134,7 +134,7 @@ fn init(
                     &mut world,
                     None,
                     vulkan_context,
-                    &mut render_context.resources,
+                    &mut render_context,
                 );
             }
             models
@@ -148,17 +148,10 @@ fn add_cube(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
 ) {
-    let cube = add_model_to_world(
-        "Cube",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.resources,
-    )
-    .expect("Could not find cube?");
+    let cube = add_model_to_world("Cube", models, world, None, vulkan_context, render_context)
+        .expect("Could not find cube?");
     world.insert_one(cube, Cube {}).unwrap();
 }
 
@@ -272,7 +265,7 @@ fn cube_system(
     world: &mut World,
     models: &HashMap<String, World>,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     timer: &mut Timer,
 ) {
     if timer.tick() {

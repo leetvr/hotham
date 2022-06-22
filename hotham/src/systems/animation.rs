@@ -34,17 +34,16 @@ mod tests {
     use crate::{
         asset_importer::{add_model_to_world, load_models_from_glb},
         rendering::resources::Resources,
-        resources::VulkanContext,
+        resources::{vulkan_context, RenderContext, VulkanContext},
     };
 
     use super::*;
     #[test]
     pub fn animation_test() {
-        let vulkan_context = VulkanContext::testing().unwrap();
-        let mut resources = unsafe { Resources::new_without_descriptors(&vulkan_context) };
+        let (mut render_context, vulkan_context) = RenderContext::testing();
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
-        let models = load_models_from_glb(&data, &vulkan_context, &mut resources).unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
         let mut query = PreparedQuery::<(&mut AnimationTarget, &mut Transform)>::default();
         let mut world = World::new();
 
@@ -55,7 +54,7 @@ mod tests {
             &mut world,
             None,
             &vulkan_context,
-            &resources,
+            &mut render_context,
         )
         .unwrap();
         {

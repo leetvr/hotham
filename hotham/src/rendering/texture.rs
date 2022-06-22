@@ -1,4 +1,4 @@
-use crate::{rendering::image::Image, resources::VulkanContext};
+use crate::{asset_importer::ImportContext, rendering::image::Image, resources::VulkanContext};
 use anyhow::{anyhow, Result};
 use ash::vk;
 use gltf::image::Format;
@@ -56,17 +56,11 @@ impl Texture {
     }
 
     /// Load a texture from a glTF document
-    pub fn load(
-        mesh_name: &str,
+    pub(crate) fn load(
         texture: gltf::texture::Texture,
-        vulkan_context: &VulkanContext,
-        images: &[gltf::image::Data],
+        import_context: &mut ImportContext,
     ) -> Option<Self> {
-        let texture_name = &format!(
-            "Texture {} for mesh {}",
-            texture.name().unwrap_or(""),
-            mesh_name
-        );
+        let texture_name = &format!("Texture {}", texture.name().unwrap_or(""));
         match texture.source().source() {
             gltf::image::Source::Uri { uri, .. } => {
                 let (buf, width, height) = parse_image(uri)
@@ -74,7 +68,7 @@ impl Texture {
                 Some(
                     Texture::new(
                         texture_name,
-                        vulkan_context,
+                        &import_context.vulkan_context,
                         &buf,
                         width,
                         height,
@@ -86,12 +80,12 @@ impl Texture {
             // TODO: Fix this
             gltf::image::Source::View { .. } => {
                 let index = texture.source().index();
-                let image = &images[index];
+                let image = &import_context.images[index];
                 let texture = if image.format != Format::R8G8B8A8 {
                     let pixels = add_alpha_channel(image);
                     Texture::new(
                         texture_name,
-                        vulkan_context,
+                        &import_context.vulkan_context,
                         &pixels,
                         image.width,
                         image.height,
@@ -100,7 +94,7 @@ impl Texture {
                 } else {
                     Texture::new(
                         texture_name,
-                        vulkan_context,
+                        &import_context.vulkan_context,
                         &image.pixels,
                         image.width,
                         image.height,

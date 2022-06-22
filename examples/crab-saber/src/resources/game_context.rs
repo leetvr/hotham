@@ -54,18 +54,15 @@ impl Debug for GameContext {
 
 impl GameContext {
     pub fn new(engine: &mut Engine, world: &mut World) -> Self {
-        let mut render_context = &mut engine.render_context;
+        let render_context = &mut engine.render_context;
         let vulkan_context = &engine.vulkan_context;
         let physics_context = &mut engine.physics_context;
         let gui_context = &engine.gui_context;
 
         let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
-        let models = asset_importer::load_models_from_glb(
-            &glb_buffers,
-            vulkan_context,
-            &mut render_context.resources,
-        )
-        .expect("Unable to load models!");
+        let models =
+            asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                .expect("Unable to load models!");
 
         // Add environment
         add_environment(&models, world, vulkan_context, render_context);
@@ -182,7 +179,7 @@ fn add_pointer(
         world,
         None,
         vulkan_context,
-        &render_context.resources,
+        render_context,
     )
     .unwrap();
 
@@ -203,7 +200,7 @@ fn add_environment(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
 ) {
     add_model_to_world(
         "Environment",
@@ -211,17 +208,10 @@ fn add_environment(
         world,
         None,
         vulkan_context,
-        &render_context.resources,
+        render_context,
     );
 
-    add_model_to_world(
-        "Ramp",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.resources,
-    );
+    add_model_to_world("Ramp", models, world, None, vulkan_context, render_context);
 }
 
 pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContext) {
@@ -282,7 +272,7 @@ pub fn pre_spawn_cube(
     world: &mut World,
     models: &HashMap<String, World>,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
     // Set the color randomly
@@ -298,7 +288,7 @@ pub fn pre_spawn_cube(
         world,
         None,
         vulkan_context,
-        &render_context.resources,
+        render_context,
     )
     .unwrap();
 

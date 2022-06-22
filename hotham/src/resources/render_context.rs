@@ -198,6 +198,38 @@ impl RenderContext {
         })
     }
 
+    #[cfg(test)]
+    pub(crate) fn testing() -> (Self, VulkanContext) {
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let resolution = vk::Extent2D {
+            height: 800,
+            width: 800,
+        };
+        // Create an image with vulkan_context
+        let image = vulkan_context
+            .create_image(
+                COLOR_FORMAT,
+                &resolution,
+                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
+                2,
+                1,
+            )
+            .unwrap();
+        vulkan_context
+            .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
+            .unwrap();
+
+        let swapchain = Swapchain {
+            images: vec![image.handle],
+            resolution,
+        };
+
+        (
+            RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap(),
+            vulkan_context,
+        )
+    }
+
     // TODO: Make this update the scene data rather than creating a new one
     pub(crate) fn update_scene_data(
         &mut self,
@@ -870,31 +902,5 @@ mod tests {
     use super::*;
 
     #[test]
-    pub fn render_context_smoke_test() {
-        let vulkan_context = VulkanContext::testing().unwrap();
-        let resolution = vk::Extent2D {
-            height: 800,
-            width: 800,
-        };
-        // Create an image with vulkan_context
-        let image = vulkan_context
-            .create_image(
-                COLOR_FORMAT,
-                &resolution,
-                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
-                2,
-                1,
-            )
-            .unwrap();
-        vulkan_context
-            .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
-            .unwrap();
-
-        let swapchain = Swapchain {
-            images: vec![image.handle],
-            resolution,
-        };
-
-        RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap();
-    }
+    pub fn render_context_smoke_test() {}
 }
