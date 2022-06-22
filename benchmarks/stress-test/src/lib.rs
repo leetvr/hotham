@@ -330,17 +330,6 @@ fn create_mesh(
     let index_buffer =
         Buffer::new(vulkan_context, &indices, vk::BufferUsageFlags::INDEX_BUFFER).unwrap();
 
-    let texture_descriptor_set = vulkan_context.create_textures_descriptor_sets(
-        render_context.descriptor_set_layouts.textures_layout,
-        "Empty Material",
-        &[
-            &Texture::empty(vulkan_context)?,
-            &Texture::empty(vulkan_context)?,
-            &Texture::empty(vulkan_context)?,
-            &Texture::empty(vulkan_context)?,
-            &Texture::empty(vulkan_context)?,
-        ],
-    )?[0];
     let material = Material::default();
 
     todo!();

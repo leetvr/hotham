@@ -511,8 +511,7 @@ fn update_font_texture(
         texture.width as u32,
         texture.height as u32,
         COLOR_FORMAT,
-    )
-    .expect("Unable to create font texture");
+    );
 
     unsafe {
         vulkan_context.device.update_descriptor_sets(

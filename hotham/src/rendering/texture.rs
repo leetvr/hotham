@@ -34,34 +34,38 @@ impl Texture {
         width: u32,
         height: u32,
         format: vk::Format,
-    ) -> Result<Self> {
-        let image_t = vulkan_context.create_image(
-            format,
-            &vk::Extent2D { width, height },
-            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
-            1,
-            1,
-        )?;
+    ) -> Self {
+        let image_t = vulkan_context
+            .create_image(
+                format,
+                &vk::Extent2D { width, height },
+                vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+                1,
+                1,
+            )
+            .unwrap();
 
-        let (image, sampler) =
-            vulkan_context.create_texture_image(name, image_buf, 1, vec![0], image_t)?;
+        let (image, sampler) = vulkan_context
+            .create_texture_image(name, image_buf, 1, vec![0], image_t)
+            .unwrap();
+
         let descriptor = vk::DescriptorImageInfo::builder()
             .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
             .image_view(image.view)
             .sampler(sampler)
             .build();
 
-        Ok(Texture {
+        Texture {
             image,
             sampler,
             descriptor,
-        })
+        }
     }
 
     /// Load a texture from a glTF document. Returns the texture ID
     pub(crate) fn load(texture: gltf::texture::Texture, import_context: &mut ImportContext) -> u32 {
         let texture_name = &format!("Texture {}", texture.name().unwrap_or(""));
-        match texture.source().source() {
+        let texture = match texture.source().source() {
             gltf::image::Source::Uri { uri, .. } => {
                 let (buf, width, height) = parse_image(uri)
                     .unwrap_or_else(|_| panic!("Unable to load image! URI: {}", uri));
@@ -73,7 +77,6 @@ impl Texture {
                     height,
                     TEXTURE_FORMAT,
                 )
-                .unwrap();
             }
             // TODO: Fix this
             gltf::image::Source::View { .. } => {
@@ -99,6 +102,7 @@ impl Texture {
                         TEXTURE_FORMAT,
                     )
                 };
+                texture
             }
         };
 
@@ -106,7 +110,7 @@ impl Texture {
     }
 
     /// Load an empty texture. Useful for materials that are missing some part of the PBR material.
-    pub fn empty(vulkan_context: &VulkanContext) -> Result<Self> {
+    pub fn empty(vulkan_context: &VulkanContext) -> Self {
         Self::new(
             "Empty Texture",
             vulkan_context,

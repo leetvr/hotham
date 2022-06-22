@@ -194,7 +194,7 @@ mod tests {
                 height: 300,
             },
             world_size: [1.0, 1.0].into(),
-            texture: Texture::empty(&mut vulkan_context).unwrap(),
+            texture: Texture::empty(&mut vulkan_context),
             input: None,
         };
         let panel_entity = world.spawn((panel,));
