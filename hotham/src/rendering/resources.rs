@@ -40,37 +40,32 @@ impl Resources {
     pub(crate) unsafe fn new(vulkan_context: &VulkanContext, descriptors: &Descriptors) -> Self {
         let vertex_buffer = Buffer::new(
             vulkan_context,
-            &[],
             vk::BufferUsageFlags::VERTEX_BUFFER,
             VERTEX_BUFFER_SIZE,
         );
 
         let index_buffer = Buffer::new(
             vulkan_context,
-            &[],
             vk::BufferUsageFlags::INDEX_BUFFER,
             VERTEX_BUFFER_SIZE,
         );
 
-        let mut draw_data_buffer = Buffer::new(
+        let draw_data_buffer = Buffer::new(
             vulkan_context,
-            &[],
             vk::BufferUsageFlags::STORAGE_BUFFER,
             DRAW_DATA_BUFFER_SIZE,
         );
         draw_data_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 0);
 
-        let mut materials_buffer = Buffer::new(
+        let materials_buffer = Buffer::new(
             vulkan_context,
-            &[],
             vk::BufferUsageFlags::STORAGE_BUFFER,
             MATERIAL_BUFFER_SIZE,
         );
         materials_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 1);
 
-        let mut draw_indirect_buffer = Buffer::new(
+        let draw_indirect_buffer = Buffer::new(
             vulkan_context,
-            &[],
             vk::BufferUsageFlags::STORAGE_BUFFER,
             MATERIAL_BUFFER_SIZE,
         );

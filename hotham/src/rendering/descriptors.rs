@@ -88,7 +88,6 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
-        vk::DescriptorBindingFlags::empty(),
         flags,
     ];
     let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()

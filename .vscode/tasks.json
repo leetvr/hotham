@@ -69,7 +69,7 @@
 			"args": [
 				"-p",
 				"hotham",
-				"vulkan_init_test"
+				"buffer_smoke_test"
 			],
 			"env": {
 				"RUST_BACKTRACE": "1"

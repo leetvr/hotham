@@ -1273,9 +1273,9 @@ fn create_vulkan_device(
         .queue_create_infos(slice_from_ref(&queue_create_info))
         .enabled_extension_names(&extension_names)
         .enabled_features(&enabled_features)
-        .push_next(&mut physical_device_features)
         .push_next(&mut descriptor_indexing_features)
-        .push_next(&mut robust_features);
+        .push_next(&mut robust_features)
+        .push_next(&mut physical_device_features);
 
     let device =
         unsafe { vulkan_instance.create_device(physical_device, &device_create_info, None) }?;

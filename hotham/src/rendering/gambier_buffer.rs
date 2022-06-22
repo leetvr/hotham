@@ -15,8 +15,10 @@ pub struct GambierBuffer<T: Sized> {
     pub device_memory: vk::DeviceMemory,
     /// A pointer to the start of the memory
     pub memory_address: std::ptr::NonNull<T>,
-    /// The length of the buffer
+    /// The current length of the buffer
     pub len: usize,
+    /// The maximum length of the buffer
+    pub max_len: usize,
     /// Flags describing the buffer's usage
     pub usage: vk::BufferUsageFlags,
 }
@@ -25,15 +27,13 @@ impl<T: Sized> GambierBuffer<T> {
     /// Create a new buffer
     pub unsafe fn new(
         vulkan_context: &VulkanContext,
-        initial_data: &[T],
         usage: vk::BufferUsageFlags,
-        len: usize,
+        max_len: usize,
     ) -> GambierBuffer<T> {
         let device = &vulkan_context.device;
 
-        let size = (std::mem::size_of::<T>() * len) as _;
+        let size = (std::mem::size_of::<T>() * max_len) as _;
 
-        println!("Attempting to create buffer of {:?} bytes..", size);
         let buffer = device
             .create_buffer(
                 &vk::BufferCreateInfo::builder().usage(usage).size(size),
@@ -41,7 +41,6 @@ impl<T: Sized> GambierBuffer<T> {
             )
             .unwrap();
 
-        println!("..done! Allocating memory..");
         let memory_requirements = device.get_buffer_memory_requirements(buffer);
         let flags = vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
         let device_memory = allocate_memory(vulkan_context, memory_requirements, flags);
@@ -65,26 +64,62 @@ impl<T: Sized> GambierBuffer<T> {
             buffer,
             device_memory,
             memory_address: std::ptr::NonNull::new_unchecked(memory_address),
-            len: initial_data.len(),
+            len: 0,
+            max_len,
             usage,
         }
     }
 
     /// Dumb update - overrides the content of the GPU buffer with `data`.
-    pub unsafe fn overwrite(&self, data: &[T]) {
+    /// SAFETY: Unchecked! The caller MUST ensure `data` is valid and that `data.len` does not exceed `self.max_len`
+    pub unsafe fn overwrite(&mut self, data: &[T]) {
         copy_nonoverlapping(data.as_ptr(), self.memory_address.as_ptr(), data.len());
+        self.len = data.len();
+    }
+
+    /// Dumb append - appends the content of the GPU buffer with `data`.
+    /// SAFETY: Unchecked! The caller MUST ensure `data` is valid and that `self.len + data.len` does not exceed `self.max_len`
+    pub unsafe fn append(&mut self, data: &[T]) {
+        copy_nonoverlapping(
+            data.as_ptr(),
+            self.memory_address.as_ptr().offset(self.len as _),
+            data.len(),
+        );
+        self.len += data.len();
+    }
+
+    /// Dumb push - adds `data` to the GPU buffer.
+    /// SAFETY: Unchecked! The caller MUST ensure `data` is valid and that `self.len + 1` does not exceed `self.max_len`
+    pub unsafe fn push(&mut self, data: &T) {
+        copy_nonoverlapping(
+            data as _,
+            self.memory_address.as_ptr().offset(self.len as _),
+            1,
+        );
+        self.len += 1;
+    }
+
+    /// Get the buffer's underlying data as a slice
+    pub unsafe fn as_slice(&self) -> &[T] {
+        std::slice::from_raw_parts(self.memory_address.as_ptr(), self.len)
+    }
+
+    /// Get the buffer's underlying data as a slice
+    pub unsafe fn as_mut_slice(&self) -> &mut [T] {
+        std::slice::from_raw_parts_mut(self.memory_address.as_ptr(), self.len)
     }
 
     /// safety: After calling this function the buffer will be in an UNUSABLE state
-    pub unsafe fn destroy(&self, device: &ash::Device) {
+    pub unsafe fn destroy(&mut self, device: &ash::Device) {
         device.unmap_memory(self.device_memory);
         device.free_memory(self.device_memory, None);
         device.destroy_buffer(self.buffer, None);
+        self.len = 0;
     }
 
     /// Write to the specified descriptor set
     pub unsafe fn update_descriptor_set(
-        &mut self,
+        &self,
         device: &ash::Device,
         descriptor_set: vk::DescriptorSet,
         binding: usize,
@@ -101,5 +136,44 @@ impl<T: Sized> GambierBuffer<T> {
             .descriptor_type(vk::DescriptorType::STORAGE_BUFFER);
 
         device.update_descriptor_sets(std::slice::from_ref(&write), &[]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    pub fn buffer_smoke_test() {
+        let vulkan_context = VulkanContext::testing().unwrap();
+        unsafe {
+            let mut buffer: GambierBuffer<i32> = GambierBuffer::new(
+                &vulkan_context,
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+                10_000,
+            );
+
+            // First, write some data into the buffer.
+            let initial_data = vec![1, 2, 3, 4];
+            buffer.overwrite(&initial_data);
+            assert_eq!(buffer.as_slice(), &initial_data);
+
+            // Next, overwrite it
+            let next_data = vec![4, 5, 6, 7];
+            buffer.overwrite(&next_data);
+            assert_eq!(buffer.as_slice(), &next_data);
+
+            // Then, append to it
+            let mut additional_data = vec![8, 9, 10, 11];
+            buffer.append(&additional_data);
+            let mut expected_data = next_data.clone();
+            expected_data.append(&mut additional_data);
+            assert_eq!(buffer.as_slice(), &expected_data);
+
+            // Then, push to it
+            buffer.push(&12);
+            expected_data.push(12);
+            assert_eq!(buffer.as_slice(), &expected_data);
+        }
     }
 }
