@@ -51,7 +51,7 @@ pub struct Material {
 
 impl Material {
     /// Load a material from a glTF document
-    pub(crate) fn load(material: MaterialData, import_context: &mut ImportContext) -> Result<()> {
+    pub(crate) fn load(material: MaterialData, import_context: &mut ImportContext) {
         let material_name = material.name().unwrap_or("<unnamed>");
 
         let pbr_metallic_roughness = material.pbr_metallic_roughness();
@@ -134,6 +134,7 @@ impl Material {
             alpha_mask_cutoff,
         };
 
+        // Then push it into the materials buffer
         unsafe {
             import_context
                 .render_context
@@ -141,8 +142,6 @@ impl Material {
                 .materials_buffer
                 .push(&material)
         }
-
-        Ok(())
     }
 
     /// Create a simple, unlit, white coloured material.

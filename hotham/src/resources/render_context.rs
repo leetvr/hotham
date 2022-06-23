@@ -1,4 +1,4 @@
-use std::{ffi::CStr, io::Cursor, mem::size_of, time::Instant};
+use std::{ffi::CStr, io::Cursor, mem::size_of, slice::from_ref as slice_from_ref, time::Instant};
 
 pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
@@ -56,9 +56,6 @@ pub struct RenderContext {
     pub color_image: Image,
     pub render_area: vk::Rect2D,
     pub scene_data: SceneData,
-    pub scene_data_buffer: Buffer<SceneData>,
-    pub scene_params_buffer: Buffer<SceneParams>,
-    pub scene_data_descriptor_sets: Vec<vk::DescriptorSet>,
     pub render_start_time: Instant,
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
@@ -133,47 +130,6 @@ impl RenderContext {
 
         println!("[HOTHAM_RENDERER] Creating UBO..");
         let scene_data = SceneData::default();
-        let scene_data_buffer = Buffer::new(
-            vulkan_context,
-            &[scene_data],
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-        )?;
-
-        let scene_params = SceneParams::default();
-        let scene_params_buffer = Buffer::new(
-            vulkan_context,
-            &[scene_params],
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-        )?;
-
-        let diffuse_ibl = Texture::from_ktx2(
-            "Diffuse IBL",
-            include_bytes!("../../data/diffuse_ibl.ktx2"),
-            vulkan_context,
-        )?;
-        let specular_ibl = Texture::from_ktx2(
-            "Specular IBL",
-            include_bytes!("../../data/specular_ibl.ktx2"),
-            vulkan_context,
-        )?;
-        let brdf_lut = Texture::from_ktx2(
-            "BRDF LUT",
-            include_bytes!("../../data/brdf_lut.ktx2"),
-            vulkan_context,
-        )?;
-
-        let scene_data_descriptor_sets = vulkan_context.create_scene_data_descriptor_sets(
-            descriptor_set_layouts.scene_data_layout,
-            &scene_data_buffer,
-            &scene_params_buffer,
-            &diffuse_ibl,
-            &specular_ibl,
-            &brdf_lut,
-        )?;
-
-        println!("[HOTHAM_RENDERER] ..done! {:?}", scene_data_buffer);
-
-        println!("[HOTHAM_RENDERER] Done! Renderer initialized!");
 
         Ok(Self {
             frames,
@@ -186,9 +142,6 @@ impl RenderContext {
             color_image,
             render_area,
             scene_data,
-            scene_data_buffer,
-            scene_params_buffer,
-            scene_data_descriptor_sets,
             render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
             views: Vec::new(),
@@ -283,9 +236,6 @@ impl RenderContext {
             camera_position,
         };
 
-        self.scene_data_buffer
-            .update(vulkan_context, &[self.scene_data])?;
-
         Ok(())
     }
 
@@ -344,7 +294,7 @@ impl RenderContext {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                &self.scene_data_descriptor_sets,
+                slice_from_ref(&self.descriptors.set),
                 &[],
             );
         }
@@ -397,6 +347,93 @@ impl RenderContext {
             device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
             device.reset_fences(&[fence]).unwrap();
         }
+    }
+
+    pub(crate) fn create_texture_image(
+        &mut self,
+        name: &str,
+        vulkan_context: &VulkanContext,
+        image_buf: &[u8],
+        mip_count: u32,
+        offsets: Vec<vk::DeviceSize>,
+        texture_image: Image,
+    ) -> Result<(Image, u32)> {
+        // Get the image's properties
+        let layer_count = texture_image.layer_count;
+
+        vulkan_context.set_debug_name(
+            vk::ObjectType::IMAGE,
+            texture_image.handle.as_raw(),
+            name,
+        )?;
+
+        // This is only neccesary on desktop
+        if vulkan_context.physical_device_properties.device_type
+            == vk::PhysicalDeviceType::DISCRETE_GPU
+        {
+            // Create a staging buffer.
+            println!("[HOTHAM_VULKAN] Creating staging buffer..");
+            let usage = vk::BufferUsageFlags::TRANSFER_SRC;
+            let size = 8 * image_buf.len();
+            let (staging_buffer, staging_memory, _) =
+                vulkan_context.create_buffer_with_data(image_buf, usage, size as _)?;
+            println!("[HOTHAM_VULKAN] ..done!");
+
+            // Copy the buffer into the image
+            let initial_layout = vk::ImageLayout::UNDEFINED;
+            let transfer_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+            vulkan_context.transition_image_layout(
+                texture_image.handle,
+                initial_layout,
+                transfer_layout,
+                layer_count,
+                mip_count,
+            );
+
+            println!("[HOTHAM_VULKAN] Copying buffer to image..");
+            vulkan_context.copy_buffer_to_image(
+                staging_buffer,
+                &texture_image,
+                layer_count,
+                mip_count,
+                offsets,
+            );
+
+            // Now transition the image
+            println!("[HOTHAM_VULKAN] ..done! Transitioning image layout..");
+            let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+            vulkan_context.transition_image_layout(
+                texture_image.handle,
+                transfer_layout,
+                final_layout,
+                layer_count,
+                mip_count,
+            );
+            println!("[HOTHAM_VULKAN] ..done! Freeing staging buffer..");
+
+            // Free the staging buffer
+            unsafe {
+                vulkan_context.device.destroy_buffer(staging_buffer, None);
+                vulkan_context.device.free_memory(staging_memory, None);
+            }
+        } else {
+            todo!()
+        }
+
+        unsafe {
+            self.resources.write_texture_to_array(
+                vulkan_context,
+                &self.descriptors,
+                &texture_image,
+            );
+        }
+
+        println!(
+            "[HOTHAM_VULKAN] ..done! Texture {} created successfully.",
+            name
+        );
+
+        Ok((texture_image, 0))
     }
 }
 

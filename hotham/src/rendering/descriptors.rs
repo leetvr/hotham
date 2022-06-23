@@ -23,6 +23,31 @@ impl Descriptors {
 
         Self { layout, set, pool }
     }
+
+    pub unsafe fn write_texture_descriptor(
+        &self,
+        vulkan_context: &VulkanContext,
+        image_view: vk::ImageView,
+        sampler: vk::Sampler,
+        array_index: u32,
+    ) {
+        let image_info = vk::DescriptorImageInfo {
+            sampler,
+            image_view,
+            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        };
+
+        let texture_write = vk::WriteDescriptorSet::builder()
+            .image_info(std::slice::from_ref(&image_info))
+            .dst_binding(3)
+            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+            .dst_array_element(array_index)
+            .dst_set(self.set);
+
+        vulkan_context
+            .device
+            .update_descriptor_sets(std::slice::from_ref(&texture_write), &[]);
+    }
 }
 
 unsafe fn allocate_descriptor_set(

@@ -260,7 +260,7 @@ impl GuiContext {
     pub(crate) fn paint_gui(
         &mut self,
         vulkan_context: &VulkanContext,
-        render_context: &RenderContext,
+        render_context: &mut RenderContext,
         current_swapchain_image_index: usize,
         ui_panel: &mut UIPanel,
         panel: &mut Panel,
@@ -320,11 +320,7 @@ impl GuiContext {
 
         let texture = &egui_context.fonts().texture();
         if texture.version != self.font_texture_version {
-            let _font_texture = update_font_texture(
-                vulkan_context,
-                texture,
-                self.font_texture_descriptor_sets[0],
-            );
+            let _font_texture = update_font_texture(vulkan_context, render_context, texture);
             self.font_texture_version = texture.version;
         }
 
@@ -488,8 +484,8 @@ fn handle_panel_input(
 
 fn update_font_texture(
     vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
     texture: &egui::Texture,
-    descriptor_set: vk::DescriptorSet,
 ) -> Texture {
     unsafe {
         vulkan_context
@@ -504,26 +500,13 @@ fn update_font_texture(
         .flat_map(|&r| vec![r, r, r, r])
         .collect::<Vec<_>>();
 
-    let texture = Texture::new(
+    Texture::new(
         "Font texture",
         vulkan_context,
+        render_context,
         &image_buf,
         texture.width as u32,
         texture.height as u32,
         COLOR_FORMAT,
-    );
-
-    unsafe {
-        vulkan_context.device.update_descriptor_sets(
-            &[vk::WriteDescriptorSet::builder()
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .dst_set(descriptor_set)
-                .image_info(&[texture.descriptor])
-                .dst_binding(0)
-                .build()],
-            &[],
-        );
-    }
-
-    texture
+    )
 }

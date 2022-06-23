@@ -3,7 +3,7 @@ use crate::{
         animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
         Root, Skin, Transform, TransformMatrix, Visible,
     },
-    rendering::{material::Material, resources::Resources},
+    rendering::{material::Material, resources::Resources, texture::Texture},
     resources::{render_context::DescriptorSetLayouts, RenderContext, VulkanContext},
 };
 use anyhow::Result;
@@ -88,11 +88,15 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
         Material::load(material, import_context);
     }
 
+    for texture in document.textures() {
+        Texture::load(texture, import_context);
+    }
+
     for node_data in document.scenes().next().unwrap().nodes() {
         let mut world = World::default();
 
-        // load_node(&mut import_context, &node_data, &mut world, true)?;
-        // add_parents(&node_data, &mut world, &mut node_entity_map);
+        load_node(&node_data, import_context, &mut world, true);
+        add_parents(&node_data, &mut world, &mut import_context.node_entity_map);
         // add_skins_and_joints(
         //     &node_data,
         //     buffer,
@@ -102,10 +106,10 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
         // );
         // add_animations(&animations, buffer, &mut world, &mut node_entity_map);
 
-        // models.insert(
-        //     node_data.name().expect("Node has no name!").to_string(),
-        //     world,
-        // );
+        import_context.models.insert(
+            node_data.name().expect("Node has no name!").to_string(),
+            world,
+        );
     }
 
     Ok(())
@@ -114,14 +118,10 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
 fn load_node(
     node_data: &gltf::Node,
-    gltf_buffer: &[u8],
-    vulkan_context: &VulkanContext,
-    descriptor_set_layouts: &DescriptorSetLayouts,
+    import_context: &mut ImportContext,
     world: &mut World,
-    node_entity_map: &mut HashMap<usize, Entity>,
     is_root: bool,
-    images: &[gltf::image::Data],
-) -> Result<()> {
+) {
     let transform = Transform::load(node_data.transform());
     let transform_matrix = TransformMatrix(node_data.transform().matrix().into());
     let info = Info {
@@ -132,26 +132,17 @@ fn load_node(
         node_id: node_data.index(),
     };
     let this_entity = world.spawn((transform, transform_matrix, info));
-    node_entity_map.insert(node_data.index(), this_entity);
+    import_context
+        .node_entity_map
+        .insert(node_data.index(), this_entity);
 
     if is_root {
         world.insert_one(this_entity, Root {}).unwrap();
     }
 
     for child in node_data.children() {
-        load_node(
-            &child,
-            gltf_buffer,
-            vulkan_context,
-            descriptor_set_layouts,
-            world,
-            node_entity_map,
-            false,
-            images,
-        )?;
+        load_node(&child, import_context, world, false);
     }
-
-    Ok(())
 }
 
 fn add_parents(

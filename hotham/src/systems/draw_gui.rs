@@ -14,7 +14,7 @@ pub fn draw_gui_system(
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: &usize,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     gui_context: &mut GuiContext,
     haptic_context: &mut HapticContext,
 ) {
@@ -239,16 +239,6 @@ mod tests {
 
         render_context
             .update_scene_data(&views, &vulkan_context)
-            .unwrap();
-        render_context
-            .scene_params_buffer
-            .update(
-                &vulkan_context,
-                &[SceneParams {
-                    // debug_view_inputs: 1.,
-                    ..Default::default()
-                }],
-            )
             .unwrap();
     }
 

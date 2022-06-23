@@ -50,8 +50,7 @@ impl Panel {
             .build();
         let texture = Texture {
             image: output_image,
-            sampler,
-            descriptor,
+            index: 0,
         };
         todo!();
         let mesh = create_mesh(&texture, vulkan_context, render_context, world_size);

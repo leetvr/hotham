@@ -243,16 +243,6 @@ mod tests {
         render_context
             .update_scene_data(&views, &vulkan_context)
             .unwrap();
-        render_context
-            .scene_params_buffer
-            .update(
-                &vulkan_context,
-                &[SceneParams {
-                    debug_view_equation,
-                    ..Default::default()
-                }],
-            )
-            .unwrap();
         render_context.begin_frame(&vulkan_context, 0);
         render_context.begin_pbr_render_pass(&vulkan_context, 0);
         update_transform_matrix_system(&mut Default::default(), world);

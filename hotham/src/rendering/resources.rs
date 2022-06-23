@@ -8,6 +8,7 @@ use crate::{components::Mesh, resources::vulkan_context};
 use super::{
     descriptors::{self, Descriptors},
     gambier_buffer::GambierBuffer as Buffer,
+    image::Image,
     material::Material,
     texture::Texture,
     vertex::Vertex,
@@ -37,8 +38,11 @@ pub struct Resources {
     /// Mesh data used to generate DrawData
     pub mesh_data: Arena<Mesh>,
 
+    /// Shared sampler in repeat mode, takes care of most things
+    pub texture_sampler: vk::Sampler,
+
     /// Shared sampler
-    pub sampler: vk::Sampler,
+    pub cube_sampler: vk::Sampler,
 
     /// Texture descriptor information
     texture_count: u32,
@@ -80,8 +84,12 @@ impl Resources {
         );
         draw_indirect_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 2);
 
-        let sampler = vulkan_context
+        let texture_sampler = vulkan_context
             .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
+            .unwrap();
+
+        let cube_sampler = vulkan_context
+            .create_texture_sampler(vk::SamplerAddressMode::CLAMP_TO_EDGE, 1)
             .unwrap();
 
         Self {
@@ -92,8 +100,28 @@ impl Resources {
             draw_indirect_buffer,
             mesh_data: Default::default(),
             texture_count: 0,
-            sampler,
+            texture_sampler,
+            cube_sampler,
         }
+    }
+
+    pub(crate) unsafe fn write_texture_to_array(
+        &mut self,
+        vulkan_context: &VulkanContext,
+        descriptors: &Descriptors,
+        image: &Image,
+    ) -> u32 {
+        let sampler = if image.format == vk::Format::R16G16_SFLOAT || image.layer_count == 6 {
+            self.cube_sampler
+        } else {
+            self.texture_sampler
+        };
+
+        let index = self.texture_count;
+        descriptors.write_texture_descriptor(vulkan_context, image.view, sampler, index);
+        self.texture_count += 1;
+
+        index
     }
 }
 

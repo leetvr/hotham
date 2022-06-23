@@ -1,4 +1,8 @@
-use crate::{asset_importer::ImportContext, rendering::image::Image, resources::VulkanContext};
+use crate::{
+    asset_importer::ImportContext,
+    rendering::image::Image,
+    resources::{RenderContext, VulkanContext},
+};
 use anyhow::{anyhow, Result};
 use ash::vk;
 use gltf::image::Format;
@@ -14,10 +18,8 @@ use std::{
 pub struct Texture {
     /// Handle to the underlying image
     pub image: Image,
-    /// Handle to the underlying sampler
-    pub sampler: vk::Sampler,
-    /// Handle to the underlying descriptor
-    pub descriptor: vk::DescriptorImageInfo,
+    /// Index in the shader
+    pub index: u32,
 }
 
 const TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
@@ -30,6 +32,7 @@ impl Texture {
     pub fn new(
         name: &str,
         vulkan_context: &VulkanContext,
+        render_context: &mut RenderContext,
         image_buf: &[u8],
         width: u32,
         height: u32,
@@ -45,21 +48,11 @@ impl Texture {
             )
             .unwrap();
 
-        let (image, sampler) = vulkan_context
-            .create_texture_image(name, image_buf, 1, vec![0], image_t)
+        let (image, index) = render_context
+            .create_texture_image(name, vulkan_context, image_buf, 1, vec![0], image_t)
             .unwrap();
 
-        let descriptor = vk::DescriptorImageInfo::builder()
-            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-            .image_view(image.view)
-            .sampler(sampler)
-            .build();
-
-        Texture {
-            image,
-            sampler,
-            descriptor,
-        }
+        Texture { image, index }
     }
 
     /// Load a texture from a glTF document. Returns the texture ID
@@ -72,6 +65,7 @@ impl Texture {
                 Texture::new(
                     texture_name,
                     &import_context.vulkan_context,
+                    &mut import_context.render_context,
                     &buf,
                     width,
                     height,
@@ -87,6 +81,7 @@ impl Texture {
                     Texture::new(
                         texture_name,
                         &import_context.vulkan_context,
+                        &mut import_context.render_context,
                         &pixels,
                         image.width,
                         image.height,
@@ -96,6 +91,7 @@ impl Texture {
                     Texture::new(
                         texture_name,
                         &import_context.vulkan_context,
+                        &mut import_context.render_context,
                         &image.pixels,
                         image.width,
                         image.height,
@@ -106,23 +102,21 @@ impl Texture {
             }
         };
 
-        0
+        texture.index
     }
 
     /// Load an empty texture. Useful for materials that are missing some part of the PBR material.
     pub fn empty(vulkan_context: &VulkanContext) -> Self {
-        Self::new(
-            "Empty Texture",
-            vulkan_context,
-            &EMPTY_KTX,
-            1,
-            1,
-            TEXTURE_FORMAT,
-        )
+        todo!()
     }
 
     /// Load a texture from a KTX2 buffer
-    pub fn from_ktx2(name: &str, buf: &[u8], vulkan_context: &VulkanContext) -> Result<Self> {
+    pub fn from_ktx2(
+        name: &str,
+        buf: &[u8],
+        vulkan_context: &VulkanContext,
+        render_context: &mut RenderContext,
+    ) -> Result<Self> {
         let buf = Cursor::new(buf.to_vec());
         let buf = Box::new(buf);
         let (buf, image_t, mip_levels, offsets) = parse_ktx(buf, vulkan_context)?;
@@ -131,20 +125,28 @@ impl Texture {
             image_t.format, image_t.layer_count, mip_levels
         );
 
-        let (image, sampler) =
-            vulkan_context.create_texture_image(name, &buf, mip_levels, offsets, image_t)?;
+        let image = render_context.create_texture_image(
+            name,
+            vulkan_context,
+            &buf,
+            mip_levels,
+            offsets,
+            image_t,
+        )?;
 
-        let descriptor = vk::DescriptorImageInfo::builder()
-            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-            .image_view(image.view)
-            .sampler(sampler)
-            .build();
+        todo!()
 
-        Ok(Texture {
-            image,
-            sampler,
-            descriptor,
-        })
+        // let descriptor = vk::DescriptorImageInfo::builder()
+        //     .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+        //     .image_view(image.view)
+        //     .sampler(sampler)
+        //     .build();
+
+        // Ok(Texture {
+        //     image,
+        //     sampler,
+        //     descriptor,
+        // })
     }
 }
 
