@@ -69,7 +69,8 @@
 			"args": [
 				"-p",
 				"hotham",
-				"buffer_smoke_test"
+				"asset_importer::tests::test_load_model",
+				"--release"
 			],
 			"env": {
 				"RUST_BACKTRACE": "1"

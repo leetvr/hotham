@@ -48,7 +48,7 @@ mod tests {
     use std::{io::Write, marker::PhantomData};
 
     use crate::{
-        components::{mesh::MeshUBO, Joint, Parent, Skin},
+        components::{Joint, Parent, Skin},
         rendering::buffer::Buffer,
         resources::VulkanContext,
         systems::skinning_system,
@@ -63,21 +63,21 @@ mod tests {
 
     #[test]
     pub fn test_skinning_system() {
-        let mut world = World::new();
+        // let mut world = World::new();
 
-        // Create the transform for the skin entity
-        let translation = vector![1.0, 2.0, 3.0];
-        let root_transform_matrix = Matrix4::new_translation(&translation);
+        // // Create the transform for the skin entity
+        // let translation = vector![1.0, 2.0, 3.0];
+        // let root_transform_matrix = Matrix4::new_translation(&translation);
 
-        // Create a skin
-        let inverse = root_transform_matrix.try_inverse().unwrap();
-        let mut ubo_data = MeshUBO::default();
-        ubo_data.joint_matrices[0] = inverse.clone();
-        ubo_data.joint_matrices[1] = inverse.clone();
-        ubo_data.joint_count = 2.;
+        // // Create a skin
+        // let inverse = root_transform_matrix.try_inverse().unwrap();
+        // let mut ubo_data = MeshUBO::default();
+        // ubo_data.joint_matrices[0] = inverse.clone();
+        // ubo_data.joint_matrices[1] = inverse.clone();
+        // ubo_data.joint_count = 2.;
 
-        // Store the inverse matrices for our test
-        let joint_matrices = vec![inverse.clone(), inverse];
+        // // Store the inverse matrices for our test
+        // let joint_matrices = vec![inverse.clone(), inverse];
 
         todo!()
 

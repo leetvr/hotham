@@ -111,9 +111,11 @@ fn create_mesh(
         render_context.resources.vertex_buffer.append(&vertices);
     }
 
-    Mesh {
-        primitives: vec![primitive],
-    }
+    todo!()
+
+    // Mesh {
+    //     primitives: vec![primitive],
+    // }
 }
 
 fn add_material(

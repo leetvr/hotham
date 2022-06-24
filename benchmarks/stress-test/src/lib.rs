@@ -5,7 +5,7 @@ use std::{
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{mesh::MeshUBO, Mesh, Transform, TransformMatrix, Visible},
+    components::{Mesh, Transform, TransformMatrix, Visible},
     hecs::{With, World},
     nalgebra::Vector3,
     rendering::{buffer::Buffer, material::Material, texture::Texture, vertex::Vertex},
@@ -311,7 +311,6 @@ fn create_mesh(
     world: &mut World,
 ) -> Result<(), hotham::HothamError> {
     let mesh_layout = render_context.descriptor_set_layouts.mesh_layout;
-    let mesh_ubo = MeshUBO::default();
     let num_vertices = 1_000_000;
     let mut vertices = Vec::with_capacity(num_vertices);
     let mut indices = Vec::with_capacity(num_vertices);

@@ -3,7 +3,7 @@ use crate::{
         animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
         Root, Skin, Transform, TransformMatrix, Visible,
     },
-    rendering::{material::Material, resources::Resources, texture::Texture},
+    rendering::{material::Material, mesh_data::MeshData, resources::Resources, texture::Texture},
     resources::{render_context::DescriptorSetLayouts, RenderContext, VulkanContext},
 };
 use anyhow::Result;
@@ -81,7 +81,7 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     // Previously, we assumed nodes were the centre of the universe. That is untrue.
     // Instead, we'll import each resource type individually, updating references as we go.
     for mesh in document.meshes() {
-        Mesh::load(mesh, import_context);
+        MeshData::load(mesh, import_context);
     }
 
     for material in document.materials() {
@@ -341,36 +341,9 @@ pub fn add_model_to_world(
 
         // Create a new mesh for this entity in the destination world.
         if let Ok(mesh) = source_world.get_mut::<Mesh>(*source_entity) {
-            let info = source_world.get_mut::<Info>(*source_entity).unwrap();
-
-            // // Create new description sets
-            // let descriptor_sets = vulkan_context
-            //     .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
-            //     .unwrap();
-
-            // // Create a new buffer
-            // let ubo_buffer = Buffer::new(
-            //     vulkan_context,
-            //     &[mesh.ubo_data],
-            //     vk::BufferUsageFlags::UNIFORM_BUFFER,
-            // )
-            // .unwrap();
-            // vulkan_context.update_buffer_descriptor_set(
-            //     &ubo_buffer,
-            //     mesh.descriptor_sets[0],
-            //     0,
-            //     vk::DescriptorType::UNIFORM_BUFFER,
-            // );
-
-            // let new_mesh = Mesh {
-            //     descriptor_sets: [descriptor_sets[0]],
-            //     ubo_buffer,
-            //     ubo_data: mesh.ubo_data,
-            //     primitives: mesh.primitives.clone(),
-            // };
-            // destination_world
-            //     .insert_one(*destination_entity, new_mesh)
-            //     .unwrap();
+            destination_world
+                .insert_one(*destination_entity, mesh.clone())
+                .unwrap();
         }
 
         if let Ok(skin) = source_world.get_mut::<Skin>(*source_entity) {
