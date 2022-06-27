@@ -249,6 +249,30 @@ impl RenderContext {
                 slice_from_ref(&self.descriptors.set),
                 &[],
             );
+            device.cmd_bind_index_buffer(
+                command_buffer,
+                self.resources.index_buffer.buffer,
+                0,
+                vk::IndexType::UINT32,
+            );
+            device.cmd_bind_vertex_buffers(
+                command_buffer,
+                0,
+                slice_from_ref(&self.resources.vertex_buffer.buffer),
+                &[0],
+            );
+
+            // Update the global push constants
+            let scene_data = create_push_constant(&self.scene_data);
+            device.cmd_push_constants(
+                command_buffer,
+                self.pipeline_layout,
+                vk::ShaderStageFlags::VERTEX
+                    | vk::ShaderStageFlags::FRAGMENT
+                    | vk::ShaderStageFlags::COMPUTE,
+                0,
+                scene_data,
+            )
         }
     }
 

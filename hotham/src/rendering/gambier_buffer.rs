@@ -108,6 +108,11 @@ impl<T: Sized> GambierBuffer<T> {
         self.len = 0;
     }
 
+    /// Clear the buffer.
+    pub fn clear(&mut self) {
+        self.len = 0;
+    }
+
     /// Write to the specified descriptor set
     pub unsafe fn update_descriptor_set(
         &self,
@@ -138,7 +143,7 @@ mod tests {
     pub fn buffer_smoke_test() {
         let vulkan_context = VulkanContext::testing().unwrap();
         unsafe {
-            let mut buffer: GambierBuffer<i32> = GambierBuffer::new(
+            let mut buffer: GambierBuffer<usize> = GambierBuffer::new(
                 &vulkan_context,
                 vk::BufferUsageFlags::STORAGE_BUFFER,
                 10_000,
@@ -165,6 +170,10 @@ mod tests {
             buffer.push(&12);
             expected_data.push(12);
             assert_eq!(buffer.as_slice(), &expected_data);
+
+            // Finally, clear it
+            buffer.clear();
+            assert_eq!(buffer.as_slice().len(), 0);
         }
     }
 }

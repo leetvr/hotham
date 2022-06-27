@@ -18,7 +18,7 @@ struct Material {
     vec4 specularFactor;
     uint workflow;
     uint baseColorTextureID;
-    uint metallicRoughnessTextureID;
+    uint physicalDescriptorTextureID;
     uint normalTextureID;
     uint occlusionTextureID;
     uint emissiveTextureID;
@@ -35,12 +35,6 @@ struct VkDrawIndexedIndirectCommand
 	uint firstIndex;
 	int  vertexOffset;
 	uint firstInstance;
-};
-
-struct Light {
-    vec4 position;
-    vec4 color;
-    vec4 direction;
 };
 
 layout (push_constant) uniform SceneData { 

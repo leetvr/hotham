@@ -1,5 +1,6 @@
 use crate::{
     components::{Mesh, TransformMatrix, Visible},
+    rendering::resources::DrawData,
     resources::VulkanContext,
     resources::{render_context::create_push_constant, RenderContext},
 };
@@ -13,50 +14,42 @@ pub fn rendering_system(
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: usize,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
 ) {
-    for (_, (mesh, transform_matrix)) in query.query_mut(world) {
-        let device = &vulkan_context.device;
-        let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
+    let draw_data_buffer = &mut render_context.resources.draw_data_buffer;
+    draw_data_buffer.clear();
+    let draw_indirect_buffer = &mut render_context.resources.draw_indirect_buffer;
+    draw_indirect_buffer.clear();
+    let meshes = &render_context.resources.mesh_data;
+    let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
+    let device = &vulkan_context.device;
 
-        unsafe {
-            // for primitive in &mesh.primitives {
-            //     // Bind vertex and index buffers
-            //     device.cmd_bind_vertex_buffers(
-            //         command_buffer,
-            //         0,
-            //         &[primitive.vertex_buffer.handle],
-            //         &[0],
-            //     );
-            //     device.cmd_bind_index_buffer(
-            //         command_buffer,
-            //         primitive.index_buffer.handle,
-            //         0,
-            //         vk::IndexType::UINT32,
-            //     );
-
-            //     // Bind texture descriptor sets
-            //     device.cmd_bind_descriptor_sets(
-            //         command_buffer,
-            //         vk::PipelineBindPoint::GRAPHICS,
-            //         render_context.pipeline_layout,
-            //         1,
-            //         &[primitive.texture_descriptor_set],
-            //         &[],
-            //     );
-
-            //     // Push constants
-            //     let material_push_constant = create_push_constant(&primitive.material);
-            //     device.cmd_push_constants(
-            //         command_buffer,
-            //         render_context.pipeline_layout,
-            //         vk::ShaderStageFlags::FRAGMENT,
-            //         0,
-            //         material_push_constant,
-            //     );
-            //     device.cmd_draw_indexed(command_buffer, primitive.indices_count, 1, 0, 0, 1);
-            // }
+    unsafe {
+        for (_, (mesh, transform_matrix)) in query.query_mut(world) {
+            let mesh = meshes.get(mesh.handle).unwrap();
+            for primitive in &mesh.primitives {
+                draw_data_buffer.push(&DrawData {
+                    transform: transform_matrix.0,
+                    material_id: primitive.material_id,
+                    ..Default::default()
+                });
+                draw_indirect_buffer.push(&vk::DrawIndexedIndirectCommand {
+                    index_count: primitive.indices_count,
+                    instance_count: 1,
+                    first_index: primitive.index_buffer_offset,
+                    vertex_offset: primitive.vertex_buffer_offset as _,
+                    first_instance: 0,
+                });
+            }
         }
+
+        device.cmd_draw_indexed_indirect(
+            command_buffer,
+            draw_indirect_buffer.buffer,
+            0,
+            draw_indirect_buffer.len as _,
+            std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
+        );
     }
 }
 
@@ -151,7 +144,9 @@ mod tests {
         debug_view_equation: f32,
     ) {
         // Render the scene
+        let mut renderdoc = begin_renderdoc();
         render(render_context, vulkan_context, debug_view_equation, world);
+        end_renderdoc(&mut renderdoc);
 
         // Save the resulting image to the disk and get its hash, along with a "known good" hash
         // of what the image *should* be.
@@ -264,5 +259,20 @@ mod tests {
         let bytes = std::fs::read(&file_path).unwrap();
         bytes.iter().for_each(|b| hasher.write_u8(*b));
         return hasher.finish();
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    use renderdoc::RenderDoc;
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    fn begin_renderdoc() -> RenderDoc<renderdoc::V141> {
+        let mut renderdoc = RenderDoc::<renderdoc::V141>::new().unwrap();
+        renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
+        renderdoc
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    fn end_renderdoc(renderdoc: &mut RenderDoc<renderdoc::V141>) {
+        let _ = renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
     }
 }

@@ -75,7 +75,7 @@ impl Resources {
 
         let draw_indirect_buffer = Buffer::new(
             vulkan_context,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
+            vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::INDIRECT_BUFFER,
             MATERIAL_BUFFER_SIZE,
         );
         draw_indirect_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 2);
@@ -122,6 +122,7 @@ impl Resources {
 }
 
 /// Instructions on how to draw this primitive
+#[derive(Debug, Default, Clone)]
 pub struct DrawData {
     /// The transform of the parent mesh
     pub transform: Matrix4<f32>,
@@ -130,5 +131,5 @@ pub struct DrawData {
     /// The ID of the material to use.
     pub material_id: u32,
     /// Padding
-    _pad: Vector3<f32>,
+    pub(crate) _pad: Vector3<f32>,
 }

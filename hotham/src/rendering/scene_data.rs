@@ -12,7 +12,8 @@ pub struct SceneData {
     /// Direction of global light
     pub light_direction: Vector4<f32>,
     /// Debug information
-    pub debug_data: Vector4<f32>, // x = debug view, yzw = unused
+    /// x = debug inputs, y = debug algorithm, zw unused. See pbr.frag for more details
+    pub debug_data: Vector4<f32>,
 }
 
 impl Default for SceneData {

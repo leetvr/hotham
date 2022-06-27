@@ -32,7 +32,7 @@ pub struct Material {
     /// The base color texture.
     pub base_color_texture_set: u32,
     /// The metallic-roughness texture.
-    pub metallic_roughness_texture_set: u32,
+    pub physical_descrtiptor_texture_id: u32,
     /// Normal texture
     pub normal_texture_set: u32,
     /// Occlusion texture set
@@ -124,7 +124,7 @@ impl Material {
             specular_factor,
             workflow,
             base_color_texture_set,
-            metallic_roughness_texture_set,
+            physical_descrtiptor_texture_id: metallic_roughness_texture_set,
             normal_texture_set,
             occlusion_texture_set,
             emissive_texture_set,
