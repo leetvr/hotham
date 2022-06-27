@@ -4,7 +4,7 @@ use crate::{
         Root, Skin, Transform, TransformMatrix, Visible,
     },
     rendering::{material::Material, mesh_data::MeshData, resources::Resources, texture::Texture},
-    resources::{render_context::DescriptorSetLayouts, RenderContext, VulkanContext},
+    resources::{RenderContext, VulkanContext},
 };
 use anyhow::Result;
 
@@ -434,7 +434,7 @@ mod tests {
     use super::*;
     use crate::{
         components::{Root, Transform},
-        resources::{render_context::create_descriptor_set_layouts, vulkan_context, VulkanContext},
+        resources::{vulkan_context, VulkanContext},
     };
     use approx::assert_relative_eq;
 

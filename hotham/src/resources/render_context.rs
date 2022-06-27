@@ -39,16 +39,8 @@ use ash::{
 use nalgebra::Matrix4;
 use openxr as xr;
 
-#[derive(Debug, Copy, Clone)]
-pub struct DescriptorSetLayouts {
-    pub scene_data_layout: vk::DescriptorSetLayout,
-    pub textures_layout: vk::DescriptorSetLayout,
-    pub mesh_layout: vk::DescriptorSetLayout,
-}
-
 pub struct RenderContext {
     pub frames: Vec<Frame>,
-    pub descriptor_set_layouts: DescriptorSetLayouts,
     pub pipeline_layout: vk::PipelineLayout,
     pub pipeline: vk::Pipeline,
     pub render_pass: vk::RenderPass,
@@ -87,18 +79,11 @@ impl RenderContext {
 
         let descriptors = unsafe { Descriptors::new(vulkan_context) };
         let resources = unsafe { Resources::new(vulkan_context, &descriptors) };
-        let descriptor_set_layouts = create_descriptor_set_layouts(vulkan_context)?;
 
         // Pipeline, render pass
         let render_pass = create_render_pass(vulkan_context)?;
-        let pipeline_layout = create_pipeline_layout(
-            vulkan_context,
-            &[
-                descriptor_set_layouts.scene_data_layout,
-                descriptor_set_layouts.textures_layout,
-                descriptor_set_layouts.mesh_layout,
-            ],
-        )?;
+        let pipeline_layout =
+            create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.layout))?;
         let pipeline = create_pipeline(vulkan_context, pipeline_layout, &render_area, render_pass)?;
 
         // Depth image, shared between frames
@@ -133,7 +118,6 @@ impl RenderContext {
 
         Ok(Self {
             frames,
-            descriptor_set_layouts,
             pipeline,
             pipeline_layout,
             render_pass,
@@ -470,145 +454,10 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     let c2r3 = -1.0;
     let c3r3 = 0.0;
 
-    /*
-    #[rustfmt::skip]
-    Matrix4::from_column_slice(&[
-        c0r0, c0r1, c0r2, c0r3,
-        c1r0, c1r1, c1r2, c1r3,
-        c2r0, c2r1, c2r2, c2r3,
-        c3r0, c3r1, c3r2, c3r3,
-    ]) */
     Matrix4::from_column_slice(&[
         c0r0, c0r1, c0r2, c0r3, c1r0, c1r1, c1r2, c1r3, c2r0, c2r1, c2r2, c2r3, c3r0, c3r1, c3r2,
         c3r3,
     ])
-}
-
-pub fn create_descriptor_set_layouts(
-    vulkan_context: &VulkanContext,
-) -> VkResult<DescriptorSetLayouts> {
-    // Set 0 = SceneData
-    // set = 0 binding = 0
-    let scene_buffer = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT);
-    // set = 0 binding = 1
-    let scene_params = vk::DescriptorSetLayoutBinding::builder()
-        .binding(1)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 0 binding = 2
-    let sampler_irradiance = vk::DescriptorSetLayoutBinding::builder()
-        .binding(2)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 0 binding = 3
-    let prefiltered_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(3)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 0 binding = 4
-    let sampler_brdflut = vk::DescriptorSetLayoutBinding::builder()
-        .binding(4)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    let scene_data_layout = unsafe {
-        vulkan_context.device.create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[
-                *scene_buffer,
-                *scene_params,
-                *sampler_irradiance,
-                *prefiltered_map,
-                *sampler_brdflut,
-            ]),
-            None,
-        )
-    }?;
-    vulkan_context.set_debug_name(
-        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
-        scene_data_layout.as_raw(),
-        "Scene Data DescriptorSetLayout",
-    )?;
-
-    // Set 1 = MaterialData
-    // set = 1 binding = 0
-    let color_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 1 binding = 1
-    let physical_descriptor_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(1)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 1 binding = 2
-    let normal_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(2)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 1 binding = 3
-    let ao_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(3)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 1 binding = 4
-    let emissive_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(4)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    let material_layout = unsafe {
-        vulkan_context.device.create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[
-                *color_map,
-                *physical_descriptor_map,
-                *normal_map,
-                *ao_map,
-                *emissive_map,
-            ]),
-            None,
-        )
-    }?;
-    vulkan_context.set_debug_name(
-        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
-        material_layout.as_raw(),
-        "Material Data DescriptorSetLayout",
-    )?;
-
-    // Set 2 = MeshData
-    // set = 2, binding = 0
-    let mesh_data = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX);
-    let mesh_data_layout = unsafe {
-        vulkan_context.device.create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[*mesh_data]),
-            None,
-        )
-    }?;
-    vulkan_context.set_debug_name(
-        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
-        mesh_data_layout.as_raw(),
-        "Mesh Data DescriptorSetLayout",
-    )?;
-
-    Ok(DescriptorSetLayouts {
-        scene_data_layout,
-        textures_layout: material_layout,
-        mesh_layout: mesh_data_layout,
-    })
 }
 
 fn create_frames(

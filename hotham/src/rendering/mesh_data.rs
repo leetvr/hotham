@@ -6,7 +6,7 @@ use crate::{
     asset_importer::ImportContext,
     components::Mesh,
     rendering::{buffer::Buffer, primitive::Primitive},
-    resources::{render_context::DescriptorSetLayouts, VulkanContext},
+    resources::VulkanContext,
 };
 use std::mem::{transmute, MaybeUninit};
 /// Wrapper that encapsulates geometry. Maps closely to the [glTF spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#meshes)

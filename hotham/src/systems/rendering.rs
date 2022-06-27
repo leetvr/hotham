@@ -151,7 +151,7 @@ mod tests {
         debug_view_equation: f32,
     ) {
         // Render the scene
-        schedule(render_context, vulkan_context, debug_view_equation, world);
+        render(render_context, vulkan_context, debug_view_equation, world);
 
         // Save the resulting image to the disk and get its hash, along with a "known good" hash
         // of what the image *should* be.
@@ -200,11 +200,10 @@ mod tests {
         let known_good_hash = hash_file(&known_good_path);
 
         //  TODO: Fix this on non-windows platforms.
-        #[cfg(target_os = "windows")]
         assert_eq!(output_hash, known_good_hash, "Bad render: {}", name);
     }
 
-    fn schedule(
+    fn render(
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
         debug_view_equation: f32,

@@ -302,26 +302,26 @@ fn create_mesh(
     vulkan_context: &mut VulkanContext,
     world: &mut World,
 ) -> Result<(), hotham::HothamError> {
-    let mesh_layout = render_context.descriptor_set_layouts.mesh_layout;
-    let num_vertices = 1_000_000;
-    let mut vertices = Vec::with_capacity(num_vertices);
-    let mut indices = Vec::with_capacity(num_vertices);
+    // let mesh_layout = render_context.descriptor_set_layouts.mesh_layout;
+    // let num_vertices = 1_000_000;
+    // let mut vertices = Vec::with_capacity(num_vertices);
+    // let mut indices = Vec::with_capacity(num_vertices);
 
-    for _ in 0..num_vertices {
-        vertices.push(Vertex::default());
-        indices.push(0);
-    }
+    // for _ in 0..num_vertices {
+    //     vertices.push(Vertex::default());
+    //     indices.push(0);
+    // }
 
-    let vertex_buffer = Buffer::new(
-        vulkan_context,
-        &vertices,
-        vk::BufferUsageFlags::VERTEX_BUFFER,
-    )
-    .unwrap();
-    let index_buffer =
-        Buffer::new(vulkan_context, &indices, vk::BufferUsageFlags::INDEX_BUFFER).unwrap();
+    // let vertex_buffer = Buffer::new(
+    //     vulkan_context,
+    //     &vertices,
+    //     vk::BufferUsageFlags::VERTEX_BUFFER,
+    // )
+    // .unwrap();
+    // let index_buffer =
+    //     Buffer::new(vulkan_context, &indices, vk::BufferUsageFlags::INDEX_BUFFER).unwrap();
 
-    let material = Material::default();
+    // let material = Material::default();
 
     todo!();
 
