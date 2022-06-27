@@ -194,7 +194,6 @@ mod tests {
         let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
         let known_good_hash = hash_file(&known_good_path);
 
-        //  TODO: Fix this on non-windows platforms.
         assert_eq!(output_hash, known_good_hash, "Bad render: {}", name);
     }
 
@@ -235,6 +234,7 @@ mod tests {
         };
         let views = vec![view.clone(), view];
         render_context.update_scene_data(&views).unwrap();
+        render_context.scene_data.debug_data.y = debug_view_equation;
         render_context.begin_frame(&vulkan_context, 0);
         render_context.begin_pbr_render_pass(&vulkan_context, 0);
         update_transform_matrix_system(&mut Default::default(), world);

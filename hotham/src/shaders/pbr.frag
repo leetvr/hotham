@@ -1,4 +1,4 @@
-// PBR shader based on Sasche Williems' implementation:
+// PBR shader based on Sascha Williems' implementation:
 // https://github.com/SaschaWillems/Vulkan-glTF-PBR
 // Which in turn was based on https://github.com/KhronosGroup/glTF-WebGL-PBR
 #version 460
@@ -7,6 +7,7 @@
 const float epsilon = 1e-6;
 #define DEFAULT_EXPOSURE 4.5
 #define DEFAULT_GAMMA 2.2
+#define DEFAULT_IBL_SCALE 0.4
 
 // Inputs
 layout (location = 0) in vec3 inWorldPos;
@@ -19,7 +20,7 @@ layout(location = 0) out vec4 outColor;
 
 // Encapsulate the various inputs used by the various functions in the shading equation
 // We store values in this struct to simplify the integration of alternative implementations
-// of the shading terms, outlined in the Readme.MD Appendix.
+// of the shading terms, outlined in the Readme.MD Appendix of Sascha's implementation.
 struct PBRInfo
 {
 	float NdotL;                  // cos angle between normal and light direction
@@ -63,6 +64,7 @@ vec4 tonemap(vec4 color)
 	return vec4(pow(outcol, vec3(1.0f / DEFAULT_GAMMA)), color.a);
 }
 
+// TODO: Is there a builtin for this?
 vec4 SRGBtoLINEAR(vec4 srgbIn)
 {
 	#ifdef MANUAL_SRGB
@@ -98,22 +100,14 @@ vec3 getNormal(uint normalTextureID)
 	return normalize(TBN * tangentNormal);
 }
 
-// Calculation of the lighting contribution from an optional Image Based Light source.
-// Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
-// See our README.md on Environment Maps [3] for additional discussion.
-// vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
-// {
-// 	float lod = (pbrInputs.perceptualRoughness * uboParams.prefilteredCubeMipLevels);
-// 	// retrieve a scale and bias to F0. See [1], Figure 3
-// 	vec3 brdf = (texture(samplerBRDFLUT, vec2(pbrInputs.NdotV, 1.0 - pbrInputs.perceptualRoughness))).rgb;
-// 	vec3 diffuseLight = SRGBtoLINEAR(tonemap(texture(samplerIrradiance, n))).rgb;
-// 	vec3 specularLight = SRGBtoLINEAR(tonemap(textureLod(prefilteredMap, reflection, lod))).rgb;
-
-// 	vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
-// 	vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
-
-// 	return diffuse + specular;
-// }
+// Add some fake IBL. Texture reads are PHENOMENALLY expensive on mobile so we'll need to come up with a
+// faster solution than reading all the IBL images.
+vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
+{
+	vec4 irradiance  = vec4(0.5);
+	vec4 ibl_diffuse = irradiance * vec4(pbrInputs.diffuseColor, 1.0);
+	return SRGBtoLINEAR(tonemap(ibl_diffuse)).xyz;
+}
 
 // Basic Lambertian diffuse
 // Implementation from Lambert's Photometria https://archive.org/details/lambertsphotome00lambgoog
@@ -295,7 +289,7 @@ void main()
 	vec3 color = NdotL * u_LightColor * (diffuseContrib + specContrib);
 
 	// Calculate lighting contribution from image based lighting source (IBL)
-	// color += getIBLContribution(pbrInputs, n, reflection) * uboParams.scaleIBLAmbient;
+	color += getIBLContribution(pbrInputs, n, reflection) * DEFAULT_IBL_SCALE;
 
 	const float u_OcclusionStrength = 1.0f;
 	// Apply optional PBR terms for additional (optional) shading
