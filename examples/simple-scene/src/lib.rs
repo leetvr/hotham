@@ -54,29 +54,9 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     ];
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
-    add_helmet(
-        &models,
-        &mut world,
-        vulkan_context,
-        render_context,
-        physics_context,
-    );
-    add_hand(
-        &models,
-        Handedness::Left,
-        &mut world,
-        vulkan_context,
-        render_context,
-        physics_context,
-    );
-    add_hand(
-        &models,
-        Handedness::Right,
-        &mut world,
-        vulkan_context,
-        render_context,
-        physics_context,
-    );
+    add_helmet(&models, &mut world, physics_context);
+    add_hand(&models, Handedness::Left, &mut world, physics_context);
+    add_hand(&models, Handedness::Right, &mut world, physics_context);
 
     Ok(world)
 }
@@ -84,19 +64,10 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
 fn add_helmet(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
-    vulkan_context: &mut VulkanContext,
-    render_context: &mut RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
-    let helmet = add_model_to_world(
-        "Damaged Helmet",
-        models,
-        world,
-        None,
-        vulkan_context,
-        render_context,
-    )
-    .expect("Could not find Damaged Helmet");
+    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
+        .expect("Could not find Damaged Helmet");
     let transform = world.get::<Transform>(helmet).unwrap();
     let position = transform.position();
     drop(transform);

@@ -128,14 +128,7 @@ fn init(
                 &mut render_context,
             )?;
             for name in models.keys() {
-                add_model_to_world(
-                    name,
-                    &models,
-                    &mut world,
-                    None,
-                    vulkan_context,
-                    &mut render_context,
-                );
+                add_model_to_world(name, &models, &mut world, None);
             }
             models
         }
@@ -150,8 +143,7 @@ fn add_cube(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) {
-    let cube = add_model_to_world("Cube", models, world, None, vulkan_context, render_context)
-        .expect("Could not find cube?");
+    let cube = add_model_to_world("Cube", models, world, None).expect("Could not find cube?");
     world.insert_one(cube, Cube {}).unwrap();
 }
 

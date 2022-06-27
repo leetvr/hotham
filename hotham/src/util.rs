@@ -53,29 +53,13 @@ pub fn get_world_with_hands() -> World {
     let mut world = World::new();
 
     // Add two hands
-    let left_hand = add_model_to_world(
-        "Left Hand",
-        &models,
-        &mut world,
-        None,
-        &vulkan_context,
-        &mut render_context,
-    )
-    .unwrap();
+    let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
     {
         let mut transform = world.get_mut::<Transform>(left_hand).unwrap();
         transform.translation = [-0.2, 1.4, 0.0].into();
     }
 
-    let right_hand = add_model_to_world(
-        "Right Hand",
-        &models,
-        &mut world,
-        None,
-        &vulkan_context,
-        &mut render_context,
-    )
-    .unwrap();
+    let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
     {
         let mut transform = world.get_mut::<Transform>(right_hand).unwrap();
         transform.translation = [0.2, 1.4, 0.0].into();

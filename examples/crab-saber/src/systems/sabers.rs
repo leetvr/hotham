@@ -78,15 +78,7 @@ pub fn add_saber(
         Color::Blue => "Blue Saber",
         Color::Red => "Red Saber",
     };
-    let saber = add_model_to_world(
-        model_name,
-        models,
-        world,
-        None,
-        vulkan_context,
-        render_context,
-    )
-    .unwrap();
+    let saber = add_model_to_world(model_name, models, world, None).unwrap();
     add_saber_physics(world, physics_context, saber);
     world.insert(saber, (Saber {}, color)).unwrap();
     saber

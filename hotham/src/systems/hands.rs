@@ -73,23 +73,13 @@ pub fn add_hand(
     models: &std::collections::HashMap<String, World>,
     handedness: Handedness,
     world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
     let model_name = match handedness {
         Handedness::Left => "Left Hand",
         Handedness::Right => "Right Hand",
     };
-    let hand = add_model_to_world(
-        model_name,
-        models,
-        world,
-        None,
-        vulkan_context,
-        render_context,
-    )
-    .unwrap();
+    let hand = add_model_to_world(model_name, models, world, None).unwrap();
     {
         // Add a hand component
         world

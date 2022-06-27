@@ -10,6 +10,7 @@ use super::{
     gambier_buffer::GambierBuffer as Buffer,
     image::Image,
     material::Material,
+    mesh_data::MeshData,
     texture::Texture,
     vertex::Vertex,
 };
@@ -36,7 +37,7 @@ pub struct Resources {
     pub draw_indirect_buffer: Buffer<vk::DrawIndexedIndirectCommand>,
 
     /// Mesh data used to generate DrawData
-    pub mesh_data: Arena<Mesh>,
+    pub mesh_data: Arena<MeshData>,
 
     /// Shared sampler in repeat mode, takes care of most things
     pub texture_sampler: vk::Sampler,

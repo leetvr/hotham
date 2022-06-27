@@ -33,8 +33,7 @@ pub fn animation_system(
 mod tests {
     use crate::{
         asset_importer::{add_model_to_world, load_models_from_glb},
-        rendering::resources::Resources,
-        resources::{vulkan_context, RenderContext, VulkanContext},
+        resources::RenderContext,
     };
 
     use super::*;
@@ -48,15 +47,7 @@ mod tests {
         let mut world = World::new();
 
         // Add the left hand
-        let left_hand = add_model_to_world(
-            "Left Hand",
-            &models,
-            &mut world,
-            None,
-            &vulkan_context,
-            &mut render_context,
-        )
-        .unwrap();
+        let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
         {
             let mut left_hand_controller = world.get_mut::<AnimationController>(left_hand).unwrap();
             left_hand_controller.blend_from = 0;

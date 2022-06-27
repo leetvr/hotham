@@ -25,7 +25,7 @@ pub(crate) struct ImportContext<'a> {
     pub render_context: &'a mut RenderContext,
     pub models: &'a mut Models,
     pub node_entity_map: HashMap<usize, Entity>,
-    pub mesh_map: HashMap<usize, Id<Mesh>>,
+    pub mesh_map: HashMap<usize, Mesh>,
     pub document: Document,
     pub buffer: gltf::buffer::Data,
     pub images: Vec<gltf::image::Data>,
@@ -81,7 +81,7 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     // Previously, we assumed nodes were the centre of the universe. That is untrue.
     // Instead, we'll import each resource type individually, updating references as we go.
     for mesh in document.meshes() {
-        MeshData::load(mesh, import_context);
+        Mesh::load(mesh, import_context);
     }
 
     for material in document.materials() {
@@ -135,6 +135,15 @@ fn load_node(
     import_context
         .node_entity_map
         .insert(node_data.index(), this_entity);
+
+    if let Some(mesh) = node_data
+        .mesh()
+        .and_then(|m| import_context.mesh_map.get(&m.index()))
+    {
+        world
+            .insert(this_entity, (mesh.clone(), Visible {}))
+            .unwrap();
+    }
 
     if is_root {
         world.insert_one(this_entity, Root {}).unwrap();
@@ -309,8 +318,6 @@ pub fn add_model_to_world(
     models: &Models,
     destination_world: &mut World,
     parent: Option<Entity>,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
 ) -> Option<Entity> {
     let source_world = models.get(name)?;
     let source_entities = source_world.iter();
@@ -418,30 +425,6 @@ pub fn add_model_to_world(
     // Get the new root entity.
     let new_root_entity = entity_map.get(&root_entity).cloned().unwrap();
 
-    // We'll also need to fix up any meshes
-    for (_, (info, mesh)) in destination_world.query_mut::<(&Info, &mut Mesh)>() {
-        // // Create new description sets
-        // let new_descriptor_sets = vulkan_context
-        //     .create_mesh_descriptor_sets(descriptor_set_layouts.mesh_layout, &info.name)
-        //     .unwrap();
-        // mesh.descriptor_sets = [new_descriptor_sets[0]];
-
-        // // Create a new buffer
-        // let new_ubo_buffer = Buffer::new(
-        //     vulkan_context,
-        //     &[mesh.ubo_data],
-        //     vk::BufferUsageFlags::UNIFORM_BUFFER,
-        // )
-        // .unwrap();
-        // vulkan_context.update_buffer_descriptor_set(
-        //     &new_ubo_buffer,
-        //     mesh.descriptor_sets[0],
-        //     0,
-        //     vk::DescriptorType::UNIFORM_BUFFER,
-        // );
-        // mesh.ubo_buffer = new_ubo_buffer;
-    }
-
     Some(new_root_entity)
 }
 
@@ -468,12 +451,14 @@ mod tests {
             (
                 "Asteroid",
                 0,
+                1800,
                 vector![0., 0., 0.],
                 Quaternion::new(1., 0., 0., 0.),
             ),
             (
                 "Refinery",
                 1,
+                23928,
                 vector![-0.06670809, 2.1408155, -0.46151406],
                 Quaternion::new(
                     0.719318151473999,
@@ -485,30 +470,37 @@ mod tests {
             (
                 "Damaged Helmet",
                 0,
+                46356,
                 vector![0., 1.4, 0.],
                 Quaternion::new(0.707, 0.707, 0., 0.),
             ),
         ];
-        for (name, id, translation, rotation) in &test_data {
-            let model_world = models
+        for (name, id, indicies_count, translation, rotation) in &test_data {
+            let _ = models
                 .get(*name)
                 .expect(&format!("Unable to find model with name {}", name));
 
             let mut world = World::default();
-            let model = add_model_to_world(
-                *name,
-                &models,
-                &mut world,
-                None,
-                &vulkan_context,
-                &mut render_context,
-            );
+            let model = add_model_to_world(*name, &models, &mut world, None);
             assert!(model.is_some(), "Model {} could not be added", name);
 
             let model = model.unwrap();
             let (info, transform, mesh, ..) = world
                 .query_one_mut::<(&Info, &Transform, &Mesh, &TransformMatrix, &Root)>(model)
                 .unwrap();
+            let mesh = render_context.resources.mesh_data.get(mesh.handle).unwrap();
+            let primitive = &mesh.primitives[0];
+            assert_eq!(primitive.indices_count, *indicies_count as u32);
+
+            // Ensure we populated the buffers correctly.
+            unsafe {
+                let vertex_buffer = render_context.resources.vertex_buffer.as_slice();
+                let index_buffer = render_context.resources.index_buffer.as_slice();
+                for n in 0..primitive.indices_count as _ {
+                    let index = index_buffer[(primitive.index_buffer_offset + n) as usize] as usize;
+                    let _vertex = &vertex_buffer[index];
+                }
+            }
             assert_eq!(
                 transform.translation, *translation,
                 "Model {} has wrong translation",
@@ -533,14 +525,7 @@ mod tests {
         let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
 
         let mut world = World::default();
-        let _hand = add_model_to_world(
-            "Left Hand",
-            &models,
-            &mut world,
-            None,
-            &vulkan_context,
-            &mut render_context,
-        );
+        let _hand = add_model_to_world("Left Hand", &models, &mut world, None);
 
         // Make sure there is only one root
         let mut roots = world.query_mut::<(&Root, &Info, &Transform)>().into_iter();

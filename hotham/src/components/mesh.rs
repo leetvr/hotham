@@ -7,8 +7,8 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    /// Takes mesh data from a glTF file, uploads it to the GPU and hands back a handle
-    pub(crate) fn load(mesh_data: gltf::Mesh, import_context: &mut ImportContext) -> Mesh {
+    /// Takes mesh data from a glTF file, uploads it to the GPU and inserts it into mesh_map
+    pub(crate) fn load(mesh_data: gltf::Mesh, import_context: &mut ImportContext) {
         MeshData::load(mesh_data, import_context)
     }
 }

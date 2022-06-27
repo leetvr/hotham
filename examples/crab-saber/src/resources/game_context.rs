@@ -173,15 +173,7 @@ fn add_pointer(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) -> Entity {
-    let pointer = add_model_to_world(
-        "Blue Pointer",
-        models,
-        world,
-        None,
-        vulkan_context,
-        render_context,
-    )
-    .unwrap();
+    let pointer = add_model_to_world("Blue Pointer", models, world, None).unwrap();
 
     world
         .insert_one(
@@ -202,16 +194,8 @@ fn add_environment(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) {
-    add_model_to_world(
-        "Environment",
-        models,
-        world,
-        None,
-        vulkan_context,
-        render_context,
-    );
-
-    add_model_to_world("Ramp", models, world, None, vulkan_context, render_context);
+    add_model_to_world("Environment", models, world, None);
+    add_model_to_world("Ramp", models, world, None);
 }
 
 pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContext) {
@@ -282,15 +266,7 @@ pub fn pre_spawn_cube(
         Color::Blue => "Blue Cube",
     };
 
-    let cube = add_model_to_world(
-        model_name,
-        models,
-        world,
-        None,
-        vulkan_context,
-        render_context,
-    )
-    .unwrap();
+    let cube = add_model_to_world(model_name, models, world, None).unwrap();
 
     let rigid_body = RigidBodyBuilder::new_dynamic().lock_rotations().build();
     let handle = physics_context.rigid_bodies.insert(rigid_body);
