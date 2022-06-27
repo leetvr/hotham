@@ -126,6 +126,8 @@ impl Resources {
 pub struct DrawData {
     /// The transform of the parent mesh
     pub transform: Matrix4<f32>,
+    /// The inverse transpose of the transform of the parent mesh
+    pub inverse_transpose: Matrix4<f32>,
     /// A bounding sphere for the primitive in x, y, z, radius format
     pub bounding_sphere: Vector4<f32>,
     /// The ID of the material to use.

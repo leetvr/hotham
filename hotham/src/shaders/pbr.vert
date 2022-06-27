@@ -42,7 +42,7 @@ void main()
 	if (length(inNormal) == 0.0) {
 		outNormal = inNormal;
 	} else {
-		outNormal = mat3(d.transform) * inNormal;
+		outNormal = normalize(mat3(d.inverseTranspose) * inNormal);
 	}
 
 	outWorldPos = localPosition;
