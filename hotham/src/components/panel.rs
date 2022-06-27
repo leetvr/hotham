@@ -92,7 +92,7 @@ fn create_mesh(
         .into_iter()
         .map(|(p, t)| Vertex {
             position: p,
-            texture_coords_0: t,
+            texture_coords: t,
             ..Default::default()
         })
         .collect();

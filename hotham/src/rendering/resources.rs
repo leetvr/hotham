@@ -3,16 +3,11 @@ use id_arena::Arena;
 use nalgebra::{Matrix4, Vector3, Vector4};
 use vulkan_context::VulkanContext;
 
-use crate::{components::Mesh, resources::vulkan_context};
+use crate::resources::vulkan_context;
 
 use super::{
-    descriptors::{self, Descriptors},
-    gambier_buffer::GambierBuffer as Buffer,
-    image::Image,
-    material::Material,
-    mesh_data::MeshData,
-    texture::Texture,
-    vertex::Vertex,
+    descriptors::Descriptors, gambier_buffer::GambierBuffer as Buffer, image::Image,
+    material::Material, mesh_data::MeshData, vertex::Vertex,
 };
 
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO

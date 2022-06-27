@@ -1,4 +1,4 @@
-use std::{ffi::CStr, io::Cursor, mem::size_of, slice::from_ref as slice_from_ref, time::Instant};
+use std::{ffi::CStr, io::Cursor, mem::size_of, slice::from_ref as slice_from_ref};
 
 pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
@@ -16,26 +16,14 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 
 use crate::{
     rendering::{
-        buffer::Buffer,
-        camera::Camera,
-        descriptors::Descriptors,
-        frame::Frame,
-        image::Image,
-        material::Material,
-        resources::Resources,
-        scene_data::{SceneData, SceneParams},
-        swapchain::Swapchain,
-        texture::Texture,
-        vertex::Vertex,
+        camera::Camera, descriptors::Descriptors, frame::Frame, image::Image, material::Material,
+        resources::Resources, scene_data::SceneData, swapchain::Swapchain, vertex::Vertex,
     },
     resources::{VulkanContext, XrContext},
     COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
-use ash::{
-    prelude::VkResult,
-    vk::{self, Handle},
-};
+use ash::vk::{self, Handle};
 use nalgebra::Matrix4;
 use openxr as xr;
 use vk_shader_macros::include_glsl;
@@ -181,26 +169,12 @@ impl RenderContext {
         let near = 0.05;
         let far = 100.0;
 
-        let view = [view_matrices[0], view_matrices[1]];
         let fov_left = views[0].fov;
         let fov_right = views[1].fov;
-        if self.frame_index == 1 {
-            println!(
-                "[FOV Left]: up: {} down: {}, left: {}, right: {}",
-                fov_left.angle_up, fov_left.angle_down, fov_left.angle_left, fov_left.angle_right
-            );
-            println!(
-                "[FOV Right]: up: {} down: {}, left: {}, right: {}",
-                fov_right.angle_up,
-                fov_right.angle_down,
-                fov_right.angle_left,
-                fov_right.angle_right
-            );
-        }
 
-        let projection = [
-            get_projection(fov_left, near, far),
-            get_projection(fov_right, near, far),
+        let view_projection = [
+            get_projection(fov_left, near, far) * view_matrices[0],
+            get_projection(fov_right, near, far) * view_matrices[1],
         ];
 
         let camera_position = [self.cameras[0].position(), self.cameras[1].position()];
@@ -209,9 +183,9 @@ impl RenderContext {
         }
 
         self.scene_data = SceneData {
-            view,
-            projection,
+            view_projection,
             camera_position,
+            ..Default::default()
         };
 
         Ok(())
@@ -732,7 +706,6 @@ pub fn create_shader(
     stage: vk::ShaderStageFlags,
     vulkan_context: &VulkanContext,
 ) -> Result<(vk::ShaderModule, vk::PipelineShaderStageCreateInfo)> {
-    let mut cursor = Cursor::new(shader_code);
     let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
     let create_info = vk::ShaderModuleCreateInfo::builder().code(shader_code);
     let shader_module = unsafe {
@@ -754,9 +727,11 @@ fn create_pipeline_layout(
     set_layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout> {
     let push_constant_ranges = [vk::PushConstantRange {
-        stage_flags: vk::ShaderStageFlags::FRAGMENT,
+        stage_flags: vk::ShaderStageFlags::COMPUTE
+            | vk::ShaderStageFlags::VERTEX
+            | vk::ShaderStageFlags::FRAGMENT,
         offset: 0,
-        size: size_of::<Material>() as _,
+        size: size_of::<SceneData>() as _,
     }];
     let create_info = &vk::PipelineLayoutCreateInfo::builder()
         .set_layouts(set_layouts)
@@ -767,12 +742,4 @@ fn create_pipeline_layout(
             .create_pipeline_layout(create_info, None)
     }
     .map_err(|e| e.into())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    pub fn render_context_smoke_test() {}
 }

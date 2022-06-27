@@ -24,8 +24,7 @@ impl Primitive {
     ) -> Self {
         let mut indices = Vec::new();
         let mut positions = Vec::new();
-        let mut tex_coords_0 = Vec::new();
-        let mut tex_coords_1 = Vec::new();
+        let mut tex_coords = Vec::new();
         let mut normals = Vec::new();
         let mut joint_indices = Vec::new();
         let mut joint_weights = Vec::new();
@@ -60,21 +59,11 @@ impl Primitive {
 
         if let Some(iter) = reader.read_tex_coords(0) {
             for v in iter.into_f32() {
-                tex_coords_0.push(vector![v[0], v[1]]);
+                tex_coords.push(vector![v[0], v[1]]);
             }
         } else {
             for _ in 0..positions.len() {
-                tex_coords_0.push(vector![0., 0.]);
-            }
-        }
-
-        if let Some(iter) = reader.read_tex_coords(1) {
-            for v in iter.into_f32() {
-                tex_coords_1.push(vector![v[0], v[1]]);
-            }
-        } else {
-            for _ in 0..positions.len() {
-                tex_coords_1.push(vector![0., 0.]);
+                tex_coords.push(vector![0., 0.]);
             }
         }
 
@@ -98,17 +87,11 @@ impl Primitive {
             }
         }
 
-        let vertices: Vec<Vertex> = izip!(
-            positions,
-            normals,
-            tex_coords_0,
-            tex_coords_1,
-            joint_indices,
-            joint_weights
-        )
-        .into_iter()
-        .map(Vertex::from_zip)
-        .collect();
+        let vertices: Vec<Vertex> =
+            izip!(positions, normals, tex_coords, joint_indices, joint_weights)
+                .into_iter()
+                .map(Vertex::from_zip)
+                .collect();
 
         // Grab the offsets - note that we want to do this BEFORE we add these vertices to the buffer.
         let vertex_buffer = &mut import_context.render_context.resources.vertex_buffer;
