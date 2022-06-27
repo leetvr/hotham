@@ -71,7 +71,7 @@ mod tests {
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
-        rendering::{buffer::Buffer, image::Image, scene_data::SceneParams, swapchain::Swapchain},
+        rendering::{buffer::Buffer, image::Image, swapchain::Swapchain},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
             rendering_system, update_parent_transform_matrix_system, update_transform_matrix_system,
@@ -237,9 +237,7 @@ mod tests {
 
         render_context.begin_frame(&vulkan_context, 0);
 
-        render_context
-            .update_scene_data(&views, &vulkan_context)
-            .unwrap();
+        render_context.update_scene_data(&views).unwrap();
     }
 
     fn button_was_clicked(world: &mut World) -> bool {

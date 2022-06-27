@@ -1,4 +1,5 @@
 use ash::vk::{self, Handle};
+use vk_shader_macros::include_glsl;
 
 /// How much the GUI should be scaled by
 // TODO - this this necessary?
@@ -151,7 +152,7 @@ impl GuiContext {
 
             // Vertex shader stage
             let (vertex_shader, vertex_stage) = create_shader(
-                include_bytes!("../../shaders/gui.vert.spv"),
+                include_glsl!("src/shaders/gui.vert"),
                 vk::ShaderStageFlags::VERTEX,
                 vulkan_context,
             )
@@ -159,7 +160,7 @@ impl GuiContext {
 
             // Fragment shader stage
             let (fragment_shader, fragment_stage) = create_shader(
-                include_bytes!("../../shaders/gui.frag.spv"),
+                include_glsl!("src/shaders/gui.frag"),
                 vk::ShaderStageFlags::FRAGMENT,
                 vulkan_context,
             )

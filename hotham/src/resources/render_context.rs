@@ -38,6 +38,11 @@ use ash::{
 };
 use nalgebra::Matrix4;
 use openxr as xr;
+use vk_shader_macros::include_glsl;
+
+static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert");
+static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag");
+// static COMPUTE: &[u32] = include_glsl!("src/shaders/render.comp");
 
 pub struct RenderContext {
     pub frames: Vec<Frame>,
@@ -48,10 +53,8 @@ pub struct RenderContext {
     pub color_image: Image,
     pub render_area: vk::Rect2D,
     pub scene_data: SceneData,
-    pub render_start_time: Instant,
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
-    pub last_frame_time: Instant,
     pub frame_index: usize,
     pub resources: Resources,
     pub(crate) descriptors: Descriptors,
@@ -113,9 +116,6 @@ impl RenderContext {
             &color_image,
         )?;
 
-        println!("[HOTHAM_RENDERER] Creating UBO..");
-        let scene_data = SceneData::default();
-
         Ok(Self {
             frames,
             pipeline,
@@ -125,11 +125,9 @@ impl RenderContext {
             depth_image,
             color_image,
             render_area,
-            scene_data,
-            render_start_time: Instant::now(),
+            scene_data: Default::default(),
             cameras: vec![Default::default(); 2],
             views: Vec::new(),
-            last_frame_time: Instant::now(),
             descriptors,
             resources,
         })
@@ -168,11 +166,7 @@ impl RenderContext {
     }
 
     // TODO: Make this update the scene data rather than creating a new one
-    pub(crate) fn update_scene_data(
-        &mut self,
-        views: &[xr::View],
-        vulkan_context: &VulkanContext,
-    ) -> Result<()> {
+    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) -> Result<()> {
         self.views = views.to_owned();
 
         // View (camera)
@@ -320,7 +314,6 @@ impl RenderContext {
                 .unwrap();
         }
 
-        self.last_frame_time = Instant::now();
         self.frame_index += 1;
     }
 
@@ -607,18 +600,12 @@ fn create_pipeline(
     // Build up the state of the pipeline
 
     // Vertex shader stage
-    let (vertex_shader, vertex_stage) = create_shader(
-        include_bytes!("../../shaders/pbr.vert.spv"),
-        vk::ShaderStageFlags::VERTEX,
-        vulkan_context,
-    )?;
+    let (vertex_shader, vertex_stage) =
+        create_shader(VERT, vk::ShaderStageFlags::VERTEX, vulkan_context)?;
 
     // Fragment shader stage
-    let (fragment_shader, fragment_stage) = create_shader(
-        include_bytes!("../../shaders/pbr.frag.spv"),
-        vk::ShaderStageFlags::FRAGMENT,
-        vulkan_context,
-    )?;
+    let (fragment_shader, fragment_stage) =
+        create_shader(FRAG, vk::ShaderStageFlags::FRAGMENT, vulkan_context)?;
 
     let stages = [vertex_stage, fragment_stage];
 
@@ -741,14 +728,13 @@ fn create_pipeline(
 }
 
 pub fn create_shader(
-    shader_code: &[u8],
+    shader_code: &[u32],
     stage: vk::ShaderStageFlags,
     vulkan_context: &VulkanContext,
 ) -> Result<(vk::ShaderModule, vk::PipelineShaderStageCreateInfo)> {
     let mut cursor = Cursor::new(shader_code);
-    let shader_code = ash::util::read_spv(&mut cursor)?;
     let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
-    let create_info = vk::ShaderModuleCreateInfo::builder().code(&shader_code);
+    let create_info = vk::ShaderModuleCreateInfo::builder().code(shader_code);
     let shader_module = unsafe {
         vulkan_context
             .device

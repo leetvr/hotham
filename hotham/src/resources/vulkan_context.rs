@@ -722,7 +722,6 @@ fn add_device_extension_names(extension_names: &mut Vec<CString>) {
     extension_names.push(vk::KhrShaderDrawParametersFn::name().to_owned());
 
     // Add Multiview extension
-    #[cfg(target_os = "android")]
     extension_names.push(CString::new("VK_KHR_multiview").unwrap());
 
     // If we're on macOS we've got to add portability
