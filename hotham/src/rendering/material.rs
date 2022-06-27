@@ -134,6 +134,8 @@ impl Material {
             alpha_mask_cutoff,
         };
 
+        println!("Imported material {:?} - {}", material, material_name);
+
         // Then push it into the materials buffer
         unsafe {
             import_context

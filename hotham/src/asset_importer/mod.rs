@@ -434,6 +434,7 @@ mod tests {
     use super::*;
     use crate::{
         components::{Root, Transform},
+        rendering::resources,
         resources::{vulkan_context, VulkanContext},
     };
     use approx::assert_relative_eq;
@@ -448,6 +449,13 @@ mod tests {
         ];
         let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
         let test_data = vec![
+            (
+                "Damaged Helmet",
+                0,
+                46356,
+                vector![0., 1.4, 0.],
+                Quaternion::new(0.707, 0.707, 0., 0.),
+            ),
             (
                 "Asteroid",
                 0,
@@ -466,13 +474,6 @@ mod tests {
                     0.6883626580238342,
                     0.006518156733363867,
                 ),
-            ),
-            (
-                "Damaged Helmet",
-                0,
-                46356,
-                vector![0., 1.4, 0.],
-                Quaternion::new(0.707, 0.707, 0., 0.),
             ),
         ];
         for (name, id, indicies_count, translation, rotation) in &test_data {
@@ -501,6 +502,20 @@ mod tests {
                     let _vertex = &vertex_buffer[index];
                 }
             }
+
+            // Ensure we imported the material correctly
+            if *name == "Damaged Helmet" {
+                unsafe {
+                    let material = &render_context.resources.materials_buffer.as_slice()
+                        [primitive.material_id as usize];
+                    assert_eq!(material.base_color_texture_set, 0);
+                    assert_eq!(material.physical_descrtiptor_texture_id, 1);
+                    assert_eq!(material.normal_texture_set, 2);
+                    assert_eq!(material.occlusion_texture_set, 3);
+                }
+            }
+
+            // Ensure the transform was populated correctly
             assert_eq!(
                 transform.translation, *translation,
                 "Model {} has wrong translation",

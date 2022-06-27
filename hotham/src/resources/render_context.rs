@@ -395,20 +395,17 @@ impl RenderContext {
             todo!()
         }
 
-        unsafe {
-            self.resources.write_texture_to_array(
-                vulkan_context,
-                &self.descriptors,
-                &texture_image,
-            );
-        }
+        let texture_index = unsafe {
+            self.resources
+                .write_texture_to_array(vulkan_context, &self.descriptors, &texture_image)
+        };
 
         println!(
             "[HOTHAM_VULKAN] ..done! Texture {} created successfully.",
             name
         );
 
-        Ok((texture_image, 0))
+        Ok((texture_image, texture_index))
     }
 }
 
