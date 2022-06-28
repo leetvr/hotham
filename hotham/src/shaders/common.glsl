@@ -37,12 +37,6 @@ struct VkDrawIndexedIndirectCommand
 	uint firstInstance;
 };
 
-layout (push_constant) uniform SceneData { 
-    mat4 viewProjection[2];
-    vec4 cameraPosition[2];
-    vec4 lightDirection;
-    vec4 debugData;
-} sceneData;
 
 layout(std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
     DrawData data[];
@@ -56,5 +50,12 @@ layout(std430, set = 0, binding = 2) writeonly buffer DrawCommandsBuffer {
     VkDrawIndexedIndirectCommand drawCommands[];
 } draw_commands_buffer;
 
+layout (set = 0, binding = 3) uniform SceneData { 
+    mat4 viewProjection[2];
+    vec4 cameraPosition[2];
+    vec4 lightDirection;
+    vec4 debugData;
+} sceneData;
+
 // Textures
-layout(set = 0, binding = 3) uniform sampler2D textures[];
+layout(set = 0, binding = 4) uniform sampler2D textures[];

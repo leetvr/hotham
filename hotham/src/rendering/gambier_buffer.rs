@@ -125,11 +125,17 @@ impl<T: Sized> GambierBuffer<T> {
             .offset(0)
             .range(vk::WHOLE_SIZE);
 
+        let descriptor_type = if self.usage.contains(vk::BufferUsageFlags::UNIFORM_BUFFER) {
+            vk::DescriptorType::UNIFORM_BUFFER
+        } else {
+            vk::DescriptorType::STORAGE_BUFFER
+        };
+
         let write = vk::WriteDescriptorSet::builder()
             .buffer_info(std::slice::from_ref(&buffer_info))
             .dst_set(descriptor_set)
             .dst_binding(binding as _)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER);
+            .descriptor_type(descriptor_type);
 
         device.update_descriptor_sets(std::slice::from_ref(&write), &[]);
     }

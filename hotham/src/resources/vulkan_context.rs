@@ -723,6 +723,7 @@ fn add_device_extension_names(extension_names: &mut Vec<CString>) {
 
     // Add Multiview extension
     extension_names.push(CString::new("VK_KHR_multiview").unwrap());
+    extension_names.push(CString::new("VK_EXT_descriptor_indexing").unwrap());
 
     // If we're on macOS we've got to add portability
     #[cfg(target_os = "macos")]

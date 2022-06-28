@@ -1,6 +1,7 @@
+use crate::resources::VulkanContext;
 use ash::vk;
 
-use crate::resources::VulkanContext;
+static TEXTURE_BINDING: u32 = 4;
 
 /// A wrapper around all the various bits of descriptor functionality
 #[derive(Clone, Debug)]
@@ -39,7 +40,7 @@ impl Descriptors {
 
         let texture_write = vk::WriteDescriptorSet::builder()
             .image_info(std::slice::from_ref(&image_info))
-            .dst_binding(3)
+            .dst_binding(TEXTURE_BINDING)
             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
             .dst_array_element(array_index)
             .dst_set(self.set);
@@ -95,9 +96,17 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
             descriptor_count: 1,
             ..Default::default()
         },
-        // Textures
+        // Scene Data
         vk::DescriptorSetLayoutBinding {
             binding: 3,
+            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+        // Textures
+        vk::DescriptorSetLayoutBinding {
+            binding: 4,
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1000,
@@ -110,6 +119,7 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
 
     let descriptor_flags = [
+        vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
@@ -135,6 +145,10 @@ unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
     let pool_sizes = [
         vk::DescriptorPoolSize {
             ty: vk::DescriptorType::STORAGE_BUFFER,
+            descriptor_count: 100,
+        },
+        vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::UNIFORM_BUFFER,
             descriptor_count: 100,
         },
         vk::DescriptorPoolSize {

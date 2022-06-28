@@ -178,15 +178,18 @@ impl RenderContext {
         ];
 
         let camera_position = [self.cameras[0].position(), self.cameras[1].position()];
-        if self.frame_index == 0 {
-            println!("Camera position: {:?}", camera_position);
-        }
 
         self.scene_data = SceneData {
             view_projection,
             camera_position,
             ..Default::default()
         };
+
+        unsafe {
+            self.resources
+                .scene_data_buffer
+                .overwrite(slice_from_ref(&self.scene_data));
+        }
 
         Ok(())
     }
@@ -261,18 +264,6 @@ impl RenderContext {
                 slice_from_ref(&self.resources.vertex_buffer.buffer),
                 &[0],
             );
-
-            // Update the global push constants
-            let scene_data = create_push_constant(&self.scene_data);
-            device.cmd_push_constants(
-                command_buffer,
-                self.pipeline_layout,
-                vk::ShaderStageFlags::VERTEX
-                    | vk::ShaderStageFlags::FRAGMENT
-                    | vk::ShaderStageFlags::COMPUTE,
-                0,
-                scene_data,
-            )
         }
     }
 
@@ -747,16 +738,7 @@ fn create_pipeline_layout(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout> {
-    let push_constant_ranges = [vk::PushConstantRange {
-        stage_flags: vk::ShaderStageFlags::COMPUTE
-            | vk::ShaderStageFlags::VERTEX
-            | vk::ShaderStageFlags::FRAGMENT,
-        offset: 0,
-        size: size_of::<SceneData>() as _,
-    }];
-    let create_info = &vk::PipelineLayoutCreateInfo::builder()
-        .set_layouts(set_layouts)
-        .push_constant_ranges(&push_constant_ranges);
+    let create_info = &vk::PipelineLayoutCreateInfo::builder().set_layouts(set_layouts);
     unsafe {
         vulkan_context
             .device

@@ -7,7 +7,7 @@ use crate::resources::vulkan_context;
 
 use super::{
     descriptors::Descriptors, gambier_buffer::GambierBuffer as Buffer, image::Image,
-    material::Material, mesh_data::MeshData, vertex::Vertex,
+    material::Material, mesh_data::MeshData, scene_data::SceneData, vertex::Vertex,
 };
 
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
@@ -30,6 +30,9 @@ pub struct Resources {
 
     /// The actual draw calls for this frame.
     pub draw_indirect_buffer: Buffer<vk::DrawIndexedIndirectCommand>,
+
+    /// Shared data used in a scene
+    pub scene_data_buffer: Buffer<SceneData>,
 
     /// Mesh data used to generate DrawData
     pub mesh_data: Arena<MeshData>,
@@ -80,6 +83,10 @@ impl Resources {
         );
         draw_indirect_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 2);
 
+        let scene_data_buffer =
+            Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1);
+        scene_data_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 3);
+
         let texture_sampler = vulkan_context
             .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
             .unwrap();
@@ -93,6 +100,7 @@ impl Resources {
             index_buffer,
             draw_data_buffer,
             materials_buffer,
+            scene_data_buffer,
             draw_indirect_buffer,
             mesh_data: Default::default(),
             texture_count: 0,
