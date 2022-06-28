@@ -9,7 +9,6 @@ struct DrawData {
     mat4 inverseTranspose;
     vec4 boundingSphere;
     uint materialID;
-    vec3 pad;
 };
 
 struct Material {
@@ -45,7 +44,7 @@ layout (push_constant) uniform SceneData {
     vec4 debugData;
 } sceneData;
 
-layout(std140, set = 0, binding = 0) readonly buffer DrawDataBuffer {
+layout(std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
     DrawData data[];
 } drawDataBuffer;
 

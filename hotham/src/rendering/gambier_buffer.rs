@@ -166,14 +166,26 @@ mod tests {
             expected_data.append(&mut additional_data);
             assert_eq!(buffer.as_slice(), &expected_data);
 
-            // Then, push to it
-            buffer.push(&12);
-            expected_data.push(12);
-            assert_eq!(buffer.as_slice(), &expected_data);
+            // Then, push a bunch of shit to it
+            let push_data = vec![12, 13, 14, 15, 16, 17, 18, 19, 20];
+            for n in &push_data {
+                buffer.push(n);
+                expected_data.push(*n);
+                assert_eq!(buffer.as_slice(), &expected_data);
+            }
 
-            // Finally, clear it
+            // Clear it
             buffer.clear();
+            let mut expected_data = vec![];
             assert_eq!(buffer.as_slice().len(), 0);
+
+            // Push data again.
+            let push_data = vec![12, 13, 14, 15, 16, 17, 18, 19, 20];
+            for n in &push_data {
+                buffer.push(n);
+                expected_data.push(*n);
+                assert_eq!(buffer.as_slice(), &expected_data);
+            }
         }
     }
 }

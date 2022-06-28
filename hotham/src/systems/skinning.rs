@@ -11,7 +11,6 @@ pub fn skinning_system(
     meshes_query: &mut PreparedQuery<(&mut Mesh, &Skin)>,
     world: &mut World,
 ) {
-    todo!();
     // let mut joint_matrices: HashMap<Entity, HashMap<usize, Matrix4<f32>>> = HashMap::new();
     // for (_, (transform_matrix, joint, info)) in joints_query.query(world).iter() {
     //     let inverse_transform = world

@@ -91,6 +91,7 @@ impl Timer {
 #[allow(dead_code)]
 enum StressTest {
     ManyCubes,
+    ManyHelmets,
     ManyVertices,
     Sponza,
 }
@@ -112,7 +113,20 @@ fn init(
                 &mut render_context,
             )?;
 
-            add_cube(&models, &mut world, vulkan_context, render_context);
+            add_model_to_world("Cube", &models, &mut world, None).expect("Could not find cube?");
+            models
+        }
+        StressTest::ManyHelmets => {
+            let glb_buffers: Vec<&[u8]> =
+                vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
+            let models = asset_importer::load_models_from_glb(
+                &glb_buffers,
+                vulkan_context,
+                &mut render_context,
+            )?;
+
+            add_model_to_world("Damaged Helmet", &models, &mut world, None)
+                .expect("Could not find cube?");
             models
         }
         StressTest::ManyVertices => {
@@ -135,16 +149,6 @@ fn init(
     };
 
     Ok((world, models))
-}
-
-fn add_cube(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
-) {
-    let cube = add_model_to_world("Cube", models, world, None).expect("Could not find cube?");
-    world.insert_one(cube, Cube {}).unwrap();
 }
 
 struct TickProps<'a> {
@@ -192,9 +196,8 @@ fn tick(
         );
 
         match tick_props.test {
-            StressTest::ManyCubes => {
-                cube_system(world, models, vulkan_context, render_context, timer)
-            }
+            StressTest::ManyCubes => model_system(world, models, timer, "Cube"),
+            StressTest::ManyHelmets => model_system(world, models, timer, "Damaged Helmet"),
             StressTest::ManyVertices => subdivide_mesh_system(world, vulkan_context, timer),
             StressTest::Sponza => {}
         }
@@ -253,31 +256,30 @@ fn subdivide_mesh_system(world: &mut World, vulkan_context: &VulkanContext, time
 
 struct Cube;
 
-fn cube_system(
+fn model_system(
     world: &mut World,
     models: &HashMap<String, World>,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
     timer: &mut Timer,
+    model_name: &str,
 ) {
     if timer.tick() {
-        add_cube(models, world, vulkan_context, render_context);
-        rearrange_cubes(world);
+        add_model_to_world(model_name, models, world, None).expect("Could not find object?");
+        rearrange_models(world);
     }
 
-    rotate_cubes(world, timer.total_time().as_secs_f32());
+    rotate_models(world, timer.total_time().as_secs_f32());
 }
 
-fn rotate_cubes(world: &mut World, total_time: f32) {
-    for (_, transform) in world.query_mut::<With<Cube, &mut Transform>>() {
+fn rotate_models(world: &mut World, total_time: f32) {
+    for (_, transform) in world.query_mut::<With<Mesh, &mut Transform>>() {
         transform.rotation =
             hotham::nalgebra::Rotation::from_axis_angle(&Vector3::y_axis(), total_time.sin() * 2.)
                 .into();
     }
 }
 
-fn rearrange_cubes(world: &mut World) {
-    let query = world.query_mut::<With<Cube, &mut Transform>>();
+fn rearrange_models(world: &mut World) {
+    let query = world.query_mut::<With<Mesh, &mut Transform>>();
     let query_iter = query.into_iter();
     let num_cubes = query_iter.len() as f32;
     let slice = std::f32::consts::TAU / num_cubes;

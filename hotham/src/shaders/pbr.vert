@@ -14,7 +14,7 @@ layout (location = 4) in vec4 inWeight0;
 layout (location = 0) out vec4 outWorldPos;
 layout (location = 1) out vec3 outNormal;
 layout (location = 2) out vec2 outUV;
-layout (location = 3) out uint outMaterialID;
+layout (location = 3) flat out uint outMaterialID;
 
 out gl_PerVertex
 {

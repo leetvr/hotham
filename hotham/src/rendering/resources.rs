@@ -123,6 +123,7 @@ impl Resources {
 
 /// Instructions on how to draw this primitive
 #[derive(Debug, Default, Clone)]
+#[repr(C, align(16))]
 pub struct DrawData {
     /// The transform of the parent mesh
     pub transform: Matrix4<f32>,
@@ -132,6 +133,4 @@ pub struct DrawData {
     pub bounding_sphere: Vector4<f32>,
     /// The ID of the material to use.
     pub material_id: u32,
-    /// Padding
-    pub(crate) _pad: Vector3<f32>,
 }
