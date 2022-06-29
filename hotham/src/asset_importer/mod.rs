@@ -1,7 +1,8 @@
 use crate::{
     components::{
-        animation_controller::AnimationController, AnimationTarget, Info, Joint, Mesh, Parent,
-        Root, Skin, Transform, TransformMatrix, Visible,
+        animation_controller::{self, AnimationController},
+        AnimationTarget, Info, Joint, Mesh, Parent, Root, Skin, Transform, TransformMatrix,
+        Visible,
     },
     rendering::{material::Material, mesh_data::MeshData, resources::Resources, texture::Texture},
     resources::{RenderContext, VulkanContext},
@@ -92,28 +93,51 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
         Texture::load(texture, import_context);
     }
 
+    // We need *some* entity to stash the AnimationController onto.
+    // For now, just use the first root entity.
+    let mut animation_controller_entity = None;
     for node in document.scenes().next().unwrap().nodes() {
         let mut world = World::default();
 
-        load_node(&node, import_context, &mut world, true);
+        let root = load_node(&node, import_context, &mut world, true);
+
+        // Hacky
+        if animation_controller_entity.is_none() {
+            animation_controller_entity = Some(root);
+        }
+
         add_parents(&node, &mut world, &mut import_context.node_entity_map);
-        // add_animations(&animations, buffer, &mut world, &mut node_entity_map);
 
         import_context
             .models
             .insert(node.name().expect("Node has no name!").to_string(), world);
     }
 
-    // Finally, import any skins. Note that this has to be done after every single node has been imported, as
-    // a skin can reference ANY other nodes in the document.
+    // Finally, import any skins or animations.
+    // Note that this has to be done after every single node has been imported, as skins and animations can reference any other node.
+
+    // Skins are attached to nodes, so we need to go back through the node tree.
     for node in document.scenes().next().unwrap().nodes() {
-        load_skin(node, import_context);
+        load_skins(node, import_context);
     }
+
+    // TODO: This is *clearly* incorrect, and always was. Needs to be fixed if we want to support more than one animation per file.
+    let animation_controller = AnimationController::load(document.animations(), import_context);
+    let animation_controller_entity = animation_controller_entity.unwrap();
+    // Find the world the entity belongs to.
+    let world = import_context
+        .models
+        .values_mut()
+        .find(|w| w.contains(animation_controller_entity))
+        .unwrap();
+    world
+        .insert_one(animation_controller_entity, animation_controller)
+        .unwrap();
 
     Ok(())
 }
 
-fn load_skin(node: gltf::Node, import_context: &mut ImportContext) {
+fn load_skins(node: gltf::Node, import_context: &mut ImportContext) {
     if let Some(skin) = node.skin() {
         // Load the skin
         let skin = Skin::load(skin, import_context);
@@ -132,12 +156,11 @@ fn load_skin(node: gltf::Node, import_context: &mut ImportContext) {
             .find(|w| w.contains(node_entity))
             .unwrap();
 
-        println!("Added skin {:?} to {:?}", skin, node.name());
         world.insert_one(node_entity, skin).unwrap();
     }
 
     for node in node.children() {
-        load_skin(node, import_context);
+        load_skins(node, import_context);
     }
 }
 
@@ -147,7 +170,7 @@ fn load_node(
     import_context: &mut ImportContext,
     world: &mut World,
     is_root: bool,
-) {
+) -> Entity {
     let transform = Transform::load(node_data.transform());
     let transform_matrix = TransformMatrix(node_data.transform().matrix().into());
     let info = Info {
@@ -160,7 +183,7 @@ fn load_node(
     let this_entity = world.spawn((transform, transform_matrix, info));
     import_context
         .node_entity_map
-        .insert(node_data.index(), this_entity);
+        .insert(node_data.index(), this_entity.clone());
 
     if let Some(mesh) = node_data
         .mesh()
@@ -178,6 +201,8 @@ fn load_node(
     for child in node_data.children() {
         load_node(&child, import_context, world, false);
     }
+
+    this_entity
 }
 
 fn add_parents(
@@ -192,104 +217,6 @@ fn add_parents(
         let child_entity = node_entity_map.get(&child_id).unwrap();
         world.insert_one(*child_entity, parent).unwrap();
         add_parents(&child_node, world, node_entity_map);
-    }
-}
-
-fn add_animations(
-    animations: &[gltf::Animation], // Clippy ptr_arg
-    buffer: &[u8],
-    world: &mut World,
-    node_entity_map: &mut HashMap<usize, Entity>,
-) {
-    let (controller_entity, _) = world.query::<&Root>().iter().next().unwrap();
-
-    for animation in animations.iter() {
-        'chunks: for chunk in &animation.channels().chunks(3) {
-            let mut translations = Vec::new();
-            let mut rotations = Vec::new();
-            let mut scales = Vec::new();
-            let mut target = 0;
-            '_channels: for channel in chunk {
-                target = channel.target().node().index();
-                if !node_entity_map.contains_key(&target) {
-                    continue 'chunks;
-                }
-
-                let reader = channel.reader(|_| Some(buffer));
-                match reader.read_outputs() {
-                    Some(ReadOutputs::Translations(translation_data)) => {
-                        for t in translation_data {
-                            translations.push(vector![t[0], t[1], t[2]]);
-                        }
-                    }
-                    Some(ReadOutputs::Rotations(rotation_data)) => {
-                        for r in rotation_data.into_f32() {
-                            // gltf gives us a quaternion in [x, y, z, w] but we need [w, x, y, z]
-                            rotations.push(UnitQuaternion::new_normalize(Quaternion::new(
-                                r[3], r[0], r[1], r[2],
-                            )));
-                        }
-                    }
-                    Some(ReadOutputs::Scales(scale_data)) => {
-                        for s in scale_data {
-                            scales.push(vector![s[0], s[1], s[2]]);
-                        }
-                    }
-                    _ => {}
-                }
-            }
-
-            let target_entity = *node_entity_map.get(&target).unwrap();
-            if !world.contains(target_entity) {
-                println!("[HOTHAM_GLTF] - Error importing animation {:?}. No target, probably due to malformed file. Ignoring", animation.name());
-                return;
-            }
-
-            assert!(
-                translations.len() == rotations.len() && rotations.len() == scales.len(),
-                "Animation {} - {:?} has malformed data for node {}. translations.len() - {}, rotations.len() - {}, scales.len() - {}",
-                animation.index(),
-                animation.name(),
-                target,
-                translations.len(),
-                rotations.len(),
-                scales.len(),
-            );
-
-            let animation = izip!(translations, rotations, scales)
-                .map(|(t, r, s)| Transform {
-                    translation: t,
-                    rotation: r,
-                    scale: s,
-                })
-                .collect_vec();
-
-            // If an animation target exists already, push this animation onto it. Otherwise, create a new one.
-            match world.query_one_mut::<&mut AnimationTarget>(target_entity) {
-                Ok(animation_target) => {
-                    animation_target.animations.push(animation);
-                }
-                _ => {
-                    world
-                        .insert_one(
-                            target_entity,
-                            AnimationTarget {
-                                controller: controller_entity,
-                                animations: vec![animation],
-                            },
-                        )
-                        .unwrap();
-                }
-            }
-
-            // Add an animation controller to our parent, if needed.
-            let entity_ref = world.entity(controller_entity).unwrap();
-            if !entity_ref.has::<AnimationController>() {
-                world
-                    .insert_one(controller_entity, AnimationController::default())
-                    .unwrap();
-            }
-        }
     }
 }
 
@@ -343,13 +270,11 @@ pub fn add_model_to_world(
             let mut new_skin = skin.clone();
 
             // Go through each of the joints and map them to their new entities.
-            new_skin.joints = skin
+            new_skin
                 .joints
-                .iter()
-                .map(|e| entity_map.get(&e).cloned().unwrap())
-                .collect();
+                .iter_mut()
+                .for_each(|e| *e = entity_map.get(&e).cloned().unwrap());
 
-            println!("Adding skin {:?} to {}", new_skin, name);
             destination_world
                 .insert_one(*destination_entity, new_skin)
                 .unwrap();
@@ -386,17 +311,16 @@ pub fn add_model_to_world(
         if let Ok(animation_controller) =
             source_world.get_mut::<AnimationController>(*source_entity)
         {
-            destination_world
-                .insert_one(*destination_entity, animation_controller.clone())
-                .unwrap();
-        }
+            let mut new_animation_controller = animation_controller.clone();
 
-        if let Ok(animation_target) = source_world.get_mut::<AnimationTarget>(*source_entity) {
-            let mut new_animation_target = animation_target.clone();
-            new_animation_target.controller =
-                *entity_map.get(&animation_target.controller).unwrap();
+            // Go through each of the joints and map them to their new entities.
+            new_animation_controller
+                .targets
+                .iter_mut()
+                .for_each(|t| t.target = entity_map.get(&t.target).cloned().unwrap());
+
             destination_world
-                .insert_one(*destination_entity, new_animation_target)
+                .insert_one(*destination_entity, new_animation_controller)
                 .unwrap();
         }
 
@@ -566,16 +490,13 @@ mod tests {
         }
 
         // Make sure we imported the AnimationController
-        // let animation_controllers = world.query_mut::<&AnimationController>().into_iter();
-        // assert_eq!(animation_controllers.len(), 1);
-
-        // // Make sure we got all the AnimationTargets
-        // {
-        //     let mut animation_targets = world.query::<&AnimationTarget>();
-        //     assert_eq!(animation_targets.iter().len(), 17);
-        //     for (_, animation_target) in animation_targets.iter() {
-        //         assert!(world.contains(animation_target.controller));
-        //     }
-        // }
+        {
+            let mut query = world.query::<&AnimationController>();
+            assert_eq!(query.iter().len(), 1);
+            let (_, animation_controller) = query.iter().next().unwrap();
+            for target in animation_controller.targets.iter() {
+                assert!(world.contains(target.target));
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
 use crate::{
     asset_importer::add_model_to_world,
     components::{hand::Handedness, AnimationController, Hand, RigidBody},
-    resources::{PhysicsContext, RenderContext, VulkanContext, XrContext},
+    resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
 use hecs::{PreparedQuery, World};
