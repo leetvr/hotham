@@ -30,25 +30,24 @@ pub(crate) unsafe fn parse_raw_string(
 use hecs::World;
 
 #[cfg(test)]
-use crate::resources::VulkanContext;
+use crate::{
+    asset_importer::{add_model_to_world, load_models_from_glb},
+    resources::{RenderContext, VulkanContext},
+};
 
 /// Convenience function to get a world with hands
 #[cfg(test)]
-pub fn get_world_with_hands() -> World {
-    use crate::{
-        asset_importer::{add_model_to_world, load_models_from_glb},
-        components::Transform,
-        rendering::resources::Resources,
-        resources::RenderContext,
-    };
-
-    let (mut render_context, vulkan_context) = RenderContext::testing();
+pub fn get_world_with_hands(
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+) -> World {
+    use crate::components::{Info, Skin, Transform};
 
     let data: Vec<&[u8]> = vec![
         include_bytes!("../../test_assets/left_hand.glb"),
         include_bytes!("../../test_assets/right_hand.glb"),
     ];
-    let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
+    let models = load_models_from_glb(&data, vulkan_context, render_context).unwrap();
 
     let mut world = World::new();
 
@@ -63,6 +62,12 @@ pub fn get_world_with_hands() -> World {
     {
         let mut transform = world.get_mut::<Transform>(right_hand).unwrap();
         transform.translation = [0.2, 1.4, 0.0].into();
+    }
+
+    // Sanity check
+    {
+        let mut query = world.query::<(&Skin)>();
+        assert_eq!(query.iter().len(), 2);
     }
 
     world

@@ -40,7 +40,7 @@ pub struct Resources {
     pub mesh_data: Arena<MeshData>,
 
     /// Buffer for skins
-    pub skins_buffer: Buffer<[Matrix4<f32>; MAX_JOINTS]>,
+    pub skins_buffer: Buffer<[Matrix4<f32>; 64]>,
 
     /// Shared sampler in repeat mode, takes care of most things
     pub texture_sampler: vk::Sampler,

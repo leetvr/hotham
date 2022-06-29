@@ -209,7 +209,7 @@ fn tick(
             &mut queries.roots_query,
             world,
         );
-        skinning_system(&mut queries.joints_query, &mut queries.meshes_query, world);
+        skinning_system(&mut queries.skins_query, world, render_context);
     }
 
     if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {

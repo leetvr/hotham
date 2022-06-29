@@ -17,7 +17,7 @@ ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
 generational-arena = "0.2.8"
 gltf = {version = "1.0", features = ["KHR_materials_pbrSpecularGlossiness"]}
-hecs = "0.7.5"
+hecs = "0.7.7"
 hotham-debug-server = {path = "../hotham-debug-server", version = "0.2"}
 id-arena = "2.2.1"
 image = "0.23"

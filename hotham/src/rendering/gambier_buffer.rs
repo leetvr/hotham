@@ -102,6 +102,11 @@ impl<T: Sized> GambierBuffer<T> {
         std::slice::from_raw_parts(self.memory_address.as_ptr(), self.len)
     }
 
+    /// Get the buffer's underlying data as a mutable slice
+    pub unsafe fn as_slice_mut(&self) -> &mut [T] {
+        std::slice::from_raw_parts_mut(self.memory_address.as_ptr(), self.len)
+    }
+
     /// safety: After calling this function the buffer will be in an UNUSABLE state
     pub unsafe fn destroy(&mut self, device: &ash::Device) {
         device.unmap_memory(self.device_memory);
@@ -194,6 +199,21 @@ mod tests {
                 expected_data.push(*n);
                 assert_eq!(buffer.as_slice(), &expected_data);
             }
+
+            // Modify elementwise
+            let expected_data = vec![2, 3, 4, 5, 6, 7, 8, 9, 0];
+            for (index, n) in buffer.as_slice_mut().iter_mut().enumerate() {
+                *n = expected_data[index];
+            }
+            assert_eq!(buffer.as_slice(), &expected_data);
+
+            // Modify by index
+            let expected_data = vec![22, 23, 24, 25, 26, 27, 28, 29, 20];
+            let data = buffer.as_slice_mut();
+            for (index, n) in expected_data.iter().enumerate() {
+                data[index] = *n;
+            }
+            assert_eq!(buffer.as_slice(), &expected_data);
         }
     }
 }

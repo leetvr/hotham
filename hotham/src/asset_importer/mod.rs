@@ -8,10 +8,8 @@ use crate::{
 };
 use anyhow::Result;
 
-use generational_arena::Index;
 use gltf::{animation::util::ReadOutputs, Document};
 use hecs::{Entity, World};
-use id_arena::Id;
 use itertools::{izip, Itertools};
 use nalgebra::{vector, Matrix4, Quaternion, UnitQuaternion};
 use std::collections::HashMap;
@@ -23,7 +21,7 @@ pub type Models = HashMap<String, World>;
 pub(crate) struct ImportContext<'a> {
     pub vulkan_context: &'a VulkanContext,
     pub render_context: &'a mut RenderContext,
-    pub models: &'a mut Models,
+    pub models: Models,
     pub node_entity_map: HashMap<usize, Entity>,
     pub mesh_map: HashMap<usize, Mesh>,
     pub document: Document,
@@ -37,7 +35,6 @@ impl<'a> ImportContext<'a> {
         vulkan_context: &'a VulkanContext,
         render_context: &'a mut RenderContext,
         glb_buffer: &'a [u8],
-        models: &'a mut Models,
     ) -> Self {
         let (document, mut buffers, images) = gltf::import_slice(glb_buffer).unwrap();
 
@@ -45,7 +42,7 @@ impl<'a> ImportContext<'a> {
         Self {
             vulkan_context,
             render_context,
-            models,
+            models: Default::default(),
             node_entity_map: Default::default(),
             mesh_map: Default::default(),
             document,
@@ -56,18 +53,23 @@ impl<'a> ImportContext<'a> {
     }
 }
 
-/// Load glTF models from a GLB file
+/// Load glTF models from an array of GLB files.
 pub fn load_models_from_glb(
     glb_buffers: &[&[u8]],
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) -> Result<Models> {
+    // Global models map, shared between imports.
     let mut models = HashMap::new();
 
     for glb_buffer in glb_buffers {
-        let mut import_context =
-            ImportContext::new(vulkan_context, render_context, glb_buffer, &mut models);
+        let mut import_context = ImportContext::new(vulkan_context, render_context, glb_buffer);
         load_models_from_gltf_data(&mut import_context).unwrap();
+
+        // Take all the models we imported and add them to the global map
+        for (k, v) in import_context.models.drain() {
+            models.insert(k, v);
+        }
     }
 
     Ok(models)
@@ -105,29 +107,38 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     // Finally, import any skins. Note that this has to be done after every single node has been imported, as
     // a skin can reference ANY other nodes in the document.
     for node in document.scenes().next().unwrap().nodes() {
-        if let Some(skin) = node.skin() {
-            // Load the skin
-            let skin = Skin::load(skin, import_context);
-
-            // Get the entity this node is mapped to
-            let node_entity = import_context
-                .node_entity_map
-                .get(&node.index())
-                .unwrap()
-                .clone();
-
-            // This part is tricky - we don't know which world this entity is in, so we need to look through them all
-            let world = import_context
-                .models
-                .values_mut()
-                .find(|w| w.contains(node_entity))
-                .unwrap();
-
-            world.insert_one(node_entity, skin).unwrap();
-        }
+        load_skin(node, import_context);
     }
 
     Ok(())
+}
+
+fn load_skin(node: gltf::Node, import_context: &mut ImportContext) {
+    if let Some(skin) = node.skin() {
+        // Load the skin
+        let skin = Skin::load(skin, import_context);
+
+        // Get the entity this node is mapped to
+        let node_entity = import_context
+            .node_entity_map
+            .get(&node.index())
+            .unwrap()
+            .clone();
+
+        // This part is tricky - we don't know which world this entity is in, so we need to look through them all
+        let world = import_context
+            .models
+            .values_mut()
+            .find(|w| w.contains(node_entity))
+            .unwrap();
+
+        println!("Added skin {:?} to {:?}", skin, node.name());
+        world.insert_one(node_entity, skin).unwrap();
+    }
+
+    for node in node.children() {
+        load_skin(node, import_context);
+    }
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
@@ -293,6 +304,8 @@ pub fn add_model_to_world(
     let source_entities = source_world.iter();
     let mut entity_map = HashMap::new();
 
+    println!("Adding {} to world", name);
+
     // Reserve some empty entities in the new world for us to use.
     let new_entities = destination_world.reserve_entities(source_entities.len() as _);
 
@@ -336,6 +349,7 @@ pub fn add_model_to_world(
                 .map(|e| entity_map.get(&e).cloned().unwrap())
                 .collect();
 
+            println!("Adding skin {:?} to {}", new_skin, name);
             destination_world
                 .insert_one(*destination_entity, new_skin)
                 .unwrap();
@@ -398,6 +412,8 @@ pub fn add_model_to_world(
 
     // Get the new root entity.
     let new_root_entity = entity_map.get(&root_entity).cloned().unwrap();
+
+    destination_world.flush();
 
     Some(new_root_entity)
 }
@@ -527,10 +543,6 @@ mod tests {
             .into_iter();
         assert_eq!(meshes.len(), 1);
 
-        // Make sure we imported the AnimationController
-        let animation_controllers = world.query_mut::<&AnimationController>().into_iter();
-        assert_eq!(animation_controllers.len(), 1);
-
         // Make sure we got all the nodes
         let transforms = world.query_mut::<&Transform>().into_iter();
         assert_eq!(transforms.len(), 28);
@@ -544,22 +556,26 @@ mod tests {
             }
         }
 
-        // Make sure we got all the joints
+        // Make sure we got the skin
         {
-            let mut joints = world.query::<&Joint>();
-            assert_eq!(joints.iter().len(), 25);
-            for (_, joint) in joints.iter() {
-                assert!(world.contains(joint.skeleton_root));
+            let mut query = world.query::<&Skin>();
+            let (_, skin) = query.iter().next().unwrap();
+            for joint in skin.joints.iter() {
+                assert!(world.contains(*joint));
             }
         }
 
-        // Make sure we got all the AnimationTargets
-        {
-            let mut animation_targets = world.query::<&AnimationTarget>();
-            assert_eq!(animation_targets.iter().len(), 17);
-            for (_, animation_target) in animation_targets.iter() {
-                assert!(world.contains(animation_target.controller));
-            }
-        }
+        // Make sure we imported the AnimationController
+        // let animation_controllers = world.query_mut::<&AnimationController>().into_iter();
+        // assert_eq!(animation_controllers.len(), 1);
+
+        // // Make sure we got all the AnimationTargets
+        // {
+        //     let mut animation_targets = world.query::<&AnimationTarget>();
+        //     assert_eq!(animation_targets.iter().len(), 17);
+        //     for (_, animation_target) in animation_targets.iter() {
+        //         assert!(world.contains(animation_target.controller));
+        //     }
+        // }
     }
 }

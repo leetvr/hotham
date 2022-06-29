@@ -99,8 +99,8 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         // Skins
         vk::DescriptorSetLayoutBinding {
             binding: 3,
-            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            stage_flags: vk::ShaderStageFlags::VERTEX,
             descriptor_count: 1,
             ..Default::default()
         },

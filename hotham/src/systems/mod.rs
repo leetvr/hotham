@@ -41,7 +41,7 @@ pub struct Queries<'a> {
     pub grabbing_query: PreparedQuery<(&'a mut Hand, &'a Collider)>,
     pub hands_query: PreparedQuery<(&'a mut Hand, &'a mut AnimationController, &'a mut RigidBody)>,
     pub joints_query: PreparedQuery<(&'a TransformMatrix, &'a Joint, &'a Info)>,
-    pub meshes_query: PreparedQuery<(&'a mut Mesh, &'a Skin)>,
+    pub skins_query: PreparedQuery<(&'a Skin, &'a TransformMatrix)>,
     pub parent_query: PreparedQuery<&'a Parent>,
     pub rendering_query:
         PreparedQuery<With<Visible, (&'a Mesh, &'a TransformMatrix, Option<&'a Skin>)>>,
