@@ -108,7 +108,9 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         vk::DescriptorSetLayoutBinding {
             binding: 4,
             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            stage_flags: vk::ShaderStageFlags::COMPUTE
+                | vk::ShaderStageFlags::VERTEX
+                | vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1,
             ..Default::default()
         },

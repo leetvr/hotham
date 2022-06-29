@@ -10,9 +10,7 @@ use hotham::{
     nalgebra::Vector3,
     rendering::{buffer::Buffer, material::Material, texture::Texture, vertex::Vertex},
     resources::{vulkan_context::VulkanContext, RenderContext},
-    schedule_functions::{
-        begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass, physics_step,
-    },
+    schedule_functions::{begin_frame, begin_pbr_renderpass, end_frame, physics_step},
     systems::{
         animation_system, collision_system, grabbing_system, hands_system,
         rendering::rendering_system, skinning::skinning_system,
@@ -221,7 +219,6 @@ fn tick(
             xr_context.frame_index,
             render_context,
         );
-        end_pbr_renderpass(xr_context, vulkan_context, render_context);
     }
 
     end_frame(xr_context, vulkan_context, render_context);

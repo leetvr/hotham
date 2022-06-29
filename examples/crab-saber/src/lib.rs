@@ -6,8 +6,7 @@ use hotham::{
     components::Visible,
     hecs::{Entity, World},
     schedule_functions::{
-        apply_haptic_feedback, begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass,
-        physics_step,
+        apply_haptic_feedback, begin_frame, begin_pbr_renderpass, end_frame, physics_step,
     },
     systems::{
         audio_system, collision_system, draw_gui_system, rendering_system,
@@ -163,7 +162,6 @@ fn tick(
             xr_context.frame_index,
             render_context,
         );
-        end_pbr_renderpass(xr_context, vulkan_context, render_context);
     }
 
     // End the frame

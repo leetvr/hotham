@@ -4,9 +4,7 @@ use hotham::{
     hecs::World,
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
     resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext},
-    schedule_functions::{
-        begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass, physics_step,
-    },
+    schedule_functions::{begin_frame, begin_pbr_renderpass, end_frame, physics_step},
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
         rendering::rendering_system, skinning::skinning_system,
@@ -99,7 +97,6 @@ fn tick(
     let physics_context = &mut engine.physics_context;
 
     begin_frame(xr_context, vulkan_context, render_context);
-
     if current_state == xr::SessionState::FOCUSED {
         hands_system(&mut queries.hands_query, world, xr_context, physics_context);
         grabbing_system(&mut queries.grabbing_query, world, physics_context);
@@ -129,8 +126,7 @@ fn tick(
             xr_context.frame_index,
             render_context,
         );
-        end_pbr_renderpass(xr_context, vulkan_context, render_context);
     }
 
-    end_frame(xr_context, vulkan_context, render_context);
+    xr_context.end_frame().unwrap();
 }

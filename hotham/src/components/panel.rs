@@ -6,7 +6,7 @@ use nalgebra::{vector, Vector2, Vector4};
 use crate::components::Mesh;
 use crate::hotham_error::HothamError;
 use crate::rendering::material::Material;
-use crate::rendering::primitive::Primitive;
+use crate::rendering::primitive::{calculate_bounding_sphere, Primitive};
 use crate::{
     rendering::texture::Texture,
     resources::{RenderContext, VulkanContext},
@@ -104,6 +104,7 @@ fn create_mesh(
         material_id,
         index_buffer_offset: render_context.resources.index_buffer.len as _,
         vertex_buffer_offset: render_context.resources.vertex_buffer.len as _,
+        bounding_sphere: calculate_bounding_sphere(&positions),
     };
 
     unsafe {

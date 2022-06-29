@@ -10,7 +10,7 @@ use crate::{
 pub fn begin_frame(
     xr_context: &mut XrContext,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
 ) {
     let active_action_set = ActiveActionSet::new(&xr_context.action_set);
     xr_context
@@ -31,15 +31,6 @@ pub fn begin_frame(
         .unwrap();
     xr_context.views = views;
     xr_context.view_state_flags = view_state_flags;
-
-    // If the shouldRender flag is set, start rendering
-    if xr_context.frame_state.should_render {
-        render_context.begin_frame(vulkan_context, xr_context.frame_index);
-    } else {
-        println!(
-            "[HOTHAM_BEGIN_FRAME] - Session is runing but shouldRender is false - not rendering"
-        );
-    }
 }
 
 #[cfg(target_os = "windows")]
@@ -53,10 +44,10 @@ mod tests {
 
     pub fn test_begin_frame() {
         let (mut xr_context, vulkan_context) = XrContext::new().unwrap();
-        let render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
+        let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
         xr_context.frame_index = 100;
 
-        begin_frame(&mut xr_context, &vulkan_context, &render_context);
+        begin_frame(&mut xr_context, &vulkan_context, &mut render_context);
         assert_eq!(xr_context.frame_index, 0);
     }
 }

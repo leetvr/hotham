@@ -30,12 +30,13 @@ use vk_shader_macros::include_glsl;
 
 static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert");
 static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag");
-// static COMPUTE: &[u32] = include_glsl!("src/shaders/render.comp");
+static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp");
 
 pub struct RenderContext {
     pub frames: Vec<Frame>,
     pub pipeline_layout: vk::PipelineLayout,
     pub pipeline: vk::Pipeline,
+    pub compute_pipeline: vk::Pipeline,
     pub render_pass: vk::RenderPass,
     pub depth_image: Image,
     pub color_image: Image,
@@ -76,6 +77,7 @@ impl RenderContext {
         let pipeline_layout =
             create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.layout))?;
         let pipeline = create_pipeline(vulkan_context, pipeline_layout, &render_area, render_pass)?;
+        let compute_pipeline = create_compute_pipeline(&vulkan_context.device, pipeline_layout);
 
         // Depth image, shared between frames
         let depth_image = vulkan_context.create_image(
@@ -107,6 +109,7 @@ impl RenderContext {
         Ok(Self {
             frames,
             pipeline,
+            compute_pipeline,
             pipeline_layout,
             render_pass,
             frame_index: 0,
@@ -198,12 +201,21 @@ impl RenderContext {
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];
-        let command_buffer = frame.command_buffer;
 
         // Wait for the GPU to be ready.
         self.wait(device, frame);
+    }
 
-        // Begin recording the command buffer.
+    pub(crate) fn cull_objects(
+        &self,
+        vulkan_context: &VulkanContext,
+        swapchain_image_index: usize,
+    ) {
+        let device = &vulkan_context.device;
+        let frame = &self.frames[swapchain_image_index];
+        let command_buffer = frame.command_buffer;
+        let fence = frame.fence;
+
         unsafe {
             device
                 .begin_command_buffer(
@@ -212,6 +224,38 @@ impl RenderContext {
                         .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
                 )
                 .unwrap();
+            device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.compute_pipeline,
+            );
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.pipeline_layout,
+                0,
+                slice_from_ref(&self.descriptors.set),
+                &[],
+            );
+            device.cmd_dispatch(
+                command_buffer,
+                self.resources.draw_indirect_buffer.len as u32,
+                1,
+                1,
+            );
+            device.end_command_buffer(command_buffer).unwrap();
+
+            let submit_info =
+                vk::SubmitInfo::builder().command_buffers(std::slice::from_ref(&command_buffer));
+            device
+                .queue_submit(
+                    vulkan_context.graphics_queue, // TODO: get a proper queue
+                    std::slice::from_ref(&submit_info),
+                    fence,
+                )
+                .unwrap();
+            device.wait_for_fences(&[fence], true, 1000000000).unwrap();
+            device.reset_fences(&[fence]).unwrap();
         }
     }
 
@@ -234,6 +278,13 @@ impl RenderContext {
             .clear_values(&CLEAR_VALUES);
 
         unsafe {
+            device
+                .begin_command_buffer(
+                    command_buffer,
+                    &vk::CommandBufferBeginInfo::builder()
+                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                )
+                .unwrap();
             device.cmd_begin_render_pass(
                 command_buffer,
                 &render_pass_begin_info,
@@ -333,57 +384,51 @@ impl RenderContext {
             name,
         )?;
 
-        // This is only neccesary on desktop
-        if vulkan_context.physical_device_properties.device_type
-            == vk::PhysicalDeviceType::DISCRETE_GPU
-        {
-            // Create a staging buffer.
-            println!("[HOTHAM_VULKAN] Creating staging buffer..");
-            let usage = vk::BufferUsageFlags::TRANSFER_SRC;
-            let size = 8 * image_buf.len();
-            let (staging_buffer, staging_memory, _) =
-                vulkan_context.create_buffer_with_data(image_buf, usage, size as _)?;
-            println!("[HOTHAM_VULKAN] ..done!");
+        // TODO: This is only neccesary on desktop!
+        // Create a staging buffer.
+        println!("[HOTHAM_VULKAN] Creating staging buffer..");
+        let usage = vk::BufferUsageFlags::TRANSFER_SRC;
+        let size = 8 * image_buf.len();
+        let (staging_buffer, staging_memory, _) =
+            vulkan_context.create_buffer_with_data(image_buf, usage, size as _)?;
+        println!("[HOTHAM_VULKAN] ..done!");
 
-            // Copy the buffer into the image
-            let initial_layout = vk::ImageLayout::UNDEFINED;
-            let transfer_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
-            vulkan_context.transition_image_layout(
-                texture_image.handle,
-                initial_layout,
-                transfer_layout,
-                layer_count,
-                mip_count,
-            );
+        // Copy the buffer into the image
+        let initial_layout = vk::ImageLayout::UNDEFINED;
+        let transfer_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+        vulkan_context.transition_image_layout(
+            texture_image.handle,
+            initial_layout,
+            transfer_layout,
+            layer_count,
+            mip_count,
+        );
 
-            println!("[HOTHAM_VULKAN] Copying buffer to image..");
-            vulkan_context.copy_buffer_to_image(
-                staging_buffer,
-                &texture_image,
-                layer_count,
-                mip_count,
-                offsets,
-            );
+        println!("[HOTHAM_VULKAN] Copying buffer to image..");
+        vulkan_context.copy_buffer_to_image(
+            staging_buffer,
+            &texture_image,
+            layer_count,
+            mip_count,
+            offsets,
+        );
 
-            // Now transition the image
-            println!("[HOTHAM_VULKAN] ..done! Transitioning image layout..");
-            let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
-            vulkan_context.transition_image_layout(
-                texture_image.handle,
-                transfer_layout,
-                final_layout,
-                layer_count,
-                mip_count,
-            );
-            println!("[HOTHAM_VULKAN] ..done! Freeing staging buffer..");
+        // Now transition the image
+        println!("[HOTHAM_VULKAN] ..done! Transitioning image layout..");
+        let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+        vulkan_context.transition_image_layout(
+            texture_image.handle,
+            transfer_layout,
+            final_layout,
+            layer_count,
+            mip_count,
+        );
+        println!("[HOTHAM_VULKAN] ..done! Freeing staging buffer..");
 
-            // Free the staging buffer
-            unsafe {
-                vulkan_context.device.destroy_buffer(staging_buffer, None);
-                vulkan_context.device.free_memory(staging_memory, None);
-            }
-        } else {
-            todo!()
+        // Free the staging buffer
+        unsafe {
+            vulkan_context.device.destroy_buffer(staging_buffer, None);
+            vulkan_context.device.free_memory(staging_memory, None);
         }
 
         let texture_index = unsafe {
@@ -745,4 +790,29 @@ fn create_pipeline_layout(
             .create_pipeline_layout(create_info, None)
     }
     .map_err(|e| e.into())
+}
+
+fn create_compute_pipeline(device: &ash::Device, layout: vk::PipelineLayout) -> vk::Pipeline {
+    unsafe {
+        let shader_entry_name = CStr::from_bytes_with_nul_unchecked(b"main\0");
+        let compute_module = device
+            .create_shader_module(&vk::ShaderModuleCreateInfo::builder().code(&COMPUTE), None)
+            .unwrap();
+        let create_info = vk::ComputePipelineCreateInfo::builder()
+            .stage(vk::PipelineShaderStageCreateInfo {
+                stage: vk::ShaderStageFlags::COMPUTE,
+                module: compute_module,
+                p_name: shader_entry_name.as_ptr(),
+                ..Default::default()
+            })
+            .layout(layout);
+
+        device
+            .create_compute_pipelines(
+                vk::PipelineCache::null(),
+                std::slice::from_ref(&create_info),
+                None,
+            )
+            .unwrap()[0]
+    }
 }

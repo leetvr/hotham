@@ -17,7 +17,6 @@ pub fn skinning_system(
 ) {
     let mut skins = 0;
     for (_, (skin, transform_matrix)) in skins_query.query(world).iter() {
-        dbg!(skin.id);
         let buffer = unsafe { render_context.resources.skins_buffer.as_slice_mut() };
         let joint_matrices = &mut buffer[skin.id as usize];
 
@@ -65,7 +64,6 @@ mod tests {
 
         let mut called = 0;
         for (_, (skin, info)) in world.query::<(&Skin, &Info)>().iter() {
-            dbg!(skin.id, &info.name);
             let correct_matrices: Vec<Matrix4<f32>> = if info.name == "hands:Lhand" {
                 println!("Left hand!");
                 serde_json::from_slice(include_bytes!(

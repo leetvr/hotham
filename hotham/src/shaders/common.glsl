@@ -51,7 +51,7 @@ layout(std140, set = 0, binding = 1) readonly buffer MaterialBuffer {
 
 layout(std430, set = 0, binding = 2) writeonly buffer DrawCommandsBuffer {
     VkDrawIndexedIndirectCommand drawCommands[];
-} draw_commands_buffer;
+} drawCommandsBuffer;
 
 layout(std140, set = 0, binding = 3) readonly buffer SkinsBuffer {
     mat4 jointMatrices[][MAX_JOINTS]; // dynamically sized array of 64 element long arrays of mat4.

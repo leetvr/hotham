@@ -1,8 +1,8 @@
 use crate::{
-    components::{skin::NO_SKIN, Mesh, Skin, TransformMatrix, Visible},
+    components::{skin::NO_SKIN, Mesh, Skin, Transform, TransformMatrix, Visible},
     rendering::resources::DrawData,
-    resources::RenderContext,
     resources::VulkanContext,
+    resources::{RenderContext, XrContext},
 };
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
@@ -10,22 +10,21 @@ use hecs::{PreparedQuery, With, World};
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
 pub fn rendering_system(
-    query: &mut PreparedQuery<With<Visible, (&Mesh, &TransformMatrix, Option<&Skin>)>>,
+    query: &mut PreparedQuery<With<Visible, (&Mesh, &Transform, &TransformMatrix, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: usize,
     render_context: &mut RenderContext,
 ) {
-    let draw_data_buffer = &mut render_context.resources.draw_data_buffer;
-    draw_data_buffer.clear();
-    let draw_indirect_buffer = &mut render_context.resources.draw_indirect_buffer;
-    draw_indirect_buffer.clear();
-    let meshes = &render_context.resources.mesh_data;
-    let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
-    let device = &vulkan_context.device;
-
+    // First, we need to collect all our draw data
     unsafe {
-        for (_, (mesh, transform_matrix, skin)) in query.query_mut(world) {
+        let draw_data_buffer = &mut render_context.resources.draw_data_buffer;
+        let draw_indirect_buffer = &mut render_context.resources.draw_indirect_buffer;
+        let meshes = &render_context.resources.mesh_data;
+        draw_data_buffer.clear();
+        draw_indirect_buffer.clear();
+
+        for (_, (mesh, transform, transform_matrix, skin)) in query.query_mut(world) {
             let mesh = meshes.get(mesh.handle).unwrap();
             let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
             for primitive in &mesh.primitives {
@@ -35,7 +34,7 @@ pub fn rendering_system(
                     inverse_transpose: transform_matrix.0.try_inverse().unwrap().transpose(),
                     material_id: primitive.material_id,
                     skin_id,
-                    ..Default::default()
+                    bounding_sphere: primitive.get_bounding_sphere(&transform),
                 });
                 draw_indirect_buffer.push(&vk::DrawIndexedIndirectCommand {
                     index_count: primitive.indices_count,
@@ -46,7 +45,17 @@ pub fn rendering_system(
                 });
             }
         }
+    }
 
+    render_context.begin_frame(vulkan_context, swapchain_image_index);
+    render_context.cull_objects(vulkan_context, swapchain_image_index);
+    render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
+
+    let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
+    let device = &vulkan_context.device;
+    let draw_indirect_buffer = &render_context.resources.draw_indirect_buffer;
+
+    unsafe {
         device.cmd_draw_indexed_indirect(
             command_buffer,
             draw_indirect_buffer.buffer,
@@ -55,6 +64,9 @@ pub fn rendering_system(
             std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
         );
     }
+
+    render_context.end_pbr_render_pass(vulkan_context, swapchain_image_index);
+    render_context.end_frame(vulkan_context, swapchain_image_index);
 }
 
 #[cfg(target_os = "windows")]
@@ -239,8 +251,6 @@ mod tests {
         let views = vec![view.clone(), view];
         render_context.update_scene_data(&views).unwrap();
         render_context.scene_data.debug_data.y = debug_view_equation;
-        render_context.begin_frame(&vulkan_context, 0);
-        render_context.begin_pbr_render_pass(&vulkan_context, 0);
         update_transform_matrix_system(&mut Default::default(), world);
         update_parent_transform_matrix_system(
             &mut Default::default(),
@@ -254,8 +264,6 @@ mod tests {
             0,
             render_context,
         );
-        render_context.end_pbr_render_pass(&vulkan_context, 0);
-        render_context.end_frame(&vulkan_context, 0);
     }
 
     fn hash_file(file_path: &str) -> u64 {
