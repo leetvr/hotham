@@ -70,7 +70,7 @@ impl RenderContext {
         };
 
         let descriptors = unsafe { Descriptors::new(vulkan_context) };
-        let resources = unsafe { Resources::new(vulkan_context, &descriptors) };
+        let mut resources = unsafe { Resources::new(vulkan_context, &descriptors) };
 
         // Pipeline, render pass
         let render_pass = create_render_pass(vulkan_context)?;
@@ -105,6 +105,10 @@ impl RenderContext {
             &depth_image,
             &color_image,
         )?;
+        let scene_data = Default::default();
+        unsafe {
+            resources.scene_data_buffer.push(&scene_data);
+        }
 
         Ok(Self {
             frames,
@@ -116,9 +120,9 @@ impl RenderContext {
             depth_image,
             color_image,
             render_area,
-            scene_data: Default::default(),
             cameras: vec![Default::default(); 2],
             views: Vec::new(),
+            scene_data,
             descriptors,
             resources,
         })
@@ -156,7 +160,6 @@ impl RenderContext {
         )
     }
 
-    // TODO: Make this update the scene data rather than creating a new one
     pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) -> Result<()> {
         self.views = views.to_owned();
 
@@ -182,16 +185,11 @@ impl RenderContext {
 
         let camera_position = [self.cameras[0].position(), self.cameras[1].position()];
 
-        self.scene_data = SceneData {
-            view_projection,
-            camera_position,
-            ..Default::default()
-        };
-
         unsafe {
-            self.resources
-                .scene_data_buffer
-                .overwrite(slice_from_ref(&self.scene_data));
+            let scene_data = &mut self.resources.scene_data_buffer.as_slice_mut()[0];
+            scene_data.camera_position = camera_position;
+            scene_data.view_projection = view_projection;
+            scene_data.debug_data = self.scene_data.debug_data;
         }
 
         Ok(())

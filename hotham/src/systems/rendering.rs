@@ -199,7 +199,7 @@ mod tests {
         let image_from_vulkan = DynamicImage::ImageRgba8(
             RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
         );
-        let output_path = format!("../test_assets/render_{}_known_good.jpg", name);
+        let output_path = format!("../test_assets/render_{}.jpg", name);
         {
             let output_path = std::path::Path::new(&output_path);
             let mut file = std::fs::File::create(output_path).unwrap();
@@ -249,8 +249,8 @@ mod tests {
             },
         };
         let views = vec![view.clone(), view];
-        render_context.update_scene_data(&views).unwrap();
         render_context.scene_data.debug_data.y = debug_view_equation;
+        render_context.update_scene_data(&views).unwrap();
         update_transform_matrix_system(&mut Default::default(), world);
         update_parent_transform_matrix_system(
             &mut Default::default(),
