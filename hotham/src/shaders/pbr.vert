@@ -43,7 +43,7 @@ void main()
 			inWeight.w * jointMatrices[int(inJoint.w)];
 
 		outWorldPos = d.transform * skinMatrix * vec4(inPos, 1.0);
-		// TODO should we should probably be using the inverse transpose here instead?
+		// TODO we should probably be using the inverse transpose here instead?
 		outNormal = normalize(mat3(d.transform) * mat3(skinMatrix) * inNormal);
 	}
 

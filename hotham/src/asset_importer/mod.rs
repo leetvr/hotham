@@ -78,8 +78,6 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     // A bit lazy, but whatever.
     let document = import_context.document.clone();
 
-    // Previously, we assumed nodes were the centre of the universe. That is untrue.
-    // Instead, we'll import each resource type individually, updating references as we go.
     for mesh in document.meshes() {
         Mesh::load(mesh, import_context);
     }
@@ -92,21 +90,41 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
         Texture::load(texture, import_context);
     }
 
-    for skin in document.skins() {
-        Skin::load(skin, import_context);
-    }
-
-    for node_data in document.scenes().next().unwrap().nodes() {
+    for node in document.scenes().next().unwrap().nodes() {
         let mut world = World::default();
 
-        load_node(&node_data, import_context, &mut world, true);
-        add_parents(&node_data, &mut world, &mut import_context.node_entity_map);
+        load_node(&node, import_context, &mut world, true);
+        add_parents(&node, &mut world, &mut import_context.node_entity_map);
         // add_animations(&animations, buffer, &mut world, &mut node_entity_map);
 
-        import_context.models.insert(
-            node_data.name().expect("Node has no name!").to_string(),
-            world,
-        );
+        import_context
+            .models
+            .insert(node.name().expect("Node has no name!").to_string(), world);
+    }
+
+    // Finally, import any skins. Note that this has to be done after every single node has been imported, as
+    // a skin can reference ANY other nodes in the document.
+    for node in document.scenes().next().unwrap().nodes() {
+        if let Some(skin) = node.skin() {
+            // Load the skin
+            let skin = Skin::load(skin, import_context);
+
+            // Get the entity this node is mapped to
+            let node_entity = import_context
+                .node_entity_map
+                .get(&node.index())
+                .unwrap()
+                .clone();
+
+            // This part is tricky - we don't know which world this entity is in, so we need to look through them all
+            let world = import_context
+                .models
+                .values_mut()
+                .find(|w| w.contains(node_entity))
+                .unwrap();
+
+            world.insert_one(node_entity, skin).unwrap();
+        }
     }
 
     Ok(())
@@ -195,10 +213,10 @@ fn add_animations(
                     }
                     Some(ReadOutputs::Rotations(rotation_data)) => {
                         for r in rotation_data.into_f32() {
+                            // gltf gives us a quaternion in [x, y, z, w] but we need [w, x, y, z]
                             rotations.push(UnitQuaternion::new_normalize(Quaternion::new(
                                 r[3], r[0], r[1], r[2],
                             )));
-                            // gltf gives us a quaternion in [x, y, z, w] but we need [w, x, y, z]
                         }
                     }
                     Some(ReadOutputs::Scales(scale_data)) => {
@@ -305,18 +323,21 @@ pub fn add_model_to_world(
                 .unwrap();
         }
 
+        // If the source entity had a skin, insert it into the new world.
+        // Right now inserting a model with a skin into the world more than once is not supported. This is because
+        // we would have to allocate a new skin_id, which would require some mucking about with our buffers.
         if let Ok(skin) = source_world.get_mut::<Skin>(*source_entity) {
-            destination_world
-                .insert_one(*destination_entity, skin.clone())
-                .unwrap();
-        }
+            let mut new_skin = skin.clone();
 
-        // If the source entity had a joint, clone it and set the skeleton root to the corresponding entity in the destination world.
-        if let Ok(joint) = source_world.get_mut::<Joint>(*source_entity) {
-            let mut new_joint = *joint;
-            new_joint.skeleton_root = *entity_map.get(&joint.skeleton_root).unwrap();
+            // Go through each of the joints and map them to their new entities.
+            new_skin.joints = skin
+                .joints
+                .iter()
+                .map(|e| entity_map.get(&e).cloned().unwrap())
+                .collect();
+
             destination_world
-                .insert_one(*destination_entity, new_joint)
+                .insert_one(*destination_entity, new_skin)
                 .unwrap();
         }
 
@@ -334,6 +355,7 @@ pub fn add_model_to_world(
                 .unwrap();
 
             // Set a parent for the root entity if one was specified.
+            // TODO: Is this neccessary?
             if let Some(parent) = parent {
                 destination_world
                     .insert_one(*destination_entity, Parent(parent))
@@ -384,11 +406,7 @@ pub fn add_model_to_world(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        components::{Root, Transform},
-        rendering::resources,
-        resources::{vulkan_context, VulkanContext},
-    };
+    use crate::components::{Root, Transform};
     use approx::assert_relative_eq;
 
     #[test]

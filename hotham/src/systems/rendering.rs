@@ -1,5 +1,5 @@
 use crate::{
-    components::{Mesh, TransformMatrix, Visible},
+    components::{skin::NO_SKIN, Mesh, Skin, TransformMatrix, Visible},
     rendering::resources::DrawData,
     resources::RenderContext,
     resources::VulkanContext,
@@ -10,7 +10,7 @@ use hecs::{PreparedQuery, With, World};
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
 pub fn rendering_system(
-    query: &mut PreparedQuery<With<Visible, (&mut Mesh, &TransformMatrix)>>,
+    query: &mut PreparedQuery<With<Visible, (&Mesh, &TransformMatrix, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: usize,
@@ -25,14 +25,16 @@ pub fn rendering_system(
     let device = &vulkan_context.device;
 
     unsafe {
-        for (_, (mesh, transform_matrix)) in query.query_mut(world) {
+        for (_, (mesh, transform_matrix, skin)) in query.query_mut(world) {
             let mesh = meshes.get(mesh.handle).unwrap();
+            let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
             for primitive in &mesh.primitives {
                 draw_data_buffer.push(&DrawData {
                     transform: transform_matrix.0,
                     // TODO: better to use the matrix we get from the component's isometry3?
                     inverse_transpose: transform_matrix.0.try_inverse().unwrap().transpose(),
                     material_id: primitive.material_id,
+                    skin_id,
                     ..Default::default()
                 });
                 draw_indirect_buffer.push(&vk::DrawIndexedIndirectCommand {

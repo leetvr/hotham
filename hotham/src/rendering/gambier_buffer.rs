@@ -86,13 +86,15 @@ impl<T: Sized> GambierBuffer<T> {
 
     /// Dumb push - adds `data` to the GPU buffer.
     /// SAFETY: Unchecked! The caller MUST ensure `data` is valid and that `self.len + 1` does not exceed `self.max_len`
-    pub unsafe fn push(&mut self, data: &T) {
+    pub unsafe fn push(&mut self, data: &T) -> u32 {
+        let index = self.len as u32;
         copy_nonoverlapping(
             data as _,
-            self.memory_address.as_ptr().offset(self.len as _),
+            self.memory_address.as_ptr().offset(index as _),
             1,
         );
         self.len += 1;
+        index
     }
 
     /// Get the buffer's underlying data as a slice

@@ -142,7 +142,7 @@ impl Material {
                 .render_context
                 .resources
                 .materials_buffer
-                .push(&material)
+                .push(&material);
         }
     }
 

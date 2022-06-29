@@ -1,46 +1,57 @@
-use nalgebra::Matrix4;
+use std::mem::MaybeUninit;
 
 use crate::asset_importer::ImportContext;
+use hecs::Entity;
+use nalgebra::Matrix4;
+
+pub static NO_SKIN: u32 = std::u32::MAX;
 
 /// Component added to an entity to point to the joints in the node
 /// Automatically added by `gltf_loader`
 #[derive(Debug, Clone, PartialEq)]
 pub struct Skin {
-    /// List of joints, represented by their node ID
-    pub joint_ids: Vec<usize>,
+    /// List of joints
+    pub joints: Vec<Entity>,
+    /// Inverse bind matrices, used to build the final joint matrices for this skin
+    pub inverse_bind_matrices: Vec<Matrix4<f32>>,
+    /// Index into skin buffer
+    pub(crate) id: u32,
 }
 
 impl Skin {
-    pub(crate) fn load(skin: gltf::Skin, import_context: &mut ImportContext) {
-        // let this_entity = *node_entity_map.get(&node_data.index()).unwrap();
-        let mut joint_matrices = Vec::new();
+    pub(crate) fn load(skin: gltf::Skin, import_context: &mut ImportContext) -> Skin {
         let reader = skin.reader(|_| Some(&import_context.buffer));
-        let matrices = reader.read_inverse_bind_matrices().unwrap();
-        for m in matrices {
-            let m = Matrix4::from(m);
-            joint_matrices.push(m);
+        let inverse_bind_matrices = reader
+            .read_inverse_bind_matrices()
+            .unwrap() //}
+            .map(Matrix4::from)
+            .collect();
+
+        let joints = skin
+            .joints()
+            .map(|j| {
+                import_context
+                    .node_entity_map
+                    .get(&j.index())
+                    .cloned()
+                    .unwrap()
+            })
+            .collect();
+
+        // Nasty, but safe - this data will be correctly populated when the skin system runs:
+        // Having a Skin and not running the skin system is forbidden!
+        let id = unsafe {
+            import_context
+                .render_context
+                .resources
+                .skins_buffer
+                .push(&MaybeUninit::uninit().assume_init())
+        };
+
+        Skin {
+            joints,
+            id,
+            inverse_bind_matrices,
         }
-        // let mut joint_ids = Vec::new();
-
-        // for (joint_node, inverse_bind_matrix) in node_skin_data.joints().zip(joint_matrices.iter()) {
-        //     let joint = Joint {
-        //         skeleton_root: this_entity,
-        //         inverse_bind_matrix: *inverse_bind_matrix,
-        //     };
-        //     joint_ids.push(joint_node.index());
-        //     let joint_entity = node_entity_map.get(&joint_node.index()).unwrap();
-        //     world.insert_one(*joint_entity, joint).unwrap();
-        // }
-
-        // // Add a Skin to the entity.
-        // world.insert_one(this_entity, Skin { joint_ids }).unwrap();
-
-        // // Tell the vertex shader how many joints we have
-        // let mut mesh = world.get_mut::<Mesh>(this_entity).unwrap();
-        // mesh.ubo_data.joint_count = joint_matrices.len() as f32;
-
-        // for child in node_data.children() {
-        //     add_skins_and_joints(&child, buffer, world, vulkan_context, node_entity_map);
-        // }
     }
 }

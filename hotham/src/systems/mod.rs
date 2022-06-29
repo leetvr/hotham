@@ -43,7 +43,8 @@ pub struct Queries<'a> {
     pub joints_query: PreparedQuery<(&'a TransformMatrix, &'a Joint, &'a Info)>,
     pub meshes_query: PreparedQuery<(&'a mut Mesh, &'a Skin)>,
     pub parent_query: PreparedQuery<&'a Parent>,
-    pub rendering_query: PreparedQuery<With<Visible, (&'a mut Mesh, &'a TransformMatrix)>>,
+    pub rendering_query:
+        PreparedQuery<With<Visible, (&'a Mesh, &'a TransformMatrix, Option<&'a Skin>)>>,
     pub roots_query: PreparedQuery<Without<Parent, &'a TransformMatrix>>,
     pub update_rigid_body_transforms_query: PreparedQuery<(&'a RigidBody, &'a mut Transform)>,
     pub update_transform_matrix_query: PreparedQuery<(&'a Transform, &'a mut TransformMatrix)>,

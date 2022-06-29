@@ -13,7 +13,8 @@ use super::{
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
 static DRAW_DATA_BUFFER_SIZE: usize = 10_000; // TODO
 static MATERIAL_BUFFER_SIZE: usize = 10_000; // TODO
-const MAX_JOINTS: usize = 64;
+
+pub(crate) const MAX_JOINTS: usize = 64;
 
 /// A container that holds all of the resources required to draw a frame.
 pub struct Resources {
@@ -153,4 +154,6 @@ pub struct DrawData {
     pub bounding_sphere: Vector4<f32>,
     /// The ID of the material to use.
     pub material_id: u32,
+    /// An optional skin to use.
+    pub skin_id: u32,
 }
