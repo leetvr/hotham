@@ -1,12 +1,11 @@
 use crate::{
     components::{Mesh, TransformMatrix, Visible},
     rendering::resources::DrawData,
+    resources::RenderContext,
     resources::VulkanContext,
-    resources::{render_context::create_push_constant, RenderContext},
 };
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
-use nalgebra::AbstractRotation;
 
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
@@ -197,7 +196,7 @@ mod tests {
         let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
         let known_good_hash = hash_file(&known_good_path);
 
-        // assert_eq!(output_hash, known_good_hash, "Bad render: {}", name);
+        assert_eq!(output_hash, known_good_hash, "Bad render: {}", name);
     }
 
     fn render(

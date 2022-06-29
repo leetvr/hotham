@@ -3,6 +3,8 @@
 #extension GL_EXT_multiview : enable
 
 #define NO_TEXTURE 4294967295
+#define NO_SKIN 4294967295
+#define MAX_JOINTS 64
 
 struct DrawData {
     mat4 transform;
@@ -50,12 +52,17 @@ layout(std430, set = 0, binding = 2) writeonly buffer DrawCommandsBuffer {
     VkDrawIndexedIndirectCommand drawCommands[];
 } draw_commands_buffer;
 
-layout (set = 0, binding = 3) uniform SceneData { 
+layout(std140, set = 0, binding = 3) readonly buffer SkinsBuffer {
+    mat4 joints[][MAX_JOINTS]; // dynamically sized array of 64 element long arrays of mat4.
+} skinsBuffer;
+
+layout (set = 0, binding = 4) uniform SceneData { 
     mat4 viewProjection[2];
     vec4 cameraPosition[2];
     vec4 lightDirection;
     vec4 debugData;
 } sceneData;
 
+
 // Textures
-layout(set = 0, binding = 4) uniform sampler2D textures[];
+layout(set = 0, binding = 5) uniform sampler2D textures[];

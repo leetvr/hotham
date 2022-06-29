@@ -92,18 +92,15 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
         Texture::load(texture, import_context);
     }
 
+    for skin in document.skins() {
+        Skin::load(skin, import_context);
+    }
+
     for node_data in document.scenes().next().unwrap().nodes() {
         let mut world = World::default();
 
         load_node(&node_data, import_context, &mut world, true);
         add_parents(&node_data, &mut world, &mut import_context.node_entity_map);
-        // add_skins_and_joints(
-        //     &node_data,
-        //     buffer,
-        //     &mut world,
-        //     vulkan_context,
-        //     &mut node_entity_map,
-        // );
         // add_animations(&animations, buffer, &mut world, &mut node_entity_map);
 
         import_context.models.insert(
@@ -168,51 +165,6 @@ fn add_parents(
         add_parents(&child_node, world, node_entity_map);
     }
 }
-
-// fn add_skins_and_joints(
-//     node_data: &gltf::Node,
-//     buffer: &[u8],
-//     world: &mut World,
-//     vulkan_context: &VulkanContext,
-//     node_entity_map: &mut HashMap<usize, Entity>,
-// ) {
-//     // Do we need to add a Skin?
-//     // TODO: Extract this to components::Skin
-//     if let Some(node_skin_data) = node_data.skin() {
-//         println!("[HOTHAM_GLTF] Adding a skin to {}", node_data.index());
-//         let this_entity = *node_entity_map.get(&node_data.index()).unwrap();
-//         let mut joint_matrices = Vec::new();
-//         let reader = node_skin_data.reader(|_| Some(buffer));
-//         let matrices = reader.read_inverse_bind_matrices().unwrap();
-//         for m in matrices {
-//             let m = Matrix4::from(m);
-//             joint_matrices.push(m);
-//         }
-//         let mut joint_ids = Vec::new();
-
-//         for (joint_node, inverse_bind_matrix) in node_skin_data.joints().zip(joint_matrices.iter())
-//         {
-//             let joint = Joint {
-//                 skeleton_root: this_entity,
-//                 inverse_bind_matrix: *inverse_bind_matrix,
-//             };
-//             joint_ids.push(joint_node.index());
-//             let joint_entity = node_entity_map.get(&joint_node.index()).unwrap();
-//             world.insert_one(*joint_entity, joint).unwrap();
-//         }
-
-//         // Add a Skin to the entity.
-//         world.insert_one(this_entity, Skin { joint_ids }).unwrap();
-
-//         // Tell the vertex shader how many joints we have
-//         let mut mesh = world.get_mut::<Mesh>(this_entity).unwrap();
-//         mesh.ubo_data.joint_count = joint_matrices.len() as f32;
-//     }
-
-//     for child in node_data.children() {
-//         add_skins_and_joints(&child, buffer, world, vulkan_context, node_entity_map);
-//     }
-// }
 
 fn add_animations(
     animations: &[gltf::Animation], // Clippy ptr_arg

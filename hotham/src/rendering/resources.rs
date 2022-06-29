@@ -13,6 +13,7 @@ use super::{
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
 static DRAW_DATA_BUFFER_SIZE: usize = 10_000; // TODO
 static MATERIAL_BUFFER_SIZE: usize = 10_000; // TODO
+const MAX_JOINTS: usize = 64;
 
 /// A container that holds all of the resources required to draw a frame.
 pub struct Resources {
@@ -36,6 +37,9 @@ pub struct Resources {
 
     /// Mesh data used to generate DrawData
     pub mesh_data: Arena<MeshData>,
+
+    /// Buffer for skins
+    pub skins_buffer: Buffer<[Matrix4<f32>; MAX_JOINTS]>,
 
     /// Shared sampler in repeat mode, takes care of most things
     pub texture_sampler: vk::Sampler,
@@ -83,9 +87,16 @@ impl Resources {
         );
         draw_indirect_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 2);
 
+        let skins_buffer = Buffer::new(
+            vulkan_context,
+            vk::BufferUsageFlags::STORAGE_BUFFER,
+            MATERIAL_BUFFER_SIZE,
+        );
+        skins_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 3);
+
         let scene_data_buffer =
             Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1);
-        scene_data_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 3);
+        scene_data_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 4);
 
         let texture_sampler = vulkan_context
             .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
@@ -100,6 +111,7 @@ impl Resources {
             index_buffer,
             draw_data_buffer,
             materials_buffer,
+            skins_buffer,
             scene_data_buffer,
             draw_indirect_buffer,
             mesh_data: Default::default(),

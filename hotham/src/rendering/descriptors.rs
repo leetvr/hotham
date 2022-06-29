@@ -1,7 +1,7 @@
 use crate::resources::VulkanContext;
 use ash::vk;
 
-static TEXTURE_BINDING: u32 = 4;
+static TEXTURE_BINDING: u32 = 5;
 
 /// A wrapper around all the various bits of descriptor functionality
 #[derive(Clone, Debug)]
@@ -56,8 +56,8 @@ unsafe fn allocate_descriptor_set(
     pool: vk::DescriptorPool,
     layout: vk::DescriptorSetLayout,
 ) -> vk::DescriptorSet {
-    let mut descriptor_counts =
-        vk::DescriptorSetVariableDescriptorCountAllocateInfo::builder().descriptor_counts(&[1000]);
+    let mut descriptor_counts = vk::DescriptorSetVariableDescriptorCountAllocateInfo::builder()
+        .descriptor_counts(&[10_000]);
     let set = vulkan_context
         .device
         .allocate_descriptor_sets(
@@ -96,7 +96,7 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
             descriptor_count: 1,
             ..Default::default()
         },
-        // Scene Data
+        // Skins
         vk::DescriptorSetLayoutBinding {
             binding: 3,
             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
@@ -104,12 +104,20 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
             descriptor_count: 1,
             ..Default::default()
         },
-        // Textures
+        // Scene Data
         vk::DescriptorSetLayoutBinding {
             binding: 4,
+            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+        // Textures
+        vk::DescriptorSetLayoutBinding {
+            binding: TEXTURE_BINDING,
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
-            descriptor_count: 1000,
+            descriptor_count: 10_000,
             ..Default::default()
         },
     ];
@@ -119,6 +127,7 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
 
     let descriptor_flags = [
+        vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
