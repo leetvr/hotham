@@ -11,6 +11,7 @@ struct DrawData {
     mat4 inverseTranspose;
     vec4 boundingSphere;
     uint materialID;
+    uint skinID;
 };
 
 struct Material {
@@ -53,7 +54,7 @@ layout(std430, set = 0, binding = 2) writeonly buffer DrawCommandsBuffer {
 } draw_commands_buffer;
 
 layout(std140, set = 0, binding = 3) readonly buffer SkinsBuffer {
-    mat4 joints[][MAX_JOINTS]; // dynamically sized array of 64 element long arrays of mat4.
+    mat4 jointMatrices[][MAX_JOINTS]; // dynamically sized array of 64 element long arrays of mat4.
 } skinsBuffer;
 
 layout (set = 0, binding = 4) uniform SceneData { 

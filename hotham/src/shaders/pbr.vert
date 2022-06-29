@@ -8,8 +8,8 @@
 layout (location = 0) in vec3 inPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV;
-layout (location = 3) in vec4 inJoint0;
-layout (location = 4) in vec4 inWeight0;
+layout (location = 3) in vec4 inJoint;
+layout (location = 4) in vec4 inWeight;
 
 layout (location = 0) out vec4 outWorldPos;
 layout (location = 1) out vec3 outNormal;
@@ -24,29 +24,30 @@ out gl_PerVertex
 void main() 
 {
 	DrawData d = drawDataBuffer.data[gl_DrawID];
-	vec4 localPosition;
-	// if (node.jointCount > 0.0) {
-	// 	// Mesh is skinned
-	// 	mat4 skinMat = 
-	// 		inWeight0.x * node.jointMatrix[int(inJoint0.x)] +
-	// 		inWeight0.y * node.jointMatrix[int(inJoint0.y)] +
-	// 		inWeight0.z * node.jointMatrix[int(inJoint0.z)] +
-	// 		inWeight0.w * node.jointMatrix[int(inJoint0.w)];
 
-	// 	locPos = node.matrix * skinMat * vec4(inPos, 1.0);
-	// 	outNormal = normalize(transpose(inverse(mat3(node.matrix * skinMat))) * inNormal);
-	// } else {
-	localPosition = d.transform * vec4(inPos, 1.0);
-	// }
-
-	if (length(inNormal) == 0.0) {
-		outNormal = inNormal;
+	if (d.skinID == NO_SKIN) {
+		// Mesh has no skin
+		outWorldPos = d.transform * vec4(inPos, 1.0);
+		if (length(inNormal) == 0.0) {
+			outNormal = inNormal;
+		} else {
+			outNormal = normalize(mat3(d.inverseTranspose) * inNormal);
+		}
 	} else {
-		outNormal = normalize(mat3(d.inverseTranspose) * inNormal);
+		// Mesh is skinned
+		mat4[MAX_JOINTS] jointMatrices = skinsBuffer.jointMatrices[d.skinID];
+		mat4 skinMatrix = 
+			inWeight.x * jointMatrices[int(inJoint.x)] +
+			inWeight.y * jointMatrices[int(inJoint.y)] +
+			inWeight.z * jointMatrices[int(inJoint.z)] +
+			inWeight.w * jointMatrices[int(inJoint.w)];
+
+		outWorldPos = d.transform * skinMatrix * vec4(inPos, 1.0);
+		// TODO should we should probably be using the inverse transpose here instead?
+		outNormal = normalize(mat3(d.transform) * mat3(skinMatrix) * inNormal);
 	}
 
-	outWorldPos = localPosition;
 	outUV = inUV;
 	outMaterialID = d.materialID;
-	gl_Position = sceneData.viewProjection[gl_ViewIndex] * localPosition;
+	gl_Position = sceneData.viewProjection[gl_ViewIndex] * outWorldPos;
 }
