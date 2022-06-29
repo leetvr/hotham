@@ -97,6 +97,7 @@ fn tick(
     let physics_context = &mut engine.physics_context;
 
     begin_frame(xr_context, vulkan_context, render_context);
+
     if current_state == xr::SessionState::FOCUSED {
         hands_system(&mut queries.hands_query, world, xr_context, physics_context);
         grabbing_system(&mut queries.grabbing_query, world, physics_context);

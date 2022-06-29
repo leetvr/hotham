@@ -15,7 +15,6 @@ pub fn skinning_system(
     world: &mut World,
     render_context: &mut RenderContext,
 ) {
-    let mut skins = 0;
     for (_, (skin, transform_matrix)) in skins_query.query(world).iter() {
         let buffer = unsafe { render_context.resources.skins_buffer.as_slice_mut() };
         let joint_matrices = &mut buffer[skin.id as usize];
@@ -31,9 +30,7 @@ pub fn skinning_system(
             let joint_matrix = inverse_transform * joint_transform * inverse_bind_matrix;
             joint_matrices[n] = joint_matrix;
         }
-        skins += 1;
     }
-    assert_eq!(skins, 2);
 }
 
 #[cfg(target_os = "windows")]

@@ -16,7 +16,7 @@ pub static UNLIT_WORKFLOW: u32 = 2;
 
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
-#[repr(C)]
+#[repr(C, align(16))]
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Material {
     /// The base color of the material

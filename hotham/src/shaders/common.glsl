@@ -45,7 +45,7 @@ layout(std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
     DrawData data[];
 } drawDataBuffer;
 
-layout(std140, set = 0, binding = 1) readonly buffer MaterialBuffer {
+layout(std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
     Material materials[];
 } materialBuffer;
 
