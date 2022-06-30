@@ -13,6 +13,7 @@ use super::{
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
 static DRAW_DATA_BUFFER_SIZE: usize = 10_000; // TODO
 static MATERIAL_BUFFER_SIZE: usize = 10_000; // TODO
+static SKINS_BUFFER_SIZE: usize = 100; // TODO
 
 pub(crate) const MAX_JOINTS: usize = 64;
 
@@ -91,7 +92,7 @@ impl Resources {
         let skins_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::STORAGE_BUFFER,
-            MATERIAL_BUFFER_SIZE,
+            SKINS_BUFFER_SIZE,
         );
         skins_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 3);
 

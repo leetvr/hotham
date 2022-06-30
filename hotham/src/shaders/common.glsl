@@ -53,8 +53,8 @@ layout(std430, set = 0, binding = 2) writeonly buffer DrawCommandsBuffer {
     VkDrawIndexedIndirectCommand drawCommands[];
 } drawCommandsBuffer;
 
-layout(std140, set = 0, binding = 3) readonly buffer SkinsBuffer {
-    mat4 jointMatrices[][MAX_JOINTS]; // dynamically sized array of 64 element long arrays of mat4.
+layout(std430, set = 0, binding = 3) readonly buffer SkinsBuffer {
+    mat4 jointMatrices[100][64]; // dynamically sized array of 64 element long arrays of mat4.
 } skinsBuffer;
 
 layout (set = 0, binding = 4) uniform SceneData { 

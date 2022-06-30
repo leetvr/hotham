@@ -1,4 +1,4 @@
-use crate::components::{animation_controller::AnimationController, Transform};
+use crate::components::{animation_controller::AnimationController, transform, Transform};
 use hecs::{PreparedQuery, World};
 
 /// Animation system
@@ -11,7 +11,6 @@ pub fn animation_system(query: &mut PreparedQuery<&AnimationController>, world: 
 
         for target in &controller.targets {
             let mut transform = world.get_mut::<Transform>(target.target).unwrap();
-
             transform.translation =
                 target.translations[blend_from].lerp(&target.translations[blend_to], blend_amount);
             transform.rotation =
@@ -44,8 +43,8 @@ mod tests {
         {
             let mut left_hand_controller = world.get_mut::<AnimationController>(left_hand).unwrap();
             left_hand_controller.blend_from = 0;
-            left_hand_controller.blend_from = 1;
-            left_hand_controller.blend_amount = 0.5;
+            left_hand_controller.blend_to = 1;
+            left_hand_controller.blend_amount = 0.0;
         }
 
         // Collect all the transforms in the world so we can compare them later.
