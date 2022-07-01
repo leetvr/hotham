@@ -11,6 +11,9 @@ pub mod space_state;
 pub mod state;
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
+pub mod inputs;
+
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use crate::openxr_loader::{
     PFN_xrEnumerateInstanceExtensionProperties, PFN_xrGetInstanceProcAddr, PFN_xrVoidFunction,
     XrInstance_T, XrResult,
