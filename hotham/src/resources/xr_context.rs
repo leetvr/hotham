@@ -62,7 +62,7 @@ pub struct XrContext {
     pub session: Session<Vulkan>,
     pub session_state: SessionState,
     pub swapchain: Swapchain<Vulkan>,
-    pub reference_space: Space,
+    pub stage_space: Space,
     pub action_set: ActionSet,
     pub pose_action: Action<Posef>,
     pub grab_action: Action<f32>,
@@ -102,7 +102,7 @@ impl XrContext {
             create_vulkan_context(&instance, system, application_name, application_version)?;
         let (session, frame_waiter, frame_stream) =
             create_xr_session(&instance, system, &vulkan_context)?;
-        let reference_space =
+        let stage_space =
             session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&instance, system)?;
         let swapchain = create_xr_swapchain(&session, &swapchain_resolution, VIEW_COUNT)?;
@@ -221,7 +221,7 @@ impl XrContext {
             session,
             session_state: SessionState::IDLE,
             swapchain,
-            reference_space,
+            stage_space,
             action_set,
             pose_action,
             trigger_action,
@@ -314,7 +314,7 @@ impl XrContext {
         ];
 
         let layer_projection = xr::CompositionLayerProjection::new()
-            .space(&self.reference_space)
+            .space(&self.stage_space)
             .views(&views);
 
         let layers = [&*layer_projection];
