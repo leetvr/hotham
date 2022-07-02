@@ -63,6 +63,7 @@ pub struct XrContext {
     pub session_state: SessionState,
     pub swapchain: Swapchain<Vulkan>,
     pub stage_space: Space,
+    pub view_space: Space,
     pub action_set: ActionSet,
     pub pose_action: Action<Posef>,
     pub grab_action: Action<f32>,
@@ -104,6 +105,8 @@ impl XrContext {
             create_xr_session(&instance, system, &vulkan_context)?;
         let stage_space =
             session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
+        let view_space =
+            session.create_reference_space(ReferenceSpaceType::VIEW, xr::Posef::IDENTITY)?;
         let swapchain_resolution = get_swapchain_resolution(&instance, system)?;
         let swapchain = create_xr_swapchain(&session, &swapchain_resolution, VIEW_COUNT)?;
 
@@ -222,6 +225,7 @@ impl XrContext {
             session_state: SessionState::IDLE,
             swapchain,
             stage_space,
+            view_space,
             action_set,
             pose_action,
             trigger_action,
