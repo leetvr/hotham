@@ -20,7 +20,7 @@ pub fn audio_system(
 ) {
     for (_, (sound_emitter, rigid_body)) in query.query_mut(world) {
         // First, where is the listener?
-        let listener_location =
+        let stage_from_listener =
             get_location_from_poses(xr_context.views[0].pose, xr_context.views[1].pose);
 
         // Get the position and velocity of the entity.
@@ -29,10 +29,10 @@ pub fn audio_system(
             .get(rigid_body.handle)
             .expect("Unable to get RigidBody");
 
-        let velocity = (*rigid_body.linvel()).into();
+        let velocity_in_stage = (*rigid_body.linvel()).into();
 
         // Now transform the position of the entity w.r.t. the listener
-        let position = listener_location
+        let position_in_listener = stage_from_listener
             .inverse_transform_point(&Point3::from(*rigid_body.translation()))
             .into();
 
@@ -41,9 +41,9 @@ pub fn audio_system(
             (SoundState::Stopped, Some(SoundState::Playing)) => {
                 println!(
                     "[HOTHAM_AUDIO] - Playing sound effect at {:?}, {:?} from {:?}!. Original position: {:?}",
-                    position, velocity, listener_location, rigid_body.translation()
+                    position_in_listener, velocity_in_stage, stage_from_listener, rigid_body.translation()
                 );
-                audio_context.play_audio(sound_emitter, position, velocity);
+                audio_context.play_audio(sound_emitter, position_in_listener, velocity_in_stage);
             }
             (SoundState::Paused, Some(SoundState::Playing)) => {
                 audio_context.resume_audio(sound_emitter);
@@ -64,7 +64,7 @@ pub fn audio_system(
         sound_emitter.next_state = None;
 
         // Update its position and velocity
-        audio_context.update_motion(sound_emitter, position, velocity);
+        audio_context.update_motion(sound_emitter, position_in_listener, velocity_in_stage);
     }
 }
 
