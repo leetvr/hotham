@@ -26,7 +26,7 @@ pub fn begin_frame(
         .locate_views(
             VIEW_TYPE,
             xr_context.frame_state.predicted_display_time,
-            &xr_context.reference_space,
+            &xr_context.stage_space,
         )
         .unwrap();
     xr_context.views = views;
