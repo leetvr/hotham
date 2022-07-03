@@ -87,11 +87,9 @@ fn add_material(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) -> u32 {
-    let material = Material::unlit_white();
-    unsafe {
-        render_context.resources.materials_buffer.push(&material);
-    }
-    render_context.resources.materials_buffer.len as _
+    let mut material = Material::unlit_white();
+    material.base_color_texture_set = output_texture.index;
+    unsafe { render_context.resources.materials_buffer.push(&material) }
 }
 
 /// Input to a panel

@@ -17,7 +17,7 @@ pub static UNLIT_WORKFLOW: u32 = 2;
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
 #[repr(C, align(16))]
-#[derive(Debug, Default, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     /// The base color of the material
     pub base_color_factor: Vector4<f32>,
@@ -47,6 +47,27 @@ pub struct Material {
     pub alpha_mask: f32,
     /// Alpha mask cutoff - see fragment shader
     pub alpha_mask_cutoff: f32,
+}
+
+impl Default for Material {
+    fn default() -> Self {
+        Self {
+            base_color_factor: Default::default(),
+            emissive_factor: Default::default(),
+            diffuse_factor: Default::default(),
+            specular_factor: Default::default(),
+            workflow: UNLIT_WORKFLOW,
+            base_color_texture_set: NO_TEXTURE,
+            physical_descrtiptor_texture_id: NO_TEXTURE,
+            normal_texture_set: NO_TEXTURE,
+            occlusion_texture_set: NO_TEXTURE,
+            emissive_texture_set: NO_TEXTURE,
+            metallic_factor: Default::default(),
+            roughness_factor: Default::default(),
+            alpha_mask: Default::default(),
+            alpha_mask_cutoff: Default::default(),
+        }
+    }
 }
 
 impl Material {
