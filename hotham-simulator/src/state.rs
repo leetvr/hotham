@@ -4,7 +4,8 @@ use ash::{
     Device, Entry as AshEntry, Instance as AshInstance,
 };
 
-use openxr_sys::{Path, Posef, SessionState, Space, Vector3f};
+use nalgebra::{vector, Quaternion, Unit, UnitQuaternion};
+use openxr_sys::{Path, Posef, Quaternionf, SessionState, Space, Vector3f};
 
 use std::{
     collections::HashMap,
@@ -197,8 +198,6 @@ impl State {
     }
 
     pub fn update_actions(&mut self) -> Option<()> {
-        let mut z_delta = 0.00;
-        let mut x_delta = 0.00;
         let mut x_rot = 0.0;
         let mut y_rot = 0.0;
 
@@ -207,46 +206,72 @@ impl State {
 
         self.last_frame_time = now;
 
+        let delta_secs = delta.as_secs_f32();
+        let keyboard_speed = 2f32 * delta_secs;
+        let mouse_speed = 1f32 * delta_secs;
+
         if let Some(input_event) = self.event_rx.as_ref()?.try_recv().ok() {
             match input_event {
                 HothamInputEvent::KeyboardInput { .. } => {
                     self.input_state.process_event(input_event)
                 }
                 HothamInputEvent::MouseInput { x, y } => {
-                    x_rot = -(x * 0.001) as _;
-                    y_rot = -(y * 0.001) as _;
+                    x_rot = -x as f32 * mouse_speed;
+                    y_rot = -y as f32 * mouse_speed;
                 }
-            }
-        }
-
-        for pressed in self.input_state.pressed.iter() {
-            match pressed {
-                winit::event::VirtualKeyCode::W => {
-                    z_delta += -1f32;
-                }
-                winit::event::VirtualKeyCode::S => {
-                    z_delta += 1f32;
-                }
-                winit::event::VirtualKeyCode::A => {
-                    x_delta += -1f32;
-                }
-                winit::event::VirtualKeyCode::D => {
-                    x_delta += 1f32;
-                }
-                _ => {}
             }
         }
 
         let pose = &mut self.view_poses[0];
+        let position = &mut pose.position;
+
         let orientation = &mut pose.orientation;
         orientation.x = (orientation.x + x_rot).clamp(-1.0, 1.0);
         orientation.y = (orientation.y + y_rot).clamp(-1.0, 1.0);
 
-        let position = &mut pose.position;
-        let delta_secs = delta.as_secs_f32();
-        let speed = 2f32 * delta_secs;
-        position.z += z_delta * speed;
-        position.x += x_delta * speed;
+        let forward = rotate_vector_by_quaternion(
+            Vector3f {
+                x: 0f32,
+                y: 0f32,
+                z: 1f32,
+            },
+            *orientation,
+        );
+
+        let right = rotate_vector_by_quaternion(
+            Vector3f {
+                x: 1f32,
+                y: 0f32,
+                z: 0f32,
+            },
+            *orientation,
+        );
+
+        for pressed in self.input_state.pressed.iter() {
+            match pressed {
+                winit::event::VirtualKeyCode::W => {
+                    position.x -= forward.x * keyboard_speed;
+                    position.y -= forward.y * keyboard_speed;
+                    position.z -= forward.z * keyboard_speed;
+                }
+                winit::event::VirtualKeyCode::S => {
+                    position.x += forward.x * keyboard_speed;
+                    position.y += forward.y * keyboard_speed;
+                    position.z += forward.z * keyboard_speed;
+                }
+                winit::event::VirtualKeyCode::A => {
+                    position.x -= right.x * keyboard_speed;
+                    position.y -= right.y * keyboard_speed;
+                    position.z -= right.z * keyboard_speed;
+                }
+                winit::event::VirtualKeyCode::D => {
+                    position.x += right.x * keyboard_speed;
+                    position.y += right.y * keyboard_speed;
+                    position.z += right.z * keyboard_speed;
+                }
+                _ => {}
+            }
+        }
 
         // let left_hand = self.left_hand_space;
         // let right_hand = self.right_hand_space;
@@ -256,5 +281,24 @@ impl State {
         // self.spaces.get_mut(&right_hand).unwrap().position.x += x_delta;
 
         Some(())
+    }
+}
+
+fn rotate_vector_by_quaternion(
+    vector: Vector3f,
+    Quaternionf { x, y, z, w }: Quaternionf,
+) -> Vector3f {
+    let i = x;
+    let j = y;
+    let k = z;
+    let w = w;
+    let q1: Unit<Quaternion<f32>> = UnitQuaternion::from_quaternion(Quaternion::new(w, i, j, k));
+
+    let rotated_vector = q1.transform_vector(&vector![vector.x, vector.y, vector.z]);
+
+    Vector3f {
+        x: rotated_vector.x,
+        y: rotated_vector.y,
+        z: rotated_vector.z,
     }
 }
