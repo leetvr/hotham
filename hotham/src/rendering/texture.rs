@@ -2,6 +2,7 @@ use crate::{
     asset_importer::ImportContext,
     rendering::image::Image,
     resources::{RenderContext, VulkanContext},
+    COLOR_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::vk;
@@ -38,7 +39,7 @@ impl Texture {
         height: u32,
         format: vk::Format,
     ) -> Self {
-        let image_t = vulkan_context
+        let image = vulkan_context
             .create_image(
                 format,
                 &vk::Extent2D { width, height },
@@ -48,8 +49,8 @@ impl Texture {
             )
             .unwrap();
 
-        let (image, index) = render_context
-            .create_texture_image(name, vulkan_context, image_buf, 1, vec![0], image_t)
+        let index = render_context
+            .create_texture_image(name, vulkan_context, image_buf, 1, vec![0], &image)
             .unwrap();
 
         Texture { image, index }
@@ -105,9 +106,26 @@ impl Texture {
         texture.index
     }
 
-    /// Load an empty texture. Useful for materials that are missing some part of the PBR material.
-    pub fn empty(vulkan_context: &VulkanContext) -> Self {
-        todo!()
+    /// Create an empty texture. Useful for obtaining a texture you want to write to later on.
+    pub fn empty(
+        vulkan_context: &VulkanContext,
+        render_context: &mut RenderContext,
+        resolution: vk::Extent2D,
+    ) -> Self {
+        let image = vulkan_context
+            .create_image(
+                COLOR_FORMAT,
+                &resolution,
+                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
+                1,
+                1,
+            )
+            .unwrap();
+        let index = render_context
+            .create_texture_image("Empty Texture", vulkan_context, &[], 1, vec![0], &image)
+            .unwrap();
+
+        Texture { image, index }
     }
 
     /// Load a texture from a KTX2 buffer
@@ -119,34 +137,22 @@ impl Texture {
     ) -> Result<Self> {
         let buf = Cursor::new(buf.to_vec());
         let buf = Box::new(buf);
-        let (buf, image_t, mip_levels, offsets) = parse_ktx(buf, vulkan_context)?;
+        let (buf, image, mip_levels, offsets) = parse_ktx(buf, vulkan_context)?;
         println!(
             "Creating texture image with format {:?}, array layers {} and mip_levels {}",
-            image_t.format, image_t.layer_count, mip_levels
+            image.format, image.layer_count, mip_levels
         );
 
-        let image = render_context.create_texture_image(
+        let index = render_context.create_texture_image(
             name,
             vulkan_context,
             &buf,
             mip_levels,
             offsets,
-            image_t,
+            &image,
         )?;
 
-        todo!()
-
-        // let descriptor = vk::DescriptorImageInfo::builder()
-        //     .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-        //     .image_view(image.view)
-        //     .sampler(sampler)
-        //     .build();
-
-        // Ok(Texture {
-        //     image,
-        //     sampler,
-        //     descriptor,
-        // })
+        Ok(Texture { image, index })
     }
 }
 

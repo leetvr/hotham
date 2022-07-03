@@ -154,20 +154,20 @@ impl Primitive {
 
 /// Get a bounding sphere for the primitive, used for occlusion culling
 pub fn calculate_bounding_sphere(vertices: &[Vertex]) -> Vector4<f32> {
-    let mut points = vertices.iter().map(|v| v.position);
+    let points = vertices.iter().map(|v| v.position).collect::<Vec<_>>();
     let num_points = points.len();
     if num_points == 0 {
         return Default::default();
     }
 
     let mut centre = Vector3::zeros();
-    for p in points.by_ref() {
+    for p in &points {
         centre += p;
     }
 
     centre /= num_points as f32;
-    let mut radius = (&points.nth(0).unwrap() - &centre).norm_squared();
-    for p in points.skip(1) {
+    let mut radius = (&points[0] - &centre).norm_squared();
+    for p in points.iter().skip(1) {
         radius = radius.max((p - &centre).norm_squared());
     }
 

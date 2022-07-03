@@ -179,24 +179,28 @@ mod tests {
         use crate::{
             components::{Collider, Panel, Transform},
             rendering::texture::Texture,
-            resources::physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
+            resources::{
+                physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
+                RenderContext,
+            },
         };
         use nalgebra::vector;
         use rapier3d::prelude::ColliderBuilder;
 
-        let (mut xr_context, mut vulkan_context) = XrContext::new().unwrap();
+        let (mut xr_context, vulkan_context) = XrContext::new().unwrap();
+        let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
         let mut physics_context = PhysicsContext::default();
         let mut world = World::default();
 
-        let panel = Panel {
-            resolution: vk::Extent2D {
+        let panel = Panel::create(
+            &vulkan_context,
+            &mut render_context,
+            vk::Extent2D {
                 width: 300,
                 height: 300,
             },
-            world_size: [1.0, 1.0].into(),
-            texture: Texture::empty(&mut vulkan_context),
-            input: None,
-        };
+            [1.0, 1.0].into(),
+        );
         let panel_entity = world.spawn((panel,));
 
         // Place the panel *directly above* where the pointer will be located.

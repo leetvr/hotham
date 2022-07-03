@@ -32,27 +32,7 @@ impl Panel {
         resolution: vk::Extent2D,
         world_size: Vector2<f32>,
     ) -> Result<(Panel, Mesh), HothamError> {
-        let output_image = vulkan_context
-            .create_image(
-                COLOR_FORMAT,
-                &resolution,
-                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED,
-                1,
-                1,
-            )
-            .unwrap();
-        let sampler = vulkan_context
-            .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
-            .unwrap();
-        let descriptor = vk::DescriptorImageInfo::builder()
-            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-            .image_view(output_image.view)
-            .sampler(sampler)
-            .build();
-        let texture = Texture {
-            image: output_image,
-            index: 0,
-        };
+        let texture = Texture::empty(vulkan_context, render_context, resolution);
         let mesh = create_mesh(&texture, vulkan_context, render_context, world_size);
 
         Ok((
