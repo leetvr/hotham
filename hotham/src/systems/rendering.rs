@@ -47,7 +47,6 @@ pub fn rendering_system(
         }
     }
 
-    render_context.begin_frame(vulkan_context, swapchain_image_index);
     // render_context.cull_objects(vulkan_context, swapchain_image_index);
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
 

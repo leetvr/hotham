@@ -18,7 +18,7 @@ pub fn begin_frame(
         .sync_actions(&[active_action_set])
         .unwrap();
 
-    // Wait for a frame to become available from the runtime
+    // Wait for a frame to become available from the runtime, then get its index.
     xr_context.begin_frame().unwrap();
 
     let (view_state_flags, views) = xr_context
@@ -31,6 +31,13 @@ pub fn begin_frame(
         .unwrap();
     xr_context.views = views;
     xr_context.view_state_flags = view_state_flags;
+
+    // If we shouldn't render yet, we're done.
+    if !xr_context.frame_state.should_render {
+        return;
+    }
+
+    render_context.begin_frame(vulkan_context, xr_context.frame_index);
 }
 
 #[cfg(target_os = "windows")]

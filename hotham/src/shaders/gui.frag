@@ -9,5 +9,4 @@ layout(binding = 0, set = 0) uniform sampler2D font_texture;
 
 void main() { 
     outColor = inColor * texture(font_texture, inUV); 
-    // outColor = vec4(1.0, 1.0, 1.0, 1.0);
 }

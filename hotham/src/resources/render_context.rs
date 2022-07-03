@@ -202,6 +202,17 @@ impl RenderContext {
 
         // Wait for the GPU to be ready.
         self.wait(device, frame);
+
+        let command_buffer = frame.command_buffer;
+        unsafe {
+            device
+                .begin_command_buffer(
+                    command_buffer,
+                    &vk::CommandBufferBeginInfo::builder()
+                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                )
+                .unwrap();
+        }
     }
 
     pub(crate) fn cull_objects(
@@ -257,6 +268,8 @@ impl RenderContext {
         }
     }
 
+    /// Begin the PBR renderpass.
+    /// DOES NOT BEGIN RECORDING COMMAND BUFFERS - call begin_frame first!
     pub(crate) fn begin_pbr_render_pass(
         &self,
         vulkan_context: &VulkanContext,
@@ -276,13 +289,6 @@ impl RenderContext {
             .clear_values(&CLEAR_VALUES);
 
         unsafe {
-            device
-                .begin_command_buffer(
-                    command_buffer,
-                    &vk::CommandBufferBeginInfo::builder()
-                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
-                )
-                .unwrap();
             device.cmd_begin_render_pass(
                 command_buffer,
                 &render_pass_begin_info,

@@ -169,25 +169,11 @@ mod tests {
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
     ) {
-        println!("[DRAW_GUI_TEST] Running schedule..");
+        println!("[DRAW_GUI_TEST] Beginning frame..");
         begin_frame(render_context, vulkan_context);
 
         // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
         haptic_context.right_hand_amplitude_this_frame = 0.;
-
-        // Draw the GUI
-        draw_gui_system(
-            query,
-            world,
-            vulkan_context,
-            &0,
-            render_context,
-            gui_context,
-            haptic_context,
-        );
-
-        // Begin the PBR Render Pass
-        render_context.begin_pbr_render_pass(vulkan_context, 0);
 
         // Update transforms, etc.
         update_transform_matrix_system(&mut Default::default(), world);
@@ -199,7 +185,20 @@ mod tests {
             world,
         );
 
+        // Draw the GUI
+        println!("[DRAW_GUI_TEST] draw_gui_system");
+        draw_gui_system(
+            query,
+            world,
+            vulkan_context,
+            &0,
+            render_context,
+            gui_context,
+            haptic_context,
+        );
+
         // Render
+        println!("[DRAW_GUI_TEST] rendering_system");
         rendering_system(
             &mut Default::default(),
             world,
@@ -208,9 +207,7 @@ mod tests {
             render_context,
         );
 
-        // End PBR render
-        render_context.end_pbr_render_pass(vulkan_context, 0);
-        render_context.end_frame(vulkan_context, 0);
+        panic!()
     }
 
     fn begin_frame(render_context: &mut RenderContext, vulkan_context: &VulkanContext) {
@@ -236,7 +233,6 @@ mod tests {
         let views = vec![view.clone(), view];
 
         render_context.begin_frame(&vulkan_context, 0);
-
         render_context.update_scene_data(&views).unwrap();
     }
 
