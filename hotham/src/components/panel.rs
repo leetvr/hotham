@@ -6,6 +6,7 @@ use nalgebra::{vector, Vector2, Vector4};
 use crate::components::Mesh;
 use crate::hotham_error::HothamError;
 use crate::rendering::material::Material;
+use crate::rendering::mesh_data::MeshData;
 use crate::rendering::primitive::{calculate_bounding_sphere, Primitive};
 use crate::{
     rendering::texture::Texture,
@@ -52,7 +53,6 @@ impl Panel {
             image: output_image,
             index: 0,
         };
-        todo!();
         let mesh = create_mesh(&texture, vulkan_context, render_context, world_size);
 
         Ok((
@@ -98,25 +98,8 @@ fn create_mesh(
         .collect();
 
     let indices = [0, 1, 2, 0, 3, 1];
-
-    let primitive = Primitive {
-        indices_count: 6,
-        material_id,
-        index_buffer_offset: render_context.resources.index_buffer.len as _,
-        vertex_buffer_offset: render_context.resources.vertex_buffer.len as _,
-        bounding_sphere: calculate_bounding_sphere(&positions),
-    };
-
-    unsafe {
-        render_context.resources.index_buffer.append(&indices);
-        render_context.resources.vertex_buffer.append(&vertices);
-    }
-
-    todo!()
-
-    // Mesh {
-    //     primitives: vec![primitive],
-    // }
+    let primitive = Primitive::new(&vertices, &indices, material_id, render_context);
+    Mesh::new(MeshData::new(vec![primitive]), render_context)
 }
 
 fn add_material(

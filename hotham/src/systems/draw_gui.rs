@@ -101,7 +101,7 @@ mod tests {
         let mut renderdoc = begin_renderdoc();
 
         let mut query = Default::default();
-        schedule(
+        draw(
             &mut query,
             &mut world,
             &mut gui_context,
@@ -121,7 +121,7 @@ mod tests {
 
         // Release the trigger slightly
         release_trigger(&mut world, &mut query);
-        schedule(
+        draw(
             &mut query,
             &mut world,
             &mut gui_context,
@@ -138,7 +138,7 @@ mod tests {
 
         // Move the cursor off the panel and release the trigger entirely
         move_cursor_off_panel(&mut world, &mut query);
-        schedule(
+        draw(
             &mut query,
             &mut world,
             &mut gui_context,
@@ -161,7 +161,7 @@ mod tests {
         open_file(&mut renderdoc);
     }
 
-    fn schedule(
+    fn draw(
         query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
         world: &mut World,
         gui_context: &mut GuiContext,
