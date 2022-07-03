@@ -198,14 +198,16 @@ impl State {
         let mut x_rot = 0.0;
         let mut y_rot = 0.0;
 
+        // We need to adjust the speed value so its always the same speed even if the frame rate isn't consistent
+        // The delta time is the the current time - last frame time
         let now = Instant::now();
         let delta = now - self.last_frame_time;
-
         self.last_frame_time = now;
 
         let delta_secs = delta.as_secs_f32();
         let keyboard_speed = 2f32 * delta_secs;
         let mouse_speed = 1f32 * delta_secs;
+
         if let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
             match input_event {
                 DeviceEvent::Key(keyboard_input) => self.input_state.process_event(keyboard_input),
@@ -224,6 +226,7 @@ impl State {
         orientation.x = (orientation.x + x_rot).clamp(-1.0, 1.0);
         orientation.y = (orientation.y + y_rot).clamp(-1.0, 1.0);
 
+        // get the forward vector rotated by the camera rotation quaternion
         let forward = rotate_vector_by_quaternion(
             Vector3f {
                 x: 0f32,
@@ -232,7 +235,7 @@ impl State {
             },
             *orientation,
         );
-
+        // get the right vector rotated by the camera rotation quaternion
         let right = rotate_vector_by_quaternion(
             Vector3f {
                 x: 1f32,
