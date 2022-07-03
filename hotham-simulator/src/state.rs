@@ -6,6 +6,7 @@ use ash::{
 
 use nalgebra::{vector, Quaternion, Unit, UnitQuaternion};
 use openxr_sys::{Path, Posef, Quaternionf, SessionState, Space, Vector3f};
+use winit::event::DeviceEvent;
 
 use std::{
     collections::HashMap,
@@ -19,11 +20,7 @@ use std::{
     time::Instant,
 };
 
-use crate::{
-    inputs::{HothamInputEvent, Inputs},
-    simulator::NUM_VIEWS,
-    space_state::SpaceState,
-};
+use crate::{inputs::Inputs, simulator::NUM_VIEWS, space_state::SpaceState};
 // use crate::simulator::spa
 pub struct State {
     pub vulkan_entry: Option<AshEntry>,
@@ -63,7 +60,7 @@ pub struct State {
     pub left_hand_space: u64,
     pub right_hand_space: u64,
     pub view_poses: Vec<Posef>,
-    pub event_rx: Option<Receiver<HothamInputEvent>>,
+    pub event_rx: Option<Receiver<DeviceEvent>>,
     pub input_state: Inputs,
     pub last_frame_time: Instant,
 }
@@ -209,16 +206,14 @@ impl State {
         let delta_secs = delta.as_secs_f32();
         let keyboard_speed = 2f32 * delta_secs;
         let mouse_speed = 1f32 * delta_secs;
-
-        if let Some(input_event) = self.event_rx.as_ref()?.try_recv().ok() {
+        if let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
             match input_event {
-                HothamInputEvent::KeyboardInput { .. } => {
-                    self.input_state.process_event(input_event)
-                }
-                HothamInputEvent::MouseInput { x, y } => {
+                DeviceEvent::Key(keyboard_input) => self.input_state.process_event(keyboard_input),
+                DeviceEvent::MouseMotion { delta: (y, x) } => {
                     x_rot = -x as f32 * mouse_speed;
                     y_rot = -y as f32 * mouse_speed;
                 }
+                _ => {}
             }
         }
 

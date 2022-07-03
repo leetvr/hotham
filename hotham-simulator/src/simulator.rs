@@ -1032,8 +1032,6 @@ fn create_multiview_image_views(
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
-    use crate::inputs::HothamInputEvent;
-
     let entry = state.vulkan_entry.as_ref().unwrap().clone();
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
     let device = state.device.as_ref().unwrap();
@@ -1123,15 +1121,9 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
                 }
                 Event::RedrawRequested(_window_id) => {}
                 Event::DeviceEvent { event, .. } => match event {
-                    DeviceEvent::Key(k) => event_tx
-                        .send(HothamInputEvent::KeyboardInput {
-                            key_code: k.virtual_keycode,
-                            state: k.state,
-                        })
-                        .unwrap(),
-                    DeviceEvent::MouseMotion { delta: (y, x) } => event_tx
-                        .send(HothamInputEvent::MouseInput { x, y })
-                        .unwrap(),
+                    DeviceEvent::Key(_) | DeviceEvent::MouseMotion { .. } => {
+                        event_tx.send(event).unwrap()
+                    }
                     _ => {}
                 },
                 _ => (),
