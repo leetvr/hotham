@@ -94,7 +94,7 @@ mod tests {
     #[test]
     pub fn test_audio_system() {
         // Create resources
-        let (mut xr_context, _) = XrContext::new().unwrap();
+        let (mut xr_context, _) = XrContext::testing();
         let mut audio_context = AudioContext::default();
         let mut physics_context = PhysicsContext::default();
 

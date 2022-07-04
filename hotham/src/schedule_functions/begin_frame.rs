@@ -50,7 +50,7 @@ mod tests {
     #[test]
 
     pub fn test_begin_frame() {
-        let (mut xr_context, vulkan_context) = XrContext::new().unwrap();
+        let (mut xr_context, vulkan_context) = XrContext::testing();
         let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
         xr_context.frame_index = 100;
 

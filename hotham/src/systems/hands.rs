@@ -162,7 +162,7 @@ mod tests {
     // HELPER FUNCTIONS
     fn setup() -> (World, XrContext, PhysicsContext) {
         let world = World::new();
-        let (xr_context, _) = XrContext::new().unwrap();
+        let (xr_context, _) = XrContext::testing();
         let physics_context = PhysicsContext::default();
         (world, xr_context, physics_context)
     }
