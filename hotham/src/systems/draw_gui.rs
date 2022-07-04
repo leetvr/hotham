@@ -206,6 +206,7 @@ mod tests {
             0,
             render_context,
         );
+        render_context.end_frame(vulkan_context, 0);
     }
 
     fn begin_frame(render_context: &mut RenderContext, vulkan_context: &VulkanContext) {

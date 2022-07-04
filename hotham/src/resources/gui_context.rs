@@ -507,9 +507,35 @@ fn update_font_texture(
         .flat_map(|&r| vec![r, r, r, r])
         .collect::<Vec<_>>();
 
-    // TODO:
-    // 1. create an image
-    // let image = vulkan_context.crea
-    // 2. upoad it
-    // 3. update the descriptor
+    let image = vulkan_context
+        .create_image(
+            COLOR_FORMAT,
+            &vk::Extent2D {
+                width: texture.width as _,
+                height: texture.height as _,
+            },
+            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            1,
+            1,
+        )
+        .unwrap();
+    vulkan_context.upload_image(&image_buf, 1, vec![0], &image);
+
+    let image_info = vk::DescriptorImageInfo {
+        sampler: render_context.resources.texture_sampler,
+        image_view: image.view,
+        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+    };
+
+    let texture_write = vk::WriteDescriptorSet::builder()
+        .image_info(std::slice::from_ref(&image_info))
+        .dst_binding(0)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .dst_set(descriptor_set);
+
+    unsafe {
+        vulkan_context
+            .device
+            .update_descriptor_sets(std::slice::from_ref(&texture_write), &[]);
+    }
 }
