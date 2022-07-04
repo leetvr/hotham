@@ -379,9 +379,6 @@ impl RenderContext {
         offsets: Vec<vk::DeviceSize>,
         texture_image: &Image,
     ) -> Result<u32> {
-        // Get the image's properties
-        let layer_count = texture_image.layer_count;
-
         vulkan_context.set_debug_name(
             vk::ObjectType::IMAGE,
             texture_image.handle.as_raw(),
@@ -390,51 +387,7 @@ impl RenderContext {
 
         // TODO: This is only neccesary on desktop, or if there is data in the buffer!
         if image_buf.len() > 0 {
-            // Create a staging buffer.
-            println!("[HOTHAM_VULKAN] Creating staging buffer..");
-            let usage = vk::BufferUsageFlags::TRANSFER_SRC;
-            let size = image_buf.len();
-            let (staging_buffer, staging_memory, _) =
-                vulkan_context.create_buffer_with_data(image_buf, usage, size as _)?;
-            println!("[HOTHAM_VULKAN] ..done!");
-
-            // Copy the buffer into the image
-            let initial_layout = vk::ImageLayout::UNDEFINED;
-            let transfer_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
-            vulkan_context.transition_image_layout(
-                texture_image.handle,
-                initial_layout,
-                transfer_layout,
-                layer_count,
-                mip_count,
-            );
-
-            println!("[HOTHAM_VULKAN] Copying buffer to image..");
-            vulkan_context.copy_buffer_to_image(
-                staging_buffer,
-                &texture_image,
-                layer_count,
-                mip_count,
-                offsets,
-            );
-
-            // Now transition the image
-            println!("[HOTHAM_VULKAN] ..done! Transitioning image layout..");
-            let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
-            vulkan_context.transition_image_layout(
-                texture_image.handle,
-                transfer_layout,
-                final_layout,
-                layer_count,
-                mip_count,
-            );
-            println!("[HOTHAM_VULKAN] ..done! Freeing staging buffer..");
-
-            // Free the staging buffer
-            unsafe {
-                vulkan_context.device.destroy_buffer(staging_buffer, None);
-                vulkan_context.device.free_memory(staging_memory, None);
-            }
+            vulkan_context.upload_image(image_buf, mip_count, offsets, texture_image);
         }
 
         let texture_index = unsafe {

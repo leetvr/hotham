@@ -714,6 +714,64 @@ impl VulkanContext {
             )
         }
     }
+
+    pub fn upload_image(
+        &self,
+        image_buf: &[u8],
+        mip_count: u32,
+        offsets: Vec<vk::DeviceSize>,
+        texture_image: &Image,
+    ) {
+        // Get the image's properties
+        let layer_count = texture_image.layer_count;
+
+        // Create a staging buffer.
+        println!("[HOTHAM_VULKAN] Creating staging buffer..");
+        let usage = vk::BufferUsageFlags::TRANSFER_SRC;
+        let size = image_buf.len();
+        let (staging_buffer, staging_memory, _) = self
+            .create_buffer_with_data(image_buf, usage, size as _)
+            .unwrap();
+        println!("[HOTHAM_VULKAN] ..done!");
+
+        // Copy the buffer into the image
+        let initial_layout = vk::ImageLayout::UNDEFINED;
+        let transfer_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+        self.transition_image_layout(
+            texture_image.handle,
+            initial_layout,
+            transfer_layout,
+            layer_count,
+            mip_count,
+        );
+
+        println!("[HOTHAM_VULKAN] Copying buffer to image..");
+        self.copy_buffer_to_image(
+            staging_buffer,
+            &texture_image,
+            layer_count,
+            mip_count,
+            offsets,
+        );
+
+        // Now transition the image
+        println!("[HOTHAM_VULKAN] ..done! Transitioning image layout..");
+        let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+        self.transition_image_layout(
+            texture_image.handle,
+            transfer_layout,
+            final_layout,
+            layer_count,
+            mip_count,
+        );
+        println!("[HOTHAM_VULKAN] ..done! Freeing staging buffer..");
+
+        // Free the staging buffer
+        unsafe {
+            self.device.destroy_buffer(staging_buffer, None);
+            self.device.free_memory(staging_memory, None);
+        }
+    }
 }
 
 #[allow(unused_variables)]
