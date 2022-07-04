@@ -1,11 +1,11 @@
-${env:RUST_BACKTRACE} = 1
-adb shell am force-stop rust.hotham_crab_saber
+adb shell am force-stop rust.simple_scene_example
 
+Set-Location $PSScriptRoot\..
 cargo apk run --release
 
 if ($?) {
     Start-Sleep -Seconds 2
-    $processIdStr = (adb shell pidof rust.crab_saber) | Out-String
+    $processIdStr = (adb shell pidof rust.simple_scene_example) | Out-String
     Write-Output $processIdStr
     $processId = $processIdStr -as [int]
     Write-Output $processId
