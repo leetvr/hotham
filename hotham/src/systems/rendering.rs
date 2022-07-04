@@ -9,6 +9,10 @@ use hecs::{PreparedQuery, With, World};
 
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
+///
+/// Requirements:
+/// - BEFORE: ensure you have called render_context.begin_frame
+/// - AFTER: ensure you have called render_context.end_frame
 pub fn rendering_system(
     query: &mut PreparedQuery<With<Visible, (&Mesh, &Transform, &TransformMatrix, Option<&Skin>)>>,
     world: &mut World,
@@ -65,7 +69,6 @@ pub fn rendering_system(
     }
 
     render_context.end_pbr_render_pass(vulkan_context, swapchain_image_index);
-    render_context.end_frame(vulkan_context, swapchain_image_index);
 }
 
 #[cfg(target_os = "windows")]
@@ -248,6 +251,7 @@ mod tests {
             },
         };
         let views = vec![view.clone(), view];
+        render_context.begin_frame(vulkan_context, 0);
         render_context.scene_data.debug_data.y = debug_view_equation;
         render_context.update_scene_data(&views).unwrap();
         update_transform_matrix_system(&mut Default::default(), world);
@@ -263,6 +267,7 @@ mod tests {
             0,
             render_context,
         );
+        render_context.end_frame(vulkan_context, 0);
     }
 
     fn hash_file(file_path: &str) -> u64 {
