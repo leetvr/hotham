@@ -393,7 +393,7 @@ impl RenderContext {
             // Create a staging buffer.
             println!("[HOTHAM_VULKAN] Creating staging buffer..");
             let usage = vk::BufferUsageFlags::TRANSFER_SRC;
-            let size = 8 * image_buf.len();
+            let size = image_buf.len();
             let (staging_buffer, staging_memory, _) =
                 vulkan_context.create_buffer_with_data(image_buf, usage, size as _)?;
             println!("[HOTHAM_VULKAN] ..done!");
