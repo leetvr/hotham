@@ -21,7 +21,7 @@ pub struct GuiContext {
     pub(crate) render_pass: vk::RenderPass,
     pub(crate) pipeline: vk::Pipeline,
     pub(crate) pipeline_layout: vk::PipelineLayout,
-    pub(crate) font_texture_descriptor_sets: Vec<vk::DescriptorSet>,
+    pub(crate) font_texture_descriptor_set: vk::DescriptorSet,
     pub(crate) font_texture_version: u64,
 }
 
@@ -253,7 +253,7 @@ impl GuiContext {
             render_pass,
             pipeline,
             pipeline_layout,
-            font_texture_descriptor_sets,
+            font_texture_descriptor_set: font_texture_descriptor_sets[0],
             font_texture_version: 0,
         }
     }
@@ -321,7 +321,12 @@ impl GuiContext {
 
         let texture = &egui_context.fonts().texture();
         if texture.version != self.font_texture_version {
-            let _font_texture = update_font_texture(vulkan_context, render_context, texture);
+            update_font_texture(
+                vulkan_context,
+                render_context,
+                texture,
+                self.font_texture_descriptor_set,
+            );
             self.font_texture_version = texture.version;
         }
 
@@ -390,7 +395,7 @@ impl GuiContext {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                &self.font_texture_descriptor_sets,
+                std::slice::from_ref(&self.font_texture_descriptor_set),
                 &[],
             );
         }
@@ -487,7 +492,8 @@ fn update_font_texture(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
     texture: &egui::Texture,
-) -> Texture {
+    descriptor_set: vk::DescriptorSet,
+) {
     unsafe {
         vulkan_context
             .device
@@ -501,13 +507,9 @@ fn update_font_texture(
         .flat_map(|&r| vec![r, r, r, r])
         .collect::<Vec<_>>();
 
-    Texture::new(
-        "Font texture",
-        vulkan_context,
-        render_context,
-        &image_buf,
-        texture.width as u32,
-        texture.height as u32,
-        COLOR_FORMAT,
-    )
+    // TODO:
+    // 1. create an image
+    // let image = vulkan_context.crea
+    // 2. upoad it
+    // 3. update the descriptor
 }
