@@ -34,7 +34,7 @@ pub fn hands_system(
 
         // Check it's valid before using it
         if !is_space_valid(&space) {
-            return;
+            continue;
         }
 
         let pose = space.pose;
