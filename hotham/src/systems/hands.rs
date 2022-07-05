@@ -30,11 +30,11 @@ pub fn hands_system(
         };
 
         // Locate the hand in the space.
-        let space = space.locate(&xr_context.reference_space, time).unwrap();
+        let space = space.locate(&xr_context.stage_space, time).unwrap();
 
         // Check it's valid before using it
         if !is_space_valid(&space) {
-            return;
+            continue;
         }
 
         let pose = space.pose;

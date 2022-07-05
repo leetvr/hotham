@@ -1,10 +1,10 @@
 use hecs::{PreparedQuery, World};
-use nalgebra::{Isometry3, Point3};
+use nalgebra::{Point3, Vector3};
+use openxr::{SpaceLocationFlags, SpaceVelocityFlags};
 
 use crate::{
     components::{sound_emitter::SoundState, RigidBody, SoundEmitter},
     resources::{AudioContext, PhysicsContext, XrContext},
-    util::posef_to_isometry,
 };
 
 /// Audio system
@@ -18,32 +18,62 @@ pub fn audio_system(
     physics_context: &PhysicsContext,
     xr_context: &XrContext,
 ) {
-    for (_, (sound_emitter, rigid_body)) in query.query_mut(world) {
-        // First, where is the listener?
-        let listener_location =
-            get_location_from_poses(xr_context.views[0].pose, xr_context.views[1].pose);
+    // First, where is the listener?
+    let (listener_position_in_stage, listener_velocity_in_stage) = xr_context
+        .view_space
+        .relate(
+            &xr_context.stage_space,
+            xr_context.frame_state.predicted_display_time, // TODO: Use "now" instead.
+        )
+        .unwrap();
 
+    if !listener_position_in_stage
+        .location_flags
+        .contains(SpaceLocationFlags::POSITION_VALID)
+    {
+        return;
+    }
+
+    if !listener_velocity_in_stage
+        .velocity_flags
+        .contains(SpaceVelocityFlags::LINEAR_VALID)
+    {
+        return;
+    }
+
+    let listener_position_in_stage: Vector3<_> =
+        mint::Vector3::from(listener_position_in_stage.pose.position).into();
+    let listener_velocity_in_stage: Vector3<_> =
+        mint::Vector3::from(listener_velocity_in_stage.linear_velocity).into();
+
+    for (_, (sound_emitter, rigid_body)) in query.query_mut(world) {
         // Get the position and velocity of the entity.
         let rigid_body = physics_context
             .rigid_bodies
             .get(rigid_body.handle)
             .expect("Unable to get RigidBody");
 
-        let velocity = (*rigid_body.linvel()).into();
+        let source_position_in_stage: Point3<_> = (*rigid_body.translation()).into();
+        let source_velocity_in_stage: Vector3<_> = *rigid_body.linvel();
 
-        // Now transform the position of the entity w.r.t. the listener
-        let position = listener_location
-            .inverse_transform_point(&Point3::from(*rigid_body.translation()))
-            .into();
+        // Compute relative position and velocity
+        let relative_position_in_stage =
+            (source_position_in_stage - listener_position_in_stage).into();
+        let relative_velocity_in_stage =
+            (source_velocity_in_stage - listener_velocity_in_stage).into();
 
         // Determine what we should do with the audio source
         match (sound_emitter.current_state(), &sound_emitter.next_state) {
             (SoundState::Stopped, Some(SoundState::Playing)) => {
                 println!(
                     "[HOTHAM_AUDIO] - Playing sound effect at {:?}, {:?} from {:?}!. Original position: {:?}",
-                    position, velocity, listener_location, rigid_body.translation()
+                    relative_position_in_stage, source_velocity_in_stage, listener_position_in_stage, rigid_body.translation()
                 );
-                audio_context.play_audio(sound_emitter, position, velocity);
+                audio_context.play_audio(
+                    sound_emitter,
+                    relative_position_in_stage,
+                    relative_velocity_in_stage,
+                );
             }
             (SoundState::Paused, Some(SoundState::Playing)) => {
                 audio_context.resume_audio(sound_emitter);
@@ -64,12 +94,12 @@ pub fn audio_system(
         sound_emitter.next_state = None;
 
         // Update its position and velocity
-        audio_context.update_motion(sound_emitter, position, velocity);
+        audio_context.update_motion(
+            sound_emitter,
+            relative_position_in_stage,
+            relative_velocity_in_stage,
+        );
     }
-}
-
-fn get_location_from_poses(left_eye: openxr::Posef, right_eye: openxr::Posef) -> Isometry3<f32> {
-    posef_to_isometry(left_eye).lerp_slerp(&posef_to_isometry(right_eye), 0.5)
 }
 
 #[cfg(target_os = "windows")]
@@ -186,7 +216,7 @@ mod tests {
             .locate_views(
                 VIEW_TYPE,
                 xr_context.frame_state.predicted_display_time,
-                &xr_context.reference_space,
+                &xr_context.stage_space,
             )
             .unwrap();
         xr_context.views = views;
