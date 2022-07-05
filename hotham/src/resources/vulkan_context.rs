@@ -755,7 +755,7 @@ impl VulkanContext {
         println!("[HOTHAM_VULKAN] Copying buffer to image..");
         self.copy_buffer_to_image(
             staging_buffer,
-            &texture_image,
+            texture_image,
             layer_count,
             mip_count,
             offsets,

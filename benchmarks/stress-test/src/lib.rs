@@ -105,19 +105,16 @@ pub enum StressTest {
 }
 
 fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World>) {
-    let mut render_context = &mut engine.render_context;
+    let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let mut world = World::default();
 
     let models = match test {
         StressTest::ManyCubes => {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/cube.glb")];
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                &mut render_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
 
             add_model_to_world("Cube", &models, &mut world, None).expect("Could not find cube?");
             models
@@ -125,12 +122,9 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
         StressTest::ManyHelmets => {
             let glb_buffers: Vec<&[u8]> =
                 vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                &mut render_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
 
             add_model_to_world("Damaged Helmet", &models, &mut world, None)
                 .expect("Could not find cube?");
@@ -143,12 +137,9 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
         StressTest::Sponza => {
             let file = std::fs::read("test_assets/sponza.glb").unwrap();
             let glb_buffers: Vec<&[u8]> = vec![&file];
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                &mut render_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
             for name in models.keys() {
                 add_model_to_world(name, &models, &mut world, None);
             }
@@ -243,7 +234,7 @@ fn subdivide_mesh_system(world: &mut World, render_context: &mut RenderContext, 
 
     // Calcuate the current step.
     let step = timer.total_time().as_secs() * 10;
-    update_mesh(step as _, &mesh, render_context);
+    update_mesh(step as _, mesh, render_context);
 }
 
 fn model_system(

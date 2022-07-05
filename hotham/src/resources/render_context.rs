@@ -388,13 +388,13 @@ impl RenderContext {
         )?;
 
         // TODO: This is only neccesary on desktop, or if there is data in the buffer!
-        if image_buf.len() > 0 {
+        if !image_buf.is_empty() {
             vulkan_context.upload_image(image_buf, mip_count, offsets, texture_image);
         }
 
         let texture_index = unsafe {
             self.resources
-                .write_texture_to_array(vulkan_context, &self.descriptors, &texture_image)
+                .write_texture_to_array(vulkan_context, &self.descriptors, texture_image)
         };
 
         println!(
@@ -757,7 +757,7 @@ fn create_compute_pipeline(device: &ash::Device, layout: vk::PipelineLayout) -> 
     unsafe {
         let shader_entry_name = CStr::from_bytes_with_nul_unchecked(b"main\0");
         let compute_module = device
-            .create_shader_module(&vk::ShaderModuleCreateInfo::builder().code(&COMPUTE), None)
+            .create_shader_module(&vk::ShaderModuleCreateInfo::builder().code(COMPUTE), None)
             .unwrap();
         let create_info = vk::ComputePipelineCreateInfo::builder()
             .stage(vk::PipelineShaderStageCreateInfo {

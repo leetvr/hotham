@@ -43,6 +43,7 @@ pub struct Queries<'a> {
     pub joints_query: PreparedQuery<(&'a TransformMatrix, &'a Joint, &'a Info)>,
     pub skins_query: PreparedQuery<(&'a Skin, &'a TransformMatrix)>,
     pub parent_query: PreparedQuery<&'a Parent>,
+    #[allow(clippy::type_complexity)]
     pub rendering_query: PreparedQuery<
         With<
             Visible,

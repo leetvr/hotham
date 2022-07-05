@@ -35,12 +35,12 @@ impl Primitive {
             material_id,
             index_buffer_offset: render_context.resources.index_buffer.len as _,
             vertex_buffer_offset: render_context.resources.vertex_buffer.len as _,
-            bounding_sphere: calculate_bounding_sphere(&vertices),
+            bounding_sphere: calculate_bounding_sphere(vertices),
         };
 
         unsafe {
-            render_context.resources.index_buffer.append(&indices);
-            render_context.resources.vertex_buffer.append(&vertices);
+            render_context.resources.index_buffer.append(indices);
+            render_context.resources.vertex_buffer.append(vertices);
         }
 
         primitive
@@ -63,7 +63,7 @@ impl Primitive {
         // Positions
         for v in reader
             .read_positions()
-            .expect(&format!("Mesh {} has no positions!", mesh_name))
+            .unwrap_or_else(|| panic!("Mesh {} has no positions!", mesh_name))
         {
             positions.push(vector![v[0], v[1], v[2]]);
         }
@@ -166,9 +166,9 @@ pub fn calculate_bounding_sphere(vertices: &[Vertex]) -> Vector4<f32> {
     }
 
     centre /= num_points as f32;
-    let mut radius = (&points[0] - &centre).norm_squared();
+    let mut radius = (points[0] - centre).norm_squared();
     for p in points.iter().skip(1) {
-        radius = radius.max((p - &centre).norm_squared());
+        radius = radius.max((p - centre).norm_squared());
     }
 
     radius = next_up(radius.sqrt());

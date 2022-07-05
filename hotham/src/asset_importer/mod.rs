@@ -140,11 +140,7 @@ fn load_skins(node: gltf::Node, import_context: &mut ImportContext) {
         let skin = Skin::load(skin, import_context);
 
         // Get the entity this node is mapped to
-        let node_entity = import_context
-            .node_entity_map
-            .get(&node.index())
-            .unwrap()
-            .clone();
+        let node_entity = *import_context.node_entity_map.get(&node.index()).unwrap();
 
         // This part is tricky - we don't know which world this entity is in, so we need to look through them all
         let world = import_context
@@ -180,7 +176,7 @@ fn load_node(
     let this_entity = world.spawn((transform, transform_matrix, info));
     import_context
         .node_entity_map
-        .insert(node_data.index(), this_entity.clone());
+        .insert(node_data.index(), this_entity);
 
     if let Some(mesh) = node_data
         .mesh()
@@ -270,7 +266,7 @@ pub fn add_model_to_world(
             new_skin
                 .joints
                 .iter_mut()
-                .for_each(|e| *e = entity_map.get(&e).cloned().unwrap());
+                .for_each(|e| *e = entity_map.get(e).cloned().unwrap());
 
             destination_world
                 .insert_one(*destination_entity, new_skin)

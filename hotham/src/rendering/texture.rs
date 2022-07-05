@@ -65,8 +65,8 @@ impl Texture {
                     .unwrap_or_else(|_| panic!("Unable to load image! URI: {}", uri));
                 Texture::new(
                     texture_name,
-                    &import_context.vulkan_context,
-                    &mut import_context.render_context,
+                    import_context.vulkan_context,
+                    import_context.render_context,
                     &buf,
                     width,
                     height,
@@ -77,12 +77,12 @@ impl Texture {
             gltf::image::Source::View { .. } => {
                 let index = texture.source().index();
                 let image = &import_context.images[index];
-                let texture = if image.format != Format::R8G8B8A8 {
+                if image.format != Format::R8G8B8A8 {
                     let pixels = add_alpha_channel(image);
                     Texture::new(
                         texture_name,
-                        &import_context.vulkan_context,
-                        &mut import_context.render_context,
+                        import_context.vulkan_context,
+                        import_context.render_context,
                         &pixels,
                         image.width,
                         image.height,
@@ -91,15 +91,14 @@ impl Texture {
                 } else {
                     Texture::new(
                         texture_name,
-                        &import_context.vulkan_context,
-                        &mut import_context.render_context,
+                        import_context.vulkan_context,
+                        import_context.render_context,
                         &image.pixels,
                         image.width,
                         image.height,
                         TEXTURE_FORMAT,
                     )
-                };
-                texture
+                }
             }
         };
 

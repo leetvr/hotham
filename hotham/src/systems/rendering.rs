@@ -13,6 +13,7 @@ use hecs::{PreparedQuery, With, World};
 /// Requirements:
 /// - BEFORE: ensure you have called render_context.begin_frame
 /// - AFTER: ensure you have called render_context.end_frame
+#[allow(clippy::type_complexity)]
 pub fn rendering_system(
     query: &mut PreparedQuery<With<Visible, (&Mesh, &Transform, &TransformMatrix, Option<&Skin>)>>,
     world: &mut World,
@@ -38,7 +39,7 @@ pub fn rendering_system(
                     inverse_transpose: transform_matrix.0.try_inverse().unwrap().transpose(),
                     material_id: primitive.material_id,
                     skin_id,
-                    bounding_sphere: primitive.get_bounding_sphere(&transform),
+                    bounding_sphere: primitive.get_bounding_sphere(transform),
                 });
                 draw_indirect_buffer.push(&vk::DrawIndexedIndirectCommand {
                     index_count: primitive.indices_count,

@@ -78,7 +78,7 @@ impl<T: Sized> Buffer<T> {
     pub unsafe fn append(&mut self, data: &[T]) {
         copy_nonoverlapping(
             data.as_ptr(),
-            self.memory_address.as_ptr().offset(self.len as _),
+            self.memory_address.as_ptr().add(self.len),
             data.len(),
         );
         self.len += data.len();
@@ -103,7 +103,7 @@ impl<T: Sized> Buffer<T> {
     }
 
     /// Get the buffer's underlying data as a mutable slice
-    pub unsafe fn as_slice_mut(&self) -> &mut [T] {
+    pub unsafe fn as_slice_mut(&mut self) -> &mut [T] {
         std::slice::from_raw_parts_mut(self.memory_address.as_ptr(), self.len)
     }
 
