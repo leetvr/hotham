@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use ash::vk::{self};
 use egui::emath::vec2;
 use egui::epaint::Vertex as EguiVertex;

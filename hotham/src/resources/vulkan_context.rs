@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use crate::{
     hotham_error::HothamError, rendering::image::Image, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
 };

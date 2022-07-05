@@ -75,6 +75,7 @@ pub fn rendering_system(
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
     use super::*;

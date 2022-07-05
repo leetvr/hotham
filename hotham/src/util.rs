@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(deprecated)]
 
 use anyhow::Result;
 use nalgebra::{Isometry, Isometry3, Quaternion, Translation3, Unit, UnitQuaternion, Vector3};

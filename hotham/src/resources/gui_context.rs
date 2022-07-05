@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use ash::vk::{self, Handle};
 use vk_shader_macros::include_glsl;
 

@@ -1,7 +1,8 @@
-use std::marker::PhantomData;
+#![allow(deprecated)]
 
 use anyhow::Result;
 use ash::vk;
+use std::marker::PhantomData;
 
 use crate::resources::VulkanContext;
 

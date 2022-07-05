@@ -55,6 +55,8 @@ pub fn draw_gui_system(
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use anyhow::Result;
     use ash::vk::{self, Handle};
