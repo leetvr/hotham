@@ -14,7 +14,7 @@ pub fn draw_gui_system(
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: &usize,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     gui_context: &mut GuiContext,
     haptic_context: &mut HapticContext,
 ) {
@@ -55,6 +55,8 @@ pub fn draw_gui_system(
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
+
     use super::*;
     use anyhow::Result;
     use ash::vk::{self, Handle};
@@ -65,17 +67,14 @@ mod tests {
     use std::process::Command;
 
     use crate::{
-        buffer::Buffer,
+        asset_importer,
         components::{
             panel::PanelInput,
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
-        gltf_loader,
-        image::Image,
+        rendering::{image::Image, legacy_buffer::Buffer, swapchain::Swapchain},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
-        scene_data::SceneParams,
-        swapchain::Swapchain,
         systems::{
             rendering_system, update_parent_transform_matrix_system, update_transform_matrix_system,
         },
@@ -104,7 +103,7 @@ mod tests {
         let mut renderdoc = begin_renderdoc();
 
         let mut query = Default::default();
-        schedule(
+        draw(
             &mut query,
             &mut world,
             &mut gui_context,
@@ -124,7 +123,7 @@ mod tests {
 
         // Release the trigger slightly
         release_trigger(&mut world, &mut query);
-        schedule(
+        draw(
             &mut query,
             &mut world,
             &mut gui_context,
@@ -141,7 +140,7 @@ mod tests {
 
         // Move the cursor off the panel and release the trigger entirely
         move_cursor_off_panel(&mut world, &mut query);
-        schedule(
+        draw(
             &mut query,
             &mut world,
             &mut gui_context,
@@ -164,7 +163,7 @@ mod tests {
         open_file(&mut renderdoc);
     }
 
-    fn schedule(
+    fn draw(
         query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
         world: &mut World,
         gui_context: &mut GuiContext,
@@ -172,25 +171,11 @@ mod tests {
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
     ) {
-        println!("[DRAW_GUI_TEST] Running schedule..");
+        println!("[DRAW_GUI_TEST] Beginning frame..");
         begin_frame(render_context, vulkan_context);
 
         // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
         haptic_context.right_hand_amplitude_this_frame = 0.;
-
-        // Draw the GUI
-        draw_gui_system(
-            query,
-            world,
-            vulkan_context,
-            &0,
-            render_context,
-            gui_context,
-            haptic_context,
-        );
-
-        // Begin the PBR Render Pass
-        render_context.begin_pbr_render_pass(vulkan_context, 0);
 
         // Update transforms, etc.
         update_transform_matrix_system(&mut Default::default(), world);
@@ -202,7 +187,20 @@ mod tests {
             world,
         );
 
+        // Draw the GUI
+        println!("[DRAW_GUI_TEST] draw_gui_system");
+        draw_gui_system(
+            query,
+            world,
+            vulkan_context,
+            &0,
+            render_context,
+            gui_context,
+            haptic_context,
+        );
+
         // Render
+        println!("[DRAW_GUI_TEST] rendering_system");
         rendering_system(
             &mut Default::default(),
             world,
@@ -210,9 +208,6 @@ mod tests {
             0,
             render_context,
         );
-
-        // End PBR render
-        render_context.end_pbr_render_pass(vulkan_context, 0);
         render_context.end_frame(vulkan_context, 0);
     }
 
@@ -239,20 +234,7 @@ mod tests {
         let views = vec![view.clone(), view];
 
         render_context.begin_frame(&vulkan_context, 0);
-
-        render_context
-            .update_scene_data(&views, &vulkan_context)
-            .unwrap();
-        render_context
-            .scene_params_buffer
-            .update(
-                &vulkan_context,
-                &[SceneParams {
-                    // debug_view_inputs: 1.,
-                    ..Default::default()
-                }],
-            )
-            .unwrap();
+        render_context.update_scene_data(&views).unwrap();
     }
 
     fn button_was_clicked(world: &mut World) -> bool {
@@ -349,19 +331,16 @@ mod tests {
             resolution,
         };
 
-        let render_context =
+        let mut render_context =
             RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap();
         let gui_context = GuiContext::new(&vulkan_context);
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!(
             "../../../test_assets/ferris-the-crab/source/ferris.glb"
         )];
-        let mut models = gltf_loader::load_models_from_glb(
-            &gltf_data,
-            &vulkan_context,
-            &render_context.descriptor_set_layouts,
-        )
-        .unwrap();
+        let mut models =
+            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
+                .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
         let panel = add_ui_panel_to_world(
@@ -377,7 +356,7 @@ mod tests {
                 UIPanelButton::new("Don't click me!"),
             ],
             &vulkan_context,
-            &render_context,
+            &mut render_context,
             &gui_context,
             &mut physics_context,
             &mut world,

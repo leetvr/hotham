@@ -1,4 +1,4 @@
-use std::{ffi::CStr, io::Cursor, mem::size_of, time::Instant};
+use std::{ffi::CStr, mem::size_of, slice::from_ref as slice_from_ref};
 
 pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
@@ -15,85 +15,38 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 ];
 
 use crate::{
-    buffer::Buffer,
-    camera::Camera,
-    components::Material,
-    frame::Frame,
-    image::Image,
+    rendering::{
+        camera::Camera, descriptors::Descriptors, frame::Frame, image::Image, resources::Resources,
+        scene_data::SceneData, swapchain::Swapchain, vertex::Vertex,
+    },
     resources::{VulkanContext, XrContext},
-    scene_data::{SceneData, SceneParams},
-    swapchain::Swapchain,
-    texture::Texture,
-    vertex::Vertex,
     COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
-use ash::{
-    prelude::VkResult,
-    vk::{self, Handle},
-};
+use ash::vk::{self, Handle};
 use nalgebra::Matrix4;
 use openxr as xr;
+use vk_shader_macros::include_glsl;
 
-#[derive(Debug, Copy, Clone)]
-pub struct DescriptorSetLayouts {
-    pub scene_data_layout: vk::DescriptorSetLayout,
-    pub textures_layout: vk::DescriptorSetLayout,
-    pub mesh_layout: vk::DescriptorSetLayout,
-}
+static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert");
+static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag");
+static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp");
 
-#[derive(Clone)]
 pub struct RenderContext {
     pub frames: Vec<Frame>,
-    pub descriptor_set_layouts: DescriptorSetLayouts,
     pub pipeline_layout: vk::PipelineLayout,
     pub pipeline: vk::Pipeline,
+    pub compute_pipeline: vk::Pipeline,
     pub render_pass: vk::RenderPass,
     pub depth_image: Image,
     pub color_image: Image,
     pub render_area: vk::Rect2D,
     pub scene_data: SceneData,
-    pub scene_data_buffer: Buffer<SceneData>,
-    pub scene_params_buffer: Buffer<SceneParams>,
-    pub scene_data_descriptor_sets: Vec<vk::DescriptorSet>,
-    pub render_start_time: Instant,
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
-    pub last_frame_time: Instant,
     pub frame_index: usize,
-}
-
-impl Drop for RenderContext {
-    fn drop(&mut self) {
-        // TODO: fix
-
-        // unsafe {
-        // self.vulkan_context
-        //     .device
-        //     .queue_wait_idle(self.vulkan_context.graphics_queue)
-        //     .expect("Unable to wait for queue to become idle!");
-
-        // // for layout in &self.descriptor_set_layouts {
-        // //     self.vulkan_context
-        // //         .device
-        // //         .destroy_descriptor_set_layout(*layout, None);
-        // // }
-        // self.depth_image.destroy(&self.vulkan_context);
-        // self.uniform_buffer.destroy(&self.vulkan_context);
-        // for frame in self.frames.drain(..) {
-        //     frame.destroy(&self.vulkan_context);
-        // }
-        // self.vulkan_context
-        //     .device
-        //     .destroy_pipeline_layout(self.pipeline_layout, None);
-        // self.vulkan_context
-        //     .device
-        //     .destroy_render_pass(self.render_pass, None);
-        // self.vulkan_context
-        //     .device
-        //     .destroy_pipeline(self.pipeline, None);
-        // }
-    }
+    pub resources: Resources,
+    pub(crate) descriptors: Descriptors,
 }
 
 impl RenderContext {
@@ -116,19 +69,15 @@ impl RenderContext {
             offset: vk::Offset2D::default(),
         };
 
-        let descriptor_set_layouts = create_descriptor_set_layouts(vulkan_context)?;
+        let descriptors = unsafe { Descriptors::new(vulkan_context) };
+        let mut resources = unsafe { Resources::new(vulkan_context, &descriptors) };
 
         // Pipeline, render pass
         let render_pass = create_render_pass(vulkan_context)?;
-        let pipeline_layout = create_pipeline_layout(
-            vulkan_context,
-            &[
-                descriptor_set_layouts.scene_data_layout,
-                descriptor_set_layouts.textures_layout,
-                descriptor_set_layouts.mesh_layout,
-            ],
-        )?;
+        let pipeline_layout =
+            create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.layout))?;
         let pipeline = create_pipeline(vulkan_context, pipeline_layout, &render_area, render_pass)?;
+        let compute_pipeline = create_compute_pipeline(&vulkan_context.device, pipeline_layout);
 
         // Depth image, shared between frames
         let depth_image = vulkan_context.create_image(
@@ -156,78 +105,62 @@ impl RenderContext {
             &depth_image,
             &color_image,
         )?;
-
-        println!("[HOTHAM_RENDERER] Creating UBO..");
-        let scene_data = SceneData::default();
-        let scene_data_buffer = Buffer::new(
-            vulkan_context,
-            &[scene_data],
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-        )?;
-
-        let scene_params = SceneParams::default();
-        let scene_params_buffer = Buffer::new(
-            vulkan_context,
-            &[scene_params],
-            vk::BufferUsageFlags::UNIFORM_BUFFER,
-        )?;
-
-        let diffuse_ibl = Texture::from_ktx2(
-            "Diffuse IBL",
-            include_bytes!("../../data/diffuse_ibl.ktx2"),
-            vulkan_context,
-        )?;
-        let specular_ibl = Texture::from_ktx2(
-            "Specular IBL",
-            include_bytes!("../../data/specular_ibl.ktx2"),
-            vulkan_context,
-        )?;
-        let brdf_lut = Texture::from_ktx2(
-            "BRDF LUT",
-            include_bytes!("../../data/brdf_lut.ktx2"),
-            vulkan_context,
-        )?;
-
-        let scene_data_descriptor_sets = vulkan_context.create_scene_data_descriptor_sets(
-            descriptor_set_layouts.scene_data_layout,
-            &scene_data_buffer,
-            &scene_params_buffer,
-            &diffuse_ibl,
-            &specular_ibl,
-            &brdf_lut,
-        )?;
-
-        println!("[HOTHAM_RENDERER] ..done! {:?}", scene_data_buffer);
-
-        println!("[HOTHAM_RENDERER] Done! Renderer initialized!");
+        let scene_data = Default::default();
+        unsafe {
+            resources.scene_data_buffer.push(&scene_data);
+        }
 
         Ok(Self {
             frames,
-            descriptor_set_layouts,
             pipeline,
+            compute_pipeline,
             pipeline_layout,
             render_pass,
             frame_index: 0,
             depth_image,
             color_image,
             render_area,
-            scene_data,
-            scene_data_buffer,
-            scene_params_buffer,
-            scene_data_descriptor_sets,
-            render_start_time: Instant::now(),
             cameras: vec![Default::default(); 2],
             views: Vec::new(),
-            last_frame_time: Instant::now(),
+            scene_data,
+            descriptors,
+            resources,
         })
     }
 
-    // TODO: Make this update the scene data rather than creating a new one
-    pub(crate) fn update_scene_data(
-        &mut self,
-        views: &[xr::View],
-        vulkan_context: &VulkanContext,
-    ) -> Result<()> {
+    #[cfg(test)]
+    pub(crate) fn testing() -> (Self, VulkanContext) {
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let resolution = vk::Extent2D {
+            height: 800,
+            width: 800,
+        };
+        // Create an image with vulkan_context
+        let image = vulkan_context
+            .create_image(
+                COLOR_FORMAT,
+                &resolution,
+                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
+                2,
+                1,
+            )
+            .unwrap();
+        vulkan_context
+            .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
+            .unwrap();
+
+        let swapchain = Swapchain {
+            images: vec![image.handle],
+            resolution,
+        };
+
+        (
+            RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap(),
+            vulkan_context,
+        )
+    }
+
+    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) -> Result<()> {
         self.views = views.to_owned();
 
         // View (camera)
@@ -242,41 +175,22 @@ impl RenderContext {
         let near = 0.05;
         let far = 100.0;
 
-        let view = [view_matrices[0], view_matrices[1]];
         let fov_left = views[0].fov;
         let fov_right = views[1].fov;
-        if self.frame_index == 1 {
-            println!(
-                "[FOV Left]: up: {} down: {}, left: {}, right: {}",
-                fov_left.angle_up, fov_left.angle_down, fov_left.angle_left, fov_left.angle_right
-            );
-            println!(
-                "[FOV Right]: up: {} down: {}, left: {}, right: {}",
-                fov_right.angle_up,
-                fov_right.angle_down,
-                fov_right.angle_left,
-                fov_right.angle_right
-            );
-        }
 
-        let projection = [
-            get_projection(fov_left, near, far),
-            get_projection(fov_right, near, far),
+        let view_projection = [
+            get_projection(fov_left, near, far) * view_matrices[0],
+            get_projection(fov_right, near, far) * view_matrices[1],
         ];
 
         let camera_position = [self.cameras[0].position(), self.cameras[1].position()];
-        if self.frame_index == 0 {
-            println!("Camera position: {:?}", camera_position);
+
+        unsafe {
+            let scene_data = &mut self.resources.scene_data_buffer.as_slice_mut()[0];
+            scene_data.camera_position = camera_position;
+            scene_data.view_projection = view_projection;
+            scene_data.debug_data = self.scene_data.debug_data;
         }
-
-        self.scene_data = SceneData {
-            view,
-            projection,
-            camera_position,
-        };
-
-        self.scene_data_buffer
-            .update(vulkan_context, &[self.scene_data])?;
 
         Ok(())
     }
@@ -285,12 +199,11 @@ impl RenderContext {
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];
-        let command_buffer = frame.command_buffer;
 
         // Wait for the GPU to be ready.
         self.wait(device, frame);
 
-        // Begin recording the command buffer.
+        let command_buffer = frame.command_buffer;
         unsafe {
             device
                 .begin_command_buffer(
@@ -302,6 +215,63 @@ impl RenderContext {
         }
     }
 
+    // TODO: Get culling working correctly. Requires separate queue, fence and command buffer.
+    // https://github.com/leetvr/hotham/issues/226
+    pub(crate) fn _cull_objects(
+        &self,
+        vulkan_context: &VulkanContext,
+        swapchain_image_index: usize,
+    ) {
+        let device = &vulkan_context.device;
+        let frame = &self.frames[swapchain_image_index];
+        let command_buffer = frame.command_buffer;
+        let fence = frame.fence;
+
+        unsafe {
+            device
+                .begin_command_buffer(
+                    command_buffer,
+                    &vk::CommandBufferBeginInfo::builder()
+                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                )
+                .unwrap();
+            device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.compute_pipeline,
+            );
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.pipeline_layout,
+                0,
+                slice_from_ref(&self.descriptors.set),
+                &[],
+            );
+            device.cmd_dispatch(
+                command_buffer,
+                self.resources.draw_indirect_buffer.len as u32,
+                1,
+                1,
+            );
+            device.end_command_buffer(command_buffer).unwrap();
+
+            let submit_info =
+                vk::SubmitInfo::builder().command_buffers(std::slice::from_ref(&command_buffer));
+            device
+                .queue_submit(
+                    vulkan_context.graphics_queue, // TODO: get a proper queue
+                    std::slice::from_ref(&submit_info),
+                    fence,
+                )
+                .unwrap();
+            device.wait_for_fences(&[fence], true, 1000000000).unwrap();
+            device.reset_fences(&[fence]).unwrap();
+        }
+    }
+
+    /// Begin the PBR renderpass.
+    /// DOES NOT BEGIN RECORDING COMMAND BUFFERS - call begin_frame first!
     pub(crate) fn begin_pbr_render_pass(
         &self,
         vulkan_context: &VulkanContext,
@@ -336,8 +306,20 @@ impl RenderContext {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                &self.scene_data_descriptor_sets,
+                slice_from_ref(&self.descriptors.set),
                 &[],
+            );
+            device.cmd_bind_index_buffer(
+                command_buffer,
+                self.resources.index_buffer.buffer,
+                0,
+                vk::IndexType::UINT32,
+            );
+            device.cmd_bind_vertex_buffers(
+                command_buffer,
+                0,
+                slice_from_ref(&self.resources.vertex_buffer.buffer),
+                &[0],
             );
         }
     }
@@ -378,7 +360,6 @@ impl RenderContext {
                 .unwrap();
         }
 
-        self.last_frame_time = Instant::now();
         self.frame_index += 1;
     }
 
@@ -389,6 +370,39 @@ impl RenderContext {
             device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
             device.reset_fences(&[fence]).unwrap();
         }
+    }
+
+    pub(crate) fn create_texture_image(
+        &mut self,
+        name: &str,
+        vulkan_context: &VulkanContext,
+        image_buf: &[u8],
+        mip_count: u32,
+        offsets: Vec<vk::DeviceSize>,
+        texture_image: &Image,
+    ) -> Result<u32> {
+        vulkan_context.set_debug_name(
+            vk::ObjectType::IMAGE,
+            texture_image.handle.as_raw(),
+            name,
+        )?;
+
+        // TODO: This is only neccesary on desktop, or if there is data in the buffer!
+        if !image_buf.is_empty() {
+            vulkan_context.upload_image(image_buf, mip_count, offsets, texture_image);
+        }
+
+        let texture_index = unsafe {
+            self.resources
+                .write_texture_to_array(vulkan_context, &self.descriptors, texture_image)
+        };
+
+        println!(
+            "[HOTHAM_VULKAN] ..done! Texture {} created successfully.",
+            name
+        );
+
+        Ok(texture_index)
     }
 }
 
@@ -425,145 +439,10 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     let c2r3 = -1.0;
     let c3r3 = 0.0;
 
-    /*
-    #[rustfmt::skip]
-    Matrix4::from_column_slice(&[
-        c0r0, c0r1, c0r2, c0r3,
-        c1r0, c1r1, c1r2, c1r3,
-        c2r0, c2r1, c2r2, c2r3,
-        c3r0, c3r1, c3r2, c3r3,
-    ]) */
     Matrix4::from_column_slice(&[
         c0r0, c0r1, c0r2, c0r3, c1r0, c1r1, c1r2, c1r3, c2r0, c2r1, c2r2, c2r3, c3r0, c3r1, c3r2,
         c3r3,
     ])
-}
-
-pub fn create_descriptor_set_layouts(
-    vulkan_context: &VulkanContext,
-) -> VkResult<DescriptorSetLayouts> {
-    // Set 0 = SceneData
-    // set = 0 binding = 0
-    let scene_buffer = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT);
-    // set = 0 binding = 1
-    let scene_params = vk::DescriptorSetLayoutBinding::builder()
-        .binding(1)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 0 binding = 2
-    let sampler_irradiance = vk::DescriptorSetLayoutBinding::builder()
-        .binding(2)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 0 binding = 3
-    let prefiltered_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(3)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 0 binding = 4
-    let sampler_brdflut = vk::DescriptorSetLayoutBinding::builder()
-        .binding(4)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    let scene_data_layout = unsafe {
-        vulkan_context.device.create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[
-                *scene_buffer,
-                *scene_params,
-                *sampler_irradiance,
-                *prefiltered_map,
-                *sampler_brdflut,
-            ]),
-            None,
-        )
-    }?;
-    vulkan_context.set_debug_name(
-        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
-        scene_data_layout.as_raw(),
-        "Scene Data DescriptorSetLayout",
-    )?;
-
-    // Set 1 = MaterialData
-    // set = 1 binding = 0
-    let color_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 1 binding = 1
-    let physical_descriptor_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(1)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 1 binding = 2
-    let normal_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(2)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 1 binding = 3
-    let ao_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(3)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    // set = 1 binding = 4
-    let emissive_map = vk::DescriptorSetLayoutBinding::builder()
-        .binding(4)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
-    let material_layout = unsafe {
-        vulkan_context.device.create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[
-                *color_map,
-                *physical_descriptor_map,
-                *normal_map,
-                *ao_map,
-                *emissive_map,
-            ]),
-            None,
-        )
-    }?;
-    vulkan_context.set_debug_name(
-        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
-        material_layout.as_raw(),
-        "Material Data DescriptorSetLayout",
-    )?;
-
-    // Set 2 = MeshData
-    // set = 2, binding = 0
-    let mesh_data = vk::DescriptorSetLayoutBinding::builder()
-        .binding(0)
-        .descriptor_count(1)
-        .descriptor_type(vk::DescriptorType::UNIFORM_BUFFER)
-        .stage_flags(vk::ShaderStageFlags::VERTEX);
-    let mesh_data_layout = unsafe {
-        vulkan_context.device.create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[*mesh_data]),
-            None,
-        )
-    }?;
-    vulkan_context.set_debug_name(
-        vk::ObjectType::DESCRIPTOR_SET_LAYOUT,
-        mesh_data_layout.as_raw(),
-        "Mesh Data DescriptorSetLayout",
-    )?;
-
-    Ok(DescriptorSetLayouts {
-        scene_data_layout,
-        textures_layout: material_layout,
-        mesh_layout: mesh_data_layout,
-    })
 }
 
 fn create_frames(
@@ -713,18 +592,12 @@ fn create_pipeline(
     // Build up the state of the pipeline
 
     // Vertex shader stage
-    let (vertex_shader, vertex_stage) = create_shader(
-        include_bytes!("../../shaders/pbr.vert.spv"),
-        vk::ShaderStageFlags::VERTEX,
-        vulkan_context,
-    )?;
+    let (vertex_shader, vertex_stage) =
+        create_shader(VERT, vk::ShaderStageFlags::VERTEX, vulkan_context)?;
 
     // Fragment shader stage
-    let (fragment_shader, fragment_stage) = create_shader(
-        include_bytes!("../../shaders/pbr.frag.spv"),
-        vk::ShaderStageFlags::FRAGMENT,
-        vulkan_context,
-    )?;
+    let (fragment_shader, fragment_stage) =
+        create_shader(FRAG, vk::ShaderStageFlags::FRAGMENT, vulkan_context)?;
 
     let stages = [vertex_stage, fragment_stage];
 
@@ -847,14 +720,12 @@ fn create_pipeline(
 }
 
 pub fn create_shader(
-    shader_code: &[u8],
+    shader_code: &[u32],
     stage: vk::ShaderStageFlags,
     vulkan_context: &VulkanContext,
 ) -> Result<(vk::ShaderModule, vk::PipelineShaderStageCreateInfo)> {
-    let mut cursor = Cursor::new(shader_code);
-    let shader_code = ash::util::read_spv(&mut cursor)?;
     let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
-    let create_info = vk::ShaderModuleCreateInfo::builder().code(&shader_code);
+    let create_info = vk::ShaderModuleCreateInfo::builder().code(shader_code);
     let shader_module = unsafe {
         vulkan_context
             .device
@@ -873,18 +744,36 @@ fn create_pipeline_layout(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout> {
-    let push_constant_ranges = [vk::PushConstantRange {
-        stage_flags: vk::ShaderStageFlags::FRAGMENT,
-        offset: 0,
-        size: size_of::<Material>() as _,
-    }];
-    let create_info = &vk::PipelineLayoutCreateInfo::builder()
-        .set_layouts(set_layouts)
-        .push_constant_ranges(&push_constant_ranges);
+    let create_info = &vk::PipelineLayoutCreateInfo::builder().set_layouts(set_layouts);
     unsafe {
         vulkan_context
             .device
             .create_pipeline_layout(create_info, None)
     }
     .map_err(|e| e.into())
+}
+
+fn create_compute_pipeline(device: &ash::Device, layout: vk::PipelineLayout) -> vk::Pipeline {
+    unsafe {
+        let shader_entry_name = CStr::from_bytes_with_nul_unchecked(b"main\0");
+        let compute_module = device
+            .create_shader_module(&vk::ShaderModuleCreateInfo::builder().code(COMPUTE), None)
+            .unwrap();
+        let create_info = vk::ComputePipelineCreateInfo::builder()
+            .stage(vk::PipelineShaderStageCreateInfo {
+                stage: vk::ShaderStageFlags::COMPUTE,
+                module: compute_module,
+                p_name: shader_entry_name.as_ptr(),
+                ..Default::default()
+            })
+            .layout(layout);
+
+        device
+            .create_compute_pipelines(
+                vk::PipelineCache::null(),
+                std::slice::from_ref(&create_info),
+                None,
+            )
+            .unwrap()[0]
+    }
 }

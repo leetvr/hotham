@@ -5,18 +5,18 @@ use std::{
 };
 
 use hotham::{
+    asset_importer::{self, add_model_to_world},
     components::{
         hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, Pointer, RigidBody,
         SoundEmitter, Visible,
     },
-    gltf_loader::{self, add_model_to_world},
     hecs::{Entity, World},
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
     },
     resources::{
-        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP,
-        vulkan_context::VulkanContext, AudioContext, PhysicsContext, RenderContext,
+        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
+        PhysicsContext,
     },
     vk, Engine,
 };
@@ -60,46 +60,29 @@ impl GameContext {
         let gui_context = &engine.gui_context;
 
         let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
-        let models = gltf_loader::load_models_from_glb(
-            &glb_buffers,
-            vulkan_context,
-            &render_context.descriptor_set_layouts,
-        )
-        .expect("Unable to load models!");
+        let models =
+            asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                .expect("Unable to load models!");
 
-        // Add environment
-        add_environment(&models, world, vulkan_context, render_context);
+        // Add the environment models
+        add_environment(&models, world);
 
         // Add sabers
-        let sabers = [Color::Blue, Color::Red].map(|color| {
-            add_saber(
-                color,
-                &models,
-                world,
-                vulkan_context,
-                render_context,
-                physics_context,
-            )
-        });
+        let sabers = [Color::Blue, Color::Red]
+            .map(|color| add_saber(color, &models, world, physics_context));
 
         // Spawn cubes
         for _ in 0..20 {
-            pre_spawn_cube(
-                world,
-                &models,
-                vulkan_context,
-                render_context,
-                physics_context,
-            );
+            pre_spawn_cube(world, &models, physics_context);
         }
 
-        // Add pointer
-        let pointer = add_pointer(&models, world, vulkan_context, render_context);
+        // Add a pointer to let the player interact with the UI
+        let pointer = add_pointer(&models, world);
 
-        // Add backstop
+        // Add a "backstop" collider to detect when a cube was missed
         let backstop = add_backstop(world, physics_context);
 
-        // Add panels
+        // Add UI panels
         let main_menu_panel = add_ui_panel_to_world(
             "Main Menu",
             vk::Extent2D {
@@ -170,21 +153,8 @@ fn add_backstop(
     world.spawn((Collider::new(handle),))
 }
 
-fn add_pointer(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
-) -> Entity {
-    let pointer = add_model_to_world(
-        "Blue Pointer",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
+fn add_pointer(models: &std::collections::HashMap<String, World>, world: &mut World) -> Entity {
+    let pointer = add_model_to_world("Blue Pointer", models, world, None).unwrap();
 
     world
         .insert_one(
@@ -199,29 +169,9 @@ fn add_pointer(
     pointer
 }
 
-fn add_environment(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
-) {
-    add_model_to_world(
-        "Environment",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    );
-
-    add_model_to_world(
-        "Ramp",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    );
+fn add_environment(models: &std::collections::HashMap<String, World>, world: &mut World) {
+    add_model_to_world("Environment", models, world, None);
+    add_model_to_world("Ramp", models, world, None);
 }
 
 pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContext) {
@@ -281,8 +231,6 @@ pub fn add_sound_effects(audio_context: &mut AudioContext, game_context: &mut Ga
 pub fn pre_spawn_cube(
     world: &mut World,
     models: &HashMap<String, World>,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
     // Set the color randomly
@@ -292,15 +240,7 @@ pub fn pre_spawn_cube(
         Color::Blue => "Blue Cube",
     };
 
-    let cube = add_model_to_world(
-        model_name,
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
+    let cube = add_model_to_world(model_name, models, world, None).unwrap();
 
     let rigid_body = RigidBodyBuilder::new_dynamic().lock_rotations().build();
     let handle = physics_context.rigid_bodies.insert(rigid_body);

@@ -50,6 +50,8 @@
 			"type": "cargo",
 			"command": "test",
 			"args": [
+				"-p",
+				"hotham",
 				"--release",
 				"--",
 				"--test-threads",
@@ -61,11 +63,28 @@
 			"problemMatcher": [
 				"$rustc"
 			],
+			"label": "rust: cargo test"
+		},
+		{
+			"type": "cargo",
+			"command": "test",
+			"args": [
+				"-p",
+				"hotham",
+				"asset_importer::tests::test_load_model",
+				"--release"
+			],
+			"env": {
+				"RUST_BACKTRACE": "1"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
 			"group": {
 				"kind": "test",
 				"isDefault": true
 			},
-			"label": "rust: cargo test"
+			"label": "rust: vulkan smoke test"
 		},
 		{
 			"type": "cargo",

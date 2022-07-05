@@ -93,6 +93,11 @@ impl XrContext {
         XrContextBuilder::new().path(Some(path)).build()
     }
 
+    #[cfg(test)]
+    pub fn testing() -> (XrContext, VulkanContext) {
+        XrContext::new_from_path(std::path::Path::new("../openxr_loader.dll")).unwrap()
+    }
+
     fn _new(
         instance: xr::Instance,
         system: xr::SystemId,
@@ -466,6 +471,6 @@ mod tests {
 
     #[test]
     pub fn test_xr_context_smoke_test() {
-        XrContext::new().unwrap();
+        XrContext::testing();
     }
 }

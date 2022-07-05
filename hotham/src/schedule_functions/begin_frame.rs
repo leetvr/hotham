@@ -2,6 +2,7 @@ use openxr::ActiveActionSet;
 
 use crate::{
     resources::{xr_context::XrContext, RenderContext, VulkanContext},
+    util::is_view_valid,
     VIEW_TYPE,
 };
 
@@ -10,7 +11,7 @@ use crate::{
 pub fn begin_frame(
     xr_context: &mut XrContext,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
 ) {
     let active_action_set = ActiveActionSet::new(&xr_context.action_set);
     xr_context
@@ -18,7 +19,7 @@ pub fn begin_frame(
         .sync_actions(&[active_action_set])
         .unwrap();
 
-    // Wait for a frame to become available from the runtime
+    // Wait for a frame to become available from the runtime, then get its index.
     xr_context.begin_frame().unwrap();
 
     let (view_state_flags, views) = xr_context
@@ -32,14 +33,21 @@ pub fn begin_frame(
     xr_context.views = views;
     xr_context.view_state_flags = view_state_flags;
 
-    // If the shouldRender flag is set, start rendering
-    if xr_context.frame_state.should_render {
-        render_context.begin_frame(vulkan_context, xr_context.frame_index);
-    } else {
-        println!(
-            "[HOTHAM_BEGIN_FRAME] - Session is runing but shouldRender is false - not rendering"
-        );
+    // If we have a valid view from OpenXR, update the scene buffers with the view data.
+    if is_view_valid(&xr_context.view_state_flags) {
+        let views = &xr_context.views;
+
+        // Update uniform buffers
+        render_context.update_scene_data(views).unwrap();
     }
+
+    // If we shouldn't render yet, we're done.
+    if !xr_context.frame_state.should_render {
+        println!("[HOTHAM_BEGIN_FRAME] should render is false - returning!");
+        return;
+    }
+
+    render_context.begin_frame(vulkan_context, xr_context.frame_index);
 }
 
 #[cfg(target_os = "windows")]
@@ -52,11 +60,11 @@ mod tests {
     #[test]
 
     pub fn test_begin_frame() {
-        let (mut xr_context, vulkan_context) = XrContext::new().unwrap();
-        let render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
+        let (mut xr_context, vulkan_context) = XrContext::testing();
+        let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
         xr_context.frame_index = 100;
 
-        begin_frame(&mut xr_context, &vulkan_context, &render_context);
+        begin_frame(&mut xr_context, &vulkan_context, &mut render_context);
         assert_eq!(xr_context.frame_index, 0);
     }
 }

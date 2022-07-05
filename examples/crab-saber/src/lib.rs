@@ -5,10 +5,7 @@ mod systems;
 use hotham::{
     components::Visible,
     hecs::{Entity, World},
-    schedule_functions::{
-        apply_haptic_feedback, begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass,
-        physics_step,
-    },
+    schedule_functions::{apply_haptic_feedback, begin_frame, end_frame, physics_step},
     systems::{
         audio_system, collision_system, draw_gui_system, rendering_system,
         update_parent_transform_matrix_system, update_rigid_body_transforms_system,
@@ -129,17 +126,6 @@ fn tick(
             world,
         );
 
-        // Draw GUI
-        draw_gui_system(
-            &mut hotham_queries.draw_gui_query,
-            world,
-            vulkan_context,
-            &xr_context.frame_index,
-            render_context,
-            gui_context,
-            haptic_context,
-        );
-
         // Haptics
         apply_haptic_feedback(xr_context, haptic_context);
 
@@ -155,7 +141,16 @@ fn tick(
 
     // Rendering tasks - only necessary if we are in at least the visible state
     if current_state == xr::SessionState::VISIBLE || current_state == xr::SessionState::FOCUSED {
-        begin_pbr_renderpass(xr_context, vulkan_context, render_context);
+        // Draw GUI
+        draw_gui_system(
+            &mut hotham_queries.draw_gui_query,
+            world,
+            vulkan_context,
+            &xr_context.frame_index,
+            render_context,
+            gui_context,
+            haptic_context,
+        );
         rendering_system(
             &mut hotham_queries.rendering_query,
             world,
@@ -163,7 +158,6 @@ fn tick(
             xr_context.frame_index,
             render_context,
         );
-        end_pbr_renderpass(xr_context, vulkan_context, render_context);
     }
 
     // End the frame
