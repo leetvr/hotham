@@ -149,6 +149,7 @@ impl<T: Sized> Buffer<T> {
 }
 
 #[cfg(test)]
+#[cfg(target_os = "windows")]
 mod tests {
     use super::*;
 
