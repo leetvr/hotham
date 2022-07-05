@@ -3,8 +3,8 @@ use hotham::{
     components::{hand::Handedness, Transform},
     hecs::World,
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext},
-    schedule_functions::{begin_frame, begin_pbr_renderpass, end_frame, physics_step},
+    resources::PhysicsContext,
+    schedule_functions::{begin_frame, end_frame, physics_step},
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
         rendering::rendering_system, skinning::skinning_system,
@@ -119,7 +119,6 @@ fn tick(
     }
 
     if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
-        begin_pbr_renderpass(xr_context, vulkan_context, render_context);
         rendering_system(
             &mut queries.rendering_query,
             world,
@@ -129,5 +128,5 @@ fn tick(
         );
     }
 
-    xr_context.end_frame().unwrap();
+    end_frame(xr_context, vulkan_context, render_context);
 }

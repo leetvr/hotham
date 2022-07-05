@@ -3,7 +3,7 @@ use crate::{
     resources::render_context,
 };
 use itertools::izip;
-use nalgebra::{vector, DimMax, Vector3, Vector4};
+use nalgebra::{vector, Vector3, Vector4};
 use render_context::RenderContext;
 
 /// Geometry for a mesh

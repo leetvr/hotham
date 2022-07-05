@@ -50,6 +50,8 @@
 			"type": "cargo",
 			"command": "test",
 			"args": [
+				"-p",
+				"hotham",
 				"--release",
 				"--",
 				"--test-threads",

@@ -1,5 +1,3 @@
-use std::mem::MaybeUninit;
-
 use crate::{asset_importer::ImportContext, rendering::resources::MAX_JOINTS};
 use hecs::Entity;
 use nalgebra::Matrix4;
@@ -38,8 +36,6 @@ impl Skin {
             })
             .collect();
 
-        // Nasty, but safe - this data will be correctly populated when the skin system runs:
-        // Having a Skin and not running the skin system is forbidden!
         let empty_matrices = [Matrix4::identity(); MAX_JOINTS];
         let id = unsafe {
             import_context

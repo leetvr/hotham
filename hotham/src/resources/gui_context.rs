@@ -2,12 +2,11 @@ use ash::vk::{self, Handle};
 use vk_shader_macros::include_glsl;
 
 /// How much the GUI should be scaled by
-// TODO - this this necessary?
+// TODO - is this necessary?
 pub const SCALE_FACTOR: f32 = 3.;
 
 use crate::{
     components::{panel::PanelInput, Panel, UIPanel},
-    rendering::texture::Texture,
     resources::render_context::{create_push_constant, CLEAR_VALUES},
     COLOR_FORMAT,
 };
@@ -494,6 +493,7 @@ fn update_font_texture(
     texture: &egui::Texture,
     descriptor_set: vk::DescriptorSet,
 ) {
+    println!("[HOTHAM_DRAW_GUI] Updating font texture..");
     unsafe {
         vulkan_context
             .device
@@ -538,4 +538,5 @@ fn update_font_texture(
             .device
             .update_descriptor_sets(std::slice::from_ref(&texture_write), &[]);
     }
+    println!("[HOTHAM_DRAW_GUI] Done!");
 }

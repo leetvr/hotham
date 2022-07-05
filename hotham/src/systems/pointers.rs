@@ -178,7 +178,6 @@ mod tests {
     pub fn test_pointers_system() {
         use crate::{
             components::{Collider, Panel, Transform},
-            rendering::texture::Texture,
             resources::{
                 physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
                 RenderContext,
@@ -187,7 +186,7 @@ mod tests {
         use nalgebra::vector;
         use rapier3d::prelude::ColliderBuilder;
 
-        let (mut xr_context, vulkan_context) = XrContext::new().unwrap();
+        let (mut xr_context, vulkan_context) = XrContext::testing();
         let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
         let mut physics_context = PhysicsContext::default();
         let mut world = World::default();
@@ -200,8 +199,9 @@ mod tests {
                 height: 300,
             },
             [1.0, 1.0].into(),
-        );
-        let panel_entity = world.spawn((panel,));
+        )
+        .unwrap();
+        let panel_entity = world.spawn(panel);
 
         // Place the panel *directly above* where the pointer will be located.
         let collider = ColliderBuilder::cuboid(0.5, 0.5, 0.0)
@@ -247,13 +247,14 @@ mod tests {
             Transform::default(),
         ));
 
-        schedule(&mut physics_context, &mut world, &mut xr_context);
+        tick(&mut physics_context, &mut world, &mut xr_context);
 
         let transform = world.get_mut::<Transform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
         assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
 
+        dbg!(panel_entity);
         let panel = world.get_mut::<Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 150.);
@@ -262,7 +263,7 @@ mod tests {
     }
 
     #[cfg(target_os = "windows")]
-    fn schedule(
+    fn tick(
         physics_context: &mut PhysicsContext,
         world: &mut hecs::World,
         xr_context: &mut XrContext,

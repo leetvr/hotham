@@ -1,8 +1,8 @@
 use crate::{
     components::{skin::NO_SKIN, Mesh, Skin, Transform, TransformMatrix, Visible},
     rendering::resources::DrawData,
+    resources::RenderContext,
     resources::VulkanContext,
-    resources::{RenderContext, XrContext},
 };
 use ash::vk;
 use hecs::{PreparedQuery, With, World};

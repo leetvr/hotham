@@ -771,6 +771,8 @@ impl VulkanContext {
             self.device.destroy_buffer(staging_buffer, None);
             self.device.free_memory(staging_memory, None);
         }
+
+        println!("[HOTHAM_VULKAN] ..done!");
     }
 }
 

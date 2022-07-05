@@ -4,19 +4,13 @@ use hotham::{
     components::RigidBody,
     hecs::{Entity, PreparedQuery, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext, XrContext},
+    resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
 
 use crate::components::{Color, Saber};
 
 const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
-/* Original matrix
-    -0.5581498959847122,
-    0.8274912503663805,
-    0.03413791007514528,
-    -0.05061153302400824,
-*/
 const ROTATION_OFFSET: Quaternion<f32> =
     Quaternion::new(-0.558_149_8, 0.827_491_2, 0.034_137_9, -0.050_611_5);
 
@@ -70,8 +64,6 @@ pub fn add_saber(
     color: Color,
     models: &Models,
     world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
     physics_context: &mut PhysicsContext,
 ) -> Entity {
     let model_name = match color {

@@ -8,6 +8,7 @@ static TEXTURE_BINDING: u32 = 5;
 pub(crate) struct Descriptors {
     pub layout: vk::DescriptorSetLayout,
     pub set: vk::DescriptorSet,
+    #[allow(unused)]
     pub pool: vk::DescriptorPool,
 }
 

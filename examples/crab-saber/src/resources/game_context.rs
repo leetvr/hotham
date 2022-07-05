@@ -15,8 +15,8 @@ use hotham::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
     },
     resources::{
-        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP,
-        vulkan_context::VulkanContext, AudioContext, PhysicsContext, RenderContext,
+        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
+        PhysicsContext,
     },
     vk, Engine,
 };
@@ -64,39 +64,25 @@ impl GameContext {
             asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                 .expect("Unable to load models!");
 
-        // Add environment
-        add_environment(&models, world, vulkan_context, render_context);
+        // Add the environment models
+        add_environment(&models, world);
 
         // Add sabers
-        let sabers = [Color::Blue, Color::Red].map(|color| {
-            add_saber(
-                color,
-                &models,
-                world,
-                vulkan_context,
-                render_context,
-                physics_context,
-            )
-        });
+        let sabers = [Color::Blue, Color::Red]
+            .map(|color| add_saber(color, &models, world, physics_context));
 
         // Spawn cubes
         for _ in 0..20 {
-            pre_spawn_cube(
-                world,
-                &models,
-                vulkan_context,
-                render_context,
-                physics_context,
-            );
+            pre_spawn_cube(world, &models, physics_context);
         }
 
-        // Add pointer
-        let pointer = add_pointer(&models, world, vulkan_context, render_context);
+        // Add a pointer to let the player interact with the UI
+        let pointer = add_pointer(&models, world);
 
-        // Add backstop
+        // Add a "backstop" collider to detect when a cube was missed
         let backstop = add_backstop(world, physics_context);
 
-        // Add panels
+        // Add UI panels
         let main_menu_panel = add_ui_panel_to_world(
             "Main Menu",
             vk::Extent2D {
@@ -167,12 +153,7 @@ fn add_backstop(
     world.spawn((Collider::new(handle),))
 }
 
-fn add_pointer(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
-) -> Entity {
+fn add_pointer(models: &std::collections::HashMap<String, World>, world: &mut World) -> Entity {
     let pointer = add_model_to_world("Blue Pointer", models, world, None).unwrap();
 
     world
@@ -188,12 +169,7 @@ fn add_pointer(
     pointer
 }
 
-fn add_environment(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
-) {
+fn add_environment(models: &std::collections::HashMap<String, World>, world: &mut World) {
     add_model_to_world("Environment", models, world, None);
     add_model_to_world("Ramp", models, world, None);
 }
@@ -255,8 +231,6 @@ pub fn add_sound_effects(audio_context: &mut AudioContext, game_context: &mut Ga
 pub fn pre_spawn_cube(
     world: &mut World,
     models: &HashMap<String, World>,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
     // Set the color randomly

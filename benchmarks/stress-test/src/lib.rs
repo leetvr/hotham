@@ -5,19 +5,19 @@ use std::{
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{Mesh, Transform, TransformMatrix, Visible},
+    components::{Mesh, Transform},
     hecs::{With, World},
     nalgebra::Vector3,
-    rendering::{buffer::Buffer, material::Material, texture::Texture, vertex::Vertex},
+    rendering::vertex::Vertex,
     resources::{vulkan_context::VulkanContext, RenderContext},
-    schedule_functions::{begin_frame, begin_pbr_renderpass, end_frame, physics_step},
+    schedule_functions::{begin_frame, end_frame, physics_step},
     systems::{
         animation_system, collision_system, grabbing_system, hands_system,
         rendering::rendering_system, skinning::skinning_system,
         update_parent_transform_matrix_system, update_rigid_body_transforms_system,
         update_transform_matrix_system, Queries,
     },
-    vk, xr, Engine, HothamResult,
+    xr, Engine, HothamResult,
 };
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -211,7 +211,6 @@ fn tick(
     }
 
     if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
-        begin_pbr_renderpass(xr_context, vulkan_context, render_context);
         rendering_system(
             &mut queries.rendering_query,
             world,

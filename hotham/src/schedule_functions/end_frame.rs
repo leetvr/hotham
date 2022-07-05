@@ -7,5 +7,9 @@ pub fn end_frame(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) {
+    if xr_context.frame_state.should_render {
+        render_context.end_frame(vulkan_context, xr_context.frame_index);
+    }
+
     xr_context.end_frame().unwrap();
 }

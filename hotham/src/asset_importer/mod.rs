@@ -1,18 +1,15 @@
 use crate::{
     components::{
-        animation_controller::{self, AnimationController},
-        AnimationTarget, Info, Joint, Mesh, Parent, Root, Skin, Transform, TransformMatrix,
-        Visible,
+        animation_controller::AnimationController, Info, Mesh, Parent, Root, Skin, Transform,
+        TransformMatrix, Visible,
     },
-    rendering::{material::Material, mesh_data::MeshData, resources::Resources, texture::Texture},
+    rendering::{material::Material, texture::Texture},
     resources::{RenderContext, VulkanContext},
 };
 use anyhow::Result;
 
-use gltf::{animation::util::ReadOutputs, Document};
+use gltf::Document;
 use hecs::{Entity, World};
-use itertools::{izip, Itertools};
-use nalgebra::{vector, Matrix4, Quaternion, UnitQuaternion};
 use std::collections::HashMap;
 
 /// Convenience type for models
@@ -348,6 +345,7 @@ mod tests {
     use super::*;
     use crate::components::{Root, Transform};
     use approx::assert_relative_eq;
+    use nalgebra::{vector, Quaternion, UnitQuaternion};
 
     #[test]
     pub fn test_load_models() {

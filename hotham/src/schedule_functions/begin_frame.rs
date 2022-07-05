@@ -2,6 +2,7 @@ use openxr::ActiveActionSet;
 
 use crate::{
     resources::{xr_context::XrContext, RenderContext, VulkanContext},
+    util::is_view_valid,
     VIEW_TYPE,
 };
 
@@ -32,8 +33,17 @@ pub fn begin_frame(
     xr_context.views = views;
     xr_context.view_state_flags = view_state_flags;
 
+    // If we have a valid view from OpenXR, update the scene buffers with the view data.
+    if is_view_valid(&xr_context.view_state_flags) {
+        let views = &xr_context.views;
+
+        // Update uniform buffers
+        render_context.update_scene_data(views).unwrap();
+    }
+
     // If we shouldn't render yet, we're done.
     if !xr_context.frame_state.should_render {
+        println!("[HOTHAM_BEGIN_FRAME] should render is false - returning!");
         return;
     }
 

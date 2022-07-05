@@ -1,4 +1,4 @@
-use std::{ffi::CStr, io::Cursor, mem::size_of, slice::from_ref as slice_from_ref};
+use std::{ffi::CStr, mem::size_of, slice::from_ref as slice_from_ref};
 
 pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
@@ -16,8 +16,8 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 
 use crate::{
     rendering::{
-        camera::Camera, descriptors::Descriptors, frame::Frame, image::Image, material::Material,
-        resources::Resources, scene_data::SceneData, swapchain::Swapchain, vertex::Vertex,
+        camera::Camera, descriptors::Descriptors, frame::Frame, image::Image, resources::Resources,
+        scene_data::SceneData, swapchain::Swapchain, vertex::Vertex,
     },
     resources::{VulkanContext, XrContext},
     COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
@@ -215,7 +215,9 @@ impl RenderContext {
         }
     }
 
-    pub(crate) fn cull_objects(
+    // TODO: Get culling working correctly. Requires separate queue, fence and command buffer.
+    // https://github.com/leetvr/hotham/issues/226
+    pub(crate) fn _cull_objects(
         &self,
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,

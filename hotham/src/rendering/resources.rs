@@ -1,6 +1,6 @@
 use ash::vk;
 use id_arena::Arena;
-use nalgebra::{Matrix4, Vector3, Vector4};
+use nalgebra::{Matrix4, Vector4};
 use vulkan_context::VulkanContext;
 
 use crate::resources::vulkan_context;

@@ -1,4 +1,3 @@
-use anyhow::{Ok, Result};
 use gltf::Material as MaterialData;
 use nalgebra::{vector, Vector4};
 

@@ -41,7 +41,7 @@ pub fn get_world_with_hands(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) -> World {
-    use crate::components::{Info, Skin, Transform};
+    use crate::components::{Skin, Transform};
 
     let data: Vec<&[u8]> = vec![
         include_bytes!("../../test_assets/left_hand.glb"),
@@ -66,7 +66,7 @@ pub fn get_world_with_hands(
 
     // Sanity check
     {
-        let mut query = world.query::<(&Skin)>();
+        let mut query = world.query::<&Skin>();
         assert_eq!(query.iter().len(), 2);
     }
 

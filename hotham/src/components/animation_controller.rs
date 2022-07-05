@@ -1,13 +1,10 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use gltf::animation::util::ReadOutputs;
-use itertools::{izip, Itertools};
+use itertools::Itertools;
 use nalgebra::{Quaternion, UnitQuaternion};
 
-use crate::{
-    asset_importer::ImportContext,
-    components::{AnimationTarget, Transform},
-};
+use crate::{asset_importer::ImportContext, components::AnimationTarget};
 
 #[derive(Debug, Clone, PartialEq, Default)]
 

@@ -1,10 +1,8 @@
-use hecs::{Entity, PreparedQuery, World};
-use nalgebra::Matrix4;
+use hecs::{PreparedQuery, World};
 use render_context::RenderContext;
-use std::collections::HashMap;
 
 use crate::{
-    components::{Info, Joint, Mesh, Skin, TransformMatrix},
+    components::{Skin, TransformMatrix},
     resources::render_context,
 };
 
@@ -37,21 +35,16 @@ pub fn skinning_system(
 #[cfg(test)]
 mod tests {
 
-    use std::{io::Write, marker::PhantomData};
+    use std::io::Write;
 
     use crate::{
-        components::{transform, Joint, Parent, Skin},
-        rendering::buffer::Buffer,
-        resources::{vulkan_context, VulkanContext},
-        systems::skinning_system,
-        util::{get_from_device_memory, get_world_with_hands},
+        components::{Info, Skin},
+        util::get_world_with_hands,
     };
 
     use super::*;
     use approx::relative_eq;
-    use ash::vk;
-    use hecs::Satisfies;
-    use nalgebra::vector;
+    use nalgebra::Matrix4;
 
     #[test]
     pub fn test_hand_skinning() {
@@ -62,7 +55,7 @@ mod tests {
         assert!(verify_matrices(&world, &render_context));
 
         // Muck all the joints up
-        for (_, (skin, info)) in world.query::<(&Skin, &Info)>().iter() {
+        for (_, skin) in world.query::<&Skin>().iter() {
             for joint in &skin.joints {
                 let mut transform_matrix = world.get_mut::<TransformMatrix>(*joint).unwrap();
                 transform_matrix.0 = Matrix4::zeros();

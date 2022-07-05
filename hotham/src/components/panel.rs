@@ -1,18 +1,18 @@
 use ash::vk::{self};
 use egui::Pos2;
 use itertools::izip;
-use nalgebra::{vector, Vector2, Vector4};
+use nalgebra::{vector, Vector2};
 
 use crate::components::Mesh;
 use crate::hotham_error::HothamError;
 use crate::rendering::material::Material;
 use crate::rendering::mesh_data::MeshData;
-use crate::rendering::primitive::{calculate_bounding_sphere, Primitive};
+use crate::rendering::primitive::Primitive;
+use crate::rendering::vertex::Vertex;
 use crate::{
     rendering::texture::Texture,
     resources::{RenderContext, VulkanContext},
 };
-use crate::{rendering::vertex::Vertex, COLOR_FORMAT};
 
 pub struct Panel {
     /// The resolution of the Panel
@@ -33,7 +33,7 @@ impl Panel {
         world_size: Vector2<f32>,
     ) -> Result<(Panel, Mesh), HothamError> {
         let texture = Texture::empty(vulkan_context, render_context, resolution);
-        let mesh = create_mesh(&texture, vulkan_context, render_context, world_size);
+        let mesh = create_panel_mesh(&texture, render_context, world_size);
 
         Ok((
             Panel {
@@ -47,13 +47,12 @@ impl Panel {
     }
 }
 
-fn create_mesh(
+fn create_panel_mesh(
     output_texture: &Texture,
-    vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
     world_size: Vector2<f32>,
 ) -> Mesh {
-    let material_id = add_material(output_texture, vulkan_context, render_context);
+    let material_id = add_material(output_texture, render_context);
     let (half_width, half_height) = (world_size.x / 2., world_size.y / 2.);
 
     let positions = [
@@ -82,11 +81,7 @@ fn create_mesh(
     Mesh::new(MeshData::new(vec![primitive]), render_context)
 }
 
-fn add_material(
-    output_texture: &Texture,
-    vulkan_context: &VulkanContext,
-    render_context: &mut RenderContext,
-) -> u32 {
+fn add_material(output_texture: &Texture, render_context: &mut RenderContext) -> u32 {
     let mut material = Material::unlit_white();
     material.base_color_texture_set = output_texture.index;
     unsafe { render_context.resources.materials_buffer.push(&material) }
