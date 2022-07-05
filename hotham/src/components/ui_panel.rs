@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use ash::vk::{self};
 use egui::emath::vec2;
 use egui::epaint::Vertex as EguiVertex;
@@ -8,8 +10,8 @@ use rapier3d::prelude::{ColliderBuilder, InteractionGroups};
 
 const BUFFER_SIZE: usize = 1024;
 
-use crate::buffer::Buffer;
 use crate::components::Panel;
+use crate::rendering::legacy_buffer::Buffer;
 use crate::resources::gui_context::SCALE_FACTOR;
 use crate::resources::physics_context::PANEL_COLLISION_GROUP;
 use crate::resources::{GuiContext, PhysicsContext};
@@ -70,7 +72,7 @@ pub fn add_ui_panel_to_world(
     translation: Vector3<f32>,
     buttons: Vec<UIPanelButton>,
     vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
     gui_context: &GuiContext,
     physics_context: &mut PhysicsContext,
     world: &mut World,

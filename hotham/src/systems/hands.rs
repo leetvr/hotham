@@ -1,7 +1,7 @@
 use crate::{
+    asset_importer::add_model_to_world,
     components::{hand::Handedness, AnimationController, Hand, RigidBody},
-    gltf_loader::add_model_to_world,
-    resources::{PhysicsContext, RenderContext, VulkanContext, XrContext},
+    resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
 use hecs::{PreparedQuery, World};
@@ -73,23 +73,13 @@ pub fn add_hand(
     models: &std::collections::HashMap<String, World>,
     handedness: Handedness,
     world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
     let model_name = match handedness {
         Handedness::Left => "Left Hand",
         Handedness::Right => "Right Hand",
     };
-    let hand = add_model_to_world(
-        model_name,
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
+    let hand = add_model_to_world(model_name, models, world, None).unwrap();
     {
         // Add a hand component
         world
@@ -172,7 +162,7 @@ mod tests {
     // HELPER FUNCTIONS
     fn setup() -> (World, XrContext, PhysicsContext) {
         let world = World::new();
-        let (xr_context, _) = XrContext::new().unwrap();
+        let (xr_context, _) = XrContext::testing();
         let physics_context = PhysicsContext::default();
         (world, xr_context, physics_context)
     }

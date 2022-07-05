@@ -1,10 +1,7 @@
+#![allow(deprecated)]
+
 use crate::{
-    buffer::Buffer,
-    hotham_error::HothamError,
-    image::Image,
-    scene_data::{SceneData, SceneParams},
-    texture::Texture,
-    DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
+    hotham_error::HothamError, rendering::image::Image, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -15,7 +12,7 @@ use ash::{
     Device, Entry, Instance as AshInstance,
 };
 use openxr as xr;
-use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy};
+use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy, slice::from_ref as slice_from_ref};
 
 type XrVulkan = xr::Vulkan;
 
@@ -31,21 +28,10 @@ pub struct VulkanContext {
     pub command_pool: vk::CommandPool,
     pub queue_family_index: u32,
     pub graphics_queue: vk::Queue,
+    #[deprecated]
     pub descriptor_pool: vk::DescriptorPool,
     pub debug_utils: DebugUtils,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
-}
-
-// NOTE: OpenXR created the instance / device etc. and is therefore the owner. We'll let it do the cleanup.
-impl Drop for VulkanContext {
-    fn drop(&mut self) {
-        // TODO: Currently we have a bug where if VulkanContext is cloned, each clone will try and cleanup.
-        // Let's fix this.
-
-        // self.device
-        //     .destroy_descriptor_pool(self.descriptor_pool, None);
-        // self.device.destroy_command_pool(self.command_pool, None);
-    }
 }
 
 impl VulkanContext {
@@ -347,6 +333,7 @@ impl VulkanContext {
     }
 
     /// Create a Vulkan buffer filled with the contents of `data`.
+    #[deprecated]
     pub fn create_buffer_with_data<T: Sized + Copy>(
         &self,
         data: &[T],
@@ -372,6 +359,7 @@ impl VulkanContext {
         Ok((buffer, device_memory, device_memory_size))
     }
 
+    #[deprecated]
     pub fn update_buffer<T: Sized + Copy>(
         &self,
         data: &[T],
@@ -400,6 +388,7 @@ impl VulkanContext {
         Ok(())
     }
 
+    #[deprecated]
     pub fn get_alignment_info<T: Sized>(
         &self,
         original_size: vk::DeviceSize,
@@ -440,6 +429,7 @@ impl VulkanContext {
         ))
     }
 
+    #[deprecated]
     fn allocate_buffer_memory(
         &self,
         buffer: vk::Buffer,
@@ -451,6 +441,7 @@ impl VulkanContext {
         self.allocate_memory(memory_requirements, properties)
     }
 
+    #[deprecated]
     fn allocate_image_memory(
         &self,
         image: vk::Image,
@@ -460,6 +451,7 @@ impl VulkanContext {
         self.allocate_memory(memory_requirements, properties)
     }
 
+    #[deprecated]
     fn allocate_memory(
         &self,
         memory_requirements: vk::MemoryRequirements,
@@ -476,82 +468,6 @@ impl VulkanContext {
         let device_memory = unsafe { self.device.allocate_memory(&allocate_info, None) }?;
 
         Ok((memory_requirements.size, device_memory))
-    }
-
-    pub fn create_texture_image(
-        &self,
-        name: &str,
-        image_buf: &[u8], // Clippy &Vec<u8>, ptr_arg for texture.rs
-        mip_count: u32,
-        offsets: Vec<vk::DeviceSize>,
-        texture_image: Image,
-    ) -> Result<(Image, vk::Sampler)> {
-        // Get the image's properties
-        let layer_count = texture_image.layer_count;
-        let format = texture_image.format;
-
-        self.set_debug_name(vk::ObjectType::IMAGE, texture_image.handle.as_raw(), name)?;
-
-        // Create a staging buffer.
-        println!("[HOTHAM_VULKAN] Creating staging buffer..");
-        let usage = vk::BufferUsageFlags::TRANSFER_SRC;
-        let size = 8 * image_buf.len();
-        let (staging_buffer, staging_memory, _) =
-            self.create_buffer_with_data(image_buf, usage, size as _)?;
-        println!("[HOTHAM_VULKAN] ..done!");
-
-        // Copy the buffer into the image
-        let initial_layout = vk::ImageLayout::UNDEFINED;
-        let transfer_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
-        self.transition_image_layout(
-            texture_image.handle,
-            initial_layout,
-            transfer_layout,
-            layer_count,
-            mip_count,
-        );
-
-        println!("[HOTHAM_VULKAN] Copying buffer to image..");
-        self.copy_buffer_to_image(
-            staging_buffer,
-            &texture_image,
-            layer_count,
-            mip_count,
-            offsets,
-        );
-
-        // Now transition the image
-        println!("[HOTHAM_VULKAN] ..done! Transitioning image layout..");
-        let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
-        self.transition_image_layout(
-            texture_image.handle,
-            transfer_layout,
-            final_layout,
-            layer_count,
-            mip_count,
-        );
-        println!("[HOTHAM_VULKAN] ..done! Freeing staging buffer..");
-        let sampler_address_mode = if format == vk::Format::R16G16_SFLOAT || layer_count == 6 {
-            vk::SamplerAddressMode::CLAMP_TO_EDGE
-        } else {
-            vk::SamplerAddressMode::REPEAT
-        };
-
-        let sampler = self.create_texture_sampler(sampler_address_mode, mip_count)?;
-        self.set_debug_name(vk::ObjectType::SAMPLER, sampler.as_raw(), name)?;
-
-        // Free the staging buffer
-        unsafe {
-            self.device.destroy_buffer(staging_buffer, None);
-            self.device.free_memory(staging_memory, None);
-        }
-
-        println!(
-            "[HOTHAM_VULKAN] ..done! Texture {} created successfully.",
-            name
-        );
-
-        Ok((texture_image, sampler))
     }
 
     pub fn transition_image_layout(
@@ -779,227 +695,6 @@ impl VulkanContext {
         self.end_single_time_commands(command_buffer);
     }
 
-    // TODO: These kind of smell - VulkanContext shouldn't know about application specific things.
-    pub fn create_mesh_descriptor_sets(
-        &self,
-        set_layout: vk::DescriptorSetLayout,
-        mesh_name: &str,
-    ) -> VkResult<Vec<vk::DescriptorSet>> {
-        println!("[HOTHAM_VULKAN] Allocating mesh descriptor sets..");
-        let descriptor_sets = unsafe {
-            self.device.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::builder()
-                    .set_layouts(&[set_layout])
-                    .descriptor_pool(self.descriptor_pool),
-            )
-        }?;
-        self.set_debug_name(
-            vk::ObjectType::DESCRIPTOR_SET,
-            descriptor_sets[0].as_raw(),
-            &format!("Mesh {}", mesh_name),
-        )?;
-        println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
-
-        Ok(descriptor_sets)
-    }
-
-    pub fn create_textures_descriptor_sets(
-        &self,
-        set_layout: vk::DescriptorSetLayout,
-        material_name: &str,
-        textures: &[&Texture; 5],
-    ) -> VkResult<Vec<vk::DescriptorSet>> {
-        println!("[HOTHAM_VULKAN] Allocating textures descriptor sets..");
-        let descriptor_sets = unsafe {
-            self.device.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::builder()
-                    .set_layouts(&[set_layout])
-                    .descriptor_pool(self.descriptor_pool),
-            )
-        }?;
-
-        self.set_debug_name(
-            vk::ObjectType::DESCRIPTOR_SET,
-            descriptor_sets[0].as_raw(),
-            &format!("Material {}", material_name),
-        )?;
-        println!("[HOTHAM_VULKAN] ..done! {:?}", descriptor_sets);
-
-        unsafe {
-            /*
-            let mut s = Vec::new();
-            for (i, texture) in textures.iter().enumerate() {
-                s.push(
-                    *vk::WriteDescriptorSet::builder()
-                        .dst_set(descriptor_sets[0])
-                        .dst_binding(i as u32)
-                        .dst_array_element(0)
-                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                        .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(texture.image.view)
-                            .sampler(texture.sampler)
-                            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                );
-            }
-
-            self.device
-                .update_descriptor_sets(&[s[0], s[1], s[2], s[3], s[4]], &[]);
-            */
-
-            let base_color_texture = &textures[0];
-            let metallic_roughness_texture = &textures[1];
-            let normal_map = &textures[2];
-            let ao_map = &textures[3];
-            let emissive_map = &textures[4];
-
-            let ds = &[
-                *vk::WriteDescriptorSet::builder()
-                    .dst_set(descriptor_sets[0])
-                    .dst_binding(0)
-                    .dst_array_element(0)
-                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                    .image_info(&[*vk::DescriptorImageInfo::builder()
-                        .image_view(base_color_texture.image.view)
-                        .sampler(base_color_texture.sampler)
-                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                *vk::WriteDescriptorSet::builder()
-                    .dst_set(descriptor_sets[0])
-                    .dst_binding(1)
-                    .dst_array_element(0)
-                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                    .image_info(&[*vk::DescriptorImageInfo::builder()
-                        .image_view(metallic_roughness_texture.image.view)
-                        .sampler(metallic_roughness_texture.sampler)
-                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                *vk::WriteDescriptorSet::builder()
-                    .dst_set(descriptor_sets[0])
-                    .dst_binding(2)
-                    .dst_array_element(0)
-                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                    .image_info(&[*vk::DescriptorImageInfo::builder()
-                        .image_view(normal_map.image.view)
-                        .sampler(normal_map.sampler)
-                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                *vk::WriteDescriptorSet::builder()
-                    .dst_set(descriptor_sets[0])
-                    .dst_binding(3)
-                    .dst_array_element(0)
-                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                    .image_info(&[*vk::DescriptorImageInfo::builder()
-                        .image_view(ao_map.image.view)
-                        .sampler(ao_map.sampler)
-                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                *vk::WriteDescriptorSet::builder()
-                    .dst_set(descriptor_sets[0])
-                    .dst_binding(4)
-                    .dst_array_element(0)
-                    .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                    .image_info(&[*vk::DescriptorImageInfo::builder()
-                        .image_view(emissive_map.image.view)
-                        .sampler(emissive_map.sampler)
-                        .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-            ];
-            self.device.update_descriptor_sets(ds, &[]);
-        }
-        Ok(descriptor_sets)
-    }
-
-    pub fn create_scene_data_descriptor_sets(
-        &self,
-        set_layout: vk::DescriptorSetLayout,
-        scene_data: &Buffer<SceneData>,
-        scene_params: &Buffer<SceneParams>,
-        irradiance: &Texture,
-        prefiltered_map: &Texture,
-        brdflut: &Texture,
-    ) -> VkResult<Vec<vk::DescriptorSet>> {
-        println!("[HOTHAM_VULKAN] Allocating scene data sets..");
-        let descriptor_sets = unsafe {
-            self.device.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::builder()
-                    .set_layouts(&[set_layout])
-                    .descriptor_pool(self.descriptor_pool),
-            )
-        }?;
-        self.set_debug_name(
-            vk::ObjectType::DESCRIPTOR_SET,
-            descriptor_sets[0].as_raw(),
-            "Scene Data",
-        )?;
-
-        self.update_buffer_descriptor_set(
-            scene_data,
-            descriptor_sets[0],
-            0,
-            vk::DescriptorType::UNIFORM_BUFFER,
-        );
-        self.update_buffer_descriptor_set(
-            scene_params,
-            descriptor_sets[0],
-            1,
-            vk::DescriptorType::UNIFORM_BUFFER,
-        );
-        unsafe {
-            self.device.update_descriptor_sets(
-                &[
-                    *vk::WriteDescriptorSet::builder()
-                        .dst_set(descriptor_sets[0])
-                        .dst_binding(2)
-                        .dst_array_element(0)
-                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                        .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(irradiance.image.view)
-                            .sampler(irradiance.sampler)
-                            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                    *vk::WriteDescriptorSet::builder()
-                        .dst_set(descriptor_sets[0])
-                        .dst_binding(3)
-                        .dst_array_element(0)
-                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                        .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(prefiltered_map.image.view)
-                            .sampler(prefiltered_map.sampler)
-                            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                    *vk::WriteDescriptorSet::builder()
-                        .dst_set(descriptor_sets[0])
-                        .dst_binding(4)
-                        .dst_array_element(0)
-                        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                        .image_info(&[*vk::DescriptorImageInfo::builder()
-                            .image_view(brdflut.image.view)
-                            .sampler(brdflut.sampler)
-                            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)]),
-                ],
-                &[],
-            )
-        }
-
-        Ok(descriptor_sets)
-    }
-
-    pub fn update_buffer_descriptor_set<T>(
-        &self,
-        buffer: &Buffer<T>,
-        descriptor_set: vk::DescriptorSet,
-        binding: usize,
-        descriptor_type: vk::DescriptorType,
-    ) {
-        unsafe {
-            self.device.update_descriptor_sets(
-                &[*vk::WriteDescriptorSet::builder()
-                    .dst_set(descriptor_set)
-                    .dst_binding(binding as _)
-                    .dst_array_element(0)
-                    .descriptor_type(descriptor_type)
-                    .buffer_info(&[*vk::DescriptorBufferInfo::builder()
-                        .buffer(buffer.handle)
-                        .offset(0)
-                        .range(buffer.size)])],
-                &[],
-            )
-        };
-    }
-
     #[cfg(not(debug_assertions))]
     pub fn set_debug_name(
         &self,
@@ -1028,14 +723,76 @@ impl VulkanContext {
             )
         }
     }
+
+    pub fn upload_image(
+        &self,
+        image_buf: &[u8],
+        mip_count: u32,
+        offsets: Vec<vk::DeviceSize>,
+        texture_image: &Image,
+    ) {
+        // Get the image's properties
+        let layer_count = texture_image.layer_count;
+
+        // Create a staging buffer.
+        println!("[HOTHAM_VULKAN] Creating staging buffer..");
+        let usage = vk::BufferUsageFlags::TRANSFER_SRC;
+        let size = image_buf.len();
+        let (staging_buffer, staging_memory, _) = self
+            .create_buffer_with_data(image_buf, usage, size as _)
+            .unwrap();
+        println!("[HOTHAM_VULKAN] ..done!");
+
+        // Copy the buffer into the image
+        let initial_layout = vk::ImageLayout::UNDEFINED;
+        let transfer_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
+        self.transition_image_layout(
+            texture_image.handle,
+            initial_layout,
+            transfer_layout,
+            layer_count,
+            mip_count,
+        );
+
+        println!("[HOTHAM_VULKAN] Copying buffer to image..");
+        self.copy_buffer_to_image(
+            staging_buffer,
+            texture_image,
+            layer_count,
+            mip_count,
+            offsets,
+        );
+
+        // Now transition the image
+        println!("[HOTHAM_VULKAN] ..done! Transitioning image layout..");
+        let final_layout = vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL;
+        self.transition_image_layout(
+            texture_image.handle,
+            transfer_layout,
+            final_layout,
+            layer_count,
+            mip_count,
+        );
+        println!("[HOTHAM_VULKAN] ..done! Freeing staging buffer..");
+
+        // Free the staging buffer
+        unsafe {
+            self.device.destroy_buffer(staging_buffer, None);
+            self.device.free_memory(staging_memory, None);
+        }
+
+        println!("[HOTHAM_VULKAN] ..done!");
+    }
 }
 
 #[allow(unused_variables)]
 #[allow(clippy::ptr_arg)] // https://github.com/rust-lang/rust-clippy/issues/8388
 fn add_device_extension_names(extension_names: &mut Vec<CString>) {
+    extension_names.push(vk::KhrShaderDrawParametersFn::name().to_owned());
+
     // Add Multiview extension
-    #[cfg(target_os = "android")]
     extension_names.push(CString::new("VK_KHR_multiview").unwrap());
+    extension_names.push(CString::new("VK_EXT_descriptor_indexing").unwrap());
 
     // If we're on macOS we've got to add portability
     #[cfg(target_os = "macos")]
@@ -1061,6 +818,7 @@ fn create_command_pool(
 }
 
 // TODO HACK: Make these values real
+#[deprecated]
 fn create_descriptor_pool(device: &Device) -> Result<vk::DescriptorPool, anyhow::Error> {
     let descriptor_pool = unsafe {
         device.create_descriptor_pool(
@@ -1220,7 +978,6 @@ pub fn create_vulkan_device_legacy(
         .collect::<Vec<_>>();
 
     add_device_extension_names(&mut extension_names);
-
     create_vulkan_device(&extension_names, vulkan_instance, physical_device)
 }
 
@@ -1233,10 +990,12 @@ fn create_vulkan_device(
         "[HOTHAM_VULKAN] Using device extensions: {:?}",
         extension_names
     );
+
     let extension_names = extension_names
         .iter()
         .map(|e| e.as_ptr())
         .collect::<Vec<_>>();
+
     let queue_priorities = [1.0];
     let graphics_family_index = unsafe {
         vulkan_instance
@@ -1253,27 +1012,38 @@ fn create_vulkan_device(
             .ok_or(HothamError::EmptyListError)?
     };
 
-    let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
+    let queue_create_info = vk::DeviceQueueCreateInfo::builder()
         .queue_priorities(&queue_priorities)
         .queue_family_index(graphics_family_index)
         .build();
 
-    let queue_create_infos = [graphics_queue_create_info];
+    // We use a *whole bunch* of different features, and somewhat annoyingly they're all enabled in different ways.
+    let enabled_features = vk::PhysicalDeviceFeatures::builder()
+        .multi_draw_indirect(true)
+        .sampler_anisotropy(true)
+        .build();
 
-    let physical_device_features = get_physical_device_features();
-    // TODO: Quest 2?
-    // physical_device_features.shader_storage_image_multisample(true);
+    let mut physical_device_features = vk::PhysicalDeviceVulkan11Features::builder()
+        .multiview(true)
+        .shader_draw_parameters(true);
 
-    let multiview = &mut vk::PhysicalDeviceVulkan11Features {
-        multiview: vk::TRUE,
-        ..Default::default()
-    };
+    let mut descriptor_indexing_features = vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
+        .shader_sampled_image_array_non_uniform_indexing(true)
+        .descriptor_binding_partially_bound(true)
+        .descriptor_binding_variable_descriptor_count(true)
+        .descriptor_binding_sampled_image_update_after_bind(true)
+        .runtime_descriptor_array(true);
+
+    let mut robust_features =
+        vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
 
     let device_create_info = vk::DeviceCreateInfo::builder()
-        .queue_create_infos(&queue_create_infos)
+        .queue_create_infos(slice_from_ref(&queue_create_info))
         .enabled_extension_names(&extension_names)
-        .enabled_features(&physical_device_features)
-        .push_next(multiview);
+        .enabled_features(&enabled_features)
+        .push_next(&mut descriptor_indexing_features)
+        .push_next(&mut robust_features)
+        .push_next(&mut physical_device_features);
 
     let device =
         unsafe { vulkan_instance.create_device(physical_device, &device_create_info, None) }?;
@@ -1283,12 +1053,6 @@ fn create_vulkan_device(
     println!("[HOTHAM_VULKAN] ..done");
 
     Ok((device, graphics_queue, graphics_family_index))
-}
-
-fn get_physical_device_features() -> vk::PhysicalDeviceFeatures {
-    vk::PhysicalDeviceFeatures::builder()
-        .sampler_anisotropy(true)
-        .build()
 }
 
 fn get_stage(
@@ -1339,13 +1103,3 @@ pub fn get_test_physical_device(instance: &AshInstance) -> vk::PhysicalDevice {
         devices[0]
     }
 }
-
-pub const EMPTY_KTX: [u8; 104] = [
-    0xAB, 0x4B, 0x54, 0x58, 0x20, 0x31, 0x31, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A, 0x01, 0x02, 0x03, 0x04,
-    0x01, 0x14, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x08, 0x19, 0x00, 0x00, 0x58, 0x80, 0x00, 0x00,
-    0x08, 0x19, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00,
-    0x1B, 0x00, 0x00, 0x00, 0x4B, 0x54, 0x58, 0x4F, 0x72, 0x69, 0x65, 0x6E, 0x74, 0x61, 0x74, 0x69,
-    0x6F, 0x6E, 0x00, 0x53, 0x3D, 0x72, 0x2C, 0x54, 0x3D, 0x64, 0x2C, 0x52, 0x3D, 0x69, 0x00, 0x00,
-    0x04, 0x00, 0x00, 0x00, 0xFF, 0xFF, 0xFF, 0xFF,
-];

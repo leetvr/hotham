@@ -1,12 +1,10 @@
 use hotham::{
+    asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, Transform},
-    gltf_loader::{self, add_model_to_world},
     hecs::World,
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext},
-    schedule_functions::{
-        begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass, physics_step,
-    },
+    resources::PhysicsContext,
+    schedule_functions::{begin_frame, end_frame, physics_step},
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
         rendering::rendering_system, skinning::skinning_system,
@@ -52,34 +50,11 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
         include_bytes!("../../../test_assets/right_hand.glb"),
         include_bytes!("../../../test_assets/damaged_helmet.glb"),
     ];
-    let models = gltf_loader::load_models_from_glb(
-        &glb_buffers,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )?;
-    add_helmet(
-        &models,
-        &mut world,
-        vulkan_context,
-        render_context,
-        physics_context,
-    );
-    add_hand(
-        &models,
-        Handedness::Left,
-        &mut world,
-        vulkan_context,
-        render_context,
-        physics_context,
-    );
-    add_hand(
-        &models,
-        Handedness::Right,
-        &mut world,
-        vulkan_context,
-        render_context,
-        physics_context,
-    );
+    let models =
+        asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    add_helmet(&models, &mut world, physics_context);
+    add_hand(&models, Handedness::Left, &mut world, physics_context);
+    add_hand(&models, Handedness::Right, &mut world, physics_context);
 
     Ok(world)
 }
@@ -87,19 +62,10 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
 fn add_helmet(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
-    vulkan_context: &mut VulkanContext,
-    render_context: &mut RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
-    let helmet = add_model_to_world(
-        "Damaged Helmet",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .expect("Could not find Damaged Helmet");
+    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
+        .expect("Could not find Damaged Helmet");
     let transform = world.get::<Transform>(helmet).unwrap();
     let position = transform.position();
     drop(transform);
@@ -149,11 +115,10 @@ fn tick(
             &mut queries.roots_query,
             world,
         );
-        skinning_system(&mut queries.joints_query, &mut queries.meshes_query, world);
+        skinning_system(&mut queries.skins_query, world, render_context);
     }
 
     if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
-        begin_pbr_renderpass(xr_context, vulkan_context, render_context);
         rendering_system(
             &mut queries.rendering_query,
             world,
@@ -161,7 +126,6 @@ fn tick(
             xr_context.frame_index,
             render_context,
         );
-        end_pbr_renderpass(xr_context, vulkan_context, render_context);
     }
 
     end_frame(xr_context, vulkan_context, render_context);

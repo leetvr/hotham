@@ -64,7 +64,7 @@ mod tests {
     /// Simple smoke test.
     #[test]
     pub fn apply_haptic_feedback_test() {
-        let (mut xr_context, _) = XrContext::new().unwrap();
+        let (mut xr_context, _) = XrContext::testing();
         let mut haptic_context = HapticContext::default();
 
         apply_haptic_feedback(&mut xr_context, &mut haptic_context);

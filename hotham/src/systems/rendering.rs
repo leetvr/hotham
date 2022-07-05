@@ -1,83 +1,81 @@
 use crate::{
-    components::{Mesh, TransformMatrix, Visible},
+    components::{skin::NO_SKIN, Mesh, Skin, Transform, TransformMatrix, Visible},
+    rendering::resources::DrawData,
+    resources::RenderContext,
     resources::VulkanContext,
-    resources::{render_context::create_push_constant, RenderContext},
 };
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
 
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
+///
+/// Requirements:
+/// - BEFORE: ensure you have called render_context.begin_frame
+/// - AFTER: ensure you have called render_context.end_frame
+#[allow(clippy::type_complexity)]
 pub fn rendering_system(
-    query: &mut PreparedQuery<With<Visible, (&mut Mesh, &TransformMatrix)>>,
+    query: &mut PreparedQuery<With<Visible, (&Mesh, &Transform, &TransformMatrix, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     swapchain_image_index: usize,
-    render_context: &RenderContext,
+    render_context: &mut RenderContext,
 ) {
-    for (_, (mesh, transform_matrix)) in query.query_mut(world) {
-        let device = &vulkan_context.device;
-        let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
+    // First, we need to collect all our draw data
+    unsafe {
+        let draw_data_buffer = &mut render_context.resources.draw_data_buffer;
+        let draw_indirect_buffer = &mut render_context.resources.draw_indirect_buffer;
+        let meshes = &render_context.resources.mesh_data;
+        draw_data_buffer.clear();
+        draw_indirect_buffer.clear();
 
-        unsafe {
-            mesh.ubo_data.transform = transform_matrix.0;
-            mesh.ubo_buffer
-                .update(vulkan_context, &[mesh.ubo_data])
-                .unwrap();
-
-            // Bind mesh descriptor sets
-            device.cmd_bind_descriptor_sets(
-                command_buffer,
-                vk::PipelineBindPoint::GRAPHICS,
-                render_context.pipeline_layout,
-                2,
-                &mesh.descriptor_sets,
-                &[],
-            );
-
+        for (_, (mesh, transform, transform_matrix, skin)) in query.query_mut(world) {
+            let mesh = meshes.get(mesh.handle).unwrap();
+            let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
             for primitive in &mesh.primitives {
-                // Bind vertex and index buffers
-                device.cmd_bind_vertex_buffers(
-                    command_buffer,
-                    0,
-                    &[primitive.vertex_buffer.handle],
-                    &[0],
-                );
-                device.cmd_bind_index_buffer(
-                    command_buffer,
-                    primitive.index_buffer.handle,
-                    0,
-                    vk::IndexType::UINT32,
-                );
-
-                // Bind texture descriptor sets
-                device.cmd_bind_descriptor_sets(
-                    command_buffer,
-                    vk::PipelineBindPoint::GRAPHICS,
-                    render_context.pipeline_layout,
-                    1,
-                    &[primitive.texture_descriptor_set],
-                    &[],
-                );
-
-                // Push constants
-                let material_push_constant = create_push_constant(&primitive.material);
-                device.cmd_push_constants(
-                    command_buffer,
-                    render_context.pipeline_layout,
-                    vk::ShaderStageFlags::FRAGMENT,
-                    0,
-                    material_push_constant,
-                );
-                device.cmd_draw_indexed(command_buffer, primitive.indices_count, 1, 0, 0, 1);
+                draw_data_buffer.push(&DrawData {
+                    transform: transform_matrix.0,
+                    // TODO: better to use the matrix we get from the component's isometry3?
+                    inverse_transpose: transform_matrix.0.try_inverse().unwrap().transpose(),
+                    material_id: primitive.material_id,
+                    skin_id,
+                    bounding_sphere: primitive.get_bounding_sphere(transform),
+                });
+                draw_indirect_buffer.push(&vk::DrawIndexedIndirectCommand {
+                    index_count: primitive.indices_count,
+                    instance_count: 1,
+                    first_index: primitive.index_buffer_offset,
+                    vertex_offset: primitive.vertex_buffer_offset as _,
+                    first_instance: 0,
+                });
             }
         }
     }
+
+    // render_context.cull_objects(vulkan_context, swapchain_image_index);
+    render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
+
+    let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
+    let device = &vulkan_context.device;
+    let draw_indirect_buffer = &render_context.resources.draw_indirect_buffer;
+
+    unsafe {
+        device.cmd_draw_indexed_indirect(
+            command_buffer,
+            draw_indirect_buffer.buffer,
+            0,
+            draw_indirect_buffer.len as _,
+            std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
+        );
+    }
+
+    render_context.end_pbr_render_pass(vulkan_context, swapchain_image_index);
 }
 
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
+    #![allow(deprecated)]
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
     use super::*;
@@ -87,11 +85,9 @@ mod tests {
     use openxr::{Fovf, Quaternionf, Vector3f};
 
     use crate::{
-        buffer::Buffer,
-        gltf_loader,
+        asset_importer,
+        rendering::{image::Image, legacy_buffer::Buffer, swapchain::Swapchain},
         resources::RenderContext,
-        scene_data::SceneParams,
-        swapchain::Swapchain,
         systems::{update_parent_transform_matrix_system, update_transform_matrix_system},
         util::get_from_device_memory,
         COLOR_FORMAT,
@@ -132,12 +128,9 @@ mod tests {
         //     include_bytes!("../../../test_assets/Sponza.bin"),
         // )];
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-        let mut models = gltf_loader::load_models_from_glb(
-            &gltf_data,
-            &vulkan_context,
-            &render_context.descriptor_set_layouts,
-        )
-        .unwrap();
+        let mut models =
+            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
+                .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
         let params = vec![
             ("Normal", 0.0),
@@ -166,12 +159,14 @@ mod tests {
         render_context: &mut RenderContext,
         world: &mut World,
         resolution: vk::Extent2D,
-        image: crate::image::Image,
+        image: Image,
         name: &str,
         debug_view_equation: f32,
     ) {
         // Render the scene
-        schedule(render_context, vulkan_context, debug_view_equation, world);
+        let mut renderdoc = begin_renderdoc();
+        render(render_context, vulkan_context, debug_view_equation, world);
+        end_renderdoc(&mut renderdoc);
 
         // Save the resulting image to the disk and get its hash, along with a "known good" hash
         // of what the image *should* be.
@@ -181,7 +176,7 @@ mod tests {
     fn save_image_to_disk(
         resolution: vk::Extent2D,
         vulkan_context: &VulkanContext,
-        image: crate::image::Image,
+        image: Image,
         name: &str,
     ) {
         let size = (resolution.height * resolution.width * 4) as usize;
@@ -219,12 +214,10 @@ mod tests {
         let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
         let known_good_hash = hash_file(&known_good_path);
 
-        //  TODO: Fix this on non-windows platforms.
-        #[cfg(target_os = "windows")]
         assert_eq!(output_hash, known_good_hash, "Bad render: {}", name);
     }
 
-    fn schedule(
+    fn render(
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
         debug_view_equation: f32,
@@ -260,21 +253,9 @@ mod tests {
             },
         };
         let views = vec![view.clone(), view];
-        render_context
-            .update_scene_data(&views, &vulkan_context)
-            .unwrap();
-        render_context
-            .scene_params_buffer
-            .update(
-                &vulkan_context,
-                &[SceneParams {
-                    debug_view_equation,
-                    ..Default::default()
-                }],
-            )
-            .unwrap();
-        render_context.begin_frame(&vulkan_context, 0);
-        render_context.begin_pbr_render_pass(&vulkan_context, 0);
+        render_context.begin_frame(vulkan_context, 0);
+        render_context.scene_data.debug_data.y = debug_view_equation;
+        render_context.update_scene_data(&views).unwrap();
         update_transform_matrix_system(&mut Default::default(), world);
         update_parent_transform_matrix_system(
             &mut Default::default(),
@@ -288,8 +269,7 @@ mod tests {
             0,
             render_context,
         );
-        render_context.end_pbr_render_pass(&vulkan_context, 0);
-        render_context.end_frame(&vulkan_context, 0);
+        render_context.end_frame(vulkan_context, 0);
     }
 
     fn hash_file(file_path: &str) -> u64 {
@@ -297,5 +277,20 @@ mod tests {
         let bytes = std::fs::read(&file_path).unwrap();
         bytes.iter().for_each(|b| hasher.write_u8(*b));
         return hasher.finish();
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    use renderdoc::RenderDoc;
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    fn begin_renderdoc() -> RenderDoc<renderdoc::V141> {
+        let mut renderdoc = RenderDoc::<renderdoc::V141>::new().unwrap();
+        renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
+        renderdoc
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
+    fn end_renderdoc(renderdoc: &mut RenderDoc<renderdoc::V141>) {
+        let _ = renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
     }
 }
