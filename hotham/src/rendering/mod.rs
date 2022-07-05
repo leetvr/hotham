@@ -1,8 +1,8 @@
-/// Buffers are used to transfer data to the GPU
-pub mod buffer;
+/// Legacy wrapper around GPU buffers
+pub mod legacy_buffer;
 
 /// Buffers are used to transfer data to the GPU
-pub mod gambier_buffer;
+pub mod buffer;
 
 /// Functionality for interacting with GPU memory
 pub mod memory;

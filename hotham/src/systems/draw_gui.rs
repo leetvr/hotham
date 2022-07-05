@@ -71,7 +71,7 @@ mod tests {
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
-        rendering::{buffer::Buffer, image::Image, swapchain::Swapchain},
+        rendering::{image::Image, legacy_buffer::Buffer, swapchain::Swapchain},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
             rendering_system, update_parent_transform_matrix_system, update_transform_matrix_system,

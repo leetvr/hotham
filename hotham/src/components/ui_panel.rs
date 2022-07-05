@@ -9,7 +9,7 @@ use rapier3d::prelude::{ColliderBuilder, InteractionGroups};
 const BUFFER_SIZE: usize = 1024;
 
 use crate::components::Panel;
-use crate::rendering::buffer::Buffer;
+use crate::rendering::legacy_buffer::Buffer;
 use crate::resources::gui_context::SCALE_FACTOR;
 use crate::resources::physics_context::PANEL_COLLISION_GROUP;
 use crate::resources::{GuiContext, PhysicsContext};

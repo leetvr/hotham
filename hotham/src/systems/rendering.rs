@@ -84,7 +84,7 @@ mod tests {
 
     use crate::{
         asset_importer,
-        rendering::{buffer::Buffer, image::Image, swapchain::Swapchain},
+        rendering::{image::Image, legacy_buffer::Buffer, swapchain::Swapchain},
         resources::RenderContext,
         systems::{update_parent_transform_matrix_system, update_transform_matrix_system},
         util::get_from_device_memory,

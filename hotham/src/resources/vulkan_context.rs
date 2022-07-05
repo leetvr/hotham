@@ -26,6 +26,7 @@ pub struct VulkanContext {
     pub command_pool: vk::CommandPool,
     pub queue_family_index: u32,
     pub graphics_queue: vk::Queue,
+    #[deprecated]
     pub descriptor_pool: vk::DescriptorPool,
     pub debug_utils: DebugUtils,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
@@ -330,6 +331,7 @@ impl VulkanContext {
     }
 
     /// Create a Vulkan buffer filled with the contents of `data`.
+    #[deprecated]
     pub fn create_buffer_with_data<T: Sized + Copy>(
         &self,
         data: &[T],
@@ -355,6 +357,7 @@ impl VulkanContext {
         Ok((buffer, device_memory, device_memory_size))
     }
 
+    #[deprecated]
     pub fn update_buffer<T: Sized + Copy>(
         &self,
         data: &[T],
@@ -383,6 +386,7 @@ impl VulkanContext {
         Ok(())
     }
 
+    #[deprecated]
     pub fn get_alignment_info<T: Sized>(
         &self,
         original_size: vk::DeviceSize,
@@ -423,6 +427,7 @@ impl VulkanContext {
         ))
     }
 
+    #[deprecated]
     fn allocate_buffer_memory(
         &self,
         buffer: vk::Buffer,
@@ -434,6 +439,7 @@ impl VulkanContext {
         self.allocate_memory(memory_requirements, properties)
     }
 
+    #[deprecated]
     fn allocate_image_memory(
         &self,
         image: vk::Image,
@@ -443,6 +449,7 @@ impl VulkanContext {
         self.allocate_memory(memory_requirements, properties)
     }
 
+    #[deprecated]
     fn allocate_memory(
         &self,
         memory_requirements: vk::MemoryRequirements,
@@ -809,6 +816,7 @@ fn create_command_pool(
 }
 
 // TODO HACK: Make these values real
+#[deprecated]
 fn create_descriptor_pool(device: &Device) -> Result<vk::DescriptorPool, anyhow::Error> {
     let descriptor_pool = unsafe {
         device.create_descriptor_pool(

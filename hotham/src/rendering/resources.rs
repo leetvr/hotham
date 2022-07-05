@@ -6,8 +6,8 @@ use vulkan_context::VulkanContext;
 use crate::resources::vulkan_context;
 
 use super::{
-    descriptors::Descriptors, gambier_buffer::GambierBuffer as Buffer, image::Image,
-    material::Material, mesh_data::MeshData, scene_data::SceneData, vertex::Vertex,
+    buffer::Buffer, descriptors::Descriptors, image::Image, material::Material,
+    mesh_data::MeshData, scene_data::SceneData, vertex::Vertex,
 };
 
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
