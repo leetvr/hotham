@@ -15,18 +15,13 @@ pub fn hands_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
+    let input = &xr_context.input;
     for (_, (hand, animation_controller, rigid_body_component)) in query.query(world).iter() {
         // Get our the space and path of the hand.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, path) = match hand.handedness {
-            Handedness::Left => (
-                &xr_context.left_hand_space,
-                xr_context.left_hand_subaction_path,
-            ),
-            Handedness::Right => (
-                &xr_context.right_hand_space,
-                xr_context.right_hand_subaction_path,
-            ),
+            Handedness::Left => (&input.left_hand_space, input.left_hand_subaction_path),
+            Handedness::Right => (&input.right_hand_space, input.right_hand_subaction_path),
         };
 
         // Locate the hand in the space.
@@ -55,10 +50,9 @@ pub fn hands_system(
         }
 
         // get grip value
-        let grip_value =
-            openxr::ActionInput::get(&xr_context.grab_action, &xr_context.session, path)
-                .unwrap()
-                .current_state;
+        let grip_value = openxr::ActionInput::get(&input.grab_action, &xr_context.session, path)
+            .unwrap()
+            .current_state;
 
         // Apply to Hand
         hand.grip_value = grip_value;
