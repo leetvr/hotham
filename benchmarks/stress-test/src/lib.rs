@@ -34,7 +34,7 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let test = StressTest::ManyVertices;
+    let test = StressTest::ManyHelmets;
     let (world, models) = init(&mut engine, &test);
     let queries = Default::default();
     let timer = Default::default();
