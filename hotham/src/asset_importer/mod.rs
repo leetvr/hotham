@@ -437,6 +437,15 @@ mod tests {
     }
 
     #[test]
+    fn test_load_model_with_no_material() {
+        let (mut render_context, vulkan_context) = RenderContext::testing();
+        let data: Vec<&[u8]> = vec![
+            include_bytes!("../../../test_assets/box_no_material.glb"),
+        ];
+        let _models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
+    }
+
+    #[test]
     pub fn test_hand() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
 
