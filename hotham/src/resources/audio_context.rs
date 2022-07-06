@@ -153,6 +153,10 @@ impl AudioContext {
         };
     }
 
+    pub(crate) fn update_listener_rotation(&mut self, rotation: mint::Quaternion<f32>) {
+        self.scene_handle.control().set_listener_rotation(rotation);
+    }
+
     /// Add a music track
     pub fn add_music_track(&mut self, mp3_bytes: Vec<u8>) -> MusicTrack {
         println!("[AUDIO_CONTEXT] Decoding MP3..");
