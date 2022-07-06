@@ -1,15 +1,18 @@
 use anyhow::Result;
 use ash::vk::{self, Handle};
 use openxr::{
-    self as xr, Action, ActionSet, EventDataBuffer, FrameStream, FrameWaiter, Path, Posef, Session,
-    SessionState, Space, Swapchain, Vulkan,
+    self as xr, EventDataBuffer, FrameStream, FrameWaiter, Session, SessionState, Space, Swapchain,
+    Vulkan,
 };
 use xr::{
-    vulkan::SessionCreateInfo, Duration, FrameState, Haptic, ReferenceSpaceType,
-    SwapchainCreateFlags, SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
+    vulkan::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType, SwapchainCreateFlags,
+    SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
 };
 
 use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
+
+mod input;
+use input::Input;
 
 #[derive(Default)]
 pub struct XrContextBuilder<'a> {
@@ -64,17 +67,7 @@ pub struct XrContext {
     pub swapchain: Swapchain<Vulkan>,
     pub stage_space: Space,
     pub view_space: Space,
-    pub action_set: ActionSet,
-    pub pose_action: Action<Posef>,
-    pub grab_action: Action<f32>,
-    pub trigger_action: Action<f32>,
-    pub haptic_feedback_action: Action<Haptic>,
-    pub left_hand_space: Space,
-    pub left_hand_subaction_path: Path,
-    pub left_pointer_space: Space,
-    pub right_hand_space: Space,
-    pub right_hand_subaction_path: Path,
-    pub right_pointer_space: Space,
+    pub input: Input,
     pub swapchain_resolution: vk::Extent2D,
     pub frame_waiter: FrameWaiter,
     pub frame_stream: FrameStream<Vulkan>,
@@ -115,106 +108,7 @@ impl XrContext {
         let swapchain_resolution = get_swapchain_resolution(&instance, system)?;
         let swapchain = create_xr_swapchain(&session, &swapchain_resolution, VIEW_COUNT)?;
 
-        // Create an action set to encapsulate our actions
-        let action_set = instance.create_action_set("input", "input pose information", 0)?;
-
-        let left_hand_subaction_path = instance.string_to_path("/user/hand/left").unwrap();
-        let right_hand_subaction_path = instance.string_to_path("/user/hand/right").unwrap();
-        let left_hand_pose_path = instance
-            .string_to_path("/user/hand/left/input/grip/pose")
-            .unwrap();
-        let left_pointer_path = instance
-            .string_to_path("/user/hand/left/input/aim/pose")
-            .unwrap();
-        let right_hand_pose_path = instance
-            .string_to_path("/user/hand/right/input/grip/pose")
-            .unwrap();
-        let right_pointer_path = instance
-            .string_to_path("/user/hand/right/input/aim/pose")
-            .unwrap();
-
-        let left_hand_grip_squeeze_path = instance
-            .string_to_path("/user/hand/left/input/squeeze/value")
-            .unwrap();
-        let left_hand_grip_trigger_path = instance
-            .string_to_path("/user/hand/left/input/trigger/value")
-            .unwrap();
-        let left_hand_haptic_feedback_path = instance
-            .string_to_path("/user/hand/left/output/haptic")
-            .unwrap();
-
-        let right_hand_grip_squeeze_path = instance
-            .string_to_path("/user/hand/right/input/squeeze/value")
-            .unwrap();
-        let right_hand_grip_trigger_path = instance
-            .string_to_path("/user/hand/right/input/trigger/value")
-            .unwrap();
-        let right_hand_haptic_feedback_path = instance
-            .string_to_path("/user/hand/right/output/haptic")
-            .unwrap();
-
-        let pose_action = action_set.create_action::<xr::Posef>(
-            "hand_pose",
-            "Hand Pose",
-            &[left_hand_subaction_path, right_hand_subaction_path],
-        )?;
-
-        let aim_action = action_set.create_action::<xr::Posef>(
-            "pointer_pose",
-            "Pointer Pose",
-            &[left_hand_subaction_path, right_hand_subaction_path],
-        )?;
-
-        let trigger_action = action_set.create_action::<f32>(
-            "trigger_pulled",
-            "Pull Trigger",
-            &[left_hand_subaction_path, right_hand_subaction_path],
-        )?;
-
-        let grab_action = action_set.create_action::<f32>(
-            "grab_object",
-            "Grab Object",
-            &[left_hand_subaction_path, right_hand_subaction_path],
-        )?;
-
-        let haptic_feedback_action = action_set.create_action::<Haptic>(
-            "haptic_feedback",
-            "Haptic Feedback",
-            &[left_hand_subaction_path, right_hand_subaction_path],
-        )?;
-
-        // Bind our actions to input devices using the given profile
-        instance.suggest_interaction_profile_bindings(
-            instance
-                .string_to_path("/interaction_profiles/oculus/touch_controller")
-                .unwrap(),
-            &[
-                xr::Binding::new(&pose_action, left_hand_pose_path),
-                xr::Binding::new(&pose_action, right_hand_pose_path),
-                xr::Binding::new(&aim_action, left_pointer_path),
-                xr::Binding::new(&aim_action, right_pointer_path),
-                xr::Binding::new(&grab_action, left_hand_grip_squeeze_path),
-                xr::Binding::new(&grab_action, right_hand_grip_squeeze_path),
-                xr::Binding::new(&trigger_action, left_hand_grip_trigger_path),
-                xr::Binding::new(&trigger_action, right_hand_grip_trigger_path),
-                xr::Binding::new(&grab_action, right_hand_grip_squeeze_path),
-                xr::Binding::new(&haptic_feedback_action, left_hand_haptic_feedback_path),
-                xr::Binding::new(&haptic_feedback_action, right_hand_haptic_feedback_path),
-            ],
-        )?;
-
-        let left_hand_space =
-            pose_action.create_space(session.clone(), left_hand_subaction_path, Posef::IDENTITY)?;
-        let left_pointer_space =
-            aim_action.create_space(session.clone(), left_hand_subaction_path, Posef::IDENTITY)?;
-
-        let right_hand_space = pose_action.create_space(
-            session.clone(),
-            right_hand_subaction_path,
-            Posef::IDENTITY,
-        )?;
-        let right_pointer_space =
-            aim_action.create_space(session.clone(), left_hand_subaction_path, Posef::IDENTITY)?;
+        let input = Input::oculus_touch_controller(&instance, &session)?;
 
         let frame_state = FrameState {
             predicted_display_time: Time::from_nanos(0),
@@ -223,7 +117,8 @@ impl XrContext {
         };
 
         // Attach the action set to the session
-        session.attach_action_sets(&[&action_set])?;
+        session.attach_action_sets(&[&input.action_set])?;
+
         let xr_context = XrContext {
             instance,
             session,
@@ -231,17 +126,7 @@ impl XrContext {
             swapchain,
             stage_space,
             view_space,
-            action_set,
-            pose_action,
-            trigger_action,
-            grab_action,
-            haptic_feedback_action,
-            left_hand_space,
-            left_pointer_space,
-            left_hand_subaction_path,
-            right_hand_space,
-            right_pointer_space,
-            right_hand_subaction_path,
+            input,
             swapchain_resolution,
             frame_waiter,
             frame_stream,

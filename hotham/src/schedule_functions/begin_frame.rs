@@ -13,7 +13,7 @@ pub fn begin_frame(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) {
-    let active_action_set = ActiveActionSet::new(&xr_context.action_set);
+    let active_action_set = ActiveActionSet::new(&xr_context.input.action_set);
     xr_context
         .session
         .sync_actions(&[active_action_set])
