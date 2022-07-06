@@ -75,12 +75,14 @@ impl Resources {
         );
         draw_data_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 0);
 
-        let materials_buffer = Buffer::new(
+        let mut materials_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::STORAGE_BUFFER,
             MATERIAL_BUFFER_SIZE,
         );
         materials_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 1);
+        // RESERVE index 0 for the default material, available as the material::NO_MATERIAL constant.
+        materials_buffer.push(&Material::default());
 
         let draw_indirect_buffer = Buffer::new(
             vulkan_context,
