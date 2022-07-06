@@ -26,24 +26,35 @@ pub use update_rigid_body_transforms::update_rigid_body_transforms_system;
 pub use update_transform_matrix::update_transform_matrix_system;
 
 use crate::components::{
-    AnimationController, AnimationTarget, Collider, Hand, Info, Joint, Mesh, Panel, Parent,
-    Pointer, RigidBody, Skin, SoundEmitter, Transform, TransformMatrix, UIPanel, Visible,
+    AnimationController, Collider, Hand, Info, Joint, Mesh, Panel, Parent, Pointer, RigidBody,
+    Skin, SoundEmitter, Transform, TransformMatrix, UIPanel, Visible,
 };
 use hecs::{PreparedQuery, With, Without};
 
 /// Queries used by `system`s in Hotham
 #[derive(Default)]
 pub struct Queries<'a> {
-    pub animation_query: PreparedQuery<(&'a mut AnimationTarget, &'a mut Transform)>,
+    pub animation_query: PreparedQuery<&'a AnimationController>,
     pub audio_query: PreparedQuery<(&'a mut SoundEmitter, &'a RigidBody)>,
     pub collision_query: PreparedQuery<&'a mut Collider>,
     pub draw_gui_query: PreparedQuery<(&'a mut Panel, &'a mut UIPanel)>,
     pub grabbing_query: PreparedQuery<(&'a mut Hand, &'a Collider)>,
     pub hands_query: PreparedQuery<(&'a mut Hand, &'a mut AnimationController, &'a mut RigidBody)>,
     pub joints_query: PreparedQuery<(&'a TransformMatrix, &'a Joint, &'a Info)>,
-    pub meshes_query: PreparedQuery<(&'a mut Mesh, &'a Skin)>,
+    pub skins_query: PreparedQuery<(&'a Skin, &'a TransformMatrix)>,
     pub parent_query: PreparedQuery<&'a Parent>,
-    pub rendering_query: PreparedQuery<With<Visible, (&'a mut Mesh, &'a TransformMatrix)>>,
+    #[allow(clippy::type_complexity)]
+    pub rendering_query: PreparedQuery<
+        With<
+            Visible,
+            (
+                &'a Mesh,
+                &'a Transform,
+                &'a TransformMatrix,
+                Option<&'a Skin>,
+            ),
+        >,
+    >,
     pub roots_query: PreparedQuery<Without<Parent, &'a TransformMatrix>>,
     pub update_rigid_body_transforms_query: PreparedQuery<(&'a RigidBody, &'a mut Transform)>,
     pub update_transform_matrix_query: PreparedQuery<(&'a Transform, &'a mut TransformMatrix)>,

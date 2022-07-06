@@ -1,13 +1,14 @@
-use std::marker::PhantomData;
+#![allow(deprecated)]
 
 use anyhow::Result;
 use ash::vk;
+use std::marker::PhantomData;
 
 use crate::resources::VulkanContext;
 
-// TODO: Let Buffer<T> own the data
 /// A thin wrapper around `vk::Buffer`
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[deprecated]
 pub struct Buffer<T> {
     /// Handle to the underlying buffer
     pub handle: vk::Buffer,

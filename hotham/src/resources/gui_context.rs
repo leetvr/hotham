@@ -1,13 +1,14 @@
+#![allow(deprecated)]
 use ash::vk::{self, Handle};
+use vk_shader_macros::include_glsl;
 
 /// How much the GUI should be scaled by
-// TODO - this this necessary?
+// TODO - is this necessary?
 pub const SCALE_FACTOR: f32 = 3.;
 
 use crate::{
     components::{panel::PanelInput, Panel, UIPanel},
     resources::render_context::{create_push_constant, CLEAR_VALUES},
-    texture::Texture,
     COLOR_FORMAT,
 };
 
@@ -20,7 +21,7 @@ pub struct GuiContext {
     pub(crate) render_pass: vk::RenderPass,
     pub(crate) pipeline: vk::Pipeline,
     pub(crate) pipeline_layout: vk::PipelineLayout,
-    pub(crate) font_texture_descriptor_sets: Vec<vk::DescriptorSet>,
+    pub(crate) font_texture_descriptor_set: vk::DescriptorSet,
     pub(crate) font_texture_version: u64,
 }
 
@@ -151,7 +152,7 @@ impl GuiContext {
 
             // Vertex shader stage
             let (vertex_shader, vertex_stage) = create_shader(
-                include_bytes!("../../shaders/gui.vert.spv"),
+                include_glsl!("src/shaders/gui.vert"),
                 vk::ShaderStageFlags::VERTEX,
                 vulkan_context,
             )
@@ -159,7 +160,7 @@ impl GuiContext {
 
             // Fragment shader stage
             let (fragment_shader, fragment_stage) = create_shader(
-                include_bytes!("../../shaders/gui.frag.spv"),
+                include_glsl!("src/shaders/gui.frag"),
                 vk::ShaderStageFlags::FRAGMENT,
                 vulkan_context,
             )
@@ -252,7 +253,7 @@ impl GuiContext {
             render_pass,
             pipeline,
             pipeline_layout,
-            font_texture_descriptor_sets,
+            font_texture_descriptor_set: font_texture_descriptor_sets[0],
             font_texture_version: 0,
         }
     }
@@ -260,7 +261,7 @@ impl GuiContext {
     pub(crate) fn paint_gui(
         &mut self,
         vulkan_context: &VulkanContext,
-        render_context: &RenderContext,
+        render_context: &mut RenderContext,
         current_swapchain_image_index: usize,
         ui_panel: &mut UIPanel,
         panel: &mut Panel,
@@ -320,10 +321,11 @@ impl GuiContext {
 
         let texture = &egui_context.fonts().texture();
         if texture.version != self.font_texture_version {
-            let _font_texture = update_font_texture(
+            update_font_texture(
                 vulkan_context,
+                render_context,
                 texture,
-                self.font_texture_descriptor_sets[0],
+                self.font_texture_descriptor_set,
             );
             self.font_texture_version = texture.version;
         }
@@ -393,7 +395,7 @@ impl GuiContext {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                &self.font_texture_descriptor_sets,
+                std::slice::from_ref(&self.font_texture_descriptor_set),
                 &[],
             );
         }
@@ -488,9 +490,11 @@ fn handle_panel_input(
 
 fn update_font_texture(
     vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
     texture: &egui::Texture,
     descriptor_set: vk::DescriptorSet,
-) -> Texture {
+) {
+    println!("[HOTHAM_DRAW_GUI] Updating font texture..");
     unsafe {
         vulkan_context
             .device
@@ -504,27 +508,36 @@ fn update_font_texture(
         .flat_map(|&r| vec![r, r, r, r])
         .collect::<Vec<_>>();
 
-    let texture = Texture::new(
-        "Font texture",
-        vulkan_context,
-        &image_buf,
-        texture.width as u32,
-        texture.height as u32,
-        COLOR_FORMAT,
-    )
-    .expect("Unable to create font texture");
+    let image = vulkan_context
+        .create_image(
+            COLOR_FORMAT,
+            &vk::Extent2D {
+                width: texture.width as _,
+                height: texture.height as _,
+            },
+            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            1,
+            1,
+        )
+        .unwrap();
+    vulkan_context.upload_image(&image_buf, 1, vec![0], &image);
+
+    let image_info = vk::DescriptorImageInfo {
+        sampler: render_context.resources.texture_sampler,
+        image_view: image.view,
+        image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+    };
+
+    let texture_write = vk::WriteDescriptorSet::builder()
+        .image_info(std::slice::from_ref(&image_info))
+        .dst_binding(0)
+        .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+        .dst_set(descriptor_set);
 
     unsafe {
-        vulkan_context.device.update_descriptor_sets(
-            &[vk::WriteDescriptorSet::builder()
-                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                .dst_set(descriptor_set)
-                .image_info(&[texture.descriptor])
-                .dst_binding(0)
-                .build()],
-            &[],
-        );
+        vulkan_context
+            .device
+            .update_descriptor_sets(std::slice::from_ref(&texture_write), &[]);
     }
-
-    texture
+    println!("[HOTHAM_DRAW_GUI] Done!");
 }

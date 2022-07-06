@@ -1,22 +1,16 @@
 use hotham::nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
 use hotham::{
+    asset_importer::{add_model_to_world, Models},
     components::RigidBody,
-    gltf_loader::{add_model_to_world, Models},
     hecs::{Entity, PreparedQuery, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    resources::{vulkan_context::VulkanContext, PhysicsContext, RenderContext, XrContext},
+    resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
 
 use crate::components::{Color, Saber};
 
 const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
-/* Original matrix
-    -0.5581498959847122,
-    0.8274912503663805,
-    0.03413791007514528,
-    -0.05061153302400824,
-*/
 const ROTATION_OFFSET: Quaternion<f32> =
     Quaternion::new(-0.558_149_8, 0.827_491_2, 0.034_137_9, -0.050_611_5);
 
@@ -31,18 +25,13 @@ pub fn sabers_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
+    let input = &xr_context.input;
     for (_, (color, rigid_body)) in query.query_mut(world) {
         // Get our the space and path of the hand.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, _) = match color {
-            Color::Red => (
-                &xr_context.left_hand_space,
-                xr_context.left_hand_subaction_path,
-            ),
-            Color::Blue => (
-                &xr_context.right_hand_space,
-                xr_context.right_hand_subaction_path,
-            ),
+            Color::Red => (&input.left_hand_space, input.left_hand_subaction_path),
+            Color::Blue => (&input.right_hand_space, input.right_hand_subaction_path),
         };
 
         // Locate the hand in the space.
@@ -70,23 +59,13 @@ pub fn add_saber(
     color: Color,
     models: &Models,
     world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
 ) -> Entity {
     let model_name = match color {
         Color::Blue => "Blue Saber",
         Color::Red => "Red Saber",
     };
-    let saber = add_model_to_world(
-        model_name,
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
+    let saber = add_model_to_world(model_name, models, world, None).unwrap();
     add_saber_physics(world, physics_context, saber);
     world.insert(saber, (Saber {}, color)).unwrap();
     saber

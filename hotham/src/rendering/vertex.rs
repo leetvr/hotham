@@ -10,9 +10,7 @@ pub struct Vertex {
     /// Normal in model space
     pub normal: Vector3<f32>,
     /// First set of texture coordinates
-    pub texture_coords_0: Vector2<f32>,
-    /// Second set of texture coordinates
-    pub texture_coords_1: Vector2<f32>,
+    pub texture_coords: Vector2<f32>,
     /// Joint indices (for skinning)
     pub joint_indices: Vector4<f32>,
     /// Joint weights (for skinning)
@@ -24,16 +22,14 @@ impl Vertex {
     pub fn new(
         position: Vector3<f32>,
         normal: Vector3<f32>,
-        texture_coords_0: Vector2<f32>,
-        texture_coords_1: Vector2<f32>,
+        texture_coords: Vector2<f32>,
         joint_indices: Vector4<f32>,
         joint_weights: Vector4<f32>,
     ) -> Self {
         Self {
             position,
-            texture_coords_0,
-            texture_coords_1,
             normal,
+            texture_coords,
             joint_indices,
             joint_weights,
         }
@@ -47,12 +43,11 @@ impl Vertex {
             Vector3<f32>,
             Vector3<f32>,
             Vector2<f32>,
-            Vector2<f32>,
             Vector4<f32>,
             Vector4<f32>,
         ),
     ) -> Self {
-        Vertex::new(t.0, t.1, t.2, t.3, t.4, t.5)
+        Vertex::new(t.0, t.1, t.2, t.3, t.4)
     }
 }
 
@@ -73,30 +68,23 @@ impl Vertex {
             .offset(memoffset::offset_of!(Vertex, normal) as _)
             .build();
 
-        let texture_coords_0 = vk::VertexInputAttributeDescription::builder()
+        let texture_coords = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(2)
             .format(vk::Format::R32G32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, texture_coords_0) as _)
-            .build();
-
-        let texture_coords_1 = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(3)
-            .format(vk::Format::R32G32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, texture_coords_1) as _)
+            .offset(memoffset::offset_of!(Vertex, texture_coords) as _)
             .build();
 
         let joint_indices = vk::VertexInputAttributeDescription::builder()
             .binding(0)
-            .location(4)
+            .location(3)
             .format(vk::Format::R32G32B32A32_SFLOAT)
             .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
             .build();
 
         let joint_weights = vk::VertexInputAttributeDescription::builder()
             .binding(0)
-            .location(5)
+            .location(4)
             .format(vk::Format::R32G32B32A32_SFLOAT)
             .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
             .build();
@@ -104,8 +92,7 @@ impl Vertex {
         vec![
             position,
             normal,
-            texture_coords_0,
-            texture_coords_1,
+            texture_coords,
             joint_indices,
             joint_weights,
         ]

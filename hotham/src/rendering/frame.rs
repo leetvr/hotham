@@ -6,9 +6,13 @@ use anyhow::Result;
 /// A container for all the resources necessary to render a single frame.
 #[derive(Debug, Clone)]
 pub struct Frame {
+    /// The fence used to signal when the frame has completed rendering
     pub fence: vk::Fence,
+    /// A command buffer used to record commands
     pub command_buffer: vk::CommandBuffer,
+    /// A framebuffer to write the final image to
     pub framebuffer: vk::Framebuffer,
+    /// The image view we've been handed from the swapchain
     pub swapchain_image_view: vk::ImageView,
 }
 

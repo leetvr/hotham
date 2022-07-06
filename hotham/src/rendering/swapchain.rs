@@ -2,8 +2,11 @@ use anyhow::Result;
 use ash::vk::{self, Handle};
 use openxr::{Swapchain as SwapchainHandle, Vulkan};
 
+/// A thin conatiner for the contents of the swapchain
 pub struct Swapchain {
+    /// The resolution of the swapchain
     pub resolution: vk::Extent2D,
+    /// The images held in the swapchain
     pub images: Vec<vk::Image>,
 }
 
