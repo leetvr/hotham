@@ -7,3 +7,6 @@ sponza*
 
 # Ignore logs
 *.log
+
+# Ignore ktx2
+*.ktx2
