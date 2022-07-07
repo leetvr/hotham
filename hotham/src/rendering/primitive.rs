@@ -1,5 +1,7 @@
 use crate::{
-    asset_importer::ImportContext, components::Transform, rendering::vertex::Vertex,
+    asset_importer::ImportContext,
+    components::Transform,
+    rendering::{material::NO_MATERIAL, vertex::Vertex},
     resources::render_context,
 };
 use itertools::izip;
@@ -125,11 +127,7 @@ impl Primitive {
         // All the materials in this glTF file will be imported into the material buffer, so all we need
         // to do is grab the index of this material and add it to the running offset. If we don't do this,
         // importing multiple glTF files will result in sadness, misery, and really ugly looking scenes.
-        let material_id = primitive_data
-            .material()
-            .index()
-            .expect("Primitives without materials are not yet supported!")
-            as u32
+        let material_id = primitive_data.material().index().unwrap_or(NO_MATERIAL) as u32
             + import_context.material_buffer_offset;
 
         Primitive::new(

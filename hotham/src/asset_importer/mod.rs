@@ -336,6 +336,8 @@ pub fn add_model_to_world(
     Some(new_root_entity)
 }
 
+// These tests are disabled for other platforms
+// https://github.com/leetvr/hotham/issues/240
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
@@ -435,6 +437,13 @@ mod tests {
             assert_eq!(&info.name, *name);
             assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
         }
+    }
+
+    #[test]
+    fn test_load_model_with_no_material() {
+        let (mut render_context, vulkan_context) = RenderContext::testing();
+        let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/box_no_material.glb")];
+        let _models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
     }
 
     #[test]

@@ -13,6 +13,9 @@ pub static SPECULAR_GLOSSINESS_WORKFLOW: u32 = 1;
 /// Tells the fragment shader to use the unlit workflow
 pub static UNLIT_WORKFLOW: u32 = 2;
 
+/// Material index into the default material
+pub static NO_MATERIAL: usize = 0;
+
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
 #[repr(C, align(16))]

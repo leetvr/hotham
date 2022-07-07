@@ -35,18 +35,13 @@ pub fn pointers_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
+    let input = &xr_context.input;
     for (_, (pointer, transform)) in query.query(world).iter() {
         // Get our the space and path of the pointer.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, path) = match pointer.handedness {
-            Handedness::Left => (
-                &xr_context.left_hand_space,
-                xr_context.left_hand_subaction_path,
-            ),
-            Handedness::Right => (
-                &xr_context.right_hand_space,
-                xr_context.right_hand_subaction_path,
-            ),
+            Handedness::Left => (&input.left_hand_space, input.left_hand_subaction_path),
+            Handedness::Right => (&input.right_hand_space, input.right_hand_subaction_path),
         };
 
         // Locate the pointer in the space.
@@ -66,7 +61,7 @@ pub fn pointers_system(
 
         // get trigger value
         let trigger_value =
-            openxr::ActionInput::get(&xr_context.trigger_action, &xr_context.session, path)
+            openxr::ActionInput::get(&input.trigger_action, &xr_context.session, path)
                 .unwrap()
                 .current_state;
         pointer.trigger_value = trigger_value;

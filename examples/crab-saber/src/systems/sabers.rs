@@ -25,18 +25,13 @@ pub fn sabers_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
+    let input = &xr_context.input;
     for (_, (color, rigid_body)) in query.query_mut(world) {
         // Get our the space and path of the hand.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, _) = match color {
-            Color::Red => (
-                &xr_context.left_hand_space,
-                xr_context.left_hand_subaction_path,
-            ),
-            Color::Blue => (
-                &xr_context.right_hand_space,
-                xr_context.right_hand_subaction_path,
-            ),
+            Color::Red => (&input.left_hand_space, input.left_hand_subaction_path),
+            Color::Blue => (&input.right_hand_space, input.right_hand_subaction_path),
         };
 
         // Locate the hand in the space.
