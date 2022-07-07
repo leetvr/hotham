@@ -43,7 +43,7 @@ const float c_MinRoughness = 0.04;
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
 const float PBR_WORKFLOW_SPECULAR_GLOSINESS = 1.0f;
 const float PBR_WORKFLOW_UNLIT = 2.0f;
-#define MANUAL_SRGB 1
+#define MANUAL_SRGB 0
 
 vec3 Uncharted2Tonemap(vec3 color)
 {
@@ -64,28 +64,18 @@ vec4 tonemap(vec4 color)
 	return vec4(pow(outcol, vec3(1.0f / DEFAULT_GAMMA)), color.a);
 }
 
-// TODO: Is there a builtin for this?
-vec4 SRGBtoLINEAR(vec4 srgbIn)
-{
-	#ifdef MANUAL_SRGB
-	#ifdef SRGB_FAST_APPROXIMATION
-	vec3 linOut = pow(srgbIn.xyz,vec3(2.2));
-	#else //SRGB_FAST_APPROXIMATION
-	vec3 bLess = step(vec3(0.04045),srgbIn.xyz);
-	vec3 linOut = mix( srgbIn.xyz/vec3(12.92), pow((srgbIn.xyz+vec3(0.055))/vec3(1.055),vec3(2.4)), bLess );
-	#endif //SRGB_FAST_APPROXIMATION
-	return vec4(linOut,srgbIn.w);;
-	#else //MANUAL_SRGB
-	return srgbIn;
-	#endif //MANUAL_SRGB
-}
-
 // Find the normal for this fragment, pulling either from a predefined normal map
 // or from the interpolated mesh normal and tangent attributes.
 vec3 getNormal(uint normalTextureID)
 {
-	// Perturb normal, see http://www.thetenthplanet.de/archives/1180
-	vec3 tangentNormal = texture(textures[normalTextureID], inUV).xyz * 2.0 - 1.0;
+	// Perturbed normal, see http://www.thetenthplanet.de/archives/1180
+	vec3 tangentNormal;
+
+	// We store the x and y normals in the ga channel of the texture, then infer the z
+	// as per: https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-normal-maps
+	tangentNormal.xy = texture(textures[normalTextureID], inUV).ga;
+	tangentNormal.xy = tangentNormal.xy * 2.0 - 1.0;
+	tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy));
 
 	vec3 q1 = dFdx(inWorldPos);
 	vec3 q2 = dFdy(inWorldPos);
@@ -106,7 +96,7 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 {
 	vec4 irradiance  = vec4(0.5);
 	vec4 ibl_diffuse = irradiance * vec4(pbrInputs.diffuseColor, 1.0);
-	return SRGBtoLINEAR(tonemap(ibl_diffuse)).xyz;
+	return tonemap(ibl_diffuse).xyz;
 }
 
 // Basic Lambertian diffuse
@@ -176,7 +166,7 @@ void main()
 	if (material.baseColorTextureID == NO_TEXTURE) {
 		baseColor = material.baseColorFactor;
 	} else {
-		baseColor = SRGBtoLINEAR(texture(textures[material.baseColorTextureID], inUV)) * material.baseColorFactor;
+		baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
 	}
 
 	if (material.alphaMask == 1.0f) {
@@ -200,7 +190,7 @@ void main()
 			// This layout intentionally reserves the 'r' channel for (optional) occlusion map data
 			vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], inUV);
 			perceptualRoughness = mrSample.g * perceptualRoughness;
-			metallic = mrSample.b * metallic;
+			metallic = mrSample.a * metallic;
 		}
 		// Roughness is authored as perceptual roughness; as is convention,
 		// convert to material roughness by squaring the perceptual roughness [2].
@@ -214,7 +204,7 @@ void main()
 			perceptualRoughness = 0.0;
 			specular = vec3(1.0);
 		} else {
-			vec4 physicalDescriptor = SRGBtoLINEAR(texture(textures[material.physicalDescriptorTextureID], inUV));
+			vec4 physicalDescriptor = texture(textures[material.physicalDescriptorTextureID], inUV);
 			specular = physicalDescriptor.rgb;
 			perceptualRoughness = 1.0 - physicalDescriptor.a;
 		}
@@ -294,14 +284,14 @@ void main()
 	const float u_OcclusionStrength = 1.0f;
 	// Apply optional PBR terms for additional (optional) shading
 	if (material.occlusionTextureID != NO_TEXTURE) {
-		float ao = texture(textures[material.occlusionTextureID], inUV).r;
+		// We use the g channel when only a single channel is neccesary, as per:
+		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
+		float ao = texture(textures[material.occlusionTextureID], inUV).g;
 		color = mix(color, color * ao, u_OcclusionStrength);
 	}
 
-	const float u_EmissiveFactor = 1.0f;
 	if (material.emissiveTextureID != NO_TEXTURE) {
-		vec3 emissive = SRGBtoLINEAR(texture(textures[material.emissiveTextureID], inUV)).rgb * u_EmissiveFactor;
-		color += emissive;
+		color += texture(textures[material.emissiveTextureID], inUV).rgb;
 	}
 	
 	outColor = vec4(color, baseColor.a);
@@ -314,7 +304,7 @@ void main()
 	// Debugging
 
 	// Shader inputs debug visualization
-	// "none", "Base Color Texture", "Normal Texture", "Occlusion Texture", "Emissive Texture", "Metalic (?)", "Roughness (?)"
+	// "none", "Base Color Texture", "Normal Texture", "Occlusion Texture", "Emissive Texture", "Metalic", "Roughness"
 	if (sceneData.debugData.x > 0.0) {
 		int index = int(sceneData.debugData.x);
 		switch (index) {
@@ -325,7 +315,7 @@ void main()
 				outColor.rgb = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : texture(textures[material.normalTextureID], inUV).rgb;
 				break;
 			case 3:
-				outColor.rgb = (material.occlusionTextureID == NO_TEXTURE) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], inUV).rrr;
+				outColor.rgb = (material.occlusionTextureID == NO_TEXTURE) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], inUV).ggg;
 				break;
 			case 4:
 				outColor.rgb = (material.emissiveTextureID == NO_TEXTURE) ?  vec3(0.0f) : texture(textures[material.emissiveTextureID], inUV).rgb;
@@ -337,7 +327,6 @@ void main()
 				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
 				break;
 		}
-		outColor = SRGBtoLINEAR(outColor);
 	}
 
 	// "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"

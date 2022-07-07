@@ -158,10 +158,8 @@ fn get_format_from_mime_type(mime_type: &str) -> image::ImageFormat {
     }
 }
 
+// This is legal.. with some caveats. But if it's wrong it'll blow up when the texture gets imported anyway
 fn get_format_from_ktx2(format: Option<ktx2::Format>) -> vk::Format {
-    match format.expect("No format specified") {
-        ktx2::Format::ASTC_4x4_SRGB_BLOCK => vk::Format::ASTC_4X4_SRGB_BLOCK,
-        ktx2::Format::BC7_SRGB_BLOCK => vk::Format::BC7_SRGB_BLOCK,
-        unknown => panic!("Unknown format {:?}", unknown),
-    }
+    let raw = format.expect("No format specified").0;
+    vk::Format::from_raw(raw.get() as _)
 }

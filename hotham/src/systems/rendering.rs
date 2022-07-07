@@ -60,13 +60,26 @@ pub fn rendering_system(
     let draw_indirect_buffer = &render_context.resources.draw_indirect_buffer;
 
     unsafe {
-        device.cmd_draw_indexed_indirect(
-            command_buffer,
-            draw_indirect_buffer.buffer,
-            0,
-            draw_indirect_buffer.len as _,
-            std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
-        );
+        // unsafe {
+        //     device.cmd_draw_indexed_indirect(
+        //         command_buffer,
+        //         draw_indirect_buffer.buffer,
+        //         0,
+        //         draw_indirect_buffer.len as _,
+        //         std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
+        //     );
+        // }
+
+        for command in draw_indirect_buffer.as_slice() {
+            device.cmd_draw_indexed(
+                command_buffer,
+                command.index_count,
+                command.instance_count,
+                command.first_index,
+                command.vertex_offset,
+                command.first_instance,
+            )
+        }
     }
 
     render_context.end_pbr_render_pass(vulkan_context, swapchain_image_index);

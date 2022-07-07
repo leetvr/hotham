@@ -1,4 +1,5 @@
 [package]
+build = "build.rs"
 description = "A framework for creating incredible standalone VR experiences"
 edition = "2018"
 keywords = ["vr", "gamedev", "openxr", "vulkan"]
