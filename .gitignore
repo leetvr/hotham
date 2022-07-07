@@ -5,8 +5,12 @@ target
 # Ignore test assets
 sponza* 
 
+# Note that we NEVER care about uncompressed glTF stuff
+*.gltf
+*.bin
+*.jpg
+*.png
+*.ktx2
+
 # Ignore logs
 *.log
-
-# Ignore ktx2
-*.ktx2
