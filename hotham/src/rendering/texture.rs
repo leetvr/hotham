@@ -64,7 +64,9 @@ impl Texture {
         if let (_, Some(basis_u)) = texture.basisu_sources() {
             match basis_u.source() {
                 gltf::image::Source::View { view, .. } => {
-                    let ktx2_data = &import_context.buffer[view.offset()..view.buffer().length()];
+                    let start = view.offset();
+                    let end = start + view.length();
+                    let ktx2_data = &import_context.buffer[start..end];
                     let ktx2_reader = ktx2::Reader::new(ktx2_data).unwrap();
                     let header = ktx2_reader.header();
                     if header.supercompression_scheme.is_some() {
@@ -74,6 +76,10 @@ impl Texture {
                     // We don't really support mipmaps with Hotham yet. So, we assume there is ONLY ONE mipmap level.
                     let image_bytes = ktx2_reader.levels().next().unwrap();
                     let format = get_format_from_ktx2(header.format);
+                    println!(
+                        "[HOTHAM_TEXTURE] Importing ktx2 texture in {:?} format",
+                        format
+                    );
                     let texture = Texture::new(
                         "",
                         import_context.vulkan_context,
@@ -93,18 +99,18 @@ impl Texture {
         let texture = match texture.source().source() {
             gltf::image::Source::View { view, mime_type } => {
                 println!("[HOTHAM_TEXTURE] - WARNING: Non-optimal image format detected. For best performance, compress your images into ktx2.");
-                println!("[HOTHAM_TEXTURE] - Decompresing image. This may take some time..");
+                print!("[HOTHAM_TEXTURE] - Decompresing image. This may take some time..");
                 let bytes = &import_context.buffer[view.offset()..view.buffer().length()];
                 let format = get_format_from_mime_type(mime_type);
                 let asset = Cursor::new(bytes);
                 let mut image = ImageReader::new(asset);
                 image.set_format(format);
-                let image = image.decode().expect("Unable to decode image!");
+                let image = image.decode().expect("Unable to decompress image!");
                 let image = image.to_rgba8();
                 let width = image.width();
                 let height = image.height();
 
-                println!("[HOTHAM_TEXTURE] - ..done!");
+                println!("..done!");
 
                 Texture::new(
                     texture_name,
