@@ -2,6 +2,7 @@
 pub mod animation_controller;
 pub mod animation_target;
 pub mod collider;
+pub mod grabbable;
 pub mod hand;
 pub mod info;
 pub mod joint;
@@ -21,6 +22,7 @@ pub mod visible;
 pub use animation_controller::AnimationController;
 pub use animation_target::AnimationTarget;
 pub use collider::Collider;
+pub use grabbable::Grabbable;
 pub use hand::Hand;
 pub use info::Info;
 pub use joint::Joint;
