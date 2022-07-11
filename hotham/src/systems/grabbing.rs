@@ -126,7 +126,22 @@ mod tests {
             &mut rigid_body_query,
         );
 
-        let hand = world.get_mut::<Hand>(hand_entity).unwrap();
+        let mut hand = world.get_mut::<Hand>(hand_entity).unwrap();
+        assert!(hand.grabbed_entity.is_none());
+
+        // Make sure hand can't grip colliders *without* a Grabbable component
+        hand.grip_value = 1.0;
+        drop(hand);
+        world.remove::<(Grabbable,)>(grabbed_entity).unwrap();
+
+        schedule(
+            &mut query,
+            &mut world,
+            &mut physics_context,
+            &mut rigid_body_query,
+        );
+
+        let hand = world.get::<Hand>(hand_entity).unwrap();
         assert!(hand.grabbed_entity.is_none());
     }
 
