@@ -93,6 +93,25 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 	return tonemap(ibl_diffuse).xyz;
 }
 
+// TODO: RESTORE
+// Calculation of the lighting contribution from an optional Image Based Light source.
+// Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
+// See our README.md on Environment Maps [3] for additional discussion.
+// vec3 getIBLContributionWithTextures(PBRInfo pbrInputs, vec3 n, vec3 reflection)
+// {
+// 	float lod = (pbrInputs.perceptualRoughness * DEFAULT_CUBE_MIPMAP_LEVELS);
+// 	// retrieve a scale and bias to F0. See [1], Figure 3
+// 	vec3 brdf = (texture(textures[BRDF_LUT_TEXTURE_ID], vec2(pbrInputs.NdotV, 1.0 - pbrInputs.perceptualRoughness))).rgb;
+// 	// vec3 diffuseLight = tonemap(texture(samplerIrradiance, n)).rgb;
+// 	// vec3 specularLight = tonemap(textureLod(prefilteredMap, reflection, lod)).rgb;
+
+// 	// vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
+// 	// vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
+
+// 	// return diffuse + specular;
+// 	return vec3(1.);
+// }
+
 // Basic Lambertian diffuse
 // Implementation from Lambert's Photometria https://archive.org/details/lambertsphotome00lambgoog
 // See also [1], Equation 1
