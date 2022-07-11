@@ -4,24 +4,25 @@ use std::{
 };
 
 use hotham::{
-    buffer::Buffer,
-    components::{mesh::MeshUBO, Material, Mesh, Primitive, Transform, TransformMatrix, Visible},
-    gltf_loader::{self, add_model_to_world},
+    asset_importer::{self, add_model_to_world},
+    components::{Mesh, Transform, TransformMatrix, Visible},
     hecs::{With, World},
     nalgebra::Vector3,
-    resources::{vulkan_context::VulkanContext, RenderContext},
-    schedule_functions::{
-        begin_frame, begin_pbr_renderpass, end_frame, end_pbr_renderpass, physics_step,
+    rendering::{
+        material::Material,
+        mesh_data::MeshData,
+        primitive::{calculate_bounding_sphere, Primitive},
+        vertex::Vertex,
     },
+    resources::RenderContext,
+    schedule_functions::{begin_frame, end_frame, physics_step},
     systems::{
         animation_system, collision_system, grabbing_system, hands_system,
         rendering::rendering_system, skinning::skinning_system,
         update_parent_transform_matrix_system, update_rigid_body_transforms_system,
         update_transform_matrix_system, Queries,
     },
-    texture::Texture,
-    vertex::Vertex,
-    vk, xr, Engine, HothamResult,
+    xr, Engine, HothamResult,
 };
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -33,8 +34,8 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let test = StressTest::ManyCubes;
-    let (world, models) = init(&mut engine, &test)?;
+    let test = StressTest::ManyVertices;
+    let (world, models) = init(&mut engine, &test);
     let queries = Default::default();
     let timer = Default::default();
 
@@ -95,16 +96,15 @@ impl Timer {
 pub enum StressTest {
     /// Generate one cube per second
     ManyCubes,
+    /// Display an additional model each second
+    ManyHelmets,
     /// Create a dynamic mesh and increase the number of vertices each second
     ManyVertices,
     /// Load the New Sponza scene into the engine
     Sponza,
 }
 
-fn init(
-    engine: &mut Engine,
-    test: &StressTest,
-) -> Result<(World, HashMap<String, World>), hotham::HothamError> {
+fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World>) {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let mut world = World::default();
@@ -112,60 +112,42 @@ fn init(
     let models = match test {
         StressTest::ManyCubes => {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/cube.glb")];
-            let models = gltf_loader::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                &render_context.descriptor_set_layouts,
-            )?;
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
 
-            add_cube(&models, &mut world, vulkan_context, render_context);
+            add_model_to_world("Cube", &models, &mut world, None).expect("Could not find cube?");
+            models
+        }
+        StressTest::ManyHelmets => {
+            let glb_buffers: Vec<&[u8]> =
+                vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
+
+            add_model_to_world("Damaged Helmet", &models, &mut world, None)
+                .expect("Could not find cube?");
             models
         }
         StressTest::ManyVertices => {
-            create_mesh(render_context, vulkan_context, &mut world)?;
+            create_mesh(render_context, &mut world);
             Default::default()
         }
         StressTest::Sponza => {
             let file = std::fs::read("test_assets/sponza.glb").unwrap();
             let glb_buffers: Vec<&[u8]> = vec![&file];
-            let models = gltf_loader::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                &render_context.descriptor_set_layouts,
-            )?;
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
             for name in models.keys() {
-                add_model_to_world(
-                    name,
-                    &models,
-                    &mut world,
-                    None,
-                    vulkan_context,
-                    &render_context.descriptor_set_layouts,
-                );
+                add_model_to_world(name, &models, &mut world, None);
             }
             models
         }
     };
 
-    Ok((world, models))
-}
-
-fn add_cube(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
-) {
-    let cube = add_model_to_world(
-        "Cube",
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .expect("Could not find cube?");
-    world.insert_one(cube, Cube {}).unwrap();
+    (world, models)
 }
 
 struct TickProps<'a> {
@@ -213,10 +195,9 @@ fn tick(
         );
 
         match tick_props.test {
-            StressTest::ManyCubes => {
-                cube_system(world, models, vulkan_context, render_context, timer)
-            }
-            StressTest::ManyVertices => subdivide_mesh_system(world, vulkan_context, timer),
+            StressTest::ManyCubes => model_system(world, models, timer, "Cube"),
+            StressTest::ManyHelmets => model_system(world, models, timer, "Damaged Helmet"),
+            StressTest::ManyVertices => subdivide_mesh_system(world, render_context, timer),
             StressTest::Sponza => {}
         }
 
@@ -227,11 +208,10 @@ fn tick(
             &mut queries.roots_query,
             world,
         );
-        skinning_system(&mut queries.joints_query, &mut queries.meshes_query, world);
+        skinning_system(&mut queries.skins_query, world, render_context);
     }
 
     if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
-        begin_pbr_renderpass(xr_context, vulkan_context, render_context);
         rendering_system(
             &mut queries.rendering_query,
             world,
@@ -239,65 +219,48 @@ fn tick(
             xr_context.frame_index,
             render_context,
         );
-        end_pbr_renderpass(xr_context, vulkan_context, render_context);
     }
 
     end_frame(xr_context, vulkan_context, render_context);
 }
 
-fn subdivide_mesh_system(world: &mut World, vulkan_context: &VulkanContext, timer: &mut Timer) {
+fn subdivide_mesh_system(world: &mut World, render_context: &mut RenderContext, timer: &mut Timer) {
     if !timer.tick() {
         return;
     }
 
+    // Get the mesh
     let mesh = world.query_mut::<&mut Mesh>().into_iter().next().unwrap().1;
-    let step = timer.total_time().as_secs() * 10;
-    let (vertices, indices) = generate_vertices(step as _);
-    let primitive = &mut mesh.primitives[0];
-    primitive.indices_count = indices.len() as _;
-    primitive
-        .index_buffer
-        .update(vulkan_context, &indices)
-        .unwrap();
-    primitive
-        .vertex_buffer
-        .update(vulkan_context, &vertices)
-        .unwrap();
 
-    println!(
-        "There are now {} vertices and {} indices",
-        vertices.len(),
-        indices.len()
-    );
+    // Calcuate the current step.
+    let step = timer.total_time().as_secs() * 10;
+    update_mesh(step as _, mesh, render_context);
 }
 
-struct Cube;
-
-fn cube_system(
+fn model_system(
     world: &mut World,
     models: &HashMap<String, World>,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
     timer: &mut Timer,
+    model_name: &str,
 ) {
     if timer.tick() {
-        add_cube(models, world, vulkan_context, render_context);
-        rearrange_cubes(world);
+        add_model_to_world(model_name, models, world, None).expect("Could not find object?");
+        rearrange_models(world);
     }
 
-    rotate_cubes(world, timer.total_time().as_secs_f32());
+    rotate_models(world, timer.total_time().as_secs_f32());
 }
 
-fn rotate_cubes(world: &mut World, total_time: f32) {
-    for (_, transform) in world.query_mut::<With<Cube, &mut Transform>>() {
+fn rotate_models(world: &mut World, total_time: f32) {
+    for (_, transform) in world.query_mut::<With<Mesh, &mut Transform>>() {
         transform.rotation =
             hotham::nalgebra::Rotation::from_axis_angle(&Vector3::y_axis(), total_time.sin() * 2.)
                 .into();
     }
 }
 
-fn rearrange_cubes(world: &mut World) {
-    let query = world.query_mut::<With<Cube, &mut Transform>>();
+fn rearrange_models(world: &mut World) {
+    let query = world.query_mut::<With<Mesh, &mut Transform>>();
     let query_iter = query.into_iter();
     let num_cubes = query_iter.len() as f32;
     let slice = std::f32::consts::TAU / num_cubes;
@@ -316,88 +279,30 @@ fn rearrange_cubes(world: &mut World) {
     println!("[HOTHAM_STRESS_TEST] There are now {} cubes", num_cubes);
 }
 
-// This is.. disgusting.
-fn create_mesh(
-    render_context: &mut RenderContext,
-    vulkan_context: &mut VulkanContext,
-    world: &mut World,
-) -> Result<(), hotham::HothamError> {
-    let mesh_layout = render_context.descriptor_set_layouts.mesh_layout;
-    let mesh_ubo = MeshUBO::default();
-    let num_vertices = 1_000_000;
-    let mut vertices = Vec::with_capacity(num_vertices);
-    let mut indices = Vec::with_capacity(num_vertices);
-
-    for _ in 0..num_vertices {
-        vertices.push(Vertex::default());
-        indices.push(0);
-    }
-
-    let vertex_buffer = Buffer::new(
-        vulkan_context,
-        &vertices,
-        vk::BufferUsageFlags::VERTEX_BUFFER,
-    )
-    .unwrap();
-    let index_buffer =
-        Buffer::new(vulkan_context, &indices, vk::BufferUsageFlags::INDEX_BUFFER).unwrap();
-
-    let texture_descriptor_set = vulkan_context.create_textures_descriptor_sets(
-        render_context.descriptor_set_layouts.textures_layout,
-        "Empty Material",
-        &[
-            &Texture::empty(vulkan_context)?,
-            &Texture::empty(vulkan_context)?,
-            &Texture::empty(vulkan_context)?,
-            &Texture::empty(vulkan_context)?,
-            &Texture::empty(vulkan_context)?,
-        ],
-    )?[0];
-    let material = Material::default();
-
-    let primitives = vec![Primitive {
-        index_buffer,
-        vertex_buffer,
-        indices_count: 0,
-        material,
-        texture_descriptor_set,
-    }];
-
-    // Vomit
-    let descriptor_sets = [vulkan_context
-        .create_mesh_descriptor_sets(mesh_layout, "Dynamic Mesh")
-        .unwrap()[0]];
-
-    let ubo_buffer = Buffer::new(
-        vulkan_context,
-        &[mesh_ubo],
-        vk::BufferUsageFlags::UNIFORM_BUFFER,
-    )
-    .unwrap();
-
-    vulkan_context.update_buffer_descriptor_set(
-        &ubo_buffer,
-        descriptor_sets[0],
-        0,
-        vk::DescriptorType::UNIFORM_BUFFER,
-    );
-    let mesh = Mesh {
-        descriptor_sets,
-        ubo_data: mesh_ubo,
-        ubo_buffer,
-        primitives,
+fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
+    let material_id = unsafe {
+        render_context
+            .resources
+            .materials_buffer
+            .push(&Material::unlit_white())
     };
-
+    let mesh = Mesh::new(
+        MeshData::new(vec![Primitive {
+            material_id,
+            ..Default::default()
+        }]),
+        render_context,
+    );
+    update_mesh(1, &mesh, render_context);
     let transform = Transform {
         translation: [0., 1., -1.].into(),
         ..Default::default()
     };
 
     world.spawn((Visible {}, mesh, transform, TransformMatrix::default()));
-    Ok(())
 }
 
-fn generate_vertices(step: usize) -> (Vec<Vertex>, Vec<u32>) {
+fn update_mesh(step: usize, mesh: &Mesh, render_context: &mut RenderContext) {
     let mut vertices = vec![];
     let mut indices = vec![];
 
@@ -428,7 +333,27 @@ fn generate_vertices(step: usize) -> (Vec<Vertex>, Vec<u32>) {
         }
     }
 
-    (vertices, indices)
+    let mesh = render_context
+        .resources
+        .mesh_data
+        .get_mut(mesh.handle)
+        .unwrap();
+    mesh.primitives[0].indices_count = indices.len() as _;
+    mesh.primitives[0].bounding_sphere = calculate_bounding_sphere(&vertices);
+
+    // This is *really* nasty, but we can get away with it as we won't have any other meshes in the scene.
+    // In the real world, this would potentially obliterate existing meshes as we're overwriting the shared buffers.
+    // DON'T DO THIS in a real application!
+    unsafe {
+        render_context.resources.index_buffer.overwrite(&indices);
+        render_context.resources.vertex_buffer.overwrite(&vertices);
+    }
+
+    println!(
+        "There are now {} vertices and {} indices",
+        vertices.len(),
+        indices.len()
+    );
 }
 
 fn vertex(x: f32, y: f32) -> Vertex {

@@ -1,5 +1,4 @@
 [package]
-build = "build.rs"
 description = "A framework for creating incredible standalone VR experiences"
 edition = "2018"
 keywords = ["vr", "gamedev", "openxr", "vulkan"]
@@ -8,9 +7,6 @@ name = "hotham"
 readme = "../README.md"
 repository = "https://github.com/leetvr/hotham/"
 version = "0.2.0"
-
-[build-dependencies]
-shaderc = "0.8"
 
 [dependencies]
 anyhow = "1.0"
@@ -21,8 +17,9 @@ ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
 generational-arena = "0.2.8"
 gltf = {version = "1.0", features = ["KHR_materials_pbrSpecularGlossiness"]}
-hecs = "0.7.5"
+hecs = "0.7.7"
 hotham-debug-server = {path = "../hotham-debug-server", version = "0.2"}
+id-arena = "2.2.1"
 image = "0.23"
 itertools = "0.10.0"
 libktx-rs = "0.2.3"
@@ -36,6 +33,7 @@ serde = {version = "1.0", features = ["derive"]}
 symphonia = {version = "0.5", features = ["mp3"]}
 thiserror = "1.0"
 uuid = {version = "1.1", features = ["serde", "v4"]}
+vk-shader-macros = "0.2.8"
 
 [target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dev-dependencies]
 renderdoc = "0.10"

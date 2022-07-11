@@ -35,18 +35,13 @@ pub fn pointers_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
+    let input = &xr_context.input;
     for (_, (pointer, transform)) in query.query(world).iter() {
         // Get our the space and path of the pointer.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, path) = match pointer.handedness {
-            Handedness::Left => (
-                &xr_context.left_hand_space,
-                xr_context.left_hand_subaction_path,
-            ),
-            Handedness::Right => (
-                &xr_context.right_hand_space,
-                xr_context.right_hand_subaction_path,
-            ),
+            Handedness::Left => (&input.left_hand_space, input.left_hand_subaction_path),
+            Handedness::Right => (&input.right_hand_space, input.right_hand_subaction_path),
         };
 
         // Locate the pointer in the space.
@@ -66,7 +61,7 @@ pub fn pointers_system(
 
         // get trigger value
         let trigger_value =
-            openxr::ActionInput::get(&xr_context.trigger_action, &xr_context.session, path)
+            openxr::ActionInput::get(&input.trigger_action, &xr_context.session, path)
                 .unwrap()
                 .current_state;
         pointer.trigger_value = trigger_value;
@@ -178,26 +173,30 @@ mod tests {
     pub fn test_pointers_system() {
         use crate::{
             components::{Collider, Panel, Transform},
-            resources::physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
-            texture::Texture,
+            resources::{
+                physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
+                RenderContext,
+            },
         };
         use nalgebra::vector;
         use rapier3d::prelude::ColliderBuilder;
 
-        let (mut xr_context, mut vulkan_context) = XrContext::new().unwrap();
+        let (mut xr_context, vulkan_context) = XrContext::testing();
+        let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
         let mut physics_context = PhysicsContext::default();
         let mut world = World::default();
 
-        let panel = Panel {
-            resolution: vk::Extent2D {
+        let panel = Panel::create(
+            &vulkan_context,
+            &mut render_context,
+            vk::Extent2D {
                 width: 300,
                 height: 300,
             },
-            world_size: [1.0, 1.0].into(),
-            texture: Texture::empty(&mut vulkan_context).unwrap(),
-            input: None,
-        };
-        let panel_entity = world.spawn((panel,));
+            [1.0, 1.0].into(),
+        )
+        .unwrap();
+        let panel_entity = world.spawn(panel);
 
         // Place the panel *directly above* where the pointer will be located.
         let collider = ColliderBuilder::cuboid(0.5, 0.5, 0.0)
@@ -243,13 +242,14 @@ mod tests {
             Transform::default(),
         ));
 
-        schedule(&mut physics_context, &mut world, &mut xr_context);
+        tick(&mut physics_context, &mut world, &mut xr_context);
 
         let transform = world.get_mut::<Transform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
         assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
 
+        dbg!(panel_entity);
         let panel = world.get_mut::<Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 150.);
@@ -258,7 +258,7 @@ mod tests {
     }
 
     #[cfg(target_os = "windows")]
-    fn schedule(
+    fn tick(
         physics_context: &mut PhysicsContext,
         world: &mut hecs::World,
         xr_context: &mut XrContext,

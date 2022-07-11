@@ -1,7 +1,7 @@
 use crate::{
+    asset_importer::add_model_to_world,
     components::{hand::Handedness, AnimationController, Hand, RigidBody},
-    gltf_loader::add_model_to_world,
-    resources::{PhysicsContext, RenderContext, VulkanContext, XrContext},
+    resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
 use hecs::{PreparedQuery, World};
@@ -15,18 +15,13 @@ pub fn hands_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
+    let input = &xr_context.input;
     for (_, (hand, animation_controller, rigid_body_component)) in query.query(world).iter() {
         // Get our the space and path of the hand.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, path) = match hand.handedness {
-            Handedness::Left => (
-                &xr_context.left_hand_space,
-                xr_context.left_hand_subaction_path,
-            ),
-            Handedness::Right => (
-                &xr_context.right_hand_space,
-                xr_context.right_hand_subaction_path,
-            ),
+            Handedness::Left => (&input.left_hand_space, input.left_hand_subaction_path),
+            Handedness::Right => (&input.right_hand_space, input.right_hand_subaction_path),
         };
 
         // Locate the hand in the space.
@@ -34,7 +29,7 @@ pub fn hands_system(
 
         // Check it's valid before using it
         if !is_space_valid(&space) {
-            return;
+            continue;
         }
 
         let pose = space.pose;
@@ -55,10 +50,9 @@ pub fn hands_system(
         }
 
         // get grip value
-        let grip_value =
-            openxr::ActionInput::get(&xr_context.grab_action, &xr_context.session, path)
-                .unwrap()
-                .current_state;
+        let grip_value = openxr::ActionInput::get(&input.grab_action, &xr_context.session, path)
+            .unwrap()
+            .current_state;
 
         // Apply to Hand
         hand.grip_value = grip_value;
@@ -73,23 +67,13 @@ pub fn add_hand(
     models: &std::collections::HashMap<String, World>,
     handedness: Handedness,
     world: &mut World,
-    vulkan_context: &VulkanContext,
-    render_context: &RenderContext,
     physics_context: &mut PhysicsContext,
 ) {
     let model_name = match handedness {
         Handedness::Left => "Left Hand",
         Handedness::Right => "Right Hand",
     };
-    let hand = add_model_to_world(
-        model_name,
-        models,
-        world,
-        None,
-        vulkan_context,
-        &render_context.descriptor_set_layouts,
-    )
-    .unwrap();
+    let hand = add_model_to_world(model_name, models, world, None).unwrap();
     {
         // Add a hand component
         world
@@ -172,7 +156,7 @@ mod tests {
     // HELPER FUNCTIONS
     fn setup() -> (World, XrContext, PhysicsContext) {
         let world = World::new();
-        let (xr_context, _) = XrContext::new().unwrap();
+        let (xr_context, _) = XrContext::testing();
         let physics_context = PhysicsContext::default();
         (world, xr_context, physics_context)
     }
