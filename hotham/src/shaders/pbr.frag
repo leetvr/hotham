@@ -67,7 +67,10 @@ vec4 tonemap(vec4 color)
 vec3 getNormal(uint normalTextureID)
 {
 	// Perturb normal, see http://www.thetenthplanet.de/archives/1180
-	vec3 tangentNormal = texture(textures[normalTextureID], inUV).xyz * 2.0 - 1.0;
+	// vec3 tangentNormal = texture(textures[normalTextureID], inUV).xyz * 2.0 - 1.0;
+	vec3 tangentNormal;
+	tangentNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
+	tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy)); 
 
 	vec3 q1 = dFdx(inWorldPos);
 	vec3 q2 = dFdy(inWorldPos);
