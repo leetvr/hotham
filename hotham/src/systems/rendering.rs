@@ -7,6 +7,8 @@ use crate::{
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
 
+const USE_MULTI_DRAW_INDIRECT: bool = true;
+
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
 ///
@@ -60,25 +62,26 @@ pub fn rendering_system(
     let draw_indirect_buffer = &render_context.resources.draw_indirect_buffer;
 
     unsafe {
-        // unsafe {
-        //     device.cmd_draw_indexed_indirect(
-        //         command_buffer,
-        //         draw_indirect_buffer.buffer,
-        //         0,
-        //         draw_indirect_buffer.len as _,
-        //         std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
-        //     );
-        // }
-
-        for command in draw_indirect_buffer.as_slice() {
-            device.cmd_draw_indexed(
+        if USE_MULTI_DRAW_INDIRECT {
+            device.cmd_draw_indexed_indirect(
                 command_buffer,
-                command.index_count,
-                command.instance_count,
-                command.first_index,
-                command.vertex_offset,
-                command.first_instance,
-            )
+                draw_indirect_buffer.buffer,
+                0,
+                draw_indirect_buffer.len as _,
+                std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
+            );
+        } else {
+            // Issue draw calls directly - useful for renderdoc
+            for command in draw_indirect_buffer.as_slice() {
+                device.cmd_draw_indexed(
+                    command_buffer,
+                    command.index_count,
+                    command.instance_count,
+                    command.first_index,
+                    command.vertex_offset,
+                    command.first_instance,
+                )
+            }
         }
     }
 
