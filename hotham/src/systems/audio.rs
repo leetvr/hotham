@@ -1,10 +1,11 @@
 use hecs::{PreparedQuery, World};
 use nalgebra::{Point3, Vector3};
-use openxr::{SpaceLocationFlags, SpaceVelocityFlags};
+use openxr::SpaceVelocityFlags;
 
 use crate::{
     components::{sound_emitter::SoundState, RigidBody, SoundEmitter},
     resources::{AudioContext, PhysicsContext, XrContext},
+    util::is_space_valid,
 };
 
 /// Audio system
@@ -19,7 +20,7 @@ pub fn audio_system(
     xr_context: &XrContext,
 ) {
     // First, where is the listener?
-    let (listener_position_in_stage, listener_velocity_in_stage) = xr_context
+    let (stage_from_listener, listener_velocity_in_stage) = xr_context
         .view_space
         .relate(
             &xr_context.stage_space,
@@ -27,10 +28,7 @@ pub fn audio_system(
         )
         .unwrap();
 
-    if !listener_position_in_stage
-        .location_flags
-        .contains(SpaceLocationFlags::POSITION_VALID)
-    {
+    if !is_space_valid(&stage_from_listener) {
         return;
     }
 
@@ -41,8 +39,10 @@ pub fn audio_system(
         return;
     }
 
+    audio_context.update_listener_rotation(stage_from_listener.pose.orientation.into());
+
     let listener_position_in_stage: Vector3<_> =
-        mint::Vector3::from(listener_position_in_stage.pose.position).into();
+        mint::Vector3::from(stage_from_listener.pose.position).into();
     let listener_velocity_in_stage: Vector3<_> =
         mint::Vector3::from(listener_velocity_in_stage.linear_velocity).into();
 
