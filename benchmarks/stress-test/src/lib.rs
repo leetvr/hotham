@@ -120,8 +120,9 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             models
         }
         StressTest::ManyHelmets => {
-            let glb_buffers: Vec<&[u8]> =
-                vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
+            let glb_buffers: Vec<&[u8]> = vec![include_bytes!(
+                "../../../test_assets/damaged_helmet_squished.glb"
+            )];
             let models =
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
@@ -262,21 +263,23 @@ fn rotate_models(world: &mut World, total_time: f32) {
 fn rearrange_models(world: &mut World) {
     let query = world.query_mut::<With<Mesh, &mut Transform>>();
     let query_iter = query.into_iter();
-    let num_cubes = query_iter.len() as f32;
-    let slice = std::f32::consts::TAU / num_cubes;
-    let scale = 1. / num_cubes;
+    let num_models = query_iter.len() as f32;
+    let slice = std::f32::consts::TAU / num_models;
+    let scale = 1. / num_models;
 
     for (n, (_, transform)) in query_iter.enumerate() {
         let radius = slice * (n as f32);
         let rotation = hotham::nalgebra::Rotation::from_axis_angle(&Vector3::y_axis(), radius);
         let distance = [0., 0., -2.].into();
+        let height: Vector3<f32> = [0., 0.7, 0.].into();
         let translation = rotation.transform_vector(&distance);
 
         transform.translation = translation;
+        transform.translation += height;
         transform.scale = Vector3::repeat(scale);
     }
 
-    println!("[HOTHAM_STRESS_TEST] There are now {} cubes", num_cubes);
+    println!("[HOTHAM_STRESS_TEST] There are now {} models", num_models);
 }
 
 fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
