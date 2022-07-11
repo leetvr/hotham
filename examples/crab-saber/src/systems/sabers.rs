@@ -1,4 +1,5 @@
 use hotham::nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
+use hotham::rapier3d::prelude::RigidBodyType;
 use hotham::{
     asset_importer::{add_model_to_world, Models},
     components::RigidBody,
@@ -77,9 +78,9 @@ fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, sa
         .translation([0., SABER_HALF_HEIGHT, 0.].into())
         .sensor(true)
         .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::INTERSECTION_EVENTS)
+        .active_events(ActiveEvents::COLLISION_EVENTS)
         .build();
-    let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
+    let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
 
     // Add the components to the entity.
     let components = physics_context.get_rigid_body_and_collider(saber, rigid_body, collider);

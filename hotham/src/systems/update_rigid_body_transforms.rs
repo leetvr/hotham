@@ -32,7 +32,10 @@ mod tests {
     use approx::assert_relative_eq;
     use hecs::World;
     use nalgebra::{vector, UnitQuaternion};
-    use rapier3d::{math::Isometry, prelude::RigidBodyBuilder};
+    use rapier3d::{
+        math::Isometry,
+        prelude::{RigidBodyBuilder, RigidBodyType},
+    };
 
     #[test]
     pub fn test_update_rigid_body_transforms_system() {
@@ -40,7 +43,7 @@ mod tests {
         let mut physics_context = PhysicsContext::default();
 
         let entity = world.spawn((Transform::default(),));
-        let mut rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
+        let mut rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
         let rotation = UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3);
         let position = Isometry::from_parts(vector![1.0, 2.0, 3.0].into(), rotation);
         rigid_body.set_next_kinematic_position(position);
