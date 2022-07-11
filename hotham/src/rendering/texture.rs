@@ -84,7 +84,7 @@ impl Texture {
                         "",
                         import_context.vulkan_context,
                         import_context.render_context,
-                        &image_bytes,
+                        image_bytes,
                         header.pixel_width,
                         header.pixel_height,
                         format,
