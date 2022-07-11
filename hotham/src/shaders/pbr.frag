@@ -66,8 +66,7 @@ vec4 tonemap(vec4 color)
 // or from the interpolated mesh normal and tangent attributes.
 vec3 getNormal(uint normalTextureID)
 {
-	// Perturb normal, see http://www.thetenthplanet.de/archives/1180
-	// vec3 tangentNormal = texture(textures[normalTextureID], inUV).xyz * 2.0 - 1.0;
+	// We swizzle our normals to save on texture reads: https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-normal-maps
 	vec3 tangentNormal;
 	tangentNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
 	tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy)); 
@@ -181,14 +180,15 @@ void main()
 			perceptualRoughness = clamp(perceptualRoughness, c_MinRoughness, 1.0);
 			metallic = clamp(metallic, 0.0, 1.0);
 		} else {
-			// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel.
-			// This layout intentionally reserves the 'r' channel for (optional) occlusion map data
+			// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel, as per
+			// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
 			vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], inUV);
+
+			// Roughness is authored as perceptual roughness; as is convention,
+			// convert to material roughness by squaring the perceptual roughness [2].
 			perceptualRoughness = mrSample.g * perceptualRoughness;
-			metallic = mrSample.b * metallic;
+			metallic = mrSample.a * metallic;
 		}
-		// Roughness is authored as perceptual roughness; as is convention,
-		// convert to material roughness by squaring the perceptual roughness [2].
 	}
 
 	if (material.workflow == PBR_WORKFLOW_SPECULAR_GLOSINESS) {
@@ -275,9 +275,12 @@ void main()
 	color += getIBLContribution(pbrInputs, n, reflection) * DEFAULT_IBL_SCALE;
 
 	const float u_OcclusionStrength = 1.0f;
+
 	// Apply optional PBR terms for additional (optional) shading
 	if (material.occlusionTextureID != NO_TEXTURE) {
-		float ao = texture(textures[material.occlusionTextureID], inUV).r;
+		// Occlusion is stored in the 'g' channel as per:
+		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
+		float ao = texture(textures[material.occlusionTextureID], inUV).g;
 		color = mix(color, color * ao, u_OcclusionStrength);
 	}
 
