@@ -4,8 +4,8 @@ use ash::{
     Device, Entry as AshEntry, Instance as AshInstance,
 };
 
-use nalgebra::{vector, Quaternion, Unit, UnitQuaternion};
-use openxr_sys::{Path, Posef, Quaternionf, SessionState, Space, Vector3f};
+use nalgebra::{Quaternion, Unit, UnitQuaternion, Vector3};
+use openxr_sys::{Path, Posef, SessionState, Space, Vector3f};
 use winit::event::DeviceEvent;
 
 use std::{
@@ -63,11 +63,19 @@ pub struct State {
     pub event_rx: Option<Receiver<DeviceEvent>>,
     pub input_state: Inputs,
     pub last_frame_time: Instant,
+    pub camera: Camera,
+}
+
+#[derive(Default)]
+pub struct Camera {
+    yaw: f32,
+    pitch: f32,
 }
 
 impl Default for State {
     fn default() -> Self {
         State {
+            camera: Camera::default(),
             vulkan_entry: None,
             vulkan_instance: None,
             physical_device: vk::PhysicalDevice::null(),
@@ -194,9 +202,11 @@ impl State {
         println!("[HOTHAM_SIMULATOR] All things are now destroyed");
     }
 
-    pub fn update_actions(&mut self) -> Option<()> {
-        let mut x_rot = 0.0;
-        let mut y_rot = 0.0;
+    /// Updates the OpenXR camera Position & Rotation
+    /// Tries to emulate a simple first person floating camera to help navigate the scene
+    pub fn update_camera(&mut self) -> Option<()> {
+        let mut x_rot = 0f32;
+        let mut y_rot = 0f32;
 
         // We need to adjust the speed value so its always the same speed even if the frame rate isn't consistent
         // The delta time is the the current time - last frame time
@@ -204,68 +214,77 @@ impl State {
         let delta = now - self.last_frame_time;
         self.last_frame_time = now;
 
-        let delta_secs = delta.as_secs_f32();
-        let keyboard_speed = 2f32 * delta_secs;
-        let mouse_speed = 1f32 * delta_secs;
+        let dt = delta.as_secs_f32();
+        let movement_speed = 2f32 * dt;
+        let mouse_sensitivity = 4f32 * dt;
 
         if let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
             match input_event {
                 DeviceEvent::Key(keyboard_input) => self.input_state.process_event(keyboard_input),
-                DeviceEvent::MouseMotion { delta: (y, x) } => {
-                    x_rot = -x as f32 * mouse_speed;
-                    y_rot = -y as f32 * mouse_speed;
+                DeviceEvent::MouseMotion { delta: (x, y) } => {
+                    x_rot = -x as _;
+                    y_rot = -y as _;
                 }
                 _ => {}
             }
         }
 
+        // Camera position & Rotation
         let pose = &mut self.view_poses[0];
+
+        // Update Rotation
+        let orientation = &mut pose.orientation;
+
+        self.camera.yaw += x_rot * mouse_sensitivity;
+        self.camera.pitch += y_rot * mouse_sensitivity;
+
+        // I think I'm converting these two types incorrectly but it seems to work and I'm too scared to break it lol
+        let rotation: Unit<Quaternion<f32>> =
+            UnitQuaternion::from_euler_angles(self.camera.pitch, self.camera.yaw, 0f32).into();
+
+        orientation.x = rotation.i;
+        orientation.y = rotation.j;
+        orientation.z = rotation.k;
+        orientation.w = rotation.w;
+
+        // Update Position
+
         let position = &mut pose.position;
 
-        let orientation = &mut pose.orientation;
-        orientation.x = (orientation.x + x_rot).clamp(-1.0, 1.0);
-        orientation.y = (orientation.y + y_rot).clamp(-1.0, 1.0);
-
         // get the forward vector rotated by the camera rotation quaternion
-        let forward = rotate_vector_by_quaternion(
-            Vector3f {
-                x: 0f32,
-                y: 0f32,
-                z: 1f32,
-            },
-            *orientation,
-        );
+        let forward = rotate_vector_by_quaternion(Vector3::new(0f32, 0f32, 1f32), *orientation);
         // get the right vector rotated by the camera rotation quaternion
-        let right = rotate_vector_by_quaternion(
-            Vector3f {
-                x: 1f32,
-                y: 0f32,
-                z: 0f32,
-            },
-            *orientation,
-        );
+        let right = rotate_vector_by_quaternion(Vector3::new(1f32, 0f32, 0f32), *orientation);
+
+        let up = Vector3::new(0f32, 1f32, 0f32);
 
         for pressed in self.input_state.pressed.iter() {
             match pressed {
                 winit::event::VirtualKeyCode::W => {
-                    position.x -= forward.x * keyboard_speed;
-                    position.y -= forward.y * keyboard_speed;
-                    position.z -= forward.z * keyboard_speed;
+                    position.x -= forward.x * movement_speed;
+                    position.y -= forward.y * movement_speed;
+                    position.z -= forward.z * movement_speed;
                 }
                 winit::event::VirtualKeyCode::S => {
-                    position.x += forward.x * keyboard_speed;
-                    position.y += forward.y * keyboard_speed;
-                    position.z += forward.z * keyboard_speed;
+                    position.x += forward.x * movement_speed;
+                    position.y += forward.y * movement_speed;
+                    position.z += forward.z * movement_speed;
                 }
                 winit::event::VirtualKeyCode::A => {
-                    position.x -= right.x * keyboard_speed;
-                    position.y -= right.y * keyboard_speed;
-                    position.z -= right.z * keyboard_speed;
+                    position.x -= right.x * movement_speed;
+                    position.y -= right.y * movement_speed;
+                    position.z -= right.z * movement_speed;
                 }
                 winit::event::VirtualKeyCode::D => {
-                    position.x += right.x * keyboard_speed;
-                    position.y += right.y * keyboard_speed;
-                    position.z += right.z * keyboard_speed;
+                    position.x += right.x * movement_speed;
+                    position.y += right.y * movement_speed;
+                    position.z += right.z * movement_speed;
+                }
+                winit::event::VirtualKeyCode::Space => {
+                    position.y += up.y * movement_speed;
+                }
+                winit::event::VirtualKeyCode::LShift => {
+                    position.y -= up.y * movement_speed;
                 }
                 _ => {}
             }
@@ -282,9 +301,11 @@ impl State {
     }
 }
 
+/// Rotates a Vector by the quaternion
+/// Used to get the forward, right direction to control the camera
 fn rotate_vector_by_quaternion(
-    vector: Vector3f,
-    Quaternionf { x, y, z, w }: Quaternionf,
+    vector: Vector3<f32>,
+    openxr_sys::Quaternionf { x, y, z, w }: openxr_sys::Quaternionf,
 ) -> Vector3f {
     let i = x;
     let j = y;
@@ -292,7 +313,7 @@ fn rotate_vector_by_quaternion(
     let w = w;
     let q1: Unit<Quaternion<f32>> = UnitQuaternion::from_quaternion(Quaternion::new(w, i, j, k));
 
-    let rotated_vector = q1.transform_vector(&vector![vector.x, vector.y, vector.z]);
+    let rotated_vector = q1.transform_vector(&vector);
 
     Vector3f {
         x: rotated_vector.x,
