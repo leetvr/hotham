@@ -6,7 +6,6 @@
 
 const float epsilon = 1e-6;
 #define DEFAULT_EXPOSURE 4.5
-#define DEFAULT_GAMMA 2.2
 #define DEFAULT_IBL_SCALE 0.4
 
 // Inputs
@@ -43,7 +42,6 @@ const float c_MinRoughness = 0.04;
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
 const float PBR_WORKFLOW_SPECULAR_GLOSINESS = 1.0f;
 const float PBR_WORKFLOW_UNLIT = 2.0f;
-#define MANUAL_SRGB 1
 
 vec3 Uncharted2Tonemap(vec3 color)
 {
@@ -61,31 +59,17 @@ vec4 tonemap(vec4 color)
 {
 	vec3 outcol = Uncharted2Tonemap(color.rgb * DEFAULT_EXPOSURE);
 	outcol = outcol * (1.0f / Uncharted2Tonemap(vec3(11.2f)));	
-	return vec4(pow(outcol, vec3(1.0f / DEFAULT_GAMMA)), color.a);
-}
-
-// TODO: Is there a builtin for this?
-vec4 SRGBtoLINEAR(vec4 srgbIn)
-{
-	#ifdef MANUAL_SRGB
-	#ifdef SRGB_FAST_APPROXIMATION
-	vec3 linOut = pow(srgbIn.xyz,vec3(2.2));
-	#else //SRGB_FAST_APPROXIMATION
-	vec3 bLess = step(vec3(0.04045),srgbIn.xyz);
-	vec3 linOut = mix( srgbIn.xyz/vec3(12.92), pow((srgbIn.xyz+vec3(0.055))/vec3(1.055),vec3(2.4)), bLess );
-	#endif //SRGB_FAST_APPROXIMATION
-	return vec4(linOut,srgbIn.w);;
-	#else //MANUAL_SRGB
-	return srgbIn;
-	#endif //MANUAL_SRGB
+	return vec4(outcol, 1.0);
 }
 
 // Find the normal for this fragment, pulling either from a predefined normal map
 // or from the interpolated mesh normal and tangent attributes.
 vec3 getNormal(uint normalTextureID)
 {
-	// Perturb normal, see http://www.thetenthplanet.de/archives/1180
-	vec3 tangentNormal = texture(textures[normalTextureID], inUV).xyz * 2.0 - 1.0;
+	// We swizzle our normals to save on texture reads: https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-normal-maps
+	vec3 tangentNormal;
+	tangentNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
+	tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy)); 
 
 	vec3 q1 = dFdx(inWorldPos);
 	vec3 q2 = dFdy(inWorldPos);
@@ -106,8 +90,27 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 {
 	vec4 irradiance  = vec4(0.5);
 	vec4 ibl_diffuse = irradiance * vec4(pbrInputs.diffuseColor, 1.0);
-	return SRGBtoLINEAR(tonemap(ibl_diffuse)).xyz;
+	return tonemap(ibl_diffuse).xyz;
 }
+
+// TODO: RESTORE
+// Calculation of the lighting contribution from an optional Image Based Light source.
+// Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
+// See our README.md on Environment Maps [3] for additional discussion.
+// vec3 getIBLContributionWithTextures(PBRInfo pbrInputs, vec3 n, vec3 reflection)
+// {
+// 	float lod = (pbrInputs.perceptualRoughness * DEFAULT_CUBE_MIPMAP_LEVELS);
+// 	// retrieve a scale and bias to F0. See [1], Figure 3
+// 	vec3 brdf = (texture(textures[BRDF_LUT_TEXTURE_ID], vec2(pbrInputs.NdotV, 1.0 - pbrInputs.perceptualRoughness))).rgb;
+// 	// vec3 diffuseLight = tonemap(texture(samplerIrradiance, n)).rgb;
+// 	// vec3 specularLight = tonemap(textureLod(prefilteredMap, reflection, lod)).rgb;
+
+// 	// vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
+// 	// vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
+
+// 	// return diffuse + specular;
+// 	return vec3(1.);
+// }
 
 // Basic Lambertian diffuse
 // Implementation from Lambert's Photometria https://archive.org/details/lambertsphotome00lambgoog
@@ -176,7 +179,7 @@ void main()
 	if (material.baseColorTextureID == NO_TEXTURE) {
 		baseColor = material.baseColorFactor;
 	} else {
-		baseColor = SRGBtoLINEAR(texture(textures[material.baseColorTextureID], inUV)) * material.baseColorFactor;
+		baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
 	}
 
 	if (material.alphaMask == 1.0f) {
@@ -196,14 +199,15 @@ void main()
 			perceptualRoughness = clamp(perceptualRoughness, c_MinRoughness, 1.0);
 			metallic = clamp(metallic, 0.0, 1.0);
 		} else {
-			// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel.
-			// This layout intentionally reserves the 'r' channel for (optional) occlusion map data
+			// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel, as per
+			// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
 			vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], inUV);
+
+			// Roughness is authored as perceptual roughness; as is convention,
+			// convert to material roughness by squaring the perceptual roughness [2].
 			perceptualRoughness = mrSample.g * perceptualRoughness;
-			metallic = mrSample.b * metallic;
+			metallic = mrSample.a * metallic;
 		}
-		// Roughness is authored as perceptual roughness; as is convention,
-		// convert to material roughness by squaring the perceptual roughness [2].
 	}
 
 	if (material.workflow == PBR_WORKFLOW_SPECULAR_GLOSINESS) {
@@ -214,7 +218,7 @@ void main()
 			perceptualRoughness = 0.0;
 			specular = vec3(1.0);
 		} else {
-			vec4 physicalDescriptor = SRGBtoLINEAR(texture(textures[material.physicalDescriptorTextureID], inUV));
+			vec4 physicalDescriptor = texture(textures[material.physicalDescriptorTextureID], inUV);
 			specular = physicalDescriptor.rgb;
 			perceptualRoughness = 1.0 - physicalDescriptor.a;
 		}
@@ -280,27 +284,27 @@ void main()
 	float G = geometricOcclusion(pbrInputs);
 	float D = microfacetDistribution(pbrInputs);
 
-	const vec3 u_LightColor = vec3(1.0);
-
 	// Calculation of analytical lighting contribution
 	vec3 diffuseContrib = (1.0 - F) * diffuse(pbrInputs);
 	vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-	vec3 color = NdotL * u_LightColor * (diffuseContrib + specContrib);
+	vec3 color = NdotL * (diffuseContrib + specContrib);
 
 	// Calculate lighting contribution from image based lighting source (IBL)
 	color += getIBLContribution(pbrInputs, n, reflection) * DEFAULT_IBL_SCALE;
 
 	const float u_OcclusionStrength = 1.0f;
+
 	// Apply optional PBR terms for additional (optional) shading
 	if (material.occlusionTextureID != NO_TEXTURE) {
-		float ao = texture(textures[material.occlusionTextureID], inUV).r;
+		// Occlusion is stored in the 'g' channel as per:
+		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
+		float ao = texture(textures[material.occlusionTextureID], inUV).g;
 		color = mix(color, color * ao, u_OcclusionStrength);
 	}
 
-	const float u_EmissiveFactor = 1.0f;
 	if (material.emissiveTextureID != NO_TEXTURE) {
-		vec3 emissive = SRGBtoLINEAR(texture(textures[material.emissiveTextureID], inUV)).rgb * u_EmissiveFactor;
+		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
 		color += emissive;
 	}
 	
@@ -337,7 +341,7 @@ void main()
 				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
 				break;
 		}
-		outColor = SRGBtoLINEAR(outColor);
+		outColor = outColor;
 	}
 
 	// "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
