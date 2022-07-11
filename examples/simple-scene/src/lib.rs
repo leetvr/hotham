@@ -63,7 +63,7 @@ fn add_helmet(
         .expect("Could not find Damaged Helmet");
     let mut transform = world.get_mut::<Transform>(helmet).unwrap();
     transform.translation.z = -1.;
-    transform.translation.y = 1.4;
+    transform.translation.y = 0.6;
     transform.scale = [0.5, 0.5, 0.5].into();
     let position = transform.position();
     drop(transform);
