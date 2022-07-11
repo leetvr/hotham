@@ -240,7 +240,7 @@ impl State {
 
         // I think I'm converting these two types incorrectly but it seems to work and I'm too scared to break it lol
         let rotation: Unit<Quaternion<f32>> =
-            UnitQuaternion::from_euler_angles(self.camera.pitch, self.camera.yaw, 0f32).into();
+            UnitQuaternion::from_euler_angles(self.camera.pitch, self.camera.yaw, 0f32);
 
         orientation.x = rotation.i;
         orientation.y = rotation.j;
