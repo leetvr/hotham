@@ -50,7 +50,12 @@ impl<T: Sized> Buffer<T> {
 
         // Map memory
         let memory_address = device
-            .map_memory(device_memory, 0, size, vk::MemoryMapFlags::empty())
+            .map_memory(
+                device_memory,
+                0,
+                vk::WHOLE_SIZE,
+                vk::MemoryMapFlags::empty(),
+            )
             .unwrap();
 
         // Transmute the pointer into GPU memory so that we can easily access it again.

@@ -1,4 +1,4 @@
-use nalgebra::{Matrix4, Vector4};
+use nalgebra::{Matrix4, Vector3, Vector4};
 use serde::{Deserialize, Serialize};
 
 /// Data about the current scene. Sent to the vertex and fragment shaders
@@ -11,9 +11,10 @@ pub struct SceneData {
     pub camera_position: [Vector4<f32>; 2],
     /// Direction of global light
     pub light_direction: Vector4<f32>,
-    /// Debug information
-    /// x = debug inputs, y = debug algorithm, zw unused. See pbr.frag for more details
-    pub debug_data: Vector4<f32>,
+    /// The number of models in this frame
+    pub draw_count: u32,
+    /// Debug information - x = debug inputs, y = debug algorithm, z = unused
+    pub debug_data: Vector3<f32>,
 }
 
 impl Default for SceneData {
@@ -23,6 +24,7 @@ impl Default for SceneData {
             view_projection: [Matrix4::identity(), Matrix4::identity()],
             camera_position: [Vector4::zeros(), Vector4::zeros()],
             light_direction,
+            draw_count: 0,
             debug_data: Default::default(),
         }
     }

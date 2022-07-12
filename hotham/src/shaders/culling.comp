@@ -30,6 +30,10 @@ bool check_is_visible(mat4 mat, vec3 origin, float radius)
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
+	if (id >= sceneData.drawCount) {
+		return;
+	}
+
     DrawData d = drawDataBuffer.data[id];
     vec3 centre = d.boundingSphere.xyz;
     float radius = d.boundingSphere.w;
