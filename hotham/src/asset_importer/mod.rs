@@ -87,11 +87,6 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
         Material::load(material, import_context);
     }
 
-    // TODO: load textures independent from materials
-    // for texture in document.textures() {
-    //     Texture::load(texture, import_context);
-    // }
-
     // We need *some* entity to stash the AnimationController onto.
     // For now, just use the first root entity.
     let mut animation_controller_entity = None;
@@ -113,6 +108,7 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     }
 
     // Finally, import any skins or animations.
+    //
     // Note that this has to be done after every single node has been imported, as skins and animations can reference any other node.
 
     // Skins are attached to nodes, so we need to go back through the node tree.
