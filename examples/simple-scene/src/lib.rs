@@ -36,6 +36,7 @@ pub fn real_main() -> HothamResult<()> {
 
 fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let render_context = &mut engine.render_context;
+
     let vulkan_context = &mut engine.vulkan_context;
     let physics_context = &mut engine.physics_context;
     let mut world = World::default();
@@ -71,7 +72,7 @@ fn add_helmet(
         .expect("Could not find Damaged Helmet");
     let mut transform = world.get_mut::<Transform>(helmet).unwrap();
     transform.translation.z = -1.;
-    transform.translation.y = 0.6;
+    transform.translation.y = 1.4;
     transform.scale = [0.5, 0.5, 0.5].into();
     let position = transform.position();
     drop(transform);
@@ -122,7 +123,9 @@ fn tick(
             &mut queries.roots_query,
             world,
         );
+
         debug_system(xr_context, render_context, state);
+
         skinning_system(&mut queries.skins_query, world, render_context);
     }
 
@@ -149,7 +152,11 @@ struct DebugState {
     button_pressed_last_frame: bool,
 }
 
+#[allow(unused)]
 fn debug_system(xr_context: &mut XrContext, render_context: &mut RenderContext, state: &mut State) {
+    #[cfg(not(target_os = "android"))]
+    return;
+
     let input = &xr_context.input;
     let pressed = xr::ActionInput::get(
         &input.y_button_action,

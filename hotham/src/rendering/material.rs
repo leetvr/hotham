@@ -3,7 +3,7 @@ use nalgebra::{vector, Vector4};
 
 use crate::{
     asset_importer::ImportContext,
-    rendering::texture::{Texture, NO_TEXTURE},
+    rendering::texture::{Texture, TextureUsage, NO_TEXTURE},
 };
 
 /// Tells the fragment shader to use the PBR Metalic Roughness workflow
@@ -83,32 +83,32 @@ impl Material {
         // Base Color
         let base_color_texture_info = pbr_metallic_roughness.base_color_texture();
         let base_color_texture_set = base_color_texture_info
-            .map(|i| Texture::load(i.texture(), import_context))
+            .map(|i| Texture::load(i.texture(), TextureUsage::BaseColor, import_context))
             .unwrap_or(NO_TEXTURE);
         let base_color_factor = Vector4::from(pbr_metallic_roughness.base_color_factor());
 
         // Metallic Roughness
         let metallic_roughness_texture_info = pbr_metallic_roughness.metallic_roughness_texture();
         let metallic_roughness_texture_set = metallic_roughness_texture_info
-            .map(|i| Texture::load(i.texture(), import_context))
+            .map(|i| Texture::load(i.texture(), TextureUsage::MetallicRoughness, import_context))
             .unwrap_or(NO_TEXTURE);
 
         // Normal map
         let normal_texture_info = material.normal_texture();
         let normal_texture_set = normal_texture_info
-            .map(|i| Texture::load(i.texture(), import_context))
+            .map(|i| Texture::load(i.texture(), TextureUsage::Normal, import_context))
             .unwrap_or(NO_TEXTURE);
 
         // Occlusion
         let occlusion_texture_info = material.occlusion_texture();
         let occlusion_texture_set = occlusion_texture_info
-            .map(|i| Texture::load(i.texture(), import_context))
+            .map(|i| Texture::load(i.texture(), TextureUsage::Occlusion, import_context))
             .unwrap_or(NO_TEXTURE);
 
         // Emission
         let emissive_texture_info = material.emissive_texture();
         let emissive_texture_set = emissive_texture_info
-            .map(|i| Texture::load(i.texture(), import_context))
+            .map(|i| Texture::load(i.texture(), TextureUsage::Emission, import_context))
             .unwrap_or(NO_TEXTURE);
 
         // Factors
@@ -156,8 +156,6 @@ impl Material {
             alpha_mask,
             alpha_mask_cutoff,
         };
-
-        println!("Imported material {:?} - {}", material, material_name);
 
         // Then push it into the materials buffer
         unsafe {

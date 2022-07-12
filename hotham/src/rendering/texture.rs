@@ -16,9 +16,29 @@ pub struct Texture {
     pub image: Image,
     /// Index in the shader
     pub index: u32,
+    /// How the texture will be used
+    pub texture_usage: TextureUsage,
 }
 
-const TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
+/// Describes how this texture will be used by the fragment shader.
+/// Corresponds to the glTF PBR model: https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials
+#[derive(Debug, Clone)]
+pub enum TextureUsage {
+    /// The base color of the material
+    BaseColor,
+    /// A tangent space normal texture
+    Normal,
+    /// The color and intensity of the light being emitted by the material
+    Emission,
+    /// The metalness and roughness of the material
+    MetallicRoughness,
+    /// Indicates areas that receive less less indirect light from ambient sources
+    Occlusion,
+    /// A non PBR texture
+    Other,
+}
+
+const UNCOMPRESSED_TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 
 /// Texture index to indicate to the shader that this material does not have a texture of the given type
 pub static NO_TEXTURE: u32 = std::u32::MAX;
@@ -32,14 +52,18 @@ impl Texture {
         image_buf: &[u8],
         extent: &vk::Extent2D,
         format: vk::Format,
+        texture_usage: TextureUsage,
     ) -> Self {
+        let component_mapping = get_component_mapping(&format, &texture_usage);
+
         let image = vulkan_context
-            .create_image(
+            .create_image_with_component_mapping(
                 format,
                 extent,
                 vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
                 1,
                 1,
+                component_mapping,
             )
             .unwrap();
 
@@ -47,11 +71,19 @@ impl Texture {
             .create_texture_image(name, vulkan_context, image_buf, 1, vec![0], &image)
             .unwrap();
 
-        Texture { image, index }
+        Texture {
+            image,
+            index,
+            texture_usage,
+        }
     }
 
     /// Load a texture from a glTF document. Returns the texture ID
-    pub(crate) fn load(texture: gltf::texture::Texture, import_context: &mut ImportContext) -> u32 {
+    pub(crate) fn load(
+        texture: gltf::texture::Texture,
+        texture_usage: TextureUsage,
+        import_context: &mut ImportContext,
+    ) -> u32 {
         let texture_name = &format!("Texture {}", texture.name().unwrap_or(""));
 
         let texture = match texture.source().source() {
@@ -70,6 +102,7 @@ impl Texture {
                         import_context.vulkan_context,
                         import_context.render_context,
                         bytes,
+                        texture_usage,
                     ),
                     _ => Texture::from_uncompressed(
                         texture_name,
@@ -77,6 +110,7 @@ impl Texture {
                         import_context.vulkan_context,
                         import_context.render_context,
                         bytes,
+                        texture_usage,
                     ),
                 }
             }
@@ -107,7 +141,11 @@ impl Texture {
             .create_texture_image("Empty Texture", vulkan_context, &[], 1, vec![0], &image)
             .unwrap();
 
-        Texture { image, index }
+        Texture {
+            image,
+            index,
+            texture_usage: TextureUsage::Other,
+        }
     }
 
     /// Create a texture from a ktx2 container.
@@ -119,6 +157,7 @@ impl Texture {
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,
         ktx2_data: &[u8],
+        texture_usage: TextureUsage,
     ) -> Self {
         let ktx2_reader = ktx2::Reader::new(ktx2_data).unwrap();
         let header = ktx2_reader.header();
@@ -146,6 +185,7 @@ impl Texture {
             image_bytes,
             &extent,
             format,
+            texture_usage,
         )
     }
 
@@ -159,8 +199,9 @@ impl Texture {
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,
         data: &[u8],
+        texture_usage: TextureUsage,
     ) -> Self {
-        #[cfg(not(target_os = "android"))]
+        #[cfg(target_os = "android")]
         println!("[HOTHAM_TEXTURE] - @@ WARNING: Non-optimal image format detected. For best performance, compress your images into ktx2 using Squisher: https://github.com/leetvr/squisher. @@");
 
         print!("[HOTHAM_TEXTURE] - Decompresing image. This may take some time..");
@@ -183,10 +224,46 @@ impl Texture {
             render_context,
             &image.into_raw(),
             &extent,
-            TEXTURE_FORMAT,
+            UNCOMPRESSED_TEXTURE_FORMAT,
+            texture_usage,
         )
     }
 }
+
+fn get_component_mapping(
+    format: &vk::Format,
+    texture_usage: &TextureUsage,
+) -> vk::ComponentMapping {
+    match (format, texture_usage) {
+        (&UNCOMPRESSED_TEXTURE_FORMAT, TextureUsage::Normal) => vk::ComponentMapping {
+            r: vk::ComponentSwizzle::ZERO,
+            g: vk::ComponentSwizzle::R,
+            b: vk::ComponentSwizzle::ZERO,
+            a: vk::ComponentSwizzle::B,
+        },
+        (&UNCOMPRESSED_TEXTURE_FORMAT, TextureUsage::MetallicRoughness) => vk::ComponentMapping {
+            r: vk::ComponentSwizzle::ZERO,
+            g: vk::ComponentSwizzle::G,
+            b: vk::ComponentSwizzle::ZERO,
+            a: vk::ComponentSwizzle::B,
+        },
+        (&UNCOMPRESSED_TEXTURE_FORMAT, TextureUsage::Occlusion) => vk::ComponentMapping {
+            r: vk::ComponentSwizzle::ZERO,
+            g: vk::ComponentSwizzle::R,
+            b: vk::ComponentSwizzle::ZERO,
+            a: vk::ComponentSwizzle::ZERO,
+        },
+        _ => DEFAULT_COMPONENT_MAPPING,
+    }
+}
+
+/// The identity swizzle
+pub const DEFAULT_COMPONENT_MAPPING: vk::ComponentMapping = vk::ComponentMapping {
+    r: vk::ComponentSwizzle::IDENTITY,
+    g: vk::ComponentSwizzle::IDENTITY,
+    b: vk::ComponentSwizzle::IDENTITY,
+    a: vk::ComponentSwizzle::IDENTITY,
+};
 
 fn get_format_from_mime_type(mime_type: &str) -> image::ImageFormat {
     match mime_type {

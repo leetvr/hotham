@@ -199,7 +199,7 @@ void main()
 			perceptualRoughness = clamp(perceptualRoughness, c_MinRoughness, 1.0);
 			metallic = clamp(metallic, 0.0, 1.0);
 		} else {
-			// Roughness is stored in the 'g' channel, metallic is stored in the 'b' channel, as per
+			// Roughness is stored in the 'g' channel, metallic is stored in the 'a' channel, as per
 			// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
 			vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], inUV);
 
@@ -294,7 +294,6 @@ void main()
 	color += getIBLContribution(pbrInputs, n, reflection) * DEFAULT_IBL_SCALE;
 
 	const float u_OcclusionStrength = 1.0f;
-
 	// Apply optional PBR terms for additional (optional) shading
 	if (material.occlusionTextureID != NO_TEXTURE) {
 		// Occlusion is stored in the 'g' channel as per:
@@ -326,19 +325,20 @@ void main()
 				outColor.rgba = baseColor;
 				break;
 			case 2:
-				outColor.rgb = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : texture(textures[material.normalTextureID], inUV).rgb;
+				outColor.rg = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal).xy : texture(textures[material.normalTextureID], inUV).ga;
+				outColor.b = 0.0;
 				break;
 			case 3:
-				outColor.rgb = (material.occlusionTextureID == NO_TEXTURE) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], inUV).rrr;
+				outColor.rgb = (material.occlusionTextureID == NO_TEXTURE) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], inUV).ggg;
 				break;
 			case 4:
 				outColor.rgb = (material.emissiveTextureID == NO_TEXTURE) ?  vec3(0.0f) : texture(textures[material.emissiveTextureID], inUV).rgb;
 				break;
 			case 5:
-				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).bbb;
+				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
 				break;
 			case 6:
-				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
+				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).aaa;
 				break;
 		}
 		outColor = outColor;
