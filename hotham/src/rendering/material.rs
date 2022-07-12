@@ -75,8 +75,6 @@ impl Default for Material {
 impl Material {
     /// Load a material from a glTF document
     pub(crate) fn load(material: MaterialData, import_context: &mut ImportContext) {
-        let material_name = material.name().unwrap_or("<unnamed>");
-
         let pbr_metallic_roughness = material.pbr_metallic_roughness();
         let pbr_specular_glossiness = material.pbr_specular_glossiness();
 
