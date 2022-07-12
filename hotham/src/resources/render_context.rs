@@ -216,19 +216,20 @@ impl RenderContext {
         }
     }
 
-    // TODO: Get culling working correctly. Requires separate queue, fence and command buffer.
-    // https://github.com/leetvr/hotham/issues/226
-    pub(crate) fn _cull_objects(
+    // TODO: GPU culling seems to cause deadlocks at high load. Most likely due to a clash between shared coherent memory.
+    // Solution is to split buffers apart: https://github.com/leetvr/hotham/issues/263
+    pub(crate) fn cull_objects(
         &self,
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,
     ) {
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];
-        let command_buffer = frame.command_buffer;
-        let fence = frame.fence;
+        let command_buffer = frame.compute_command_buffer;
+        let fence = frame.compute_fence;
 
         unsafe {
+            device.reset_fences(std::slice::from_ref(&fence)).unwrap();
             device
                 .begin_command_buffer(
                     command_buffer,
@@ -261,13 +262,14 @@ impl RenderContext {
                 vk::SubmitInfo::builder().command_buffers(std::slice::from_ref(&command_buffer));
             device
                 .queue_submit(
-                    vulkan_context.graphics_queue, // TODO: get a proper queue
+                    vulkan_context.graphics_queue,
                     std::slice::from_ref(&submit_info),
                     fence,
                 )
                 .unwrap();
-            device.wait_for_fences(&[fence], true, 1000000000).unwrap();
-            device.reset_fences(&[fence]).unwrap();
+            device
+                .wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX)
+                .unwrap();
         }
     }
 
@@ -369,6 +371,8 @@ impl RenderContext {
 
         unsafe {
             device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
+
+            // TEMPORARY
             device.reset_fences(&[fence]).unwrap();
         }
     }

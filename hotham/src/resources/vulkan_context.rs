@@ -1043,6 +1043,7 @@ fn create_vulkan_device(
 
     // We use a *whole bunch* of different features, and somewhat annoyingly they're all enabled in different ways.
     let enabled_features = vk::PhysicalDeviceFeatures::builder()
+        .robust_buffer_access(true)
         .multi_draw_indirect(true)
         .sampler_anisotropy(true)
         .build();
@@ -1058,8 +1059,9 @@ fn create_vulkan_device(
         .descriptor_binding_sampled_image_update_after_bind(true)
         .runtime_descriptor_array(true);
 
-    let mut robust_features =
-        vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
+    let mut robust_features = vk::PhysicalDeviceRobustness2FeaturesEXT::builder()
+        .null_descriptor(true)
+        .robust_buffer_access2(true);
 
     let device_create_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(slice_from_ref(&queue_create_info))

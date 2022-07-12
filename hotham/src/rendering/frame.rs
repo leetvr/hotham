@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::{hotham_error::HothamError, resources::VulkanContext};
+use crate::resources::VulkanContext;
 use anyhow::Result;
 
 /// A container for all the resources necessary to render a single frame.
@@ -14,6 +14,10 @@ pub struct Frame {
     pub framebuffer: vk::Framebuffer,
     /// The image view we've been handed from the swapchain
     pub swapchain_image_view: vk::ImageView,
+    /// The fence used to signal when compute work is done
+    pub compute_fence: vk::Fence,
+    /// A command buffer used to record compute commands
+    pub compute_command_buffer: vk::CommandBuffer,
 }
 
 impl Frame {
@@ -35,16 +39,24 @@ impl Frame {
             )
         }?;
 
-        let command_buffer = unsafe {
+        let compute_fence = unsafe {
+            device.create_fence(
+                &vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED),
+                None,
+            )
+        }?;
+
+        let command_buffers = unsafe {
             device.allocate_command_buffers(
                 &vk::CommandBufferAllocateInfo::builder()
-                    .command_buffer_count(1)
+                    .command_buffer_count(2)
                     .level(vk::CommandBufferLevel::PRIMARY)
                     .command_pool(command_pool),
             )
-        }?
-        .pop()
-        .ok_or(HothamError::EmptyListError)?;
+        }?;
+
+        let command_buffer = command_buffers[0];
+        let compute_command_buffer = command_buffers[1];
 
         let attachments = [color_image_view, depth_image_view, swapchain_image_view];
 
@@ -59,25 +71,11 @@ impl Frame {
 
         Ok(Self {
             fence,
+            compute_fence,
             command_buffer,
+            compute_command_buffer,
             framebuffer: frame_buffer,
             swapchain_image_view,
         })
     }
-
-    // TODO: Handle destroy
-    // pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) {
-    //     unsafe {
-    //         vulkan_context
-    //             .device
-    //             .destroy_framebuffer(self.framebuffer, None);
-    //         vulkan_context.device.destroy_fence(self.fence, None);
-    //         vulkan_context
-    //             .device
-    //             .free_command_buffers(vulkan_context.command_pool, &[self.command_buffer]);
-    //         vulkan_context
-    //             .device
-    //             .destroy_image_view(self.swapchain_image_view, None)
-    //     }
-    // }
 }

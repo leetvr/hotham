@@ -61,7 +61,8 @@ layout (set = 0, binding = 4) uniform SceneData {
     mat4 viewProjection[2];
     vec4 cameraPosition[2];
     vec4 lightDirection;
-    vec4 debugData;
+    uint drawCount;
+    vec3 debugData;
 } sceneData;
 
 

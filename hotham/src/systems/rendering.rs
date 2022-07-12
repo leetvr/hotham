@@ -54,7 +54,13 @@ pub fn rendering_system(
         }
     }
 
-    // render_context.cull_objects(vulkan_context, swapchain_image_index);
+    // Update our draw count
+    unsafe {
+        let scene_data = &mut render_context.resources.scene_data_buffer.as_slice_mut()[0];
+        scene_data.draw_count = render_context.resources.draw_indirect_buffer.len as u32;
+    }
+
+    render_context.cull_objects(vulkan_context, swapchain_image_index);
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
 
     let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
