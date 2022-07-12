@@ -38,8 +38,6 @@ pub enum TextureUsage {
     Other,
 }
 
-const UNCOMPRESSED_TEXTURE_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
-
 /// Texture index to indicate to the shader that this material does not have a texture of the given type
 pub static NO_TEXTURE: u32 = std::u32::MAX;
 
@@ -216,6 +214,11 @@ impl Texture {
             height: image.height(),
         };
 
+        let format = match texture_usage {
+            TextureUsage::BaseColor | TextureUsage::Emission => vk::Format::R8G8B8A8_SRGB,
+            _ => vk::Format::R8G8B8A8_UNORM,
+        };
+
         println!(" ..done!");
 
         Texture::new(
@@ -224,7 +227,7 @@ impl Texture {
             render_context,
             &image.into_raw(),
             &extent,
-            UNCOMPRESSED_TEXTURE_FORMAT,
+            format,
             texture_usage,
         )
     }
@@ -234,20 +237,22 @@ fn get_component_mapping(
     format: &vk::Format,
     texture_usage: &TextureUsage,
 ) -> vk::ComponentMapping {
-    match (format, texture_usage) {
-        (&UNCOMPRESSED_TEXTURE_FORMAT, TextureUsage::Normal) => vk::ComponentMapping {
+    let uncompressed =
+        *format == vk::Format::R8G8B8A8_SRGB || *format == vk::Format::R8G8B8A8_UNORM;
+    match (uncompressed, texture_usage) {
+        (true, TextureUsage::Normal) => vk::ComponentMapping {
             r: vk::ComponentSwizzle::ZERO,
             g: vk::ComponentSwizzle::R,
             b: vk::ComponentSwizzle::ZERO,
             a: vk::ComponentSwizzle::B,
         },
-        (&UNCOMPRESSED_TEXTURE_FORMAT, TextureUsage::MetallicRoughness) => vk::ComponentMapping {
+        (true, TextureUsage::MetallicRoughness) => vk::ComponentMapping {
             r: vk::ComponentSwizzle::ZERO,
             g: vk::ComponentSwizzle::G,
             b: vk::ComponentSwizzle::ZERO,
             a: vk::ComponentSwizzle::B,
         },
-        (&UNCOMPRESSED_TEXTURE_FORMAT, TextureUsage::Occlusion) => vk::ComponentMapping {
+        (true, TextureUsage::Occlusion) => vk::ComponentMapping {
             r: vk::ComponentSwizzle::ZERO,
             g: vk::ComponentSwizzle::R,
             b: vk::ComponentSwizzle::ZERO,
