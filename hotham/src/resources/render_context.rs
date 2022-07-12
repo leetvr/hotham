@@ -17,7 +17,8 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 use crate::{
     rendering::{
         camera::Camera, descriptors::Descriptors, frame::Frame, image::Image, resources::Resources,
-        scene_data::SceneData, swapchain::Swapchain, vertex::Vertex,
+        scene_data::SceneData, swapchain::Swapchain, texture::DEFAULT_COMPONENT_MAPPING,
+        vertex::Vertex,
     },
     resources::{VulkanContext, XrContext},
     COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
@@ -463,6 +464,7 @@ fn create_frames(
                 vk::ImageViewType::TYPE_2D_ARRAY,
                 2,
                 1,
+                DEFAULT_COMPONENT_MAPPING,
             )
         })
         .map(|i| {

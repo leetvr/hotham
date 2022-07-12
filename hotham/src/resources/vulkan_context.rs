@@ -1,7 +1,9 @@
 #![allow(deprecated)]
 
 use crate::{
-    hotham_error::HothamError, rendering::image::Image, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
+    hotham_error::HothamError,
+    rendering::{image::Image, texture::DEFAULT_COMPONENT_MAPPING},
+    DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -243,6 +245,7 @@ impl VulkanContext {
         view_type: vk::ImageViewType,
         layer_count: u32,
         mip_levels: u32,
+        component_mapping: vk::ComponentMapping,
     ) -> Result<vk::ImageView> {
         let aspect_mask = get_aspect_mask(format);
         let create_info = vk::ImageViewCreateInfo::builder()
@@ -255,12 +258,7 @@ impl VulkanContext {
                 base_array_layer: 0,
                 layer_count,
             })
-            .components(vk::ComponentMapping {
-                r: vk::ComponentSwizzle::R,
-                g: vk::ComponentSwizzle::G,
-                b: vk::ComponentSwizzle::B,
-                a: vk::ComponentSwizzle::A,
-            })
+            .components(component_mapping)
             .image(*image);
         unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
     }
@@ -272,6 +270,26 @@ impl VulkanContext {
         usage: vk::ImageUsageFlags,
         array_layers: u32,
         mip_levels: u32,
+    ) -> Result<Image> {
+        self.create_image_with_component_mapping(
+            format,
+            extent,
+            usage,
+            array_layers,
+            mip_levels,
+            DEFAULT_COMPONENT_MAPPING,
+        )
+    }
+
+    // TODO: Move this to `Image::new`
+    pub fn create_image_with_component_mapping(
+        &self,
+        format: vk::Format,
+        extent: &vk::Extent2D,
+        usage: vk::ImageUsageFlags,
+        array_layers: u32,
+        mip_levels: u32,
+        component_mapping: vk::ComponentMapping,
     ) -> Result<Image> {
         let tiling = vk::ImageTiling::OPTIMAL;
         let (flags, image_view_type) = if array_layers == 1 {
@@ -317,8 +335,14 @@ impl VulkanContext {
 
         unsafe { self.device.bind_image_memory(image, device_memory, 0) }?;
 
-        let image_view =
-            self.create_image_view(&image, format, image_view_type, array_layers, mip_levels)?;
+        let image_view = self.create_image_view(
+            &image,
+            format,
+            image_view_type,
+            array_layers,
+            mip_levels,
+            component_mapping,
+        )?;
 
         Ok(Image::new(
             image,
