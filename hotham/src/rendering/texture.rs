@@ -36,7 +36,7 @@ impl Texture {
         let image = vulkan_context
             .create_image(
                 format,
-                &extent,
+                extent,
                 vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
                 1,
                 1,
