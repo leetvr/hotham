@@ -40,11 +40,19 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let physics_context = &mut engine.physics_context;
     let mut world = World::default();
 
-    let glb_buffers: Vec<&[u8]> = vec![
+    let mut glb_buffers: Vec<&[u8]> = vec![
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
-        include_bytes!("../../../test_assets/damaged_helmet_squished.glb"),
     ];
+
+    #[cfg(target_os = "android")]
+    glb_buffers.push(include_bytes!(
+        "../../../test_assets/damaged_helmet_squished.glb"
+    ));
+
+    #[cfg(not(target_os = "android"))]
+    glb_buffers.push(include_bytes!("../../../test_assets/damaged_helmet.glb"));
+
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_helmet(&models, &mut world, physics_context);

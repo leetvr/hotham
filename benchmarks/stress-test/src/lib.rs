@@ -120,9 +120,13 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             models
         }
         StressTest::ManyHelmets => {
+            #[cfg(target_os = "android")]
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!(
                 "../../../test_assets/damaged_helmet_squished.glb"
             )];
+            #[cfg(not(target_os = "android"))]
+            let glb_buffers: Vec<&[u8]> =
+                vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
             let models =
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
