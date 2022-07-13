@@ -197,7 +197,8 @@ impl RenderContext {
         Ok(())
     }
 
-    pub(crate) fn begin_frame(&self, vulkan_context: &VulkanContext, swapchain_image_index: usize) {
+    /// Start rendering a frame
+    pub fn begin_frame(&self, vulkan_context: &VulkanContext, swapchain_image_index: usize) {
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];
@@ -333,11 +334,8 @@ impl RenderContext {
         }
     }
 
-    pub(crate) fn end_frame(
-        &mut self,
-        vulkan_context: &VulkanContext,
-        swapchain_image_index: usize,
-    ) {
+    /// Finish rendering a frame
+    pub fn end_frame(&mut self, vulkan_context: &VulkanContext, swapchain_image_index: usize) {
         // Get the values we need to end the renderpass
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];

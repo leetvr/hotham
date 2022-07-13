@@ -73,7 +73,7 @@ fn tick(
     }
 
     // Frame start
-    begin_frame(xr_context, vulkan_context, render_context);
+    let swapchain_image_index = begin_frame(xr_context, render_context);
 
     handle_state_change(
         previous_state,
@@ -141,12 +141,13 @@ fn tick(
 
     // Rendering tasks - only necessary if we are in at least the visible state
     if current_state == xr::SessionState::VISIBLE || current_state == xr::SessionState::FOCUSED {
+        render_context.begin_frame(vulkan_context, swapchain_image_index);
         // Draw GUI
         draw_gui_system(
             &mut hotham_queries.draw_gui_query,
             world,
             vulkan_context,
-            &xr_context.frame_index,
+            &swapchain_image_index,
             render_context,
             gui_context,
             haptic_context,
@@ -155,13 +156,14 @@ fn tick(
             &mut hotham_queries.rendering_query,
             world,
             vulkan_context,
-            xr_context.frame_index,
+            swapchain_image_index,
             render_context,
         );
+        render_context.end_frame(vulkan_context, swapchain_image_index);
     }
 
     // End the frame
-    end_frame(xr_context, vulkan_context, render_context);
+    end_frame(xr_context);
 }
 
 fn handle_state_change(

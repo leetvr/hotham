@@ -186,7 +186,7 @@ fn tick(
     let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
 
-    begin_frame(xr_context, vulkan_context, render_context);
+    let frame_index = begin_frame(xr_context, render_context);
 
     if current_state == xr::SessionState::FOCUSED {
         hands_system(&mut queries.hands_query, world, xr_context, physics_context);
@@ -217,16 +217,18 @@ fn tick(
     }
 
     if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
+        render_context.begin_frame(vulkan_context, frame_index);
         rendering_system(
             &mut queries.rendering_query,
             world,
             vulkan_context,
-            xr_context.frame_index,
+            frame_index,
             render_context,
         );
+        render_context.end_frame(vulkan_context, frame_index);
     }
 
-    end_frame(xr_context, vulkan_context, render_context);
+    end_frame(xr_context);
 }
 
 fn subdivide_mesh_system(world: &mut World, render_context: &mut RenderContext, timer: &mut Timer) {
