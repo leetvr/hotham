@@ -3,6 +3,9 @@ use ash::vk;
 use crate::resources::VulkanContext;
 use anyhow::Result;
 
+use super::{buffer::Buffer, resources::DrawData};
+static DRAW_DATA_BUFFER_SIZE: usize = 10_000; // TODO
+
 /// A container for all the resources necessary to render a single frame.
 #[derive(Debug, Clone)]
 pub struct Frame {
@@ -18,6 +21,10 @@ pub struct Frame {
     pub compute_fence: vk::Fence,
     /// A command buffer used to record compute commands
     pub compute_command_buffer: vk::CommandBuffer,
+    /// Data for the primitives that will be drawn this frame, indexed by gl_DrawId
+    pub draw_data_buffer: Buffer<DrawData>,
+    /// The actual draw calls for this frame.
+    pub draw_indirect_buffer: Buffer<vk::DrawIndexedIndirectCommand>,
 }
 
 impl Frame {
@@ -69,6 +76,21 @@ impl Frame {
 
         let frame_buffer = unsafe { device.create_framebuffer(&frame_buffer_create_info, None) }?;
 
+        let draw_data_buffer = unsafe {
+            Buffer::new(
+                vulkan_context,
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+                DRAW_DATA_BUFFER_SIZE,
+            )
+        };
+        let draw_indirect_buffer = unsafe {
+            Buffer::new(
+                vulkan_context,
+                vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::INDIRECT_BUFFER,
+                DRAW_DATA_BUFFER_SIZE,
+            )
+        };
+
         Ok(Self {
             fence,
             compute_fence,
@@ -76,6 +98,8 @@ impl Frame {
             compute_command_buffer,
             framebuffer: frame_buffer,
             swapchain_image_view,
+            draw_data_buffer,
+            draw_indirect_buffer,
         })
     }
 }

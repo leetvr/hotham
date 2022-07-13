@@ -8,6 +8,7 @@ use crate::resources::vulkan_context;
 use super::memory::allocate_memory;
 
 /// A wrapper around a chunk of allocated memory on the GPU
+#[derive(Debug, Clone)]
 pub struct Buffer<T: Sized> {
     /// A handle to the underlying vk::Buffer
     pub buffer: vk::Buffer,

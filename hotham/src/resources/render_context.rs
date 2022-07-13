@@ -105,7 +105,8 @@ impl RenderContext {
             swapchain,
             &depth_image,
             &color_image,
-        )?;
+            &descriptors,
+        );
         let scene_data = Default::default();
         unsafe {
             resources.scene_data_buffer.push(&scene_data);
@@ -247,15 +248,10 @@ impl RenderContext {
                 vk::PipelineBindPoint::COMPUTE,
                 self.pipeline_layout,
                 0,
-                slice_from_ref(&self.descriptors.set),
+                slice_from_ref(&self.descriptors.sets[swapchain_image_index]),
                 &[],
             );
-            device.cmd_dispatch(
-                command_buffer,
-                self.resources.draw_indirect_buffer.len as u32,
-                1,
-                1,
-            );
+            device.cmd_dispatch(command_buffer, frame.draw_indirect_buffer.len as u32, 1, 1);
             device.end_command_buffer(command_buffer).unwrap();
 
             let submit_info =
@@ -266,9 +262,6 @@ impl RenderContext {
                     std::slice::from_ref(&submit_info),
                     fence,
                 )
-                .unwrap();
-            device
-                .wait_for_fences(std::slice::from_ref(&fence), true, u64::MAX)
                 .unwrap();
         }
     }
@@ -309,7 +302,7 @@ impl RenderContext {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                slice_from_ref(&self.descriptors.set),
+                slice_from_ref(&self.descriptors.sets[swapchain_image_index]),
                 &[],
             );
             device.cmd_bind_index_buffer(
@@ -456,7 +449,8 @@ fn create_frames(
     swapchain: &Swapchain,
     depth_image: &Image,
     color_image: &Image,
-) -> Result<Vec<Frame>> {
+    descriptors: &Descriptors,
+) -> Vec<Frame> {
     print!("[HOTHAM_INIT] Creating frames..");
     let frames = swapchain
         .images
@@ -471,19 +465,37 @@ fn create_frames(
                 DEFAULT_COMPONENT_MAPPING,
             )
         })
-        .map(|i| {
-            Frame::new(
+        .enumerate()
+        .map(|(index, image_view)| {
+            let frame = Frame::new(
                 vulkan_context,
                 *render_pass,
                 swapchain.resolution,
-                i,
+                image_view,
                 depth_image.view,
                 color_image.view,
             )
+            .unwrap();
+
+            // Update the descriptor sets for this frame.
+            unsafe {
+                frame.draw_data_buffer.update_descriptor_set(
+                    &vulkan_context.device,
+                    descriptors.sets[index],
+                    0,
+                );
+                frame.draw_indirect_buffer.update_descriptor_set(
+                    &vulkan_context.device,
+                    descriptors.sets[index],
+                    2,
+                );
+            }
+
+            frame
         })
-        .collect::<Result<Vec<Frame>>>()?;
+        .collect::<Vec<Frame>>();
     println!(" ..done!");
-    Ok(frames)
+    frames
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {

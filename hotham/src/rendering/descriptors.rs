@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use crate::resources::VulkanContext;
 use ash::vk;
 
@@ -7,7 +9,8 @@ static TEXTURE_BINDING: u32 = 5;
 #[derive(Clone, Debug)]
 pub(crate) struct Descriptors {
     pub layout: vk::DescriptorSetLayout,
-    pub set: vk::DescriptorSet,
+    // One descriptor set per frame
+    pub sets: [vk::DescriptorSet; 3],
     #[allow(unused)]
     pub pool: vk::DescriptorPool,
 }
@@ -21,9 +24,9 @@ impl Descriptors {
         let layout = create_descriptor_layouts(&vulkan_context.device);
 
         // Finally, allocate the shared descriptor set.
-        let set = allocate_descriptor_set(vulkan_context, pool, layout);
+        let sets = allocate_descriptor_sets(vulkan_context, pool, layout);
 
-        Self { layout, set, pool }
+        Self { layout, sets, pool }
     }
 
     pub unsafe fn write_texture_descriptor(
@@ -39,36 +42,43 @@ impl Descriptors {
             image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
         };
 
-        let texture_write = vk::WriteDescriptorSet::builder()
-            .image_info(std::slice::from_ref(&image_info))
-            .dst_binding(TEXTURE_BINDING)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .dst_array_element(array_index)
-            .dst_set(self.set);
+        let texture_writes = self.sets.map(|set| {
+            vk::WriteDescriptorSet::builder()
+                .image_info(std::slice::from_ref(&image_info))
+                .dst_binding(TEXTURE_BINDING)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .dst_array_element(array_index)
+                .dst_set(set)
+                .build()
+        });
 
         vulkan_context
             .device
-            .update_descriptor_sets(std::slice::from_ref(&texture_write), &[]);
+            .update_descriptor_sets(&texture_writes, &[]);
     }
 }
 
-unsafe fn allocate_descriptor_set(
+unsafe fn allocate_descriptor_sets(
     vulkan_context: &VulkanContext,
     pool: vk::DescriptorPool,
     layout: vk::DescriptorSetLayout,
-) -> vk::DescriptorSet {
+) -> [vk::DescriptorSet; 3] {
     let mut descriptor_counts = vk::DescriptorSetVariableDescriptorCountAllocateInfo::builder()
-        .descriptor_counts(&[10_000]);
-    let set = vulkan_context
+        .descriptor_counts(&[10_000, 10_000, 10_000]);
+    let layouts = [layout, layout, layout];
+
+    vulkan_context
         .device
         .allocate_descriptor_sets(
             &vk::DescriptorSetAllocateInfo::builder()
                 .descriptor_pool(pool)
-                .set_layouts(std::slice::from_ref(&layout))
+                .set_layouts(&layouts)
                 .push_next(&mut descriptor_counts),
         )
-        .unwrap()[0];
-    set
+        .unwrap()
+        .as_slice()
+        .try_into()
+        .unwrap()
 }
 
 unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLayout {
@@ -165,7 +175,7 @@ unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
         },
         vk::DescriptorPoolSize {
             ty: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-            descriptor_count: 10_000,
+            descriptor_count: 60_000,
         },
     ];
     device

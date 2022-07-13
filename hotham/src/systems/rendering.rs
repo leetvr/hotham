@@ -25,8 +25,10 @@ pub fn rendering_system(
 ) {
     // First, we need to collect all our draw data
     unsafe {
-        let draw_data_buffer = &mut render_context.resources.draw_data_buffer;
-        let draw_indirect_buffer = &mut render_context.resources.draw_indirect_buffer;
+        let frame = &mut render_context.frames[swapchain_image_index];
+        let draw_data_buffer = &mut frame.draw_data_buffer;
+        let draw_indirect_buffer = &mut frame.draw_indirect_buffer;
+
         let meshes = &render_context.resources.mesh_data;
         draw_data_buffer.clear();
         draw_indirect_buffer.clear();
@@ -54,18 +56,13 @@ pub fn rendering_system(
         }
     }
 
-    // Update our draw count
-    unsafe {
-        let scene_data = &mut render_context.resources.scene_data_buffer.as_slice_mut()[0];
-        scene_data.draw_count = render_context.resources.draw_indirect_buffer.len as u32;
-    }
-
     render_context.cull_objects(vulkan_context, swapchain_image_index);
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
 
-    let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
     let device = &vulkan_context.device;
-    let draw_indirect_buffer = &render_context.resources.draw_indirect_buffer;
+    let frame = &render_context.frames[swapchain_image_index];
+    let command_buffer = frame.command_buffer;
+    let draw_indirect_buffer = &frame.draw_indirect_buffer;
 
     unsafe {
         if USE_MULTI_DRAW_INDIRECT {
