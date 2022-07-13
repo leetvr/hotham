@@ -57,12 +57,11 @@ layout(std430, set = 0, binding = 3) readonly buffer SkinsBuffer {
     mat4 jointMatrices[100][64]; // dynamically sized array of 64 element long arrays of mat4.
 } skinsBuffer;
 
-layout (set = 0, binding = 4) uniform SceneData { 
+layout (set = 0, binding = 4) readonly uniform SceneData { 
     mat4 viewProjection[2];
     vec4 cameraPosition[2];
     vec4 lightDirection;
-    uint drawCount;
-    vec3 debugData;
+    vec4 debugData;
 } sceneData;
 
 
