@@ -1,6 +1,10 @@
 #version 460
 #include "common.glsl"
 
+layout(push_constant) uniform FrameData {
+	uint drawCalls;
+} frameData;
+
 bool check_is_visible(mat4 mat, vec3 origin, float radius)
 {
 	uint plane_index = 0;
@@ -30,9 +34,7 @@ bool check_is_visible(mat4 mat, vec3 origin, float radius)
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
-	if (id >= sceneData.drawCount) {
-		return;
-	}
+	if (id >= frameData.drawCalls) { return; }
 
     DrawData d = drawDataBuffer.data[id];
     vec3 centre = d.boundingSphere.xyz;

@@ -35,9 +35,10 @@ static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp");
 
 pub struct RenderContext {
     pub frames: Vec<Frame>,
-    pub pipeline_layout: vk::PipelineLayout,
     pub pipeline: vk::Pipeline,
     pub compute_pipeline: vk::Pipeline,
+    pub pipeline_layout: vk::PipelineLayout,
+    pub compute_pipeline_layout: vk::PipelineLayout,
     pub render_pass: vk::RenderPass,
     pub depth_image: Image,
     pub color_image: Image,
@@ -78,7 +79,8 @@ impl RenderContext {
         let pipeline_layout =
             create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.layout))?;
         let pipeline = create_pipeline(vulkan_context, pipeline_layout, &render_area, render_pass)?;
-        let compute_pipeline = create_compute_pipeline(&vulkan_context.device, pipeline_layout);
+        let (compute_pipeline, compute_pipeline_layout) =
+            create_compute_pipeline(&vulkan_context.device, &descriptors);
 
         // Depth image, shared between frames
         let depth_image = vulkan_context.create_image(
@@ -117,6 +119,7 @@ impl RenderContext {
             pipeline,
             compute_pipeline,
             pipeline_layout,
+            compute_pipeline_layout,
             render_pass,
             frame_index: 0,
             depth_image,
@@ -227,18 +230,22 @@ impl RenderContext {
     ) {
         let device = &vulkan_context.device;
         let frame = &self.frames[swapchain_image_index];
-        let command_buffer = frame.compute_command_buffer;
-        let fence = frame.compute_fence;
+        let draw_indirect_buffer = &frame.draw_indirect_buffer;
+        let command_buffer = frame.command_buffer;
+        let buffer_memory_barrier = vk::BufferMemoryBarrier::builder()
+            .buffer(draw_indirect_buffer.buffer)
+            .size(vk::WHOLE_SIZE)
+            .src_access_mask(vk::AccessFlags::SHADER_WRITE)
+            .dst_access_mask(vk::AccessFlags::INDIRECT_COMMAND_READ)
+            .src_queue_family_index(0)
+            .dst_queue_family_index(0);
+
+        let frame_data = FrameData {
+            draw_calls: draw_indirect_buffer.len as u32,
+        };
+        let push_constant = create_push_constant(&frame_data);
 
         unsafe {
-            device.reset_fences(std::slice::from_ref(&fence)).unwrap();
-            device
-                .begin_command_buffer(
-                    command_buffer,
-                    &vk::CommandBufferBeginInfo::builder()
-                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
-                )
-                .unwrap();
             device.cmd_bind_pipeline(
                 command_buffer,
                 vk::PipelineBindPoint::COMPUTE,
@@ -247,23 +254,28 @@ impl RenderContext {
             device.cmd_bind_descriptor_sets(
                 command_buffer,
                 vk::PipelineBindPoint::COMPUTE,
-                self.pipeline_layout,
+                self.compute_pipeline_layout,
                 0,
                 slice_from_ref(&self.descriptors.sets[swapchain_image_index]),
                 &[],
             );
-            device.cmd_dispatch(command_buffer, frame.draw_indirect_buffer.len as u32, 1, 1);
-            device.end_command_buffer(command_buffer).unwrap();
-
-            let submit_info =
-                vk::SubmitInfo::builder().command_buffers(std::slice::from_ref(&command_buffer));
-            device
-                .queue_submit(
-                    vulkan_context.graphics_queue,
-                    std::slice::from_ref(&submit_info),
-                    fence,
-                )
-                .unwrap();
+            device.cmd_push_constants(
+                command_buffer,
+                self.compute_pipeline_layout,
+                vk::ShaderStageFlags::COMPUTE,
+                0,
+                push_constant,
+            );
+            device.cmd_dispatch(command_buffer, draw_indirect_buffer.len as u32, 1, 1);
+            device.cmd_pipeline_barrier(
+                command_buffer,
+                vk::PipelineStageFlags::COMPUTE_SHADER,
+                vk::PipelineStageFlags::DRAW_INDIRECT,
+                vk::DependencyFlags::empty(),
+                &[],
+                slice_from_ref(&buffer_memory_barrier),
+                &[],
+            );
         }
     }
 
@@ -769,12 +781,32 @@ fn create_pipeline_layout(
     .map_err(|e| e.into())
 }
 
-fn create_compute_pipeline(device: &ash::Device, layout: vk::PipelineLayout) -> vk::Pipeline {
+#[repr(C)]
+struct FrameData {
+    draw_calls: u32,
+}
+
+fn create_compute_pipeline(
+    device: &ash::Device,
+    descriptors: &Descriptors,
+) -> (vk::Pipeline, vk::PipelineLayout) {
     unsafe {
         let shader_entry_name = CStr::from_bytes_with_nul_unchecked(b"main\0");
         let compute_module = device
             .create_shader_module(&vk::ShaderModuleCreateInfo::builder().code(COMPUTE), None)
             .unwrap();
+
+        let create_info = &vk::PipelineLayoutCreateInfo::builder()
+            .set_layouts(slice_from_ref(&descriptors.layout))
+            .push_constant_ranges(&[vk::PushConstantRange {
+                stage_flags: vk::ShaderStageFlags::COMPUTE,
+                offset: 0,
+                size: size_of::<FrameData>() as _,
+                ..Default::default()
+            }]);
+
+        let layout = device.create_pipeline_layout(create_info, None).unwrap();
+
         let create_info = vk::ComputePipelineCreateInfo::builder()
             .stage(vk::PipelineShaderStageCreateInfo {
                 stage: vk::ShaderStageFlags::COMPUTE,
@@ -784,12 +816,14 @@ fn create_compute_pipeline(device: &ash::Device, layout: vk::PipelineLayout) -> 
             })
             .layout(layout);
 
-        device
+        let pipeline = device
             .create_compute_pipelines(
                 vk::PipelineCache::null(),
                 std::slice::from_ref(&create_info),
                 None,
             )
-            .unwrap()[0]
+            .unwrap()[0];
+
+        (pipeline, layout)
     }
 }
