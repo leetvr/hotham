@@ -46,7 +46,6 @@ pub struct RenderContext {
     pub scene_data: SceneData,
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
-    pub frame_index: usize,
     pub resources: Resources,
     pub(crate) descriptors: Descriptors,
 }
@@ -77,10 +76,12 @@ impl RenderContext {
         // Pipeline, render pass
         let render_pass = create_render_pass(vulkan_context)?;
         let pipeline_layout =
-            create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.layout))?;
+            create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.graphics_layout))?;
         let pipeline = create_pipeline(vulkan_context, pipeline_layout, &render_area, render_pass)?;
-        let (compute_pipeline, compute_pipeline_layout) =
-            create_compute_pipeline(&vulkan_context.device, &descriptors);
+        let (compute_pipeline, compute_pipeline_layout) = create_compute_pipeline(
+            &vulkan_context.device,
+            slice_from_ref(&descriptors.compute_layout),
+        );
 
         // Depth image, shared between frames
         let depth_image = vulkan_context.create_image(
@@ -119,12 +120,11 @@ impl RenderContext {
             pipeline_layout,
             compute_pipeline_layout,
             render_pass,
-            frame_index: 0,
             depth_image,
             color_image,
             render_area,
             cameras: vec![Default::default(); 2],
-            views: Vec::new(),
+            views: vec![Default::default(); 2],
             scene_data,
             descriptors,
             resources,
@@ -185,19 +185,19 @@ impl RenderContext {
         let fov_left = views[0].fov;
         let fov_right = views[1].fov;
 
-        let view_projection = [
+        self.scene_data.view_projection = [
             get_projection(fov_left, near, far) * view_matrices[0],
             get_projection(fov_right, near, far) * view_matrices[1],
         ];
 
-        let camera_position = [self.cameras[0].position(), self.cameras[1].position()];
+        self.scene_data.camera_position = [self.cameras[0].position(), self.cameras[1].position()];
 
         unsafe {
             let scene_data = &mut self.frames[swapchain_image_index]
                 .scene_data_buffer
                 .as_slice_mut()[0];
-            scene_data.camera_position = camera_position;
-            scene_data.view_projection = view_projection;
+            scene_data.camera_position = self.scene_data.camera_position;
+            scene_data.view_projection = self.scene_data.view_projection;
             scene_data.debug_data = self.scene_data.debug_data;
         }
 
@@ -228,12 +228,12 @@ impl RenderContext {
     // TODO: GPU culling seems to cause deadlocks at high load. Most likely due to a clash between shared coherent memory.
     // Solution is to split buffers apart: https://github.com/leetvr/hotham/issues/263
     pub(crate) fn cull_objects(
-        &self,
+        &mut self,
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,
     ) {
         let device = &vulkan_context.device;
-        let frame = &self.frames[swapchain_image_index];
+        let frame = &mut self.frames[swapchain_image_index];
         let draw_indirect_buffer = &frame.draw_indirect_buffer;
         let command_buffer = frame.command_buffer;
         let buffer_memory_barrier = vk::BufferMemoryBarrier::builder()
@@ -244,10 +244,37 @@ impl RenderContext {
             .src_queue_family_index(0)
             .dst_queue_family_index(0);
 
-        let frame_data = FrameData {
+        let near = 0.05;
+        let far = 100.0;
+
+        let fov_left = self.views[0].fov;
+        let fov_right = self.views[1].fov;
+        let fov = xr::Fovf {
+            angle_left: fov_left.angle_left,
+            angle_right: fov_right.angle_right,
+            angle_up: fov_left.angle_up,
+            angle_down: fov_left.angle_down,
+        };
+
+        // A virtual camera between the player's eyes
+        let frustrum_projection = get_projection(fov, near, far);
+        let frustrum_view = self.cameras[0]
+            .position
+            .lerp_slerp(&self.cameras[1].position, 0.5)
+            .to_homogeneous()
+            .try_inverse()
+            .unwrap();
+
+        let cull_data = CullData {
+            frustrum: frustrum_projection * frustrum_view,
             draw_calls: draw_indirect_buffer.len as u32,
         };
-        let push_constant = create_push_constant(&frame_data);
+
+        unsafe {
+            frame.cull_data_buffer.overwrite(&[cull_data]);
+        }
+
+        let group_count_x = (draw_indirect_buffer.len / 4) + 1;
 
         unsafe {
             device.cmd_bind_pipeline(
@@ -260,17 +287,10 @@ impl RenderContext {
                 vk::PipelineBindPoint::COMPUTE,
                 self.compute_pipeline_layout,
                 0,
-                slice_from_ref(&self.descriptors.sets[swapchain_image_index]),
+                slice_from_ref(&self.descriptors.compute_sets[swapchain_image_index]),
                 &[],
             );
-            device.cmd_push_constants(
-                command_buffer,
-                self.compute_pipeline_layout,
-                vk::ShaderStageFlags::COMPUTE,
-                0,
-                push_constant,
-            );
-            device.cmd_dispatch(command_buffer, draw_indirect_buffer.len as u32, 1, 1);
+            device.cmd_dispatch(command_buffer, group_count_x as u32, 1, 1);
             device.cmd_pipeline_barrier(
                 command_buffer,
                 vk::PipelineStageFlags::COMPUTE_SHADER,
@@ -369,8 +389,6 @@ impl RenderContext {
                 .queue_submit(graphics_queue, &[submit_info], fence)
                 .unwrap();
         }
-
-        self.frame_index += 1;
     }
 
     pub(crate) fn wait(&self, device: &ash::Device, frame: &Frame) {
@@ -378,8 +396,6 @@ impl RenderContext {
 
         unsafe {
             device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
-
-            // TEMPORARY
             device.reset_fences(&[fence]).unwrap();
         }
     }
@@ -498,9 +514,19 @@ fn create_frames(
                     descriptors.sets[index],
                     0,
                 );
+                frame.draw_data_buffer.update_descriptor_set(
+                    &vulkan_context.device,
+                    descriptors.compute_sets[index],
+                    0,
+                );
                 frame.draw_indirect_buffer.update_descriptor_set(
                     &vulkan_context.device,
-                    descriptors.sets[index],
+                    descriptors.compute_sets[index],
+                    1,
+                );
+                frame.cull_data_buffer.update_descriptor_set(
+                    &vulkan_context.device,
+                    descriptors.compute_sets[index],
                     2,
                 );
 
@@ -508,7 +534,7 @@ fn create_frames(
                 scene_data_buffer.update_descriptor_set(
                     &vulkan_context.device,
                     descriptors.sets[index],
-                    4,
+                    3,
                 );
                 scene_data_buffer.push(&Default::default());
             }
@@ -527,7 +553,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .format(COLOR_FORMAT)
         .samples(vk::SampleCountFlags::TYPE_4)
         .load_op(vk::AttachmentLoadOp::CLEAR)
-        .store_op(vk::AttachmentStoreOp::STORE)
+        .store_op(vk::AttachmentStoreOp::DONT_CARE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
@@ -538,7 +564,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .format(COLOR_FORMAT)
         .samples(vk::SampleCountFlags::TYPE_1)
         .load_op(vk::AttachmentLoadOp::DONT_CARE)
-        .store_op(vk::AttachmentStoreOp::STORE)
+        .store_op(vk::AttachmentStoreOp::DONT_CARE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
@@ -794,13 +820,16 @@ fn create_pipeline_layout(
 }
 
 #[repr(C)]
-struct FrameData {
-    draw_calls: u32,
+#[derive(Debug, Clone)]
+pub struct CullData {
+    /// View-Projection matrices (one per eye)
+    pub frustrum: Matrix4<f32>,
+    pub draw_calls: u32,
 }
 
 fn create_compute_pipeline(
     device: &ash::Device,
-    descriptors: &Descriptors,
+    layouts: &[vk::DescriptorSetLayout],
 ) -> (vk::Pipeline, vk::PipelineLayout) {
     unsafe {
         let shader_entry_name = CStr::from_bytes_with_nul_unchecked(b"main\0");
@@ -808,14 +837,7 @@ fn create_compute_pipeline(
             .create_shader_module(&vk::ShaderModuleCreateInfo::builder().code(COMPUTE), None)
             .unwrap();
 
-        let create_info = &vk::PipelineLayoutCreateInfo::builder()
-            .set_layouts(slice_from_ref(&descriptors.layout))
-            .push_constant_ranges(&[vk::PushConstantRange {
-                stage_flags: vk::ShaderStageFlags::COMPUTE,
-                offset: 0,
-                size: size_of::<FrameData>() as _,
-                ..Default::default()
-            }]);
+        let create_info = &vk::PipelineLayoutCreateInfo::builder().set_layouts(layouts);
 
         let layout = device.create_pipeline_layout(create_info, None).unwrap();
 

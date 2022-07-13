@@ -8,7 +8,10 @@ use crate::{
 
 /// Begin a frame
 /// Make sure to call this BEFORE beginning any renderpasses.
-pub fn begin_frame(xr_context: &mut XrContext, render_context: &mut RenderContext) -> usize {
+pub fn begin_frame(
+    xr_context: &mut XrContext,
+    render_context: &mut RenderContext,
+) -> (bool, usize) {
     let active_action_set = ActiveActionSet::new(&xr_context.input.action_set);
     xr_context
         .session
@@ -16,7 +19,7 @@ pub fn begin_frame(xr_context: &mut XrContext, render_context: &mut RenderContex
         .unwrap();
 
     // Wait for a frame to become available from the runtime, then get its index.
-    let frame_index = xr_context.begin_frame().unwrap();
+    let swapchain_index = xr_context.begin_frame().unwrap();
 
     let (view_state_flags, views) = xr_context
         .session
@@ -35,11 +38,11 @@ pub fn begin_frame(xr_context: &mut XrContext, render_context: &mut RenderContex
 
         // Update uniform buffers
         render_context
-            .update_scene_data(views, frame_index)
+            .update_scene_data(views, swapchain_index)
             .unwrap();
     }
 
-    frame_index
+    (xr_context.frame_state.should_render, swapchain_index)
 }
 
 #[cfg(target_os = "windows")]
@@ -55,7 +58,8 @@ mod tests {
         let (mut xr_context, vulkan_context) = XrContext::testing();
         let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
 
-        let frame_index = begin_frame(&mut xr_context, &mut render_context);
+        let (should_render, frame_index) = begin_frame(&mut xr_context, &mut render_context);
+        assert!(should_render);
         assert_eq!(frame_index, 0);
     }
 }

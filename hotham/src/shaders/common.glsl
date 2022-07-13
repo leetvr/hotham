@@ -31,15 +31,6 @@ struct Material {
     float alphaMaskCutoff;
 };
 
-struct VkDrawIndexedIndirectCommand
-{
-	uint indexCount;
-	uint instanceCount;
-	uint firstIndex;
-	int  vertexOffset;
-	uint firstInstance;
-};
-
 
 layout(std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
     DrawData data[];
@@ -49,21 +40,17 @@ layout(std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
     Material materials[];
 } materialBuffer;
 
-layout(std430, set = 0, binding = 2) writeonly buffer DrawCommandsBuffer {
-    VkDrawIndexedIndirectCommand drawCommands[];
-} drawCommandsBuffer;
 
-layout(std430, set = 0, binding = 3) readonly buffer SkinsBuffer {
+layout(std430, set = 0, binding = 2) readonly buffer SkinsBuffer {
     mat4 jointMatrices[100][64]; // dynamically sized array of 64 element long arrays of mat4.
 } skinsBuffer;
 
-layout (set = 0, binding = 4) readonly uniform SceneData { 
+layout (set = 0, binding = 3) readonly uniform SceneData { 
     mat4 viewProjection[2];
     vec4 cameraPosition[2];
     vec4 lightDirection;
     vec4 debugData;
 } sceneData;
 
-
 // Textures
-layout(set = 0, binding = 5) uniform sampler2D textures[];
+layout(set = 0, binding = 4) uniform sampler2D textures[];

@@ -77,7 +77,7 @@ impl Resources {
         );
 
         for set in descriptors.sets {
-            skins_buffer.update_descriptor_set(&vulkan_context.device, set, 3);
+            skins_buffer.update_descriptor_set(&vulkan_context.device, set, 2);
         }
 
         let texture_sampler = vulkan_context
@@ -106,6 +106,7 @@ impl Resources {
         descriptors: &Descriptors,
         image: &Image,
     ) -> u32 {
+        // TODO: Create separate samplers.
         let sampler = if image.format == vk::Format::R16G16_SFLOAT || image.layer_count == 6 {
             self.cube_sampler
         } else {

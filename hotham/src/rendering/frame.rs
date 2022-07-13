@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::resources::VulkanContext;
+use crate::resources::{render_context::CullData, VulkanContext};
 use anyhow::Result;
 
 use super::{buffer::Buffer, resources::DrawData, scene_data::SceneData};
@@ -23,6 +23,8 @@ pub struct Frame {
     pub draw_indirect_buffer: Buffer<vk::DrawIndexedIndirectCommand>,
     /// Shared data used in a scene
     pub scene_data_buffer: Buffer<SceneData>,
+    /// Shared data used in a scene
+    pub cull_data_buffer: Buffer<CullData>,
 }
 
 impl Frame {
@@ -47,7 +49,7 @@ impl Frame {
         let command_buffers = unsafe {
             device.allocate_command_buffers(
                 &vk::CommandBufferAllocateInfo::builder()
-                    .command_buffer_count(2)
+                    .command_buffer_count(1)
                     .level(vk::CommandBufferLevel::PRIMARY)
                     .command_pool(command_pool),
             )
@@ -81,6 +83,8 @@ impl Frame {
         };
         let scene_data_buffer =
             unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
+        let cull_data_buffer =
+            unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
 
         Ok(Self {
             fence,
@@ -90,6 +94,7 @@ impl Frame {
             draw_data_buffer,
             draw_indirect_buffer,
             scene_data_buffer,
+            cull_data_buffer,
         })
     }
 }

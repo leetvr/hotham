@@ -3,14 +3,17 @@ use std::convert::TryInto;
 use crate::resources::VulkanContext;
 use ash::vk;
 
-static TEXTURE_BINDING: u32 = 5;
+static TEXTURE_BINDING: u32 = 4;
 
 /// A wrapper around all the various bits of descriptor functionality
 #[derive(Clone, Debug)]
 pub(crate) struct Descriptors {
-    pub layout: vk::DescriptorSetLayout,
+    pub graphics_layout: vk::DescriptorSetLayout,
+    pub compute_layout: vk::DescriptorSetLayout,
     // One descriptor set per frame
     pub sets: [vk::DescriptorSet; 3],
+    // One descriptor set per frame
+    pub compute_sets: [vk::DescriptorSet; 3],
     #[allow(unused)]
     pub pool: vk::DescriptorPool,
 }
@@ -21,12 +24,19 @@ impl Descriptors {
         let pool = create_descriptor_pool(&vulkan_context.device);
 
         // Then create a layout.
-        let layout = create_descriptor_layouts(&vulkan_context.device);
+        let (graphics_layout, compute_layout) = create_descriptor_layouts(&vulkan_context.device);
 
         // Finally, allocate the shared descriptor set.
-        let sets = allocate_descriptor_sets(vulkan_context, pool, layout);
+        let sets = allocate_descriptor_sets(vulkan_context, pool, graphics_layout);
+        let compute_sets = allocate_compute_descriptor_sets(vulkan_context, pool, compute_layout);
 
-        Self { layout, sets, pool }
+        Self {
+            graphics_layout,
+            sets,
+            pool,
+            compute_layout,
+            compute_sets,
+        }
     }
 
     pub unsafe fn write_texture_descriptor(
@@ -81,13 +91,35 @@ unsafe fn allocate_descriptor_sets(
         .unwrap()
 }
 
-unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLayout {
-    let bindings = [
+unsafe fn allocate_compute_descriptor_sets(
+    vulkan_context: &VulkanContext,
+    pool: vk::DescriptorPool,
+    layout: vk::DescriptorSetLayout,
+) -> [vk::DescriptorSet; 3] {
+    let layouts = [layout, layout, layout];
+
+    vulkan_context
+        .device
+        .allocate_descriptor_sets(
+            &vk::DescriptorSetAllocateInfo::builder()
+                .descriptor_pool(pool)
+                .set_layouts(&layouts),
+        )
+        .unwrap()
+        .as_slice()
+        .try_into()
+        .unwrap()
+}
+
+unsafe fn create_descriptor_layouts(
+    device: &ash::Device,
+) -> (vk::DescriptorSetLayout, vk::DescriptorSetLayout) {
+    let graphics_bindings = [
         // Draw Data
         vk::DescriptorSetLayoutBinding {
             binding: 0,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::COMPUTE,
+            stage_flags: vk::ShaderStageFlags::VERTEX,
             descriptor_count: 1,
             ..Default::default()
         },
@@ -99,17 +131,9 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
             descriptor_count: 1,
             ..Default::default()
         },
-        // Draw Indirect Buffer
-        vk::DescriptorSetLayoutBinding {
-            binding: 2,
-            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-            stage_flags: vk::ShaderStageFlags::COMPUTE,
-            descriptor_count: 1,
-            ..Default::default()
-        },
         // Skins
         vk::DescriptorSetLayoutBinding {
-            binding: 3,
+            binding: 2,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
             stage_flags: vk::ShaderStageFlags::VERTEX,
             descriptor_count: 1,
@@ -117,11 +141,9 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         },
         // Scene Data
         vk::DescriptorSetLayoutBinding {
-            binding: 4,
+            binding: 3,
             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            stage_flags: vk::ShaderStageFlags::COMPUTE
-                | vk::ShaderStageFlags::VERTEX
-                | vk::ShaderStageFlags::FRAGMENT,
+            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1,
             ..Default::default()
         },
@@ -135,6 +157,33 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         },
     ];
 
+    let compute_bindings = [
+        // Draw Data
+        vk::DescriptorSetLayoutBinding {
+            binding: 0,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            stage_flags: vk::ShaderStageFlags::COMPUTE,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+        // Draw Indirect Buffer
+        vk::DescriptorSetLayoutBinding {
+            binding: 1,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            stage_flags: vk::ShaderStageFlags::COMPUTE,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+        // Cull Data
+        vk::DescriptorSetLayoutBinding {
+            binding: 2,
+            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+            stage_flags: vk::ShaderStageFlags::COMPUTE,
+            descriptor_count: 1,
+            ..Default::default()
+        },
+    ];
+
     let flags = vk::DescriptorBindingFlags::PARTIALLY_BOUND
         | vk::DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT
         | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
@@ -144,23 +193,29 @@ unsafe fn create_descriptor_layouts(device: &ash::Device) -> vk::DescriptorSetLa
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
-        vk::DescriptorBindingFlags::empty(),
         flags,
     ];
     let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
         .binding_flags(&descriptor_flags);
 
-    let shared_layout = device
+    let graphics_layout = device
         .create_descriptor_set_layout(
             &vk::DescriptorSetLayoutCreateInfo::builder()
-                .bindings(&bindings)
+                .bindings(&graphics_bindings)
                 .push_next(&mut binding_flags)
                 .flags(vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL),
             None,
         )
         .unwrap();
 
-    shared_layout
+    let compute_layout = device
+        .create_descriptor_set_layout(
+            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&compute_bindings),
+            None,
+        )
+        .unwrap();
+
+    (graphics_layout, compute_layout)
 }
 
 unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
