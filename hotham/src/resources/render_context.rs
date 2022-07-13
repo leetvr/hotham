@@ -21,7 +21,7 @@ use crate::{
         vertex::Vertex,
     },
     resources::{VulkanContext, XrContext},
-    COLOR_FORMAT, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT, VIEW_COUNT,
+    COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
 use ash::vk::{self, Handle};
@@ -86,7 +86,8 @@ impl RenderContext {
         let depth_image = vulkan_context.create_image(
             DEPTH_FORMAT,
             &swapchain.resolution,
-            DEPTH_ATTACHMENT_USAGE_FLAGS,
+            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
+                | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT,
             2,
             1,
         )?;

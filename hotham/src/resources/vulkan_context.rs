@@ -3,7 +3,7 @@
 use crate::{
     hotham_error::HothamError,
     rendering::{image::Image, texture::DEFAULT_COMPONENT_MAPPING},
-    DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
+    DEPTH_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -305,9 +305,9 @@ impl VulkanContext {
                 vk::ImageViewType::TYPE_2D_ARRAY,
             )
         };
-        let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT)
-            || usage.contains(DEPTH_ATTACHMENT_USAGE_FLAGS)
-        {
+
+        // TODO: This indicates that it's MSAA.. but do we need MSAA for depth?
+        let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT) {
             vk::SampleCountFlags::TYPE_4
         } else {
             vk::SampleCountFlags::TYPE_1
