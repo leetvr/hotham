@@ -81,11 +81,11 @@ impl Resources {
         }
 
         let texture_sampler = vulkan_context
-            .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
+            .create_texture_sampler(vk::SamplerAddressMode::REPEAT)
             .unwrap();
 
         let cube_sampler = vulkan_context
-            .create_texture_sampler(vk::SamplerAddressMode::CLAMP_TO_EDGE, 1)
+            .create_texture_sampler(vk::SamplerAddressMode::CLAMP_TO_EDGE)
             .unwrap();
 
         Self {
