@@ -169,7 +169,7 @@ impl VulkanContext {
         application_name: &str,
         application_version: u32,
     ) -> Result<Self> {
-        let vk_target_version_xr = xr::Version::new(1, 2, 0);
+        let vk_target_version_xr = xr::Version::new(1, 1, 128);
 
         let requirements = xr_instance.graphics_requirements::<XrVulkan>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
