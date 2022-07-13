@@ -274,7 +274,7 @@ mod tests {
         let views = vec![view.clone(), view];
         render_context.begin_frame(vulkan_context, 0);
         render_context.scene_data.debug_data.y = debug_view_equation;
-        render_context.update_scene_data(&views).unwrap();
+        render_context.update_scene_data(&views, 0).unwrap();
         update_transform_matrix_system(&mut Default::default(), world);
         update_parent_transform_matrix_system(
             &mut Default::default(),

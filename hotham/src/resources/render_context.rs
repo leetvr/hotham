@@ -72,7 +72,7 @@ impl RenderContext {
         };
 
         let descriptors = unsafe { Descriptors::new(vulkan_context) };
-        let mut resources = unsafe { Resources::new(vulkan_context, &descriptors) };
+        let resources = unsafe { Resources::new(vulkan_context, &descriptors) };
 
         // Pipeline, render pass
         let render_pass = create_render_pass(vulkan_context)?;
@@ -110,9 +110,6 @@ impl RenderContext {
             &descriptors,
         );
         let scene_data = Default::default();
-        unsafe {
-            resources.scene_data_buffer.push(&scene_data);
-        }
 
         Ok(Self {
             frames,
@@ -165,7 +162,11 @@ impl RenderContext {
         )
     }
 
-    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) -> Result<()> {
+    pub(crate) fn update_scene_data(
+        &mut self,
+        views: &[xr::View],
+        swapchain_image_index: usize,
+    ) -> Result<()> {
         self.views = views.to_owned();
 
         // View (camera)
@@ -191,7 +192,9 @@ impl RenderContext {
         let camera_position = [self.cameras[0].position(), self.cameras[1].position()];
 
         unsafe {
-            let scene_data = &mut self.resources.scene_data_buffer.as_slice_mut()[0];
+            let scene_data = &mut self.frames[swapchain_image_index]
+                .scene_data_buffer
+                .as_slice_mut()[0];
             scene_data.camera_position = camera_position;
             scene_data.view_projection = view_projection;
             scene_data.debug_data = self.scene_data.debug_data;
@@ -477,7 +480,7 @@ fn create_frames(
         })
         .enumerate()
         .map(|(index, image_view)| {
-            let frame = Frame::new(
+            let mut frame = Frame::new(
                 vulkan_context,
                 *render_pass,
                 swapchain.resolution,
@@ -499,6 +502,14 @@ fn create_frames(
                     descriptors.sets[index],
                     2,
                 );
+
+                let scene_data_buffer = &mut frame.scene_data_buffer;
+                scene_data_buffer.update_descriptor_set(
+                    &vulkan_context.device,
+                    descriptors.sets[index],
+                    4,
+                );
+                scene_data_buffer.push(&Default::default());
             }
 
             frame

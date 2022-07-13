@@ -34,7 +34,9 @@ pub fn begin_frame(xr_context: &mut XrContext, render_context: &mut RenderContex
         let views = &xr_context.views;
 
         // Update uniform buffers
-        render_context.update_scene_data(views).unwrap();
+        render_context
+            .update_scene_data(views, frame_index)
+            .unwrap();
     }
 
     frame_index

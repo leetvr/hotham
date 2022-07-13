@@ -7,7 +7,7 @@ use crate::resources::vulkan_context;
 
 use super::{
     buffer::Buffer, descriptors::Descriptors, image::Image, material::Material,
-    mesh_data::MeshData, scene_data::SceneData, vertex::Vertex,
+    mesh_data::MeshData, vertex::Vertex,
 };
 
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
@@ -26,9 +26,6 @@ pub struct Resources {
 
     /// Buffer for materials, indexed by material_id in DrawData
     pub materials_buffer: Buffer<Material>,
-
-    /// Shared data used in a scene
-    pub scene_data_buffer: Buffer<SceneData>,
 
     /// Mesh data used to generate DrawData
     pub mesh_data: Arena<MeshData>,
@@ -83,13 +80,6 @@ impl Resources {
             skins_buffer.update_descriptor_set(&vulkan_context.device, set, 3);
         }
 
-        let scene_data_buffer =
-            Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1);
-
-        for set in descriptors.sets {
-            scene_data_buffer.update_descriptor_set(&vulkan_context.device, set, 4);
-        }
-
         let texture_sampler = vulkan_context
             .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
             .unwrap();
@@ -103,7 +93,6 @@ impl Resources {
             index_buffer,
             materials_buffer,
             skins_buffer,
-            scene_data_buffer,
             mesh_data: Default::default(),
             texture_count: 0,
             texture_sampler,
