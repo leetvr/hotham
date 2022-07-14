@@ -131,8 +131,10 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
 
-            add_model_to_world("Damaged Helmet", &models, &mut world, None)
-                .expect("Could not find cube?");
+            for _ in 0..100 {
+                add_model_to_world("Damaged Helmet", &models, &mut world, None)
+                    .expect("Could not find cube?");
+            }
             models
         }
         StressTest::ManyVertices => {
@@ -186,7 +188,7 @@ fn tick(
     let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
 
-    begin_frame(xr_context, vulkan_context, render_context);
+    let (_, swapchain_image_index) = begin_frame(xr_context, render_context);
 
     if current_state == xr::SessionState::FOCUSED {
         hands_system(&mut queries.hands_query, world, xr_context, physics_context);
@@ -217,16 +219,18 @@ fn tick(
     }
 
     if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
+        render_context.begin_frame(vulkan_context, swapchain_image_index);
         rendering_system(
             &mut queries.rendering_query,
             world,
             vulkan_context,
-            xr_context.frame_index,
+            swapchain_image_index,
             render_context,
         );
+        render_context.end_frame(vulkan_context, swapchain_image_index);
     }
 
-    end_frame(xr_context, vulkan_context, render_context);
+    end_frame(xr_context);
 }
 
 fn subdivide_mesh_system(world: &mut World, render_context: &mut RenderContext, timer: &mut Timer) {

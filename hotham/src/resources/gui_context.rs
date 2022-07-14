@@ -79,6 +79,7 @@ impl GuiContext {
             .unwrap();
 
         // Create render pass
+        // TODO: This is *TERRIBLE*!!!
         let render_pass = unsafe {
             device.create_render_pass(
                 &vk::RenderPassCreateInfo::builder()

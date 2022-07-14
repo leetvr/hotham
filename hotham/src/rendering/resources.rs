@@ -7,11 +7,10 @@ use crate::resources::vulkan_context;
 
 use super::{
     buffer::Buffer, descriptors::Descriptors, image::Image, material::Material,
-    mesh_data::MeshData, scene_data::SceneData, vertex::Vertex,
+    mesh_data::MeshData, vertex::Vertex,
 };
 
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
-static DRAW_DATA_BUFFER_SIZE: usize = 10_000; // TODO
 static MATERIAL_BUFFER_SIZE: usize = 10_000; // TODO
 static SKINS_BUFFER_SIZE: usize = 100; // TODO
 
@@ -25,17 +24,8 @@ pub struct Resources {
     /// All the indices that will be drawn this frame.
     pub index_buffer: Buffer<u32>,
 
-    /// Data for the primitives that will be drawn this frame, indexed by gl_DrawId
-    pub draw_data_buffer: Buffer<DrawData>,
-
     /// Buffer for materials, indexed by material_id in DrawData
     pub materials_buffer: Buffer<Material>,
-
-    /// The actual draw calls for this frame.
-    pub draw_indirect_buffer: Buffer<vk::DrawIndexedIndirectCommand>,
-
-    /// Shared data used in a scene
-    pub scene_data_buffer: Buffer<SceneData>,
 
     /// Mesh data used to generate DrawData
     pub mesh_data: Arena<MeshData>,
@@ -68,56 +58,41 @@ impl Resources {
             VERTEX_BUFFER_SIZE,
         );
 
-        let draw_data_buffer = Buffer::new(
-            vulkan_context,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
-            DRAW_DATA_BUFFER_SIZE,
-        );
-        draw_data_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 0);
-
         let mut materials_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::STORAGE_BUFFER,
             MATERIAL_BUFFER_SIZE,
         );
-        materials_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 1);
+        for set in descriptors.sets {
+            materials_buffer.update_descriptor_set(&vulkan_context.device, set, 1);
+        }
+
         // RESERVE index 0 for the default material, available as the material::NO_MATERIAL constant.
         materials_buffer.push(&Material::default());
-
-        let draw_indirect_buffer = Buffer::new(
-            vulkan_context,
-            vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::INDIRECT_BUFFER,
-            MATERIAL_BUFFER_SIZE,
-        );
-        draw_indirect_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 2);
 
         let skins_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::STORAGE_BUFFER,
             SKINS_BUFFER_SIZE,
         );
-        skins_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 3);
 
-        let scene_data_buffer =
-            Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1);
-        scene_data_buffer.update_descriptor_set(&vulkan_context.device, descriptors.set, 4);
+        for set in descriptors.sets {
+            skins_buffer.update_descriptor_set(&vulkan_context.device, set, 2);
+        }
 
         let texture_sampler = vulkan_context
-            .create_texture_sampler(vk::SamplerAddressMode::REPEAT, 1)
+            .create_texture_sampler(vk::SamplerAddressMode::REPEAT)
             .unwrap();
 
         let cube_sampler = vulkan_context
-            .create_texture_sampler(vk::SamplerAddressMode::CLAMP_TO_EDGE, 1)
+            .create_texture_sampler(vk::SamplerAddressMode::CLAMP_TO_EDGE)
             .unwrap();
 
         Self {
             vertex_buffer,
             index_buffer,
-            draw_data_buffer,
             materials_buffer,
             skins_buffer,
-            scene_data_buffer,
-            draw_indirect_buffer,
             mesh_data: Default::default(),
             texture_count: 0,
             texture_sampler,
@@ -131,6 +106,7 @@ impl Resources {
         descriptors: &Descriptors,
         image: &Image,
     ) -> u32 {
+        // TODO: Create separate samplers.
         let sampler = if image.format == vk::Format::R16G16_SFLOAT || image.layer_count == 6 {
             self.cube_sampler
         } else {
