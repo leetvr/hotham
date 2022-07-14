@@ -387,7 +387,7 @@ impl RenderContext {
                 .build();
             device
                 .queue_submit(graphics_queue, &[submit_info], fence)
-                .unwrap();
+                .expect("[HOTHAM_RENDER] @@ GPU CRASH DETECTED @@ - You are probably doing too much work in a compute shader!");
         }
     }
 
