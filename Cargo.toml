@@ -1,5 +1,5 @@
 [workspace]
-members = ["hotham", "hotham-simulator", "examples/simple-scene", "examples/crab-saber", "hotham-debug-server", "benchmarks/stress-test"]
+members = ["hotham", "hotham-simulator", "examples/simple-scene", "examples/crab-saber", "hotham-debug-server", "benchmarks/stress-test", "benchmarks/multiple_guis"]
 
 # Make performance critical packages compile with optimisations
 [profile.dev.package.rapier3d]
