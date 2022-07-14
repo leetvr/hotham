@@ -104,7 +104,7 @@ fn tick(
     let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
 
-    let (should_render, swapchain_image_index) = begin_frame(xr_context, render_context);
+    let (_should_render, swapchain_image_index) = begin_frame(xr_context, render_context);
 
     if current_state == xr::SessionState::FOCUSED {
         hands_system(&mut queries.hands_query, world, xr_context, physics_context);

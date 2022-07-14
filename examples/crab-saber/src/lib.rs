@@ -73,7 +73,7 @@ fn tick(
     }
 
     // Frame start
-    let (should_render, swapchain_image_index) = begin_frame(xr_context, render_context);
+    let (_should_render, swapchain_image_index) = begin_frame(xr_context, render_context);
 
     handle_state_change(
         previous_state,
