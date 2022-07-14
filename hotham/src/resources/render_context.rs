@@ -29,9 +29,9 @@ use nalgebra::Matrix4;
 use openxr as xr;
 use vk_shader_macros::include_glsl;
 
-static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert");
-static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag");
-static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp");
+static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert", target: vulkan1_1);
+static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag", target: vulkan1_1);
+static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
 
 pub struct RenderContext {
     pub frames: Vec<Frame>,
@@ -274,7 +274,7 @@ impl RenderContext {
             frame.cull_data_buffer.overwrite(&[cull_data]);
         }
 
-        let group_count_x = (draw_indirect_buffer.len / 4) + 1;
+        let group_count_x = (draw_indirect_buffer.len / 256) + 1;
 
         unsafe {
             device.cmd_bind_pipeline(

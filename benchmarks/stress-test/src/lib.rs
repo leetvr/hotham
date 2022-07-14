@@ -131,8 +131,10 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
 
-            add_model_to_world("Damaged Helmet", &models, &mut world, None)
-                .expect("Could not find cube?");
+            for _ in 0..200 {
+                add_model_to_world("Damaged Helmet", &models, &mut world, None)
+                    .expect("Could not find cube?");
+            }
             models
         }
         StressTest::ManyVertices => {
