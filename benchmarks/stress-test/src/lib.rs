@@ -219,7 +219,7 @@ fn tick(
     }
 
     if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
-        render_context.begin_frame(vulkan_context, swapchain_image_index);
+        render_context.begin_frame(vulkan_context);
         rendering_system(
             &mut queries.rendering_query,
             world,
@@ -227,7 +227,7 @@ fn tick(
             swapchain_image_index,
             render_context,
         );
-        render_context.end_frame(vulkan_context, swapchain_image_index);
+        render_context.end_frame(vulkan_context);
     }
 
     end_frame(xr_context);

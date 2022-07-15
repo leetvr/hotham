@@ -73,7 +73,7 @@ mod tests {
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
-        rendering::{image::Image, legacy_buffer::Buffer, swapchain::Swapchain},
+        rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
             rendering_system, update_parent_transform_matrix_system, update_transform_matrix_system,
@@ -208,7 +208,7 @@ mod tests {
             0,
             render_context,
         );
-        render_context.end_frame(vulkan_context, 0);
+        render_context.end_frame(vulkan_context);
     }
 
     fn begin_frame(render_context: &mut RenderContext, vulkan_context: &VulkanContext) {
@@ -233,8 +233,8 @@ mod tests {
         };
         let views = vec![view.clone(), view];
 
-        render_context.update_scene_data(&views, 0).unwrap();
-        render_context.begin_frame(&vulkan_context, 0);
+        render_context.update_scene_data(&views).unwrap();
+        render_context.begin_frame(&vulkan_context);
     }
 
     fn button_was_clicked(world: &mut World) -> bool {
@@ -326,13 +326,13 @@ mod tests {
             .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
             .unwrap();
 
-        let swapchain = Swapchain {
+        let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
         };
 
         let mut render_context =
-            RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap();
+            RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
         let gui_context = GuiContext::new(&vulkan_context);
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!(

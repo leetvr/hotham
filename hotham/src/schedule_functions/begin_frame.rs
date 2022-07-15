@@ -37,9 +37,7 @@ pub fn begin_frame(
         let views = &xr_context.views;
 
         // Update uniform buffers
-        render_context
-            .update_scene_data(views, swapchain_index)
-            .unwrap();
+        render_context.update_scene_data(views).unwrap();
     }
 
     (xr_context.frame_state.should_render, swapchain_index)

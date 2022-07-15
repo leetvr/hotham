@@ -25,7 +25,7 @@ pub fn rendering_system(
 ) {
     // First, we need to collect all our draw data
     unsafe {
-        let frame = &mut render_context.frames[swapchain_image_index];
+        let frame = &mut render_context.frames[render_context.frame_index];
         let draw_data_buffer = &mut frame.draw_data_buffer;
         let draw_indirect_buffer = &mut frame.draw_indirect_buffer;
 
@@ -56,11 +56,11 @@ pub fn rendering_system(
         }
     }
 
-    render_context.cull_objects(vulkan_context, swapchain_image_index);
+    render_context.cull_objects(vulkan_context);
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
 
     let device = &vulkan_context.device;
-    let frame = &render_context.frames[swapchain_image_index];
+    let frame = &render_context.frames[render_context.frame_index];
     let command_buffer = frame.command_buffer;
     let draw_indirect_buffer = &frame.draw_indirect_buffer;
 
@@ -88,7 +88,7 @@ pub fn rendering_system(
         }
     }
 
-    render_context.end_pbr_render_pass(vulkan_context, swapchain_image_index);
+    render_context.end_pbr_render_pass(vulkan_context);
 }
 
 #[cfg(target_os = "windows")]
@@ -105,7 +105,7 @@ mod tests {
 
     use crate::{
         asset_importer,
-        rendering::{image::Image, legacy_buffer::Buffer, swapchain::Swapchain},
+        rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
         resources::RenderContext,
         systems::{update_parent_transform_matrix_system, update_transform_matrix_system},
         util::get_from_device_memory,
@@ -133,13 +133,13 @@ mod tests {
             .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
             .unwrap();
 
-        let swapchain = Swapchain {
+        let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
         };
 
         let mut render_context =
-            RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap();
+            RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
 
         // Get a model from GLTF
         // let gltf_data: Vec<(&[u8], &[u8])> = vec![(
@@ -272,9 +272,9 @@ mod tests {
             },
         };
         let views = vec![view.clone(), view];
-        render_context.begin_frame(vulkan_context, 0);
+        render_context.begin_frame(vulkan_context);
         render_context.scene_data.debug_data.y = debug_view_equation;
-        render_context.update_scene_data(&views, 0).unwrap();
+        render_context.update_scene_data(&views).unwrap();
         update_transform_matrix_system(&mut Default::default(), world);
         update_parent_transform_matrix_system(
             &mut Default::default(),
@@ -288,7 +288,7 @@ mod tests {
             0,
             render_context,
         );
-        render_context.end_frame(vulkan_context, 0);
+        render_context.end_frame(vulkan_context);
     }
 
     fn hash_file(file_path: &str) -> u64 {

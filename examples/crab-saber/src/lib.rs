@@ -141,7 +141,7 @@ fn tick(
 
     // Rendering tasks - only necessary if we are in at least the visible state
     if current_state == xr::SessionState::VISIBLE || current_state == xr::SessionState::FOCUSED {
-        render_context.begin_frame(vulkan_context, swapchain_image_index);
+        render_context.begin_frame(vulkan_context);
         // Draw GUI
         draw_gui_system(
             &mut hotham_queries.draw_gui_query,
@@ -152,6 +152,8 @@ fn tick(
             gui_context,
             haptic_context,
         );
+
+        // Draw objects
         rendering_system(
             &mut hotham_queries.rendering_query,
             world,
@@ -159,7 +161,7 @@ fn tick(
             swapchain_image_index,
             render_context,
         );
-        render_context.end_frame(vulkan_context, swapchain_image_index);
+        render_context.end_frame(vulkan_context);
     }
 
     // End the frame

@@ -3,7 +3,7 @@ use ash::vk;
 use crate::resources::{render_context::CullData, VulkanContext};
 use anyhow::Result;
 
-use super::{buffer::Buffer, resources::DrawData, scene_data::SceneData};
+use super::{buffer::Buffer, descriptors::Descriptors, resources::DrawData, scene_data::SceneData};
 static DRAW_DATA_BUFFER_SIZE: usize = 10_000; // TODO
 
 /// A container for all the resources necessary to render a single frame.
@@ -13,10 +13,6 @@ pub struct Frame {
     pub fence: vk::Fence,
     /// A command buffer used to record commands
     pub command_buffer: vk::CommandBuffer,
-    /// A framebuffer to write the final image to
-    pub framebuffer: vk::Framebuffer,
-    /// The image view we've been handed from the swapchain
-    pub swapchain_image_view: vk::ImageView,
     /// Data for the primitives that will be drawn this frame, indexed by gl_DrawId
     pub draw_data_buffer: Buffer<DrawData>,
     /// The actual draw calls for this frame.
@@ -30,11 +26,8 @@ pub struct Frame {
 impl Frame {
     pub(crate) fn new(
         vulkan_context: &VulkanContext,
-        render_pass: vk::RenderPass,
-        swapchain_resolution: vk::Extent2D,
-        swapchain_image_view: vk::ImageView,
-        depth_image_view: vk::ImageView,
-        color_image_view: vk::ImageView,
+        index: usize,
+        descriptors: &Descriptors,
     ) -> Result<Self> {
         let device = &vulkan_context.device;
         let command_pool = vulkan_context.command_pool;
@@ -56,16 +49,6 @@ impl Frame {
         }?;
 
         let command_buffer = command_buffers[0];
-        let attachments = [color_image_view, depth_image_view, swapchain_image_view];
-
-        let frame_buffer_create_info = vk::FramebufferCreateInfo::builder()
-            .render_pass(render_pass)
-            .attachments(&attachments)
-            .width(swapchain_resolution.width)
-            .height(swapchain_resolution.height)
-            .layers(1);
-
-        let frame_buffer = unsafe { device.create_framebuffer(&frame_buffer_create_info, None) }?;
 
         let draw_data_buffer = unsafe {
             Buffer::new(
@@ -81,16 +64,47 @@ impl Frame {
                 DRAW_DATA_BUFFER_SIZE,
             )
         };
-        let scene_data_buffer =
+        let mut scene_data_buffer =
             unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
         let cull_data_buffer =
             unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
 
+        // Update the descriptor sets for this frame.
+        unsafe {
+            draw_data_buffer.update_descriptor_set(
+                &vulkan_context.device,
+                descriptors.sets[index],
+                0,
+            );
+            draw_data_buffer.update_descriptor_set(
+                &vulkan_context.device,
+                descriptors.compute_sets[index],
+                0,
+            );
+            draw_indirect_buffer.update_descriptor_set(
+                &vulkan_context.device,
+                descriptors.compute_sets[index],
+                1,
+            );
+            cull_data_buffer.update_descriptor_set(
+                &vulkan_context.device,
+                descriptors.compute_sets[index],
+                2,
+            );
+
+            scene_data_buffer.update_descriptor_set(
+                &vulkan_context.device,
+                descriptors.sets[index],
+                3,
+            );
+
+            // Add some default data to the scene buffer.
+            scene_data_buffer.push(&Default::default());
+        }
+
         Ok(Self {
             fence,
             command_buffer,
-            framebuffer: frame_buffer,
-            swapchain_image_view,
             draw_data_buffer,
             draw_indirect_buffer,
             scene_data_buffer,
