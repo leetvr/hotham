@@ -1,7 +1,10 @@
 use ash::vk;
 
-use crate::{hotham_error::HothamError, resources::VulkanContext};
+use crate::resources::{render_context::CullData, VulkanContext};
 use anyhow::Result;
+
+use super::{buffer::Buffer, resources::DrawData, scene_data::SceneData};
+static DRAW_DATA_BUFFER_SIZE: usize = 10_000; // TODO
 
 /// A container for all the resources necessary to render a single frame.
 #[derive(Debug, Clone)]
@@ -14,6 +17,14 @@ pub struct Frame {
     pub framebuffer: vk::Framebuffer,
     /// The image view we've been handed from the swapchain
     pub swapchain_image_view: vk::ImageView,
+    /// Data for the primitives that will be drawn this frame, indexed by gl_DrawId
+    pub draw_data_buffer: Buffer<DrawData>,
+    /// The actual draw calls for this frame.
+    pub draw_indirect_buffer: Buffer<vk::DrawIndexedIndirectCommand>,
+    /// Shared data used in a scene
+    pub scene_data_buffer: Buffer<SceneData>,
+    /// Shared data used in a scene
+    pub cull_data_buffer: Buffer<CullData>,
 }
 
 impl Frame {
@@ -35,17 +46,16 @@ impl Frame {
             )
         }?;
 
-        let command_buffer = unsafe {
+        let command_buffers = unsafe {
             device.allocate_command_buffers(
                 &vk::CommandBufferAllocateInfo::builder()
                     .command_buffer_count(1)
                     .level(vk::CommandBufferLevel::PRIMARY)
                     .command_pool(command_pool),
             )
-        }?
-        .pop()
-        .ok_or(HothamError::EmptyListError)?;
+        }?;
 
+        let command_buffer = command_buffers[0];
         let attachments = [color_image_view, depth_image_view, swapchain_image_view];
 
         let frame_buffer_create_info = vk::FramebufferCreateInfo::builder()
@@ -57,27 +67,34 @@ impl Frame {
 
         let frame_buffer = unsafe { device.create_framebuffer(&frame_buffer_create_info, None) }?;
 
+        let draw_data_buffer = unsafe {
+            Buffer::new(
+                vulkan_context,
+                vk::BufferUsageFlags::STORAGE_BUFFER,
+                DRAW_DATA_BUFFER_SIZE,
+            )
+        };
+        let draw_indirect_buffer = unsafe {
+            Buffer::new(
+                vulkan_context,
+                vk::BufferUsageFlags::STORAGE_BUFFER | vk::BufferUsageFlags::INDIRECT_BUFFER,
+                DRAW_DATA_BUFFER_SIZE,
+            )
+        };
+        let scene_data_buffer =
+            unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
+        let cull_data_buffer =
+            unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
+
         Ok(Self {
             fence,
             command_buffer,
             framebuffer: frame_buffer,
             swapchain_image_view,
+            draw_data_buffer,
+            draw_indirect_buffer,
+            scene_data_buffer,
+            cull_data_buffer,
         })
     }
-
-    // TODO: Handle destroy
-    // pub(crate) fn destroy(&self, vulkan_context: &VulkanContext) {
-    //     unsafe {
-    //         vulkan_context
-    //             .device
-    //             .destroy_framebuffer(self.framebuffer, None);
-    //         vulkan_context.device.destroy_fence(self.fence, None);
-    //         vulkan_context
-    //             .device
-    //             .free_command_buffers(vulkan_context.command_pool, &[self.command_buffer]);
-    //         vulkan_context
-    //             .device
-    //             .destroy_image_view(self.swapchain_image_view, None)
-    //     }
-    // }
 }

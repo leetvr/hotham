@@ -1,7 +1,9 @@
 #![allow(deprecated)]
 
 use crate::{
-    hotham_error::HothamError, rendering::image::Image, DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
+    hotham_error::HothamError,
+    rendering::{image::Image, texture::DEFAULT_COMPONENT_MAPPING},
+    DEPTH_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -167,7 +169,7 @@ impl VulkanContext {
         application_name: &str,
         application_version: u32,
     ) -> Result<Self> {
-        let vk_target_version_xr = xr::Version::new(1, 2, 0);
+        let vk_target_version_xr = xr::Version::new(1, 1, 128);
 
         let requirements = xr_instance.graphics_requirements::<XrVulkan>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
@@ -243,6 +245,7 @@ impl VulkanContext {
         view_type: vk::ImageViewType,
         layer_count: u32,
         mip_levels: u32,
+        component_mapping: vk::ComponentMapping,
     ) -> Result<vk::ImageView> {
         let aspect_mask = get_aspect_mask(format);
         let create_info = vk::ImageViewCreateInfo::builder()
@@ -255,12 +258,7 @@ impl VulkanContext {
                 base_array_layer: 0,
                 layer_count,
             })
-            .components(vk::ComponentMapping {
-                r: vk::ComponentSwizzle::R,
-                g: vk::ComponentSwizzle::G,
-                b: vk::ComponentSwizzle::B,
-                a: vk::ComponentSwizzle::A,
-            })
+            .components(component_mapping)
             .image(*image);
         unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
     }
@@ -272,6 +270,26 @@ impl VulkanContext {
         usage: vk::ImageUsageFlags,
         array_layers: u32,
         mip_levels: u32,
+    ) -> Result<Image> {
+        self.create_image_with_component_mapping(
+            format,
+            extent,
+            usage,
+            array_layers,
+            mip_levels,
+            DEFAULT_COMPONENT_MAPPING,
+        )
+    }
+
+    // TODO: Move this to `Image::new`
+    pub fn create_image_with_component_mapping(
+        &self,
+        format: vk::Format,
+        extent: &vk::Extent2D,
+        usage: vk::ImageUsageFlags,
+        array_layers: u32,
+        mip_levels: u32,
+        component_mapping: vk::ComponentMapping,
     ) -> Result<Image> {
         let tiling = vk::ImageTiling::OPTIMAL;
         let (flags, image_view_type) = if array_layers == 1 {
@@ -287,9 +305,9 @@ impl VulkanContext {
                 vk::ImageViewType::TYPE_2D_ARRAY,
             )
         };
-        let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT)
-            || usage.contains(DEPTH_ATTACHMENT_USAGE_FLAGS)
-        {
+
+        // TODO: This indicates that it's MSAA.. but do we need MSAA for depth?
+        let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT) {
             vk::SampleCountFlags::TYPE_4
         } else {
             vk::SampleCountFlags::TYPE_1
@@ -317,8 +335,14 @@ impl VulkanContext {
 
         unsafe { self.device.bind_image_memory(image, device_memory, 0) }?;
 
-        let image_view =
-            self.create_image_view(&image, format, image_view_type, array_layers, mip_levels)?;
+        let image_view = self.create_image_view(
+            &image,
+            format,
+            image_view_type,
+            array_layers,
+            mip_levels,
+            component_mapping,
+        )?;
 
         Ok(Image::new(
             image,
@@ -572,28 +596,23 @@ impl VulkanContext {
     pub fn create_texture_sampler(
         &self,
         address_mode: vk::SamplerAddressMode,
-        mip_count: u32,
     ) -> Result<vk::Sampler> {
-        let max_anisotropy = self
-            .physical_device_properties
-            .limits
-            .max_sampler_anisotropy;
         let create_info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
             .address_mode_u(address_mode)
             .address_mode_v(address_mode)
             .address_mode_w(address_mode)
-            .anisotropy_enable(true)
-            .max_anisotropy(max_anisotropy)
-            .border_color(vk::BorderColor::INT_OPAQUE_WHITE)
+            .anisotropy_enable(false)
+            .max_anisotropy(1.0)
+            .border_color(vk::BorderColor::FLOAT_TRANSPARENT_BLACK)
             .unnormalized_coordinates(false)
             .compare_enable(false)
             .compare_op(vk::CompareOp::NEVER)
             .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
             .mip_lod_bias(0.0)
             .min_lod(0.0)
-            .max_lod(mip_count as _)
+            .max_lod(vk::LOD_CLAMP_NONE)
             .build();
 
         unsafe {

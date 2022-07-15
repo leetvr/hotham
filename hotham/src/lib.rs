@@ -59,7 +59,3 @@ pub const VIEW_TYPE: xr::ViewConfigurationType = xr::ViewConfigurationType::PRIM
 
 /// OpenXR blend mode
 pub const BLEND_MODE: xr::EnvironmentBlendMode = xr::EnvironmentBlendMode::OPAQUE;
-
-/// Vulkan depth attachment usage flags
-pub const DEPTH_ATTACHMENT_USAGE_FLAGS: vk::ImageUsageFlags =
-    vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT;

@@ -1,4 +1,5 @@
 [package]
+build = "build.rs"
 description = "A framework for creating incredible standalone VR experiences"
 edition = "2018"
 keywords = ["vr", "gamedev", "openxr", "vulkan"]
@@ -16,13 +17,13 @@ crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
 generational-arena = "0.2.8"
-gltf = {version = "1.0", features = ["KHR_materials_pbrSpecularGlossiness"]}
+gltf = {version = "1.0", features = ["KHR_materials_pbrSpecularGlossiness", "names", "utils"], default-features = false}
 hecs = "0.7.7"
 hotham-debug-server = {path = "../hotham-debug-server", version = "0.2"}
 id-arena = "2.2.1"
-image = "0.23"
+image = {version = "0.23", default-features = false, features = ["jpeg", "png"]}
 itertools = "0.10.0"
-libktx-rs = "0.2.3"
+ktx2 = "0.3"
 memoffset = "0.6.5"
 mint = "0.5.6"
 nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.29.0"}
@@ -30,7 +31,7 @@ oddio = "0.5"
 openxr = {features = ["loaded", "mint"], version = "0.16"}
 rapier3d = "0.11.1"
 serde = {version = "1.0", features = ["derive"]}
-symphonia = {version = "0.5", features = ["mp3"]}
+symphonia = {version = "0.5", default-features = false, features = ["mp3"]}
 thiserror = "1.0"
 uuid = {version = "1.1", features = ["serde", "v4"]}
 vk-shader-macros = "0.2.8"

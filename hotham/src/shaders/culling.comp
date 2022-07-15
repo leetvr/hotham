@@ -1,5 +1,35 @@
 #version 460
-#include "common.glsl"
+
+layout (local_size_x = 256) in;
+struct VkDrawIndexedIndirectCommand
+{
+	uint indexCount;
+	uint instanceCount;
+	uint firstIndex;
+	int  vertexOffset;
+	uint firstInstance;
+};
+
+struct DrawData {
+    mat4 transform;
+    mat4 inverseTranspose;
+    vec4 boundingSphere;
+    uint materialID;
+    uint skinID;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
+    DrawData data[];
+} drawDataBuffer;
+
+layout(std430, set = 0, binding = 1) writeonly buffer DrawCommandsBuffer {
+    VkDrawIndexedIndirectCommand drawCommands[];
+} drawCommandsBuffer;
+
+layout(set = 0, binding = 2) uniform CullData {
+    mat4 frustrum;
+	uint drawCalls;
+} cullData;
 
 bool check_is_visible(mat4 mat, vec3 origin, float radius)
 {
@@ -25,16 +55,20 @@ bool check_is_visible(mat4 mat, vec3 origin, float radius)
 			}
 		}
 	}
+
 	return true;
 }
 
 void main() {
     uint id = gl_GlobalInvocationID.x;
+
+	if (id >= cullData.drawCalls) { return; }
+
     DrawData d = drawDataBuffer.data[id];
     vec3 centre = d.boundingSphere.xyz;
     float radius = d.boundingSphere.w;
 
-	// Check each eye to see if the object is visible
-    bool isVisible = check_is_visible(sceneData.viewProjection[0], centre, radius) || check_is_visible(sceneData.viewProjection[1], centre, radius);
+	// // Check each eye to see if the object is visible
+    bool isVisible = check_is_visible(cullData.frustrum, centre, radius);
     drawCommandsBuffer.drawCommands[id].instanceCount = isVisible ? 1 : 0;
 }

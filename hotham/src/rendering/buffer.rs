@@ -8,6 +8,7 @@ use crate::resources::vulkan_context;
 use super::memory::allocate_memory;
 
 /// A wrapper around a chunk of allocated memory on the GPU
+#[derive(Debug, Clone)]
 pub struct Buffer<T: Sized> {
     /// A handle to the underlying vk::Buffer
     pub buffer: vk::Buffer,
@@ -50,7 +51,12 @@ impl<T: Sized> Buffer<T> {
 
         // Map memory
         let memory_address = device
-            .map_memory(device_memory, 0, size, vk::MemoryMapFlags::empty())
+            .map_memory(
+                device_memory,
+                0,
+                vk::WHOLE_SIZE,
+                vk::MemoryMapFlags::empty(),
+            )
             .unwrap();
 
         // Transmute the pointer into GPU memory so that we can easily access it again.

@@ -7,6 +7,8 @@ use crate::{
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
 
+const USE_MULTI_DRAW_INDIRECT: bool = true;
+
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
 ///
@@ -23,8 +25,10 @@ pub fn rendering_system(
 ) {
     // First, we need to collect all our draw data
     unsafe {
-        let draw_data_buffer = &mut render_context.resources.draw_data_buffer;
-        let draw_indirect_buffer = &mut render_context.resources.draw_indirect_buffer;
+        let frame = &mut render_context.frames[swapchain_image_index];
+        let draw_data_buffer = &mut frame.draw_data_buffer;
+        let draw_indirect_buffer = &mut frame.draw_indirect_buffer;
+
         let meshes = &render_context.resources.mesh_data;
         draw_data_buffer.clear();
         draw_indirect_buffer.clear();
@@ -52,21 +56,36 @@ pub fn rendering_system(
         }
     }
 
-    // render_context.cull_objects(vulkan_context, swapchain_image_index);
+    render_context.cull_objects(vulkan_context, swapchain_image_index);
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
 
-    let command_buffer = render_context.frames[swapchain_image_index].command_buffer;
     let device = &vulkan_context.device;
-    let draw_indirect_buffer = &render_context.resources.draw_indirect_buffer;
+    let frame = &render_context.frames[swapchain_image_index];
+    let command_buffer = frame.command_buffer;
+    let draw_indirect_buffer = &frame.draw_indirect_buffer;
 
     unsafe {
-        device.cmd_draw_indexed_indirect(
-            command_buffer,
-            draw_indirect_buffer.buffer,
-            0,
-            draw_indirect_buffer.len as _,
-            std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
-        );
+        if USE_MULTI_DRAW_INDIRECT {
+            device.cmd_draw_indexed_indirect(
+                command_buffer,
+                draw_indirect_buffer.buffer,
+                0,
+                draw_indirect_buffer.len as _,
+                std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
+            );
+        } else {
+            // Issue draw calls directly - useful for renderdoc
+            for command in draw_indirect_buffer.as_slice() {
+                device.cmd_draw_indexed(
+                    command_buffer,
+                    command.index_count,
+                    command.instance_count,
+                    command.first_index,
+                    command.vertex_offset,
+                    command.first_instance,
+                )
+            }
+        }
     }
 
     render_context.end_pbr_render_pass(vulkan_context, swapchain_image_index);
@@ -255,7 +274,7 @@ mod tests {
         let views = vec![view.clone(), view];
         render_context.begin_frame(vulkan_context, 0);
         render_context.scene_data.debug_data.y = debug_view_equation;
-        render_context.update_scene_data(&views).unwrap();
+        render_context.update_scene_data(&views, 0).unwrap();
         update_transform_matrix_system(&mut Default::default(), world);
         update_parent_transform_matrix_system(
             &mut Default::default(),
