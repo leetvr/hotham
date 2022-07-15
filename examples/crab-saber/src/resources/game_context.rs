@@ -13,6 +13,7 @@ use hotham::{
     hecs::{Entity, World},
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
+        RigidBodyType,
     },
     resources::{
         audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
@@ -146,7 +147,7 @@ fn add_backstop(
             DEFAULT_COLLISION_GROUP,
         ))
         .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::INTERSECTION_EVENTS)
+        .active_events(ActiveEvents::COLLISION_EVENTS)
         .build();
 
     let handle = physics_context.colliders.insert(collider);
@@ -242,7 +243,9 @@ pub fn pre_spawn_cube(
 
     let cube = add_model_to_world(model_name, models, world, None).unwrap();
 
-    let rigid_body = RigidBodyBuilder::new_dynamic().lock_rotations().build();
+    let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
+        .lock_rotations()
+        .build();
     let handle = physics_context.rigid_bodies.insert(rigid_body);
 
     world.remove_one::<Visible>(cube).unwrap();

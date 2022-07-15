@@ -2,7 +2,9 @@ use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, Transform},
     hecs::World,
-    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
+    rapier3d::prelude::{
+        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
+    },
     resources::{PhysicsContext, RenderContext, XrContext},
     schedule_functions::{begin_frame, end_frame, physics_step},
     systems::{
@@ -78,9 +80,11 @@ fn add_helmet(
     drop(transform);
     let collider = ColliderBuilder::ball(0.35)
         .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+        .active_events(ActiveEvents::COLLISION_EVENTS)
         .build();
-    let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
+    let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
+        .position(position)
+        .build();
     let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
     world.insert(helmet, components).unwrap();
 }

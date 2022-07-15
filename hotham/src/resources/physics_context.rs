@@ -17,23 +17,25 @@ pub struct PhysicsContext {
     pub narrow_phase: NarrowPhase,
     pub rigid_bodies: RigidBodySet,
     pub island_manager: IslandManager,
-    pub contact_recv: Receiver<ContactEvent>,
-    pub intersection_recv: Receiver<IntersectionEvent>,
+    pub collision_recv: Receiver<CollisionEvent>,
+    pub contact_force_recv: Receiver<ContactForceEvent>,
     pub event_handler: ChannelEventCollector,
     pub integration_parameters: IntegrationParameters,
-    pub joint_set: JointSet,
+    pub impulse_joints: ImpulseJointSet,
+    pub multibody_joints: MultibodyJointSet,
     pub ccd_solver: CCDSolver,
 }
 
 impl Default for PhysicsContext {
     fn default() -> Self {
-        let (contact_send, contact_recv) = crossbeam::channel::unbounded();
-        let (intersection_send, intersection_recv) = crossbeam::channel::unbounded();
-        let event_handler = ChannelEventCollector::new(intersection_send, contact_send);
+        let (collision_send, collision_recv) = crossbeam::channel::unbounded();
+        let (contact_force_send, contact_force_recv) = crossbeam::channel::unbounded();
+        let event_handler = ChannelEventCollector::new(collision_send, contact_force_send);
         let gravity: Matrix3x1<f32> = vector![0.0, 0.0, 0.0]; // TODO: no gravity in SPACE baby! But some games may uh, need this.
         let integration_parameters = IntegrationParameters::default();
         let physics_pipeline = PhysicsPipeline::new();
-        let joint_set = JointSet::new();
+        let impulse_joints = ImpulseJointSet::new();
+        let multibody_joints = MultibodyJointSet::new();
         let ccd_solver = CCDSolver::new();
 
         PhysicsContext {
@@ -45,11 +47,12 @@ impl Default for PhysicsContext {
             narrow_phase: NarrowPhase::new(),
             rigid_bodies: RigidBodySet::new(),
             island_manager: IslandManager::new(),
-            contact_recv,
-            intersection_recv,
+            collision_recv,
+            contact_force_recv,
             event_handler,
             integration_parameters,
-            joint_set,
+            impulse_joints,
+            multibody_joints,
             ccd_solver,
         }
     }
@@ -65,7 +68,8 @@ impl PhysicsContext {
             &mut self.narrow_phase,
             &mut self.rigid_bodies,
             &mut self.colliders,
-            &mut self.joint_set,
+            &mut self.impulse_joints,
+            &mut self.multibody_joints,
             &mut self.ccd_solver,
             &(),
             &self.event_handler,
