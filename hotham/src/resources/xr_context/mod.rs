@@ -74,7 +74,6 @@ pub struct XrContext {
     pub frame_state: FrameState,
     pub views: Vec<View>,
     pub view_state_flags: ViewStateFlags,
-    pub frame_index: usize,
 }
 
 impl XrContext {
@@ -133,7 +132,6 @@ impl XrContext {
             frame_state,
             views: Vec::new(),
             view_state_flags: ViewStateFlags::EMPTY,
-            frame_index: 0,
         };
 
         Ok((xr_context, vulkan_context))
@@ -162,14 +160,14 @@ impl XrContext {
         Ok(self.session_state)
     }
 
-    pub(crate) fn begin_frame(&mut self) -> Result<()> {
+    pub(crate) fn begin_frame(&mut self) -> Result<usize> {
         self.frame_state = self.frame_waiter.wait()?;
         self.frame_stream.begin()?;
 
-        self.frame_index = self.swapchain.acquire_image()? as _;
+        let image_index = self.swapchain.acquire_image()? as _;
         self.swapchain.wait_image(openxr::Duration::INFINITE)?;
 
-        Ok(())
+        Ok(image_index)
     }
 
     pub fn end_frame(&mut self) -> std::result::Result<(), openxr::sys::Result> {

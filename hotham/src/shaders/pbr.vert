@@ -44,7 +44,7 @@ void main()
 
 		outWorldPos = d.transform * skinMatrix * vec4(inPos, 1.0);
 		// TODO we should probably be using the inverse transpose here instead?
-		outNormal = normalize(mat3(d.transform) * mat3(skinMatrix) * inNormal);
+		outNormal = normalize(mat3(d.inverseTranspose) * mat3(skinMatrix) * inNormal);
 	}
 
 	outUV = inUV;

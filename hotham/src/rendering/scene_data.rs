@@ -11,8 +11,7 @@ pub struct SceneData {
     pub camera_position: [Vector4<f32>; 2],
     /// Direction of global light
     pub light_direction: Vector4<f32>,
-    /// Debug information
-    /// x = debug inputs, y = debug algorithm, zw unused. See pbr.frag for more details
+    /// Debug information - x = debug inputs, y = debug algorithm, z = unused
     pub debug_data: Vector4<f32>,
 }
 

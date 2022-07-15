@@ -233,8 +233,8 @@ mod tests {
         };
         let views = vec![view.clone(), view];
 
+        render_context.update_scene_data(&views, 0).unwrap();
         render_context.begin_frame(&vulkan_context, 0);
-        render_context.update_scene_data(&views).unwrap();
     }
 
     fn button_was_clicked(world: &mut World) -> bool {

@@ -3,7 +3,7 @@
 use crate::{
     hotham_error::HothamError,
     rendering::{image::Image, texture::DEFAULT_COMPONENT_MAPPING},
-    DEPTH_ATTACHMENT_USAGE_FLAGS, DEPTH_FORMAT,
+    DEPTH_FORMAT,
 };
 use anyhow::{anyhow, Result};
 use ash::{
@@ -169,7 +169,7 @@ impl VulkanContext {
         application_name: &str,
         application_version: u32,
     ) -> Result<Self> {
-        let vk_target_version_xr = xr::Version::new(1, 2, 0);
+        let vk_target_version_xr = xr::Version::new(1, 1, 128);
 
         let requirements = xr_instance.graphics_requirements::<XrVulkan>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
@@ -305,9 +305,9 @@ impl VulkanContext {
                 vk::ImageViewType::TYPE_2D_ARRAY,
             )
         };
-        let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT)
-            || usage.contains(DEPTH_ATTACHMENT_USAGE_FLAGS)
-        {
+
+        // TODO: This indicates that it's MSAA.. but do we need MSAA for depth?
+        let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT) {
             vk::SampleCountFlags::TYPE_4
         } else {
             vk::SampleCountFlags::TYPE_1
@@ -596,28 +596,23 @@ impl VulkanContext {
     pub fn create_texture_sampler(
         &self,
         address_mode: vk::SamplerAddressMode,
-        mip_count: u32,
     ) -> Result<vk::Sampler> {
-        let max_anisotropy = self
-            .physical_device_properties
-            .limits
-            .max_sampler_anisotropy;
         let create_info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
             .address_mode_u(address_mode)
             .address_mode_v(address_mode)
             .address_mode_w(address_mode)
-            .anisotropy_enable(true)
-            .max_anisotropy(max_anisotropy)
-            .border_color(vk::BorderColor::INT_OPAQUE_WHITE)
+            .anisotropy_enable(false)
+            .max_anisotropy(1.0)
+            .border_color(vk::BorderColor::FLOAT_TRANSPARENT_BLACK)
             .unnormalized_coordinates(false)
             .compare_enable(false)
             .compare_op(vk::CompareOp::NEVER)
             .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
             .mip_lod_bias(0.0)
             .min_lod(0.0)
-            .max_lod(mip_count as _)
+            .max_lod(vk::LOD_CLAMP_NONE)
             .build();
 
         unsafe {
