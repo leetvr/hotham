@@ -177,7 +177,7 @@ impl XrContext {
         Ok(image_index)
     }
 
-    pub fn update_views<'a>(&'a mut self) -> &'a [xr::View] {
+    pub fn update_views(&'_ mut self) -> &[xr::View] {
         let (view_state_flags, views) = self
             .session
             .locate_views(
@@ -192,7 +192,7 @@ impl XrContext {
             self.view_state_flags = view_state_flags;
         }
 
-        return &self.views;
+        &self.views
     }
 
     pub fn end_frame(&mut self) -> std::result::Result<(), openxr::sys::Result> {
