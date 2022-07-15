@@ -257,16 +257,8 @@ impl RenderContext {
         };
 
         // A virtual camera between the player's eyes
-        let frustrum_projection = get_projection(fov, near, far);
-        let frustrum_view = self.cameras[0]
-            .position
-            .lerp_slerp(&self.cameras[1].position, 0.5)
-            .to_homogeneous()
-            .try_inverse()
-            .unwrap();
-
         let cull_data = CullData {
-            frustrum: frustrum_projection * frustrum_view,
+            projection_matrices: self.scene_data.view_projection.clone(),
             draw_calls: draw_indirect_buffer.len as u32,
         };
 
@@ -823,7 +815,7 @@ fn create_pipeline_layout(
 #[derive(Debug, Clone)]
 pub struct CullData {
     /// View-Projection matrices (one per eye)
-    pub frustrum: Matrix4<f32>,
+    pub projection_matrices: [Matrix4<f32>; 2],
     pub draw_calls: u32,
 }
 
