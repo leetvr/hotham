@@ -85,11 +85,10 @@ impl<'a> EngineBuilder<'a> {
             .expect("!!FATAL ERROR - Unable to initialize renderer!");
         let gui_context = GuiContext::new(&vulkan_context);
 
-        let mut engine = Engine {
+        Engine {
             should_quit,
             resumed,
             event_data_buffer: Default::default(),
-
             xr_context,
             vulkan_context,
             render_context,
@@ -97,10 +96,7 @@ impl<'a> EngineBuilder<'a> {
             audio_context: Default::default(),
             gui_context,
             haptic_context: Default::default(),
-        };
-
-        engine.update().unwrap();
-        engine
+        }
     }
 }
 
@@ -129,6 +125,16 @@ pub struct Engine {
     pub haptic_context: HapticContext,
 }
 
+/// The result of calling `update()` on Engine.
+pub struct TickData {
+    /// The previous XR state.
+    pub previous_state: xr::SessionState,
+    /// The current XR state.
+    pub current_state: xr::SessionState,
+    /// The index of the currently acquired image on the OpenXR swapchain
+    pub swapchain_image_index: usize,
+}
+
 impl Engine {
     /// Create a new instance of the engine
     /// NOTE: only one instance may be running at any one time
@@ -136,43 +142,79 @@ impl Engine {
         EngineBuilder::new().build()
     }
 
-    /// IMPORTANT: Call this function each tick to update the engine's running state with the underlying OS
-    pub fn update(&mut self) -> HothamResult<(xr::SessionState, xr::SessionState)> {
-        #[cfg(target_os = "android")]
-        process_android_events(&mut self.resumed, &self.should_quit);
+    /// IMPORTANT: Call this function each tick to update the engine's running state with OpenXR and the underlying OS
+    pub fn update(&mut self) -> HothamResult<TickData> {
+        loop {
+            #[cfg(target_os = "android")]
+            process_android_events(&mut self.resumed, &self.should_quit);
 
-        let (previous_state, current_state) = {
-            let previous_state = self.xr_context.session_state;
-            let current_state = self.xr_context.poll_xr_event(&mut self.event_data_buffer)?;
-            (previous_state, current_state)
-        };
-
-        match (previous_state, current_state) {
-            (SessionState::STOPPING, SessionState::IDLE) => {
-                // Do nothing so we can process further events.
-            }
-            (_, SessionState::IDLE) => {
-                sleep(Duration::from_millis(100)); // Sleep to avoid thrashing the CPU
-            }
-            (SessionState::IDLE, SessionState::READY) => {
-                self.xr_context.session.begin(VIEW_TYPE)?;
-            }
-            (_, SessionState::EXITING) => {
+            // TODO: We *STILL* don't handle being shut down correctly. Something very odd is going on.
+            // https://github.com/leetvr/hotham/issues/220
+            if self.should_quit.load(Ordering::Acquire) {
                 // Show's over
-                println!("[HOTHAM_ENGINE] State is now exiting!");
+                println!("[HOTHAM_ENGINE] Hotham is now exiting!");
                 return Err(HothamError::ShuttingDown);
             }
-            (_, SessionState::STOPPING) => {
-                self.xr_context.end_session()?;
+
+            let (previous_state, current_state) = {
+                let previous_state = self.xr_context.session_state;
+                let current_state = self.xr_context.poll_xr_event(&mut self.event_data_buffer)?;
+                (previous_state, current_state)
+            };
+
+            // Handle any state transitions, as required.
+            match (previous_state, current_state) {
+                (SessionState::STOPPING, SessionState::IDLE) => {
+                    // Do nothing so we can process further events.
+                    continue;
+                }
+                (_, SessionState::IDLE) => {
+                    sleep(Duration::from_millis(100)); // Sleep to avoid thrashing the CPU
+                    continue;
+                }
+                (SessionState::IDLE, SessionState::READY) => {
+                    self.xr_context.session.begin(VIEW_TYPE)?;
+                }
+                (_, SessionState::EXITING | SessionState::LOSS_PENDING) => {
+                    // Show's over
+                    println!("[HOTHAM_ENGINE] Hotham is now exiting!");
+                    return Err(HothamError::ShuttingDown);
+                }
+                (_, SessionState::STOPPING) => {
+                    self.xr_context.end_session()?;
+                    continue;
+                }
+                _ => {}
             }
-            _ => {}
-        }
 
-        if self.should_quit.load(Ordering::Relaxed) {
-            return Err(HothamError::ShuttingDown);
-        }
+            let vulkan_context = &self.vulkan_context;
+            let render_context = &mut self.render_context;
 
-        Ok((previous_state, current_state))
+            // In any other state, begin the frame loop.
+            match self.xr_context.begin_frame() {
+                Err(HothamError::NotRendering) => continue,
+                Ok(swapchain_image_index) => {
+                    render_context.begin_frame(vulkan_context);
+                    return Ok(TickData {
+                        previous_state,
+                        current_state,
+                        swapchain_image_index,
+                    });
+                }
+                err => panic!("Error beginning frame: {:?}", err),
+            };
+        }
+    }
+
+    /// Call this after update
+    pub fn finish(&mut self) -> xr::Result<()> {
+        let vulkan_context = &self.vulkan_context;
+        let render_context = &mut self.render_context;
+
+        if self.xr_context.frame_state.should_render {
+            render_context.end_frame(vulkan_context);
+        }
+        self.xr_context.end_frame()
     }
 }
 
@@ -183,14 +225,15 @@ impl Default for Engine {
 }
 
 #[cfg(target_os = "android")]
-pub fn process_android_events(resumed: &mut bool, should_quit: &Arc<AtomicBool>) -> bool {
+pub fn process_android_events(resumed: &mut bool, should_quit: &Arc<AtomicBool>) {
     while let Some(event) = poll_android_events(*resumed) {
         println!("[HOTHAM_ANDROID] Received event {:?}", event);
         match event {
             ndk_glue::Event::Resume => *resumed = true,
             ndk_glue::Event::Destroy => {
-                should_quit.store(true, Ordering::Relaxed);
-                return true;
+                println!("[HOTHAM_ANDROID] !! DESTROY CALLED! DESTROY EVERYTHING! DESTROY!!!!");
+                should_quit.store(true, Ordering::Release);
+                return;
             }
             ndk_glue::Event::Pause => *resumed = false,
             _ => {}
@@ -204,8 +247,6 @@ pub fn process_android_events(resumed: &mut bool, should_quit: &Arc<AtomicBool>)
             }
         }
     }
-
-    false
 }
 
 #[cfg(target_os = "android")]

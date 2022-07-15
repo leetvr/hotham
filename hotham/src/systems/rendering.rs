@@ -6,6 +6,7 @@ use crate::{
 };
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
+use openxr as xr;
 
 const USE_MULTI_DRAW_INDIRECT: bool = true;
 
@@ -20,8 +21,9 @@ pub fn rendering_system(
     query: &mut PreparedQuery<With<Visible, (&Mesh, &Transform, &TransformMatrix, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
-    swapchain_image_index: usize,
     render_context: &mut RenderContext,
+    views: &[xr::View],
+    swapchain_image_index: usize,
 ) {
     // First, we need to collect all our draw data
     unsafe {
@@ -56,6 +58,7 @@ pub fn rendering_system(
         }
     }
 
+    render_context.update_scene_data(views).unwrap();
     render_context.cull_objects(vulkan_context);
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
 
@@ -274,7 +277,6 @@ mod tests {
         let views = vec![view.clone(), view];
         render_context.begin_frame(vulkan_context);
         render_context.scene_data.debug_data.y = debug_view_equation;
-        render_context.update_scene_data(&views).unwrap();
         update_transform_matrix_system(&mut Default::default(), world);
         update_parent_transform_matrix_system(
             &mut Default::default(),
@@ -285,8 +287,9 @@ mod tests {
             &mut Default::default(),
             world,
             vulkan_context,
-            0,
             render_context,
+            &views,
+            0,
         );
         render_context.end_frame(vulkan_context);
     }

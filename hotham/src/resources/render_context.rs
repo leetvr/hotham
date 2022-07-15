@@ -190,7 +190,7 @@ impl RenderContext {
     }
 
     /// Start rendering a frame
-    pub fn begin_frame(&self, vulkan_context: &VulkanContext) {
+    pub(crate) fn begin_frame(&self, vulkan_context: &VulkanContext) {
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[self.frame_index];
@@ -349,7 +349,7 @@ impl RenderContext {
     }
 
     /// Finish rendering a frame
-    pub fn end_frame(&mut self, vulkan_context: &VulkanContext) {
+    pub(crate) fn end_frame(&mut self, vulkan_context: &VulkanContext) {
         // Get the values we need to end the renderpass
         let device = &vulkan_context.device;
         let frame = &self.frames[self.frame_index];
