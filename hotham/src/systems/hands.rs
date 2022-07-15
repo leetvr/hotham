@@ -99,7 +99,7 @@ pub fn add_hand(
         let collider = ColliderBuilder::capsule_y(0.05, 0.02)
             .sensor(true)
             .active_collision_types(ActiveCollisionTypes::all())
-            .active_events(ActiveEvents::COLLISION_EVENTS | ActiveEvents::CONTACT_FORCE_EVENTS)
+            .active_events(ActiveEvents::COLLISION_EVENTS)
             .build();
         let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
         let components = physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
