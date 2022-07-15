@@ -1,7 +1,10 @@
+mod axes;
+
+use axes::*;
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, Transform},
-    hecs::World,
+    components::{hand::Handedness, RigidBody, Transform},
+    hecs::{PreparedQuery, World},
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
@@ -16,6 +19,11 @@ use hotham::{
     xr, Engine, HothamResult, TickData,
 };
 
+#[derive(Default)]
+struct ExtraQueries<'a> {
+    pub axes_query: PreparedQuery<(&'a mut Axes, &'a mut RigidBody)>,
+}
+
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
     println!("[HOTHAM_SIMPLE_SCENE] MAIN!");
@@ -27,10 +35,18 @@ pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
     let mut world = init(&mut engine)?;
     let mut queries = Default::default();
+    let mut extra_queries = Default::default();
     let mut state = Default::default();
 
     while let Ok(tick_data) = engine.update() {
-        tick(tick_data, &mut engine, &mut world, &mut queries, &mut state);
+        tick(
+            tick_data,
+            &mut engine,
+            &mut world,
+            &mut queries,
+            &mut extra_queries,
+            &mut state,
+        );
         engine.finish()?;
     }
 
@@ -45,6 +61,7 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let mut world = World::default();
 
     let mut glb_buffers: Vec<&[u8]> = vec![
+        include_bytes!("../../../test_assets/axes.glb"),
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
     ];
@@ -62,6 +79,15 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     add_helmet(&models, &mut world, physics_context);
     add_hand(&models, Handedness::Left, &mut world, physics_context);
     add_hand(&models, Handedness::Right, &mut world, physics_context);
+    add_axes(&models, &mut world, physics_context, AxesSpace::LeftHand);
+    add_axes(&models, &mut world, physics_context, AxesSpace::LeftPointer);
+    add_axes(&models, &mut world, physics_context, AxesSpace::RightHand);
+    add_axes(
+        &models,
+        &mut world,
+        physics_context,
+        AxesSpace::RightPointer,
+    );
 
     Ok(world)
 }
@@ -95,6 +121,7 @@ fn tick(
     engine: &mut Engine,
     world: &mut World,
     queries: &mut Queries,
+    extra_queries: &mut ExtraQueries,
     state: &mut State,
 ) {
     let xr_context = &mut engine.xr_context;
@@ -103,6 +130,12 @@ fn tick(
     let physics_context = &mut engine.physics_context;
 
     if tick_data.current_state == xr::SessionState::FOCUSED {
+        axes_system(
+            &mut extra_queries.axes_query,
+            world,
+            xr_context,
+            physics_context,
+        );
         hands_system(&mut queries.hands_query, world, xr_context, physics_context);
         grabbing_system(&mut queries.grabbing_query, world, physics_context);
         physics_step(physics_context);
