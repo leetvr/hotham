@@ -13,7 +13,6 @@ pub fn draw_gui_system(
     query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
     world: &mut World,
     vulkan_context: &VulkanContext,
-    swapchain_image_index: &usize,
     render_context: &mut RenderContext,
     gui_context: &mut GuiContext,
     haptic_context: &mut HapticContext,
@@ -28,13 +27,7 @@ pub fn draw_gui_system(
             button.clicked_this_frame = false;
         }
 
-        gui_context.paint_gui(
-            vulkan_context,
-            render_context,
-            *swapchain_image_index,
-            ui_panel,
-            panel,
-        );
+        gui_context.paint_gui(vulkan_context, render_context, ui_panel, panel);
 
         for button in &mut ui_panel.buttons {
             if !button.hovered_last_frame && button.hovered_this_frame {
@@ -73,7 +66,7 @@ mod tests {
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
-        rendering::{image::Image, legacy_buffer::Buffer, swapchain::Swapchain},
+        rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
             rendering_system, update_parent_transform_matrix_system, update_transform_matrix_system,
@@ -172,7 +165,6 @@ mod tests {
         vulkan_context: &VulkanContext,
     ) {
         println!("[DRAW_GUI_TEST] Beginning frame..");
-        begin_frame(render_context, vulkan_context);
 
         // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
         haptic_context.right_hand_amplitude_this_frame = 0.;
@@ -193,7 +185,6 @@ mod tests {
             query,
             world,
             vulkan_context,
-            &0,
             render_context,
             gui_context,
             haptic_context,
@@ -201,17 +192,20 @@ mod tests {
 
         // Render
         println!("[DRAW_GUI_TEST] rendering_system");
+        render_context.begin_frame(&vulkan_context);
+        let views = get_views();
         rendering_system(
             &mut Default::default(),
             world,
             vulkan_context,
-            0,
             render_context,
+            &views,
+            0,
         );
-        render_context.end_frame(vulkan_context, 0);
+        render_context.end_frame(vulkan_context);
     }
 
-    fn begin_frame(render_context: &mut RenderContext, vulkan_context: &VulkanContext) {
+    fn get_views() -> Vec<openxr::View> {
         let rotation: mint::Quaternion<f32> = UnitQuaternion::from_euler_angles(0., 0., 0.).into();
         let position = Vector3f {
             x: -1.0,
@@ -231,10 +225,7 @@ mod tests {
                 angle_right: 45.0_f32.to_radians(),
             },
         };
-        let views = vec![view.clone(), view];
-
-        render_context.update_scene_data(&views, 0).unwrap();
-        render_context.begin_frame(&vulkan_context, 0);
+        vec![view.clone(), view]
     }
 
     fn button_was_clicked(world: &mut World) -> bool {
@@ -326,13 +317,13 @@ mod tests {
             .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
             .unwrap();
 
-        let swapchain = Swapchain {
+        let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
         };
 
         let mut render_context =
-            RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap();
+            RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
         let gui_context = GuiContext::new(&vulkan_context);
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!(

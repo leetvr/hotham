@@ -15,7 +15,7 @@ pub enum HothamError {
     #[error("The list was empty")]
     EmptyListError,
     /// Unsupported version
-    #[error("The version of Vulkan or OpenXR is not supported")]
+    #[error("the version of vulkan or openxr is not supported")]
     UnsupportedVersionError,
     /// Invalid format
     #[error("The format provided - {format:?} - is not supported for this operation")]
@@ -29,6 +29,9 @@ pub enum HothamError {
     /// IO error
     #[error(transparent)]
     IO(#[from] std::io::Error),
+    /// Not rendering yet
+    #[error("this session is not rendering yet")]
+    NotRendering,
     /// Some other error
     #[error(transparent)]
     Other(#[from] anyhow::Error),
