@@ -39,10 +39,10 @@ static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag", target: vulkan1_1);
 static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
 
 // TODO: Is this a good idea?
-pub const PIELINE_DEPTH: usize = 2;
+pub const PIPELINE_DEPTH: usize = 2;
 
 pub struct RenderContext {
-    pub frames: [Frame; PIELINE_DEPTH],
+    pub frames: [Frame; PIPELINE_DEPTH],
     pub frame_index: usize,
     pub pipeline: vk::Pipeline,
     pub compute_pipeline: vk::Pipeline,
@@ -93,7 +93,7 @@ impl RenderContext {
 
         // Create all the per-frame resources we need
         let mut index = 0;
-        let frames = [(); PIELINE_DEPTH].map(|_| {
+        let frames = [(); PIPELINE_DEPTH].map(|_| {
             let frame =
                 Frame::new(vulkan_context, index, &descriptors).expect("Unable to create frame!");
             // mmmm.. hacky
@@ -368,7 +368,7 @@ impl RenderContext {
         }
 
         // And we're done! Bump the frame index.
-        self.frame_index = (self.frame_index + 1) % PIELINE_DEPTH;
+        self.frame_index = (self.frame_index + 1) % PIPELINE_DEPTH;
     }
 
     pub(crate) fn wait(&self, device: &ash::Device, frame: &Frame) {
