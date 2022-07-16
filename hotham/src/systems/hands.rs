@@ -5,7 +5,9 @@ use crate::{
     util::{is_space_valid, posef_to_isometry},
 };
 use hecs::{PreparedQuery, World};
-use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder};
+use rapier3d::prelude::{
+    ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
+};
 
 /// Hands system
 /// Used to allow users to interact with objects using their controllers as representations of their hands
@@ -97,9 +99,9 @@ pub fn add_hand(
         let collider = ColliderBuilder::capsule_y(0.05, 0.02)
             .sensor(true)
             .active_collision_types(ActiveCollisionTypes::all())
-            .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+            .active_events(ActiveEvents::COLLISION_EVENTS)
             .build();
-        let rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
+        let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
         let components = physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
         world.insert(hand, components).unwrap();
     }
@@ -140,7 +142,8 @@ mod tests {
     pub fn test_move_grabbed_objects() {
         let (mut world, mut xr_context, mut physics_context) = setup();
 
-        let grabbed_object_rigid_body = RigidBodyBuilder::new_kinematic_position_based().build(); // grabber sets the rigidbody as kinematic
+        let grabbed_object_rigid_body =
+            RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build(); // grabber sets the rigidbody as kinematic
         let handle = physics_context
             .rigid_bodies
             .insert(grabbed_object_rigid_body);
@@ -188,9 +191,10 @@ mod tests {
             let collider = ColliderBuilder::capsule_y(0.05, 0.02)
                 .sensor(true)
                 .active_collision_types(ActiveCollisionTypes::all())
-                .active_events(ActiveEvents::INTERSECTION_EVENTS)
+                .active_events(ActiveEvents::COLLISION_EVENTS)
                 .build();
-            let mut rigid_body = RigidBodyBuilder::new_kinematic_position_based().build();
+            let mut rigid_body =
+                RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
             rigid_body.set_next_kinematic_translation(vector![0.0, 1.4, 0.0]);
             let components =
                 physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
