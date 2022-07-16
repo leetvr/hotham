@@ -2,16 +2,18 @@ use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, Transform},
     hecs::World,
-    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
+    rapier3d::prelude::{
+        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
+    },
     resources::{PhysicsContext, RenderContext, XrContext},
-    schedule_functions::{begin_frame, end_frame, physics_step},
+    schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
         rendering::rendering_system, skinning::skinning_system,
         update_parent_transform_matrix_system, update_rigid_body_transforms_system,
         update_transform_matrix_system, Queries,
     },
-    xr, Engine, HothamResult,
+    xr, Engine, HothamResult, TickData,
 };
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -27,8 +29,9 @@ pub fn real_main() -> HothamResult<()> {
     let mut queries = Default::default();
     let mut state = Default::default();
 
-    while let Ok(xr_state) = engine.update() {
-        tick(xr_state, &mut engine, &mut world, &mut queries, &mut state);
+    while let Ok(tick_data) = engine.update() {
+        tick(tick_data, &mut engine, &mut world, &mut queries, &mut state);
+        engine.finish()?;
     }
 
     Ok(())
@@ -78,35 +81,28 @@ fn add_helmet(
     drop(transform);
     let collider = ColliderBuilder::ball(0.35)
         .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+        .active_events(ActiveEvents::COLLISION_EVENTS)
         .build();
-    let rigid_body = RigidBodyBuilder::new_dynamic().position(position).build();
+    let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
+        .position(position)
+        .build();
     let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
     world.insert(helmet, components).unwrap();
 }
 
 fn tick(
-    xr_state: (xr::SessionState, xr::SessionState),
+    tick_data: TickData,
     engine: &mut Engine,
     world: &mut World,
     queries: &mut Queries,
     state: &mut State,
 ) {
-    let current_state = xr_state.1;
-    // If we're not in a session, don't run the frame loop.
-    match xr_state.1 {
-        xr::SessionState::IDLE | xr::SessionState::EXITING | xr::SessionState::STOPPING => return,
-        _ => {}
-    }
-
     let xr_context = &mut engine.xr_context;
     let vulkan_context = &engine.vulkan_context;
     let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
 
-    let (_should_render, swapchain_image_index) = begin_frame(xr_context, render_context);
-
-    if current_state == xr::SessionState::FOCUSED {
+    if tick_data.current_state == xr::SessionState::FOCUSED {
         hands_system(&mut queries.hands_query, world, xr_context, physics_context);
         grabbing_system(&mut queries.grabbing_query, world, physics_context);
         physics_step(physics_context);
@@ -129,19 +125,15 @@ fn tick(
         skinning_system(&mut queries.skins_query, world, render_context);
     }
 
-    if current_state == xr::SessionState::FOCUSED || current_state == xr::SessionState::VISIBLE {
-        render_context.begin_frame(vulkan_context, swapchain_image_index);
-        rendering_system(
-            &mut queries.rendering_query,
-            world,
-            vulkan_context,
-            swapchain_image_index,
-            render_context,
-        );
-        render_context.end_frame(vulkan_context, swapchain_image_index);
-    }
-
-    end_frame(xr_context);
+    let views = xr_context.update_views();
+    rendering_system(
+        &mut queries.rendering_query,
+        world,
+        vulkan_context,
+        render_context,
+        views,
+        tick_data.swapchain_image_index,
+    );
 }
 
 #[derive(Clone, Debug, Default)]

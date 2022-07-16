@@ -107,7 +107,7 @@ fn parse_collider(collider: &rapier3d::geometry::Collider) -> DebugCollider {
 mod tests {
     use super::*;
     use nalgebra::{vector, UnitQuaternion};
-    use rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder};
+    use rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder, RigidBodyType};
 
     use crate::{
         components::{Info, Transform},
@@ -131,7 +131,7 @@ mod tests {
             },
         ));
 
-        let rigid_body = RigidBodyBuilder::new_dynamic().build();
+        let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
         let collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0)
             .translation(vector![0., 0.5, 0.])
             .build();
@@ -152,7 +152,7 @@ mod tests {
             },
         ));
 
-        let rigid_body = RigidBodyBuilder::new_dynamic().build();
+        let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic).build();
         let collider = ColliderBuilder::cylinder(1.0, 0.2).build();
         let components = physics_context.get_rigid_body_and_collider(e2, rigid_body, collider);
         {

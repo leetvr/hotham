@@ -72,7 +72,7 @@ mod tests {
         let mut physics_context = PhysicsContext::default();
 
         let grabbed_collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0).build();
-        let grabbed_rigid_body = RigidBodyBuilder::new_dynamic().build();
+        let grabbed_rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic).build();
         let grabbed_entity = world.spawn((
             Info {
                 name: "Test entity".to_string(),
