@@ -75,4 +75,30 @@ pub fn axes_system(
 
         rigid_body.set_next_kinematic_position(posef_to_isometry(stage_from_space));
     }
+
+    // Print the relative pose from left hand to left pointer
+    let time = xr_context.frame_state.predicted_display_time;
+    let stage_from_left_hand = input
+        .left_hand_space
+        .locate(&xr_context.stage_space, time)
+        .unwrap();
+    let stage_from_left_pointer = input
+        .left_pointer_space
+        .locate(&xr_context.stage_space, time)
+        .unwrap();
+    // Check it's valid before using it
+    if is_space_valid(&stage_from_left_hand) && is_space_valid(&stage_from_left_pointer) {
+        let stage_from_left_hand = posef_to_isometry(stage_from_left_hand.pose);
+        let stage_from_left_pointer = posef_to_isometry(stage_from_left_pointer.pose);
+        let left_hand_from_left_pointer = stage_from_left_hand.inverse() * stage_from_left_pointer;
+        let left_pointer_from_left_hand = stage_from_left_pointer.inverse() * stage_from_left_hand;
+        println!(
+            "left_hand_from_left_pointer: {}",
+            left_hand_from_left_pointer
+        );
+        println!(
+            "left_pointer_from_left_hand: {}",
+            left_pointer_from_left_hand
+        );
+    }
 }
