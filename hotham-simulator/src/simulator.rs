@@ -45,7 +45,7 @@ use std::{
     sync::{atomic::Ordering::Relaxed, mpsc::channel, Mutex, MutexGuard},
     thread,
 };
-use winit::event::{DeviceEvent, VirtualKeyCode};
+use winit::event::DeviceEvent;
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use winit::{
@@ -74,12 +74,6 @@ lazy_static! {
 #[derive(Debug, Clone, Default)]
 struct HothamSession {
     test: usize,
-}
-
-#[derive(Debug, Clone)]
-pub enum HothamInputEvent {
-    KeyboardInput { key: Option<VirtualKeyCode> },
-    MouseInput { x: f64, y: f64 },
 }
 
 #[no_mangle]
@@ -1028,6 +1022,8 @@ fn create_multiview_image_views(
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
+    use winit::event::{ElementState, MouseButton};
+
     let entry = state.vulkan_entry.as_ref().unwrap().clone();
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
     let device = state.device.as_ref().unwrap();
@@ -1098,6 +1094,8 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
         }
         let cl2 = close_window.clone();
 
+        let mut mouse_pressed = false;
+
         event_loop.run_return(move |event, _, control_flow| {
             *control_flow = ControlFlow::Poll;
 
@@ -1107,24 +1105,34 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
             }
 
             match event {
-                Event::WindowEvent {
-                    event: WindowEvent::CloseRequested,
-                    window_id,
-                } if window_id == window.id() => *control_flow = ControlFlow::Exit,
+                Event::WindowEvent { event, window_id } => match event {
+                    WindowEvent::CloseRequested => {
+                        if window_id == window.id() {
+                            *control_flow = ControlFlow::Exit
+                        }
+                    }
+                    WindowEvent::MouseInput {
+                        button: MouseButton::Left,
+                        state,
+                        ..
+                    } => {
+                        mouse_pressed = state == ElementState::Pressed;
+                    }
+                    _ => {}
+                },
                 Event::LoopDestroyed => {}
                 Event::MainEventsCleared => {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_window_id) => {}
                 Event::DeviceEvent { event, .. } => match event {
-                    DeviceEvent::Key(k) => event_tx
-                        .send(HothamInputEvent::KeyboardInput {
-                            key: k.virtual_keycode,
-                        })
-                        .unwrap(),
-                    DeviceEvent::MouseMotion { delta: (y, x) } => event_tx
-                        .send(HothamInputEvent::MouseInput { x, y })
-                        .unwrap(),
+                    DeviceEvent::Key(_) => event_tx.send(event).unwrap(),
+
+                    DeviceEvent::MouseMotion { .. } => {
+                        if mouse_pressed {
+                            event_tx.send(event).unwrap()
+                        }
+                    }
                     _ => {}
                 },
                 _ => (),
@@ -1502,7 +1510,7 @@ pub unsafe extern "system" fn sync_actions(
     _session: Session,
     _sync_info: *const ActionsSyncInfo,
 ) -> Result {
-    STATE.lock().unwrap().update_actions();
+    STATE.lock().unwrap().update_camera();
 
     Result::SUCCESS
 }

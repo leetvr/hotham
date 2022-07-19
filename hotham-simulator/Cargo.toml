@@ -16,6 +16,7 @@ openxr-sys = "0.9"
 rand = "0.8"
 vk-shader-macros = "0.2.8"
 winit = "0.26"
+nalgebra = "0.29.0"
 
 [build-dependencies]
 bindgen = "*"
