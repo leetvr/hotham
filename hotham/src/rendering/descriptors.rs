@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::resources::VulkanContext;
+use crate::resources::{render_context::PIPELINE_DEPTH, VulkanContext};
 use ash::vk;
 
 static TEXTURE_BINDING: u32 = 4;
@@ -11,9 +11,9 @@ pub(crate) struct Descriptors {
     pub graphics_layout: vk::DescriptorSetLayout,
     pub compute_layout: vk::DescriptorSetLayout,
     // One descriptor set per frame
-    pub sets: [vk::DescriptorSet; 3],
+    pub sets: [vk::DescriptorSet; PIPELINE_DEPTH],
     // One descriptor set per frame
-    pub compute_sets: [vk::DescriptorSet; 3],
+    pub compute_sets: [vk::DescriptorSet; PIPELINE_DEPTH],
     #[allow(unused)]
     pub pool: vk::DescriptorPool,
 }
@@ -72,10 +72,10 @@ unsafe fn allocate_descriptor_sets(
     vulkan_context: &VulkanContext,
     pool: vk::DescriptorPool,
     layout: vk::DescriptorSetLayout,
-) -> [vk::DescriptorSet; 3] {
+) -> [vk::DescriptorSet; PIPELINE_DEPTH] {
     let mut descriptor_counts = vk::DescriptorSetVariableDescriptorCountAllocateInfo::builder()
         .descriptor_counts(&[10_000, 10_000, 10_000]);
-    let layouts = [layout, layout, layout];
+    let layouts = [layout; PIPELINE_DEPTH];
 
     vulkan_context
         .device
@@ -95,8 +95,8 @@ unsafe fn allocate_compute_descriptor_sets(
     vulkan_context: &VulkanContext,
     pool: vk::DescriptorPool,
     layout: vk::DescriptorSetLayout,
-) -> [vk::DescriptorSet; 3] {
-    let layouts = [layout, layout, layout];
+) -> [vk::DescriptorSet; PIPELINE_DEPTH] {
+    let layouts = [layout; PIPELINE_DEPTH];
 
     vulkan_context
         .device

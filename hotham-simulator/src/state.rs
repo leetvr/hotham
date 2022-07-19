@@ -83,7 +83,7 @@ impl Default for State {
             session_state: SessionState::UNKNOWN,
             swapchain_fence: vk::Fence::null(),
             internal_swapchain: SwapchainKHR::null(),
-            image_index: 4,
+            image_index: 0,
             present_queue: vk::Queue::null(),
             present_queue_family_index: 0,
             command_pool: vk::CommandPool::null(),

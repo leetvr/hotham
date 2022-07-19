@@ -179,7 +179,7 @@ impl Input {
             Posef::IDENTITY,
         )?;
         let right_pointer_space =
-            aim_action.create_space(session.clone(), left_hand_subaction_path, Posef::IDENTITY)?;
+            aim_action.create_space(session.clone(), right_hand_subaction_path, Posef::IDENTITY)?;
 
         Ok(Input {
             action_set,

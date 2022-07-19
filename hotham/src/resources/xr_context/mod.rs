@@ -9,7 +9,10 @@ use xr::{
     SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
 };
 
-use crate::{resources::VulkanContext, BLEND_MODE, COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE};
+use crate::{
+    resources::VulkanContext, util::is_view_valid, HothamError, HothamResult, BLEND_MODE,
+    COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
+};
 
 mod input;
 use input::Input;
@@ -130,7 +133,7 @@ impl XrContext {
             frame_waiter,
             frame_stream,
             frame_state,
-            views: Vec::new(),
+            views: vec![Default::default(); VIEW_COUNT as usize],
             view_state_flags: ViewStateFlags::EMPTY,
         };
 
@@ -141,37 +144,67 @@ impl XrContext {
         &mut self,
         event_buffer: &mut EventDataBuffer,
     ) -> Result<SessionState> {
-        loop {
-            match self.instance.poll_event(event_buffer)? {
-                Some(xr::Event::SessionStateChanged(session_changed)) => {
-                    let new_state = session_changed.state();
-                    println!("[HOTHAM_POLL_EVENT] State is now {:?}", new_state);
-                    self.session_state = new_state;
-                }
-                Some(xr::Event::InstanceLossPending(_)) => {
-                    println!("[HOTHAM_POLL_EVENT] Instance loss pending!");
-                    break;
-                }
-                Some(_) => println!("[HOTHAM_POLL_EVENT] Received some other event"),
-                None => break,
+        match self.instance.poll_event(event_buffer)? {
+            Some(xr::Event::SessionStateChanged(session_changed)) => {
+                let new_state = session_changed.state();
+                println!("[HOTHAM_POLL_EVENT] State is now {:?}", new_state);
+                self.session_state = new_state;
             }
+            Some(xr::Event::InstanceLossPending(_)) => {
+                println!("[HOTHAM_POLL_EVENT] Instance loss pending!");
+            }
+            Some(_) => println!("[HOTHAM_POLL_EVENT] Received some other event"),
+            None => {}
         }
 
         Ok(self.session_state)
     }
 
-    pub(crate) fn begin_frame(&mut self) -> Result<usize> {
+    pub(crate) fn begin_frame(&mut self) -> HothamResult<usize> {
         self.frame_state = self.frame_waiter.wait()?;
         self.frame_stream.begin()?;
+
+        if !self.frame_state.should_render {
+            return Err(HothamError::NotRendering);
+        }
 
         let image_index = self.swapchain.acquire_image()? as _;
         self.swapchain.wait_image(openxr::Duration::INFINITE)?;
 
+        let active_action_set = xr::ActiveActionSet::new(&self.input.action_set);
+        self.session.sync_actions(&[active_action_set])?;
+
         Ok(image_index)
     }
 
+    pub fn update_views(&'_ mut self) -> &[xr::View] {
+        let (view_state_flags, views) = self
+            .session
+            .locate_views(
+                VIEW_TYPE,
+                self.frame_state.predicted_display_time,
+                &self.stage_space,
+            )
+            .unwrap();
+
+        if is_view_valid(&view_state_flags) {
+            self.views = views;
+            self.view_state_flags = view_state_flags;
+        }
+
+        &self.views
+    }
+
     pub fn end_frame(&mut self) -> std::result::Result<(), openxr::sys::Result> {
-        // Submit the image to OpenXR
+        // If we aren't in the rendering state, just submit empty views.
+        if !self.frame_state.should_render {
+            self.frame_stream
+                .end(self.frame_state.predicted_display_time, BLEND_MODE, &[])
+                .unwrap();
+            return Ok(());
+        }
+
+        // Release the swapchain image.
         self.swapchain.release_image().unwrap();
 
         let rect = xr::Rect2Di {

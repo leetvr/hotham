@@ -5,7 +5,7 @@ mod systems;
 use hotham::{
     components::Visible,
     hecs::{Entity, World},
-    schedule_functions::{apply_haptic_feedback, begin_frame, end_frame, physics_step},
+    schedule_functions::{apply_haptic_feedback, physics_step},
     systems::{
         audio_system, collision_system, draw_gui_system, rendering_system,
         update_parent_transform_matrix_system, update_rigid_body_transforms_system,
@@ -13,7 +13,7 @@ use hotham::{
     },
     systems::{pointers_system, Queries},
     xr::{self, SessionState},
-    Engine, HothamResult,
+    Engine, HothamResult, TickData,
 };
 
 use resources::{
@@ -34,24 +34,23 @@ pub fn real_main() -> HothamResult<()> {
     let mut hotham_queries = Default::default();
     let mut crab_saber_queries = Default::default();
 
-    while let Ok((previous_state, current_state)) = engine.update() {
+    while let Ok(tick_data) = engine.update() {
         tick(
-            previous_state,
-            current_state,
+            tick_data,
             &mut engine,
             &mut world,
             &mut hotham_queries,
             &mut crab_saber_queries,
             &mut game_context,
         );
+        engine.finish()?;
     }
 
     Ok(())
 }
 
 fn tick(
-    previous_state: xr::SessionState,
-    current_state: xr::SessionState,
+    tick_data: TickData,
     engine: &mut Engine,
     world: &mut World,
     hotham_queries: &mut Queries,
@@ -66,25 +65,10 @@ fn tick(
     let haptic_context = &mut engine.haptic_context;
     let audio_context = &mut engine.audio_context;
 
-    // If we're not in a session, don't run the frame loop.
-    match current_state {
-        xr::SessionState::IDLE | xr::SessionState::EXITING | xr::SessionState::STOPPING => return,
-        _ => {}
-    }
+    handle_state_change(&tick_data, audio_context, game_context, world);
 
-    // Frame start
-    let (_should_render, swapchain_image_index) = begin_frame(xr_context, render_context);
-
-    handle_state_change(
-        previous_state,
-        current_state,
-        audio_context,
-        game_context,
-        world,
-    );
-
-    // Core logic tasks - these are only necessary when in a FOCUSSED state.
-    if current_state == xr::SessionState::FOCUSED {
+    // Simulation tasks - these are only neccessary in the focussed state.
+    if tick_data.current_state == xr::SessionState::FOCUSED {
         // Handle input
         sabers_system(
             &mut crab_saber_queries.sabers_query,
@@ -139,41 +123,37 @@ fn tick(
         );
     }
 
-    // Rendering tasks - only necessary if we are in at least the visible state
-    if current_state == xr::SessionState::VISIBLE || current_state == xr::SessionState::FOCUSED {
-        render_context.begin_frame(vulkan_context, swapchain_image_index);
-        // Draw GUI
-        draw_gui_system(
-            &mut hotham_queries.draw_gui_query,
-            world,
-            vulkan_context,
-            &swapchain_image_index,
-            render_context,
-            gui_context,
-            haptic_context,
-        );
-        rendering_system(
-            &mut hotham_queries.rendering_query,
-            world,
-            vulkan_context,
-            swapchain_image_index,
-            render_context,
-        );
-        render_context.end_frame(vulkan_context, swapchain_image_index);
-    }
+    // Draw GUI
+    draw_gui_system(
+        &mut hotham_queries.draw_gui_query,
+        world,
+        vulkan_context,
+        render_context,
+        gui_context,
+        haptic_context,
+    );
 
-    // End the frame
-    end_frame(xr_context);
+    // Update the views - we always want to do this at the last possible minute to get an accurate position of the player's head.
+    let views = xr_context.update_views();
+
+    // Draw objects
+    rendering_system(
+        &mut hotham_queries.rendering_query,
+        world,
+        vulkan_context,
+        render_context,
+        views,
+        tick_data.swapchain_image_index,
+    );
 }
 
 fn handle_state_change(
-    previous_state: SessionState,
-    current_state: SessionState,
+    tick_data: &TickData,
     audio_context: &mut hotham::resources::AudioContext,
     game_context: &mut GameContext,
     world: &mut World,
 ) {
-    match (previous_state, current_state) {
+    match (tick_data.previous_state, tick_data.current_state) {
         (SessionState::VISIBLE, SessionState::FOCUSED) => {
             audio_context.resume_music_track();
             match game_context.state {

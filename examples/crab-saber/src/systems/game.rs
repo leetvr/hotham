@@ -387,7 +387,7 @@ fn revive_cube(
     let collider = ColliderBuilder::cuboid(0.2, 0.2, 0.2)
         .translation([0., 0.2, 0.].into()) // Offset the collider slightly
         .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::INTERSECTION_EVENTS)
+        .active_events(ActiveEvents::COLLISION_EVENTS)
         .collision_groups(InteractionGroups::new(
             DEFAULT_COLLISION_GROUP,
             DEFAULT_COLLISION_GROUP,
@@ -417,7 +417,7 @@ mod tests {
         components::{Collider, RigidBody, SoundEmitter},
         hecs::Entity,
         nalgebra::Vector3,
-        rapier3d::prelude::RigidBodyBuilder,
+        rapier3d::prelude::{RigidBodyBuilder, RigidBodyType},
         resources::HapticContext,
         Engine,
     };
@@ -810,7 +810,7 @@ mod tests {
     ) {
         let rigid_body = physics_context
             .rigid_bodies
-            .insert(RigidBodyBuilder::new_dynamic().build());
+            .insert(RigidBodyBuilder::new(RigidBodyType::Dynamic).build());
         let collider = physics_context
             .colliders
             .insert(ColliderBuilder::cuboid(0., 0., 0.).build());

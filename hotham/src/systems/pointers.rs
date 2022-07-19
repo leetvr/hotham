@@ -7,7 +7,7 @@ use nalgebra::{
 };
 use rapier3d::{
     math::Point,
-    prelude::{InteractionGroups, Ray},
+    prelude::{InteractionGroups, QueryFilter, Ray},
 };
 
 const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
@@ -73,14 +73,14 @@ pub fn pointers_system(
         let max_toi = 40.0;
         let solid = true;
         let groups = InteractionGroups::new(0b10, 0b10);
-        let filter = None;
+        let filter = QueryFilter::new().groups(groups);
 
         if let Some((handle, toi)) = physics_context.query_pipeline.cast_ray(
+            &physics_context.rigid_bodies,
             &physics_context.colliders,
             &ray,
             max_toi,
             solid,
-            groups,
             filter,
         ) {
             // The first collider hit has the handle `handle` and it hit after

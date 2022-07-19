@@ -263,12 +263,11 @@ impl GuiContext {
         &mut self,
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,
-        current_swapchain_image_index: usize,
         ui_panel: &mut UIPanel,
         panel: &mut Panel,
     ) {
         let device = &vulkan_context.device;
-        let frame = &render_context.frames[current_swapchain_image_index];
+        let frame = &render_context.frames[render_context.frame_index];
         let command_buffer = frame.command_buffer;
         let framebuffer = ui_panel.framebuffer;
         let extent = panel.resolution;

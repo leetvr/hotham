@@ -226,7 +226,7 @@ pub unsafe extern "system" fn create_vulkan_device(
 }
 
 unsafe fn create_and_store_device(device: ash::Device, queue_family_index: u32, state: &mut State) {
-    let info = vk::FenceCreateInfo::default();
+    let info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
     state.swapchain_fence = device.create_fence(&info, None).unwrap();
     state.command_pool = device
         .create_command_pool(
@@ -874,13 +874,6 @@ pub unsafe extern "system" fn poll_event(
         next_state = SessionState::FOCUSED;
         state.has_event = true;
     }
-    if state.session_state == SessionState::FOCUSED {}
-
-    // if state.session_state == SessionState::FOCUSED && state.frame_count > 1 {
-    // if state.session_state != SessionState::STOPPING && state.close_window.load(Relaxed) {
-    //     next_state = SessionState::STOPPING;
-    //     state.has_event = true;
-    // }
 
     if state.has_event {
         let data = EventDataSessionStateChanged {
@@ -904,8 +897,6 @@ pub unsafe extern "system" fn begin_session(
     session: Session,
     _begin_info: *const SessionBeginInfo,
 ) -> Result {
-    // let ptr = session.into_raw() as *mut HothamSession;
-    // let s = Box::from_raw(ptr);
     println!("[HOTHAM_SIMULATOR] Beginning session: {:?}", session);
     Result::SUCCESS
 }
@@ -915,16 +906,15 @@ pub unsafe extern "system" fn wait_frame(
     frame_state: *mut FrameState,
 ) -> Result {
     let state = STATE.lock().unwrap();
-    let _device = state.device.as_ref().unwrap();
-    let _fence = state.swapchain_fence;
+    let should_render = state.session_state == SessionState::VISIBLE
+        || state.session_state == SessionState::FOCUSED;
 
-    // device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
     *frame_state = FrameState {
         ty: StructureType::FRAME_STATE,
         next: ptr::null_mut(),
         predicted_display_time: Time::from_nanos(1),
         predicted_display_period: Duration::from_nanos(1),
-        should_render: TRUE,
+        should_render: should_render.into(),
     };
     Result::SUCCESS
 }
@@ -1447,29 +1437,22 @@ pub unsafe extern "system" fn acquire_swapchain_image(
     _acquire_info: *const SwapchainImageAcquireInfo,
     index: *mut u32,
 ) -> Result {
-    // println!("[HOTHAM_SIMULATOR] Acquire swapchain image called..");
+    let mut state = STATE.lock().unwrap();
     let swapchain = vk::SwapchainKHR::from_raw(swapchain.into_raw());
-    let state = STATE.lock().unwrap();
     let device = state.device.as_ref().unwrap();
     let ext = khr::Swapchain::new(state.vulkan_instance.as_ref().unwrap(), device);
     let fence = state.swapchain_fence;
-    device
-        .reset_fences(&[fence])
-        .expect("Failed to reset fence");
+
+    device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
+    device.reset_fences(&[fence]).unwrap();
 
     let (i, _) = ext
         .acquire_next_image(swapchain, u64::MAX - 1, vk::Semaphore::null(), fence)
         .unwrap();
-    device
-        .wait_for_fences(&[fence], true, u64::MAX)
-        .expect("Failed to wait for fence");
-    drop(state);
 
     *index = i;
 
-    let mut state = STATE.lock().unwrap();
-    state.image_index = i;
-    // println!("[HOTHAM_SIMULATOR] Done. Index is {}", i);
+    state.image_index = *index;
     Result::SUCCESS
 }
 
@@ -1581,11 +1564,16 @@ pub unsafe extern "system" fn release_swapchain_image(
 
 pub unsafe extern "system" fn end_frame(
     _session: Session,
-    _frame_end_info: *const FrameEndInfo,
+    frame_end_info: *const FrameEndInfo,
 ) -> Result {
+    // If there are no layers to present, we're done.
+    if (*frame_end_info).layer_count == 0 {
+        return Result::SUCCESS;
+    }
     let mut state = STATE.lock().unwrap();
     let instance = state.vulkan_instance.as_ref().unwrap();
     let device = state.device.as_ref().unwrap();
+
     let swapchain = state.internal_swapchain;
     let swapchains = [swapchain];
     let queue = state.present_queue;

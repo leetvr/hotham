@@ -16,8 +16,13 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 
 use crate::{
     rendering::{
-        camera::Camera, descriptors::Descriptors, frame::Frame, image::Image, resources::Resources,
-        scene_data::SceneData, swapchain::Swapchain, texture::DEFAULT_COMPONENT_MAPPING,
+        camera::Camera,
+        descriptors::Descriptors,
+        frame::Frame,
+        image::Image,
+        resources::Resources,
+        scene_data::SceneData,
+        swapchain::{Swapchain, SwapchainInfo},
         vertex::Vertex,
     },
     resources::{VulkanContext, XrContext},
@@ -33,20 +38,22 @@ static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert", target: vulkan1_1);
 static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag", target: vulkan1_1);
 static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
 
+// TODO: Is this a good idea?
+pub const PIPELINE_DEPTH: usize = 2;
+
 pub struct RenderContext {
-    pub frames: Vec<Frame>,
+    pub frames: [Frame; PIPELINE_DEPTH],
+    pub frame_index: usize,
     pub pipeline: vk::Pipeline,
     pub compute_pipeline: vk::Pipeline,
     pub pipeline_layout: vk::PipelineLayout,
     pub compute_pipeline_layout: vk::PipelineLayout,
     pub render_pass: vk::RenderPass,
-    pub depth_image: Image,
-    pub color_image: Image,
-    pub render_area: vk::Rect2D,
     pub scene_data: SceneData,
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
     pub resources: Resources,
+    pub(crate) swapchain: Swapchain,
     pub(crate) descriptors: Descriptors,
 }
 
@@ -57,72 +64,54 @@ impl RenderContext {
         let swapchain_resolution = xr_context.swapchain_resolution;
 
         // Build swapchain
-        let swapchain = Swapchain::new(xr_swapchain, swapchain_resolution)?;
-        Self::new_from_swapchain(vulkan_context, &swapchain)
+        let swapchain = SwapchainInfo::from_openxr_swapchain(xr_swapchain, swapchain_resolution)?;
+        Self::new_from_swapchain_info(vulkan_context, &swapchain)
     }
 
-    pub(crate) fn new_from_swapchain(
+    pub(crate) fn new_from_swapchain_info(
         vulkan_context: &VulkanContext,
-        swapchain: &Swapchain,
+        swapchain_info: &SwapchainInfo,
     ) -> Result<Self> {
-        let render_area = vk::Rect2D {
-            extent: swapchain.resolution,
-            offset: vk::Offset2D::default(),
-        };
-
         let descriptors = unsafe { Descriptors::new(vulkan_context) };
         let resources = unsafe { Resources::new(vulkan_context, &descriptors) };
 
         // Pipeline, render pass
         let render_pass = create_render_pass(vulkan_context)?;
+        let swapchain = Swapchain::new(swapchain_info, vulkan_context, render_pass);
         let pipeline_layout =
             create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.graphics_layout))?;
-        let pipeline = create_pipeline(vulkan_context, pipeline_layout, &render_area, render_pass)?;
+        let pipeline = create_pipeline(
+            vulkan_context,
+            pipeline_layout,
+            &swapchain.render_area,
+            render_pass,
+        )?;
         let (compute_pipeline, compute_pipeline_layout) = create_compute_pipeline(
             &vulkan_context.device,
             slice_from_ref(&descriptors.compute_layout),
         );
 
-        // Depth image, shared between frames
-        let depth_image = vulkan_context.create_image(
-            DEPTH_FORMAT,
-            &swapchain.resolution,
-            vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT
-                | vk::ImageUsageFlags::TRANSIENT_ATTACHMENT,
-            2,
-            1,
-        )?;
-
-        // Color image, used for MSAA.
-        let color_image = vulkan_context.create_image(
-            COLOR_FORMAT,
-            &swapchain.resolution,
-            vk::ImageUsageFlags::TRANSIENT_ATTACHMENT | vk::ImageUsageFlags::COLOR_ATTACHMENT,
-            2,
-            1,
-        )?;
-
         // Create all the per-frame resources we need
-        let frames = create_frames(
-            vulkan_context,
-            &render_pass,
-            swapchain,
-            &depth_image,
-            &color_image,
-            &descriptors,
-        );
+        let mut index = 0;
+        let frames = [(); PIPELINE_DEPTH].map(|_| {
+            let frame =
+                Frame::new(vulkan_context, index, &descriptors).expect("Unable to create frame!");
+            // mmmm.. hacky
+            index += 1;
+            frame
+        });
+
         let scene_data = Default::default();
 
         Ok(Self {
             frames,
+            frame_index: 0,
+            swapchain,
             pipeline,
             compute_pipeline,
             pipeline_layout,
             compute_pipeline_layout,
             render_pass,
-            depth_image,
-            color_image,
-            render_area,
             cameras: vec![Default::default(); 2],
             views: vec![Default::default(); 2],
             scene_data,
@@ -152,22 +141,18 @@ impl RenderContext {
             .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
             .unwrap();
 
-        let swapchain = Swapchain {
+        let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
         };
 
         (
-            RenderContext::new_from_swapchain(&vulkan_context, &swapchain).unwrap(),
+            RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap(),
             vulkan_context,
         )
     }
 
-    pub(crate) fn update_scene_data(
-        &mut self,
-        views: &[xr::View],
-        swapchain_image_index: usize,
-    ) -> Result<()> {
+    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) -> Result<()> {
         self.views = views.to_owned();
 
         // View (camera)
@@ -193,7 +178,7 @@ impl RenderContext {
         self.scene_data.camera_position = [self.cameras[0].position(), self.cameras[1].position()];
 
         unsafe {
-            let scene_data = &mut self.frames[swapchain_image_index]
+            let scene_data = &mut self.frames[self.frame_index]
                 .scene_data_buffer
                 .as_slice_mut()[0];
             scene_data.camera_position = self.scene_data.camera_position;
@@ -205,10 +190,10 @@ impl RenderContext {
     }
 
     /// Start rendering a frame
-    pub fn begin_frame(&self, vulkan_context: &VulkanContext, swapchain_image_index: usize) {
+    pub(crate) fn begin_frame(&self, vulkan_context: &VulkanContext) {
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
-        let frame = &self.frames[swapchain_image_index];
+        let frame = &self.frames[self.frame_index];
 
         // Wait for the GPU to be ready.
         self.wait(device, frame);
@@ -227,13 +212,10 @@ impl RenderContext {
 
     // TODO: GPU culling seems to cause deadlocks at high load. Most likely due to a clash between shared coherent memory.
     // Solution is to split buffers apart: https://github.com/leetvr/hotham/issues/263
-    pub(crate) fn cull_objects(
-        &mut self,
-        vulkan_context: &VulkanContext,
-        swapchain_image_index: usize,
-    ) {
+    pub(crate) fn cull_objects(&mut self, vulkan_context: &VulkanContext) {
         let device = &vulkan_context.device;
-        let frame = &mut self.frames[swapchain_image_index];
+        let frame_index = self.frame_index;
+        let frame = &mut self.frames[self.frame_index];
         let draw_indirect_buffer = &frame.draw_indirect_buffer;
         let command_buffer = frame.command_buffer;
         let buffer_memory_barrier = vk::BufferMemoryBarrier::builder()
@@ -287,7 +269,7 @@ impl RenderContext {
                 vk::PipelineBindPoint::COMPUTE,
                 self.compute_pipeline_layout,
                 0,
-                slice_from_ref(&self.descriptors.compute_sets[swapchain_image_index]),
+                slice_from_ref(&self.descriptors.compute_sets[frame_index]),
                 &[],
             );
             device.cmd_dispatch(command_buffer, group_count_x as u32, 1, 1);
@@ -312,15 +294,15 @@ impl RenderContext {
     ) {
         // Get the values we need to start a renderpass
         let device = &vulkan_context.device;
-        let frame = &self.frames[swapchain_image_index];
+        let frame = &self.frames[self.frame_index];
         let command_buffer = frame.command_buffer;
-        let framebuffer = frame.framebuffer;
+        let framebuffer = self.swapchain.framebuffers[swapchain_image_index];
 
         // Begin the renderpass.
         let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
             .render_pass(self.render_pass)
             .framebuffer(framebuffer)
-            .render_area(self.render_area)
+            .render_area(self.swapchain.render_area)
             .clear_values(&CLEAR_VALUES);
 
         unsafe {
@@ -339,7 +321,7 @@ impl RenderContext {
                 vk::PipelineBindPoint::GRAPHICS,
                 self.pipeline_layout,
                 0,
-                slice_from_ref(&self.descriptors.sets[swapchain_image_index]),
+                slice_from_ref(&self.descriptors.sets[self.frame_index]),
                 &[],
             );
             device.cmd_bind_index_buffer(
@@ -357,13 +339,9 @@ impl RenderContext {
         }
     }
 
-    pub(crate) fn end_pbr_render_pass(
-        &mut self,
-        vulkan_context: &VulkanContext,
-        swapchain_image_index: usize,
-    ) {
+    pub(crate) fn end_pbr_render_pass(&mut self, vulkan_context: &VulkanContext) {
         let device = &vulkan_context.device;
-        let frame = &self.frames[swapchain_image_index];
+        let frame = &self.frames[self.frame_index];
         let command_buffer = frame.command_buffer;
         unsafe {
             device.cmd_end_render_pass(command_buffer);
@@ -371,10 +349,10 @@ impl RenderContext {
     }
 
     /// Finish rendering a frame
-    pub fn end_frame(&mut self, vulkan_context: &VulkanContext, swapchain_image_index: usize) {
+    pub(crate) fn end_frame(&mut self, vulkan_context: &VulkanContext) {
         // Get the values we need to end the renderpass
         let device = &vulkan_context.device;
-        let frame = &self.frames[swapchain_image_index];
+        let frame = &self.frames[self.frame_index];
         let command_buffer = frame.command_buffer;
         let graphics_queue = vulkan_context.graphics_queue;
 
@@ -382,13 +360,15 @@ impl RenderContext {
         unsafe {
             device.end_command_buffer(command_buffer).unwrap();
             let fence = frame.fence;
-            let submit_info = vk::SubmitInfo::builder()
-                .command_buffers(&[command_buffer])
-                .build();
+            let submit_info =
+                vk::SubmitInfo::builder().command_buffers(slice_from_ref(&command_buffer));
             device
-                .queue_submit(graphics_queue, &[submit_info], fence)
+                .queue_submit(graphics_queue, slice_from_ref(&submit_info), fence)
                 .expect("[HOTHAM_RENDER] @@ GPU CRASH DETECTED @@ - You are probably doing too much work in a compute shader!");
         }
+
+        // And we're done! Bump the frame index.
+        self.frame_index = (self.frame_index + 1) % PIPELINE_DEPTH;
     }
 
     pub(crate) fn wait(&self, device: &ash::Device, frame: &Frame) {
@@ -471,79 +451,6 @@ fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
         c0r0, c0r1, c0r2, c0r3, c1r0, c1r1, c1r2, c1r3, c2r0, c2r1, c2r2, c2r3, c3r0, c3r1, c3r2,
         c3r3,
     ])
-}
-
-fn create_frames(
-    vulkan_context: &VulkanContext,
-    render_pass: &vk::RenderPass,
-    swapchain: &Swapchain,
-    depth_image: &Image,
-    color_image: &Image,
-    descriptors: &Descriptors,
-) -> Vec<Frame> {
-    print!("[HOTHAM_INIT] Creating frames..");
-    let frames = swapchain
-        .images
-        .iter()
-        .flat_map(|i| {
-            vulkan_context.create_image_view(
-                i,
-                COLOR_FORMAT,
-                vk::ImageViewType::TYPE_2D_ARRAY,
-                2,
-                1,
-                DEFAULT_COMPONENT_MAPPING,
-            )
-        })
-        .enumerate()
-        .map(|(index, image_view)| {
-            let mut frame = Frame::new(
-                vulkan_context,
-                *render_pass,
-                swapchain.resolution,
-                image_view,
-                depth_image.view,
-                color_image.view,
-            )
-            .unwrap();
-
-            // Update the descriptor sets for this frame.
-            unsafe {
-                frame.draw_data_buffer.update_descriptor_set(
-                    &vulkan_context.device,
-                    descriptors.sets[index],
-                    0,
-                );
-                frame.draw_data_buffer.update_descriptor_set(
-                    &vulkan_context.device,
-                    descriptors.compute_sets[index],
-                    0,
-                );
-                frame.draw_indirect_buffer.update_descriptor_set(
-                    &vulkan_context.device,
-                    descriptors.compute_sets[index],
-                    1,
-                );
-                frame.cull_data_buffer.update_descriptor_set(
-                    &vulkan_context.device,
-                    descriptors.compute_sets[index],
-                    2,
-                );
-
-                let scene_data_buffer = &mut frame.scene_data_buffer;
-                scene_data_buffer.update_descriptor_set(
-                    &vulkan_context.device,
-                    descriptors.sets[index],
-                    3,
-                );
-                scene_data_buffer.push(&Default::default());
-            }
-
-            frame
-        })
-        .collect::<Vec<Frame>>();
-    println!(" ..done!");
-    frames
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {

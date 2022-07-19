@@ -52,7 +52,7 @@ mod tests {
                     vector![0.0, 0.0, 0.0],
                 ))
                 .active_collision_types(ActiveCollisionTypes::all())
-                .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+                .active_events(ActiveEvents::COLLISION_EVENTS)
                 .sensor(true)
                 .build(),
             &mut world,
@@ -63,7 +63,7 @@ mod tests {
             ColliderBuilder::cuboid(1.0, 1.0, 1.0)
                 .sensor(true)
                 .active_collision_types(ActiveCollisionTypes::all())
-                .active_events(ActiveEvents::CONTACT_EVENTS | ActiveEvents::INTERSECTION_EVENTS)
+                .active_events(ActiveEvents::COLLISION_EVENTS)
                 .build(),
             &mut world,
             0,
@@ -90,7 +90,7 @@ mod tests {
             node_id,
         },));
         collider.user_data = entity.id() as _;
-        let rigid_body = RigidBodyBuilder::new_dynamic().build();
+        let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic).build();
         let components = physics_context.get_rigid_body_and_collider(entity, rigid_body, collider);
         world.insert(entity, components).unwrap();
 

@@ -111,7 +111,7 @@ mod tests {
         time::{Duration, Instant},
     };
 
-    use rapier3d::prelude::RigidBodyBuilder;
+    use rapier3d::prelude::{RigidBodyBuilder, RigidBodyType};
     const DURATION_SECS: u32 = 8;
 
     use crate::{
@@ -139,7 +139,7 @@ mod tests {
 
         // Create rigid body for the test entity
         let sound_effect = include_bytes!("../../../test_assets/ice_crash.mp3").to_vec();
-        let rigid_body = RigidBodyBuilder::new_dynamic()
+        let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
             .linvel([0.5, 0., 0.].into())
             .translation([-2., 0., 0.].into())
             .build();
