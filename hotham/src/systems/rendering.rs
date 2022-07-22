@@ -1,8 +1,8 @@
 use crate::{
     components::{skin::NO_SKIN, Mesh, Skin, Transform, TransformMatrix, Visible},
     rendering::resources::DrawData,
-    resources::VulkanContext,
     resources::{render_context::create_push_constant, RenderContext},
+    resources::{render_context::get_projection, VulkanContext},
 };
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
@@ -91,11 +91,15 @@ pub fn rendering_system(
         }
     }
 
-    let inverse_view = render_context
-        .scene_data
-        .view_projection
-        .map(|m| m.try_inverse().unwrap());
-    let constants = create_push_constant(&inverse_view);
+    let clip_matrices = views
+        .iter()
+        .map(|v| get_projection(v.fov, 0.05, 100.0).try_inverse().unwrap())
+        .collect::<Vec<_>>();
+
+    let view_matrix = render_context.cameras[0].view_matrix;
+
+    let clip_matrices = [clip_matrices[0], view_matrix];
+    let constants = create_push_constant(&clip_matrices);
 
     // Render the skybox
     unsafe {

@@ -427,7 +427,7 @@ pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(std::mem::transmute(p), size_of::<T>()) }
 }
 
-fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
+pub fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
     let tan_left = f32::tan(fov.angle_left);
     let tan_right = f32::tan(fov.angle_right);
 
@@ -788,7 +788,9 @@ fn create_skybox_pipeline(
                 &vk::PipelineLayoutCreateInfo::builder()
                     .set_layouts(set_layouts)
                     .push_constant_ranges(slice_from_ref(
-                        &vk::PushConstantRange::builder().size(128).stage_flags(vk::ShaderStageFlags::FRAGMENT),
+                        &vk::PushConstantRange::builder()
+                            .size(128)
+                            .stage_flags(vk::ShaderStageFlags::FRAGMENT),
                     )),
                 None,
             )
