@@ -1,8 +1,8 @@
 use crate::{
     components::{skin::NO_SKIN, Mesh, Skin, Transform, TransformMatrix, Visible},
     rendering::resources::DrawData,
-    resources::RenderContext,
     resources::VulkanContext,
+    resources::{render_context::create_push_constant, RenderContext},
 };
 use ash::vk;
 use hecs::{PreparedQuery, With, World};
@@ -89,6 +89,29 @@ pub fn rendering_system(
                 )
             }
         }
+    }
+
+    let inverse_view = render_context
+        .scene_data
+        .view_projection
+        .map(|m| m.try_inverse().unwrap());
+    let constants = create_push_constant(&inverse_view);
+
+    // Render the skybox
+    unsafe {
+        device.cmd_bind_pipeline(
+            command_buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            render_context.skybox_pipeline,
+        );
+        device.cmd_push_constants(
+            command_buffer,
+            render_context.skybox_pipeline_layout,
+            vk::ShaderStageFlags::FRAGMENT,
+            0,
+            constants,
+        );
+        device.cmd_draw(command_buffer, 3, 1, 0, 0);
     }
 
     render_context.end_pbr_render_pass(vulkan_context);

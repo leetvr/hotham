@@ -37,6 +37,8 @@ use vk_shader_macros::include_glsl;
 static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert", target: vulkan1_1);
 static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag", target: vulkan1_1);
 static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
+static SKYBOX_VERT: &[u32] = include_glsl!("src/shaders/skybox.vert", target: vulkan1_1);
+static SKYBOX_FRAG: &[u32] = include_glsl!("src/shaders/skybox.frag", target: vulkan1_1);
 
 // TODO: Is this a good idea?
 pub const PIPELINE_DEPTH: usize = 2;
@@ -46,8 +48,10 @@ pub struct RenderContext {
     pub frame_index: usize,
     pub pipeline: vk::Pipeline,
     pub compute_pipeline: vk::Pipeline,
+    pub skybox_pipeline: vk::Pipeline,
     pub pipeline_layout: vk::PipelineLayout,
     pub compute_pipeline_layout: vk::PipelineLayout,
+    pub skybox_pipeline_layout: vk::PipelineLayout,
     pub render_pass: vk::RenderPass,
     pub scene_data: SceneData,
     pub cameras: Vec<Camera>,
@@ -91,6 +95,9 @@ impl RenderContext {
             slice_from_ref(&descriptors.compute_layout),
         );
 
+        let (skybox_pipeline, skybox_pipeline_layout) =
+            create_skybox_pipeline(vulkan_context, &swapchain.render_area, render_pass, &[]);
+
         // Create all the per-frame resources we need
         let mut index = 0;
         let frames = [(); PIPELINE_DEPTH].map(|_| {
@@ -109,8 +116,10 @@ impl RenderContext {
             swapchain,
             pipeline,
             compute_pipeline,
+            skybox_pipeline,
             pipeline_layout,
             compute_pipeline_layout,
+            skybox_pipeline_layout,
             render_pass,
             cameras: vec![Default::default(); 2],
             views: vec![Default::default(); 2],
@@ -561,9 +570,6 @@ fn create_pipeline(
     render_area: &vk::Rect2D,
     render_pass: vk::RenderPass,
 ) -> Result<vk::Pipeline> {
-    print!("[HOTHAM_INIT] Creating pipeline..");
-    // Build up the state of the pipeline
-
     // Vertex shader stage
     let (vertex_shader, vertex_stage) =
         create_shader(VERT, vk::ShaderStageFlags::VERTEX, vulkan_context)?;
@@ -767,4 +773,139 @@ fn create_compute_pipeline(
 
         (pipeline, layout)
     }
+}
+
+fn create_skybox_pipeline(
+    vulkan_context: &VulkanContext,
+    render_area: &vk::Rect2D,
+    render_pass: vk::RenderPass,
+    set_layouts: &[vk::DescriptorSetLayout],
+) -> (vk::Pipeline, vk::PipelineLayout) {
+    let pipeline_layout = unsafe {
+        vulkan_context
+            .device
+            .create_pipeline_layout(
+                &vk::PipelineLayoutCreateInfo::builder()
+                    .set_layouts(set_layouts)
+                    .push_constant_ranges(slice_from_ref(
+                        &vk::PushConstantRange::builder().size(128).stage_flags(vk::ShaderStageFlags::FRAGMENT),
+                    )),
+                None,
+            )
+            .unwrap()
+    };
+    // Vertex shader stage
+    let (vertex_shader, vertex_stage) =
+        create_shader(SKYBOX_VERT, vk::ShaderStageFlags::VERTEX, vulkan_context).unwrap();
+
+    // Fragment shader stage
+    let (fragment_shader, fragment_stage) =
+        create_shader(SKYBOX_FRAG, vk::ShaderStageFlags::FRAGMENT, vulkan_context).unwrap();
+
+    let stages = [vertex_stage, fragment_stage];
+    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder();
+
+    // Input assembly state
+    let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::builder()
+        .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
+
+    // Viewport State
+    let viewport = vk::Viewport {
+        x: 0.0,
+        y: 0.0,
+        width: render_area.extent.width as _,
+        height: render_area.extent.height as _,
+        min_depth: 0.0,
+        max_depth: 1.0,
+    };
+    let viewports = [viewport];
+
+    // Scissors
+    let scissors = [*render_area];
+
+    let viewport_state = vk::PipelineViewportStateCreateInfo::builder()
+        .viewports(&viewports)
+        .scissors(&scissors);
+
+    // Rasterization state
+    let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
+        .polygon_mode(vk::PolygonMode::FILL)
+        .cull_mode(vk::CullModeFlags::NONE)
+        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
+        .rasterizer_discard_enable(false)
+        .depth_clamp_enable(false)
+        .depth_bias_enable(false)
+        .depth_bias_constant_factor(0.0)
+        .depth_bias_clamp(0.0)
+        .depth_bias_slope_factor(0.0)
+        .line_width(1.0);
+
+    // Multisample state
+    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
+        .rasterization_samples(vk::SampleCountFlags::TYPE_4);
+
+    // Depth stencil state
+    let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
+        .depth_test_enable(true)
+        .depth_write_enable(false)
+        .depth_compare_op(vk::CompareOp::LESS_OR_EQUAL)
+        .depth_bounds_test_enable(false)
+        .min_depth_bounds(0.0)
+        .max_depth_bounds(1.0)
+        .stencil_test_enable(false);
+
+    // Color blend state
+    let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
+        .color_write_mask(
+            vk::ColorComponentFlags::R
+                | vk::ColorComponentFlags::G
+                | vk::ColorComponentFlags::B
+                | vk::ColorComponentFlags::A,
+        )
+        .blend_enable(false)
+        .build();
+
+    let color_blend_attachments = [color_blend_attachment];
+
+    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
+        .logic_op_enable(false)
+        .attachments(&color_blend_attachments);
+
+    let create_info = vk::GraphicsPipelineCreateInfo::builder()
+        .stages(&stages)
+        .vertex_input_state(&vertex_input_state)
+        .input_assembly_state(&input_assembly_state)
+        .viewport_state(&viewport_state)
+        .rasterization_state(&rasterization_state)
+        .multisample_state(&multisample_state)
+        .depth_stencil_state(&depth_stencil_state)
+        .color_blend_state(&color_blend_state)
+        .layout(pipeline_layout)
+        .render_pass(render_pass)
+        .subpass(0)
+        .build();
+
+    let create_infos = [create_info];
+
+    let pipelines = unsafe {
+        vulkan_context.device.create_graphics_pipelines(
+            vk::PipelineCache::null(),
+            &create_infos,
+            None,
+        )
+    }
+    .unwrap();
+
+    unsafe {
+        vulkan_context
+            .device
+            .destroy_shader_module(vertex_shader, None);
+        vulkan_context
+            .device
+            .destroy_shader_module(fragment_shader, None);
+    }
+
+    let primary_pipeline = pipelines[0];
+
+    (primary_pipeline, pipeline_layout)
 }
