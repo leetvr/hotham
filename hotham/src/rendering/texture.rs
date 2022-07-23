@@ -189,7 +189,7 @@ impl Texture {
 
     /// Create a texture from an uncompressed image, like JPG or PNG.
     ///
-    /// This is slow because we have to extract the image on the CPU before we can upload it to the GPU: hardly ideal. It is neccessary
+    /// This is slow because we have to extract the image on the CPU before we can upload it to the GPU: hardly ideal. It is necessary
     /// when testing in the simulator because compressing images into desktop friendly formats like BCn would be overkill for testing.
     pub fn from_uncompressed(
         name: &str,
@@ -202,7 +202,7 @@ impl Texture {
         #[cfg(target_os = "android")]
         println!("[HOTHAM_TEXTURE] - @@ WARNING: Non-optimal image format detected. For best performance, compress your images into ktx2 using Squisher: https://github.com/leetvr/squisher. @@");
 
-        print!("[HOTHAM_TEXTURE] - Decompresing image. This may take some time..");
+        print!("[HOTHAM_TEXTURE] - Decompressing image. This may take some time..");
         let decompressed_format = get_format_from_mime_type(mime_type);
         let asset = Cursor::new(data);
         let mut image = ImageReader::new(asset);

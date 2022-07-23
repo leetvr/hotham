@@ -6,8 +6,8 @@ use crate::{
     rendering::texture::{Texture, TextureUsage, NO_TEXTURE},
 };
 
-/// Tells the fragment shader to use the PBR Metalic Roughness workflow
-pub static METALIC_ROUGHNESS_WORKFLOW: u32 = 0;
+/// Tells the fragment shader to use the PBR Metallic Roughness workflow
+pub static METALLIC_ROUGHNESS_WORKFLOW: u32 = 0;
 /// Tells the fragment shader to use the PBR Specular Glossy workflow
 pub static SPECULAR_GLOSSINESS_WORKFLOW: u32 = 1;
 /// Tells the fragment shader to use the unlit workflow
@@ -34,7 +34,7 @@ pub struct Material {
     /// The base color texture.
     pub base_color_texture_set: u32,
     /// The metallic-roughness texture.
-    pub physical_descrtiptor_texture_id: u32,
+    pub physical_descriptor_texture_id: u32,
     /// Normal texture
     pub normal_texture_set: u32,
     /// Occlusion texture set
@@ -60,7 +60,7 @@ impl Default for Material {
             specular_factor: Default::default(),
             workflow: UNLIT_WORKFLOW,
             base_color_texture_set: NO_TEXTURE,
-            physical_descrtiptor_texture_id: NO_TEXTURE,
+            physical_descriptor_texture_id: NO_TEXTURE,
             normal_texture_set: NO_TEXTURE,
             occlusion_texture_set: NO_TEXTURE,
             emissive_texture_set: NO_TEXTURE,
@@ -134,7 +134,7 @@ impl Material {
         let workflow = if pbr_specular_glossiness.is_some() {
             SPECULAR_GLOSSINESS_WORKFLOW
         } else {
-            METALIC_ROUGHNESS_WORKFLOW
+            METALLIC_ROUGHNESS_WORKFLOW
         };
 
         // Collect the material properties.
@@ -145,7 +145,7 @@ impl Material {
             specular_factor,
             workflow,
             base_color_texture_set,
-            physical_descrtiptor_texture_id: metallic_roughness_texture_set,
+            physical_descriptor_texture_id: metallic_roughness_texture_set,
             normal_texture_set,
             occlusion_texture_set,
             emissive_texture_set,

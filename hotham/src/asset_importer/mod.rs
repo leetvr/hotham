@@ -285,7 +285,7 @@ pub fn add_model_to_world(
                 .unwrap();
 
             // Set a parent for the root entity if one was specified.
-            // TODO: Is this neccessary?
+            // TODO: Is this necessary?
             if let Some(parent) = parent {
                 destination_world
                     .insert_one(*destination_entity, Parent(parent))
@@ -381,7 +381,7 @@ mod tests {
                 ),
             ),
         ];
-        for (name, id, indicies_count, translation, rotation) in &test_data {
+        for (name, id, indices_count, translation, rotation) in &test_data {
             let _ = models
                 .get(*name)
                 .expect(&format!("Unable to find model with name {}", name));
@@ -396,7 +396,7 @@ mod tests {
                 .unwrap();
             let mesh = render_context.resources.mesh_data.get(mesh.handle).unwrap();
             let primitive = &mesh.primitives[0];
-            assert_eq!(primitive.indices_count, *indicies_count as u32);
+            assert_eq!(primitive.indices_count, *indices_count as u32);
 
             // Ensure we populated the buffers correctly.
             unsafe {
@@ -414,7 +414,7 @@ mod tests {
                     let material = &render_context.resources.materials_buffer.as_slice()
                         [primitive.material_id as usize];
                     assert_eq!(material.base_color_texture_set, 0);
-                    assert_eq!(material.physical_descrtiptor_texture_id, 1);
+                    assert_eq!(material.physical_descriptor_texture_id, 1);
                     assert_eq!(material.normal_texture_set, 2);
                     assert_eq!(material.occlusion_texture_set, 3);
                 }

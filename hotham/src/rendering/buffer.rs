@@ -207,7 +207,7 @@ mod tests {
                 assert_eq!(buffer.as_slice(), &expected_data);
             }
 
-            // Modify elementwise
+            // Modify element-wise
             let expected_data = vec![2, 3, 4, 5, 6, 7, 8, 9, 0];
             for (index, n) in buffer.as_slice_mut().iter_mut().enumerate() {
                 *n = expected_data[index];

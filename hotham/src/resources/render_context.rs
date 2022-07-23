@@ -239,8 +239,8 @@ impl RenderContext {
         };
 
         // A virtual camera between the player's eyes
-        let frustrum_projection = get_projection(fov, near, far);
-        let frustrum_view = self.cameras[0]
+        let frustum_projection = get_projection(fov, near, far);
+        let frustum_view = self.cameras[0]
             .position
             .lerp_slerp(&self.cameras[1].position, 0.5)
             .to_homogeneous()
@@ -248,7 +248,7 @@ impl RenderContext {
             .unwrap();
 
         let cull_data = CullData {
-            frustrum: frustrum_projection * frustrum_view,
+            frustum: frustum_projection * frustum_view,
             draw_calls: draw_indirect_buffer.len as u32,
         };
 
@@ -395,7 +395,7 @@ impl RenderContext {
             name,
         )?;
 
-        // TODO: This is only neccesary on desktop, or if there is data in the buffer!
+        // TODO: This is only necessary on desktop, or if there is data in the buffer!
         if !image_buf.is_empty() {
             vulkan_context.upload_image(image_buf, mip_count, offsets, texture_image);
         }
@@ -730,7 +730,7 @@ fn create_pipeline_layout(
 #[derive(Debug, Clone)]
 pub struct CullData {
     /// View-Projection matrices (one per eye)
-    pub frustrum: Matrix4<f32>,
+    pub frustum: Matrix4<f32>,
     pub draw_calls: u32,
 }
 

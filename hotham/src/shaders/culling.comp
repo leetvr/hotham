@@ -27,7 +27,7 @@ layout(std430, set = 0, binding = 1) writeonly buffer DrawCommandsBuffer {
 } drawCommandsBuffer;
 
 layout(set = 0, binding = 2) uniform CullData {
-    mat4 frustrum;
+    mat4 frustum;
 	uint drawCalls;
 } cullData;
 
@@ -69,6 +69,6 @@ void main() {
     float radius = d.boundingSphere.w;
 
 	// // Check each eye to see if the object is visible
-    bool isVisible = check_is_visible(cullData.frustrum, centre, radius);
+    bool isVisible = check_is_visible(cullData.frustum, centre, radius);
     drawCommandsBuffer.drawCommands[id].instanceCount = isVisible ? 1 : 0;
 }
