@@ -218,7 +218,7 @@ impl State {
         let movement_speed = 2f32 * dt;
         let mouse_sensitivity = 4f32 * dt;
 
-        if let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
+        while let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
             match input_event {
                 DeviceEvent::Key(keyboard_input) => self.input_state.process_event(keyboard_input),
                 DeviceEvent::MouseMotion { delta: (x, y) } => {
