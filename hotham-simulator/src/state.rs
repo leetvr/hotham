@@ -286,6 +286,10 @@ impl State {
                 winit::event::VirtualKeyCode::LShift => {
                     position.y -= up.y * movement_speed;
                 }
+                winit::event::VirtualKeyCode::Q | winit::event::VirtualKeyCode::Escape => {
+                    self.session_state = SessionState::EXITING;
+                    self.has_event = true;
+                }
                 _ => {}
             }
         }
