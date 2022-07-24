@@ -135,6 +135,9 @@
     "writeonly",
     "xyzw"
   ],
+  "flagWords": [
+    "centre"
+  ],
   "ignorePaths": [
     "**/*.bin",
     "**/*.glb",
@@ -142,7 +145,8 @@
     "**/*.mp3",
     "**/*.so",
     "**/node_modules/**",
-    "**/target/**"
+    "**/target/**",
+    "cspell.json"
   ],
   "enableFiletypes": [
     "glsl"

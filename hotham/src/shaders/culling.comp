@@ -65,10 +65,10 @@ void main() {
 	if (id >= cullData.drawCalls) { return; }
 
     DrawData d = drawDataBuffer.data[id];
-    vec3 centre = d.boundingSphere.xyz;
+    vec3 center = d.boundingSphere.xyz;
     float radius = d.boundingSphere.w;
 
 	// // Check each eye to see if the object is visible
-    bool isVisible = check_is_visible(cullData.frustum, centre, radius);
+    bool isVisible = check_is_visible(cullData.frustum, center, radius);
     drawCommandsBuffer.drawCommands[id].instanceCount = isVisible ? 1 : 0;
 }
