@@ -325,8 +325,7 @@ void main()
 				outColor.rgba = baseColor;
 				break;
 			case 2:
-				outColor.rg = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal).xy : texture(textures[material.normalTextureID], inUV).ga;
-				outColor.b = 0.0;
+				outColor.rgb = n * 0.5 + 0.5;
 				break;
 			case 3:
 				outColor.rgb = (material.occlusionTextureID == NO_TEXTURE) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], inUV).ggg;
