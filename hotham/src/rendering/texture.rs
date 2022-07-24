@@ -244,7 +244,7 @@ fn get_component_mapping(
             r: vk::ComponentSwizzle::ZERO,
             g: vk::ComponentSwizzle::R,
             b: vk::ComponentSwizzle::ZERO,
-            a: vk::ComponentSwizzle::B,
+            a: vk::ComponentSwizzle::G,
         },
         (true, TextureUsage::MetallicRoughness) => vk::ComponentMapping {
             r: vk::ComponentSwizzle::ZERO,
