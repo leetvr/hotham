@@ -297,6 +297,7 @@ impl State {
         // self.spaces.get_mut(&right_hand).unwrap().position.z += z_delta;
         // self.spaces.get_mut(&right_hand).unwrap().position.x += x_delta;
 
+        self.view_poses[1] = self.view_poses[0];
         Some(())
     }
 }
