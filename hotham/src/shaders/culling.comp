@@ -46,5 +46,5 @@ void main() {
         all(greaterThan(cullData.leftClipPlanes * center4, negRadius4)),
         all(greaterThan(cullData.rightClipPlanes * center4, negRadius4))
     ));
-    drawCommandsBuffer.drawCommands[id].instanceCount = isVisible ? 1 : 0;
+    drawCommandsBuffer.drawCommands[id].instanceCount = uint(isVisible);
 }
