@@ -27,8 +27,8 @@ layout(std430, set = 0, binding = 1) writeonly buffer DrawCommandsBuffer {
 } drawCommandsBuffer;
 
 layout(set = 0, binding = 2) uniform CullData {
-    mat4 clipPlanes1;
-    mat4 clipPlanes2;
+    mat4 leftClipPlanes;
+    mat4 rightClipPlanes;
     uint drawCalls;
 } cullData;
 
@@ -43,8 +43,8 @@ void main() {
 
     // Treat as visible if at least one eye may see it
     bool isVisible = any(bvec2(
-        all(greaterThan(cullData.clipPlanes1 * center4, negRadius4)),
-        all(greaterThan(cullData.clipPlanes2 * center4, negRadius4))
+        all(greaterThan(cullData.leftClipPlanes * center4, negRadius4)),
+        all(greaterThan(cullData.rightClipPlanes * center4, negRadius4))
     ));
     drawCommandsBuffer.drawCommands[id].instanceCount = isVisible ? 1 : 0;
 }

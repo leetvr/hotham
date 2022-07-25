@@ -253,7 +253,7 @@ impl RenderContext {
         // https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
         let normalize_plane = |p: RowVector4<_>| p / p.columns(0, 3).norm();
         let cull_data = CullData {
-            clip_planes1: Matrix4::<_>::from_rows(&[
+            left_clip_planes: Matrix4::<_>::from_rows(&[
                 normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(0)),
                 normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(0)),
                 // normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(1)),
@@ -261,7 +261,7 @@ impl RenderContext {
                 normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(2)),
                 normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(2)),
             ]),
-            clip_planes2: Matrix4::<_>::from_rows(&[
+            right_clip_planes: Matrix4::<_>::from_rows(&[
                 normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(0)),
                 normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(0)),
                 // normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(1)),
@@ -750,8 +750,8 @@ fn create_pipeline_layout(
 #[derive(Debug, Clone)]
 pub struct CullData {
     /// Four clip planes per camera, one plane per row.
-    pub clip_planes1: Matrix4<f32>,
-    pub clip_planes2: Matrix4<f32>,
+    pub left_clip_planes: Matrix4<f32>,
+    pub right_clip_planes: Matrix4<f32>,
     pub draw_calls: u32,
 }
 
