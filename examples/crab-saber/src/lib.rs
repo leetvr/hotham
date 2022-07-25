@@ -67,7 +67,7 @@ fn tick(
 
     handle_state_change(&tick_data, audio_context, game_context, world);
 
-    // Simulation tasks - these are only neccessary in the focussed state.
+    // Simulation tasks - these are only necessary in the focussed state.
     if tick_data.current_state == xr::SessionState::FOCUSED {
         // Handle input
         sabers_system(

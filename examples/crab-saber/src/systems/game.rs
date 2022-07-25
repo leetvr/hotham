@@ -395,7 +395,7 @@ fn revive_cube(
         .user_data(cube_entity.id() as _)
         .build();
 
-    // Attach it to the rigidbody
+    // Attach it to the rigid body
     let collider_handle = physics_context.colliders.insert_with_parent(
         collider,
         rigid_body_handle,
