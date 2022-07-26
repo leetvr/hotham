@@ -14,7 +14,7 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     },
 ];
 
-const CULLING_TIMEOUT: u64 = 1_000_000_000; // 1 second
+const CULLING_TIMEOUT: u64 = u64::MAX;
 
 use crate::{
     rendering::{
