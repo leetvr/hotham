@@ -247,20 +247,24 @@ impl State {
             }
         }
 
+        // Update dolly camera properties
+
         self.camera.driver_mut::<Position>().translate(Vec3 {
             x: position.x,
             y: position.y,
             z: position.z,
         });
 
-        // Camera Pose
-        let pose = &mut self.view_poses[0];
-
         self.camera
             .driver_mut::<YawPitch>()
             .rotate_yaw_pitch(x_rot * mouse_sensitivity, y_rot * mouse_sensitivity);
 
         let camera_xform = self.camera.update(dt);
+
+        // Camera Pose
+        let pose = &mut self.view_poses[0];
+
+        // Apply dolly camera properties to simulator camera
 
         pose.position = Vector3f {
             x: camera_xform.position.x,
