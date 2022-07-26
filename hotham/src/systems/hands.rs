@@ -143,7 +143,7 @@ mod tests {
         let (mut world, mut xr_context, mut physics_context) = setup();
 
         let grabbed_object_rigid_body =
-            RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build(); // grabber sets the rigidbody as kinematic
+            RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build(); // grabber sets the rigid body as kinematic
         let handle = physics_context
             .rigid_bodies
             .insert(grabbed_object_rigid_body);

@@ -70,7 +70,7 @@ async fn accept_connection(
                 Ok(tungstenite::Message::Text(m)) => match serde_json::from_str::<Message>(&m) {
                     Ok(message) => Some(Ok(message)),
                     Err(e) => {
-                        let error_message = format!("Error deserialising: {:?}", e);
+                        let error_message = format!("Error deserializing: {:?}", e);
                         eprintln!("{:?}", error_message);
                         Some(Ok(Message::Error(error_message)))
                     }

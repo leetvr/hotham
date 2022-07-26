@@ -206,7 +206,7 @@ impl State {
         let movement_speed = 2f32 * dt;
         let mouse_sensitivity = 40f32 * dt;
 
-        if let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
+        while let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
             match input_event {
                 DeviceEvent::Key(keyboard_input) => self.input_state.process_event(keyboard_input),
                 DeviceEvent::MouseMotion { delta: (x, y) } => {
@@ -238,6 +238,10 @@ impl State {
                 }
                 winit::event::VirtualKeyCode::LShift => {
                     position -= self.camera.final_transform.up() * movement_speed;
+                }
+                winit::event::VirtualKeyCode::Q | winit::event::VirtualKeyCode::Escape => {
+                    self.session_state = SessionState::EXITING;
+                    self.has_event = true;
                 }
                 _ => {}
             }
@@ -278,6 +282,7 @@ impl State {
         // self.spaces.get_mut(&right_hand).unwrap().position.z += z_delta;
         // self.spaces.get_mut(&right_hand).unwrap().position.x += x_delta;
 
+        self.view_poses[1] = self.view_poses[0];
         Some(())
     }
 }

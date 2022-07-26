@@ -102,7 +102,7 @@ mod tests {
 
     use super::*;
     use ash::vk::Handle;
-    use image::{jpeg::JpegEncoder, DynamicImage, RgbaImage};
+    use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
     use nalgebra::UnitQuaternion;
     use openxr::{Fovf, Quaternionf, Vector3f};
 
