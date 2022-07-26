@@ -204,7 +204,7 @@ impl State {
 
         let dt = delta.as_secs_f32();
         let movement_speed = 2f32 * dt;
-        let mouse_sensitivity = 40f32 * dt;
+        let mouse_sensitivity = 400f32 * dt;
 
         while let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
             match input_event {
