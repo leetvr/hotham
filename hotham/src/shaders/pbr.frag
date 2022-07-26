@@ -1,4 +1,4 @@
-// PBR shader based on Sascha Williems' implementation:
+// PBR shader based on Sascha Willems' implementation:
 // https://github.com/SaschaWillems/Vulkan-glTF-PBR
 // Which in turn was based on https://github.com/KhronosGroup/glTF-WebGL-PBR
 #version 460
@@ -40,7 +40,7 @@ const float M_PI = 3.141592653589793;
 const float c_MinRoughness = 0.04;
 
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
-const float PBR_WORKFLOW_SPECULAR_GLOSINESS = 1.0f;
+const float PBR_WORKFLOW_SPECULAR_GLOSSINESS = 1.0f;
 const float PBR_WORKFLOW_UNLIT = 2.0f;
 
 vec3 Uncharted2Tonemap(vec3 color)
@@ -58,7 +58,7 @@ vec3 Uncharted2Tonemap(vec3 color)
 vec4 tonemap(vec4 color)
 {
 	vec3 outcol = Uncharted2Tonemap(color.rgb * DEFAULT_EXPOSURE);
-	outcol = outcol * (1.0f / Uncharted2Tonemap(vec3(11.2f)));	
+	outcol = outcol * (1.0f / Uncharted2Tonemap(vec3(11.2f)));
 	return vec4(outcol, 1.0);
 }
 
@@ -69,7 +69,7 @@ vec3 getNormal(uint normalTextureID)
 	// We swizzle our normals to save on texture reads: https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-normal-maps
 	vec3 tangentNormal;
 	tangentNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
-	tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy)); 
+	tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy));
 
 	vec3 q1 = dFdx(inWorldPos);
 	vec3 q2 = dFdy(inWorldPos);
@@ -152,7 +152,7 @@ float microfacetDistribution(PBRInfo pbrInputs)
 	return roughnessSq / (M_PI * f * f);
 }
 
-// Gets metallic factor from specular glossiness workflow inputs 
+// Gets metallic factor from specular glossiness workflow inputs
 float convertMetallic(vec3 diffuse, vec3 specular, float maxSpecular) {
 	float perceivedDiffuse = sqrt(0.299 * diffuse.r * diffuse.r + 0.587 * diffuse.g * diffuse.g + 0.114 * diffuse.b * diffuse.b);
 	float perceivedSpecular = sqrt(0.299 * specular.r * specular.r + 0.587 * specular.g * specular.g + 0.114 * specular.b * specular.b);
@@ -210,7 +210,7 @@ void main()
 		}
 	}
 
-	if (material.workflow == PBR_WORKFLOW_SPECULAR_GLOSINESS) {
+	if (material.workflow == PBR_WORKFLOW_SPECULAR_GLOSSINESS) {
 		vec3 specular;
 
 		// Values from specular glossiness workflow are converted to metallic roughness
@@ -222,7 +222,6 @@ void main()
 			specular = physicalDescriptor.rgb;
 			perceptualRoughness = 1.0 - physicalDescriptor.a;
 		}
-
 
 		vec4 diffuse = baseColor;
 		float maxSpecular = max(max(specular.r, specular.g), specular.b);
@@ -237,7 +236,7 @@ void main()
 
 	diffuseColor = baseColor.rgb * (vec3(1.0) - f0);
 	diffuseColor *= 1.0 - metallic;
-		
+
 	float alphaRoughness = perceptualRoughness * perceptualRoughness;
 
 	vec3 specularColor = mix(f0, baseColor.rgb, metallic);
@@ -246,7 +245,7 @@ void main()
 	float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
 
 	// For typical incident reflectance range (between 4% to 100%) set the grazing reflectance to 100% for typical fresnel effect.
-	// For very low reflectance range on highly diffuse objects (below 4%), incrementally reduce grazing reflecance to 0%.
+	// For very low reflectance range on highly diffuse objects (below 4%), incrementally reduce grazing reflectance to 0%.
 	float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
 	vec3 specularEnvironmentR0 = specularColor.rgb;
 	vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
@@ -306,7 +305,7 @@ void main()
 		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
 		color += emissive;
 	}
-	
+
 	outColor = vec4(color, baseColor.a);
 
 	if (material.workflow == PBR_WORKFLOW_UNLIT) {
@@ -317,7 +316,7 @@ void main()
 	// Debugging
 
 	// Shader inputs debug visualization
-	// "none", "Base Color Texture", "Normal Texture", "Occlusion Texture", "Emissive Texture", "Metalic (?)", "Roughness (?)"
+	// "none", "Base Color Texture", "Normal Texture", "Occlusion Texture", "Emissive Texture", "Metallic (?)", "Roughness (?)"
 	if (sceneData.debugData.x > 0.0) {
 		int index = int(sceneData.debugData.x);
 		switch (index) {
@@ -356,13 +355,12 @@ void main()
 			case 3:
 				outColor.rgb = vec3(G);
 				break;
-			case 4: 
+			case 4:
 				outColor.rgb = vec3(D);
 				break;
 			case 5:
 				outColor.rgb = specContrib;
-				break;				
+				break;
 		}
 	}
-	
 }

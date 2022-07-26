@@ -227,7 +227,7 @@ fn subdivide_mesh_system(world: &mut World, render_context: &mut RenderContext, 
     // Get the mesh
     let mesh = world.query_mut::<&mut Mesh>().into_iter().next().unwrap().1;
 
-    // Calcuate the current step.
+    // Calculate the current step.
     let step = timer.total_time().as_secs() * 10;
     update_mesh(step as _, mesh, render_context);
 }

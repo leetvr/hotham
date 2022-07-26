@@ -140,13 +140,13 @@ impl Primitive {
 
     /// Get a bounding sphere for the primitive, applying a transform
     pub fn get_bounding_sphere(&self, transform: &Transform) -> Vector4<f32> {
-        let mut centre = self.bounding_sphere.xyz();
+        let mut center = self.bounding_sphere.xyz();
         let mut radius = self.bounding_sphere.w;
 
-        centre += transform.translation;
+        center += transform.translation;
         radius *= transform.scale.max();
 
-        [centre.x, centre.y, centre.z, radius].into()
+        [center.x, center.y, center.z, radius].into()
     }
 }
 
@@ -158,20 +158,20 @@ pub fn calculate_bounding_sphere(vertices: &[Vertex]) -> Vector4<f32> {
         return Default::default();
     }
 
-    let mut centre = Vector3::zeros();
+    let mut center = Vector3::zeros();
     for p in &points {
-        centre += p;
+        center += p;
     }
 
-    centre /= num_points as f32;
-    let mut radius = (points[0] - centre).norm_squared();
+    center /= num_points as f32;
+    let mut radius = (points[0] - center).norm_squared();
     for p in points.iter().skip(1) {
-        radius = radius.max((p - centre).norm_squared());
+        radius = radius.max((p - center).norm_squared());
     }
 
     radius = next_up(radius.sqrt());
 
-    [centre.x, centre.y, centre.z, radius].into()
+    [center.x, center.y, center.z, radius].into()
 }
 
 const TINY_BITS: u32 = 0x1; // Smallest positive f32.
