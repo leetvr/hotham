@@ -30,7 +30,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::vk::{self, Handle};
-use nalgebra::Matrix4;
+use nalgebra::{Matrix4, RowVector4};
 use openxr as xr;
 use vk_shader_macros::include_glsl;
 
@@ -229,26 +229,42 @@ impl RenderContext {
         let near = 0.05;
         let far = 100.0;
 
-        let fov_left = self.views[0].fov;
-        let fov_right = self.views[1].fov;
-        let fov = xr::Fovf {
-            angle_left: fov_left.angle_left,
-            angle_right: fov_right.angle_right,
-            angle_up: fov_left.angle_up,
-            angle_down: fov_left.angle_down,
-        };
-
-        // A virtual camera between the player's eyes
-        let frustum_projection = get_projection(fov, near, far);
-        let frustum_view = self.cameras[0]
+        // Compute left_frustum_from_world
+        let left_frustum_from_left_camera = get_projection(self.views[0].fov, near, far);
+        let left_camera_from_world = self.cameras[0]
             .position
-            .lerp_slerp(&self.cameras[1].position, 0.5)
             .to_homogeneous()
             .try_inverse()
             .unwrap();
+        let left_frustum_from_world = left_frustum_from_left_camera * left_camera_from_world;
 
+        // Compute right_frustum_from_world
+        let right_frustum_from_right_camera = get_projection(self.views[1].fov, near, far);
+        let right_camera_from_world = self.cameras[1]
+            .position
+            .to_homogeneous()
+            .try_inverse()
+            .unwrap();
+        let right_frustum_from_world = right_frustum_from_right_camera * right_camera_from_world;
+
+        // Normals of the clipping planes are pointing towards the inside of the frustum.
+        // We are only using four planes per camera. The near and far planes are not used.
+        // This link points to a paper describing the math behind these expressions:
+        // https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
+        let normalize_plane = |p: RowVector4<_>| p / p.columns(0, 3).norm();
         let cull_data = CullData {
-            frustum: frustum_projection * frustum_view,
+            left_clip_planes: Matrix4::<_>::from_rows(&[
+                normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(0)),
+                normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(0)),
+                normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(2)),
+                normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(2)),
+            ]),
+            right_clip_planes: Matrix4::<_>::from_rows(&[
+                normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(0)),
+                normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(0)),
+                normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(2)),
+                normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(2)),
+            ]),
             draw_calls: draw_indirect_buffer.len as u32,
         };
 
@@ -729,8 +745,9 @@ fn create_pipeline_layout(
 #[repr(C)]
 #[derive(Debug, Clone)]
 pub struct CullData {
-    /// View-Projection matrices (one per eye)
-    pub frustum: Matrix4<f32>,
+    /// Four clip planes per camera, one plane per row.
+    pub left_clip_planes: Matrix4<f32>,
+    pub right_clip_planes: Matrix4<f32>,
     pub draw_calls: u32,
 }
 
