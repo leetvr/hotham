@@ -212,8 +212,6 @@ impl RenderContext {
         }
     }
 
-    // TODO: GPU culling seems to cause deadlocks at high load. Most likely due to a clash between shared coherent memory.
-    // Solution is to split buffers apart: https://github.com/leetvr/hotham/issues/263
     pub(crate) fn cull_objects(&mut self, vulkan_context: &VulkanContext) {
         let device = &vulkan_context.device;
         let frame_index = self.frame_index;
