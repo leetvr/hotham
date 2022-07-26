@@ -3,51 +3,6 @@
 	"tasks": [
 		{
 			"type": "cargo",
-			"command": "build",
-			"problemMatcher": [
-				"$rustc"
-			],
-			"group": "build",
-			"label": "rust: cargo build"
-		},
-		{
-			"type": "shell",
-			"windows": {
-				"command": ".\\run_on_simulator.ps1"
-			},
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
-			"label": "Run Asteroid on Simulator",
-			"problemMatcher": []
-		},
-		{
-			"type": "shell",
-			"windows": {
-				"command": ".\\run_on_device.ps1"
-			},
-			"group": "build",
-			"label": "Run Asteroid on Headset",
-			"problemMatcher": []
-		},
-		{
-			"type": "shell",
-			"windows": {
-				"command": ".\\pbr_test.ps1"
-			},
-			"group": "test",
-			"label": "Test Physically Based rendering",
-			"problemMatcher": []
-		},
-		{
-			"type": "shell",
-			"label": "Run Renderdoc",
-			"command": ".\\cubeworld.cap",
-			"problemMatcher": []
-		},
-		{
-			"type": "cargo",
 			"command": "test",
 			"args": [
 				"-p",
@@ -63,15 +18,14 @@
 			"problemMatcher": [
 				"$rustc"
 			],
-			"label": "rust: cargo test"
+			"label": "Run Hotham test suite"
 		},
 		{
 			"type": "cargo",
-			"command": "test",
+			"command": "run",
 			"args": [
-				"-p",
-				"hotham",
-				"asset_importer::tests::test_load_model",
+				"--bin",
+				"hotham_simple_scene_example",
 				"--release"
 			],
 			"env": {
@@ -80,24 +34,11 @@
 			"problemMatcher": [
 				"$rustc"
 			],
+			"label": "Run Hotham simple scene on the simulator",
 			"group": {
 				"kind": "test",
 				"isDefault": true
-			},
-			"label": "rust: vulkan smoke test"
-		},
-		{
-			"type": "cargo",
-			"command": "bench",
-			"args": [
-				"-p",
-				"hotham-asteroid"
-			],
-			"problemMatcher": [
-				"$rustc"
-			],
-			"group": "test",
-			"label": "rust: cargo bench"
+			}
 		}
 	]
 }

@@ -1,14 +1,28 @@
+use std::collections::HashMap;
+
 use crate::{
     components::{skin::NO_SKIN, Mesh, Skin, Transform, TransformMatrix, Visible},
-    rendering::resources::DrawData,
+    rendering::{
+        primitive::Primitive,
+        resources::{DrawData, PrimitiveCullData},
+    },
     resources::RenderContext,
     resources::VulkanContext,
 };
-use ash::vk;
 use hecs::{PreparedQuery, With, World};
+use nalgebra::{Matrix4, Vector4};
 use openxr as xr;
 
-const USE_MULTI_DRAW_INDIRECT: bool = true;
+struct Instance {
+    transform_matrix: Matrix4<f32>,
+    bounding_sphere: Vector4<f32>,
+    skin_id: u32,
+}
+
+struct InstancedPrimitive {
+    primitive: Primitive,
+    instances: Vec<Instance>,
+}
 
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
@@ -25,72 +39,147 @@ pub fn rendering_system(
     views: &[xr::View],
     swapchain_image_index: usize,
 ) {
-    // First, we need to collect all our draw data
+    // First, we need to walk through each entity that contains a mesh, collect its primitives
+    // and create a list of instances, indexed by primitive ID.
+    //
+    // We use primitive.index_buffer_offset as our primitive ID as it is guaranteed to be unique between
+    // primitives.
+    let mut primitive_map: HashMap<u32, InstancedPrimitive> = Default::default();
+    let meshes = &render_context.resources.mesh_data;
+
+    for (_, (mesh, transform, transform_matrix, skin)) in query.query_mut(world) {
+        let mesh = meshes.get(mesh.handle).unwrap();
+        let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
+        for primitive in &mesh.primitives {
+            let key = primitive.index_buffer_offset;
+
+            primitive_map
+                .entry(key)
+                .or_insert(InstancedPrimitive {
+                    primitive: primitive.clone(),
+                    instances: Default::default(),
+                })
+                .instances
+                .push(Instance {
+                    transform_matrix: transform_matrix.0,
+                    bounding_sphere: primitive.get_bounding_sphere(transform),
+                    skin_id,
+                });
+        }
+    }
+
+    // Next organise this data into a layout that's easily consumed by the compute shader.
+    // ORDER IS IMPORTANT HERE! The final buffer should look something like:
+    //
+    // primitive_a
+    // primitive_a
+    // primitive_c
+    // primitive_b
+    // primitive_b
+    // primitive_e
+    // primitive_e
+    //
+    // ..etc. The most important thing is that each instances are grouped by their primitive.
     unsafe {
         let frame = &mut render_context.frames[render_context.frame_index];
-        let draw_data_buffer = &mut frame.draw_data_buffer;
-        let draw_indirect_buffer = &mut frame.draw_indirect_buffer;
+        let cull_data = &mut frame.primitive_cull_data_buffer;
+        cull_data.clear();
 
-        let meshes = &render_context.resources.mesh_data;
-        draw_data_buffer.clear();
-        draw_indirect_buffer.clear();
-
-        for (_, (mesh, transform, transform_matrix, skin)) in query.query_mut(world) {
-            let mesh = meshes.get(mesh.handle).unwrap();
-            let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
-            for primitive in &mesh.primitives {
-                draw_data_buffer.push(&DrawData {
-                    transform: transform_matrix.0,
-                    // TODO: better to use the matrix we get from the component's isometry3?
-                    inverse_transpose: transform_matrix.0.try_inverse().unwrap().transpose(),
-                    material_id: primitive.material_id,
-                    skin_id,
-                    bounding_sphere: primitive.get_bounding_sphere(transform),
-                });
-                draw_indirect_buffer.push(&vk::DrawIndexedIndirectCommand {
-                    index_count: primitive.indices_count,
-                    instance_count: 1,
-                    first_index: primitive.index_buffer_offset,
-                    vertex_offset: primitive.vertex_buffer_offset as _,
-                    first_instance: 0,
+        for instanced_primitive in primitive_map.values() {
+            let primitive = &instanced_primitive.primitive;
+            for instance in &instanced_primitive.instances {
+                cull_data.push(&PrimitiveCullData {
+                    draw_data: DrawData {
+                        transform: instance.transform_matrix,
+                        inverse_transpose: instance
+                            .transform_matrix
+                            .try_inverse()
+                            .unwrap()
+                            .transpose(),
+                        material_id: primitive.material_id,
+                        skin_id: instance.skin_id,
+                    },
+                    index_offset: primitive.index_buffer_offset,
+                    bounding_sphere: instance.bounding_sphere,
+                    visible: false,
                 });
             }
         }
     }
 
+    // This is the VERY LATEST we can possibly update our views, as the compute shader will need them.
     render_context.update_scene_data(views).unwrap();
+
+    // Execute the culling shader on the GPU.
     render_context.cull_objects(vulkan_context);
+
+    // Begin the render pass, bind descriptor sets.
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
 
-    let device = &vulkan_context.device;
-    let frame = &render_context.frames[render_context.frame_index];
-    let command_buffer = frame.command_buffer;
-    let draw_indirect_buffer = &frame.draw_indirect_buffer;
-
+    // Parse through the cull buffer and record commands. This is a bit complex.
     unsafe {
-        if USE_MULTI_DRAW_INDIRECT {
-            device.cmd_draw_indexed_indirect(
-                command_buffer,
-                draw_indirect_buffer.buffer,
-                0,
-                draw_indirect_buffer.len as _,
-                std::mem::size_of::<vk::DrawIndexedIndirectCommand>() as _,
-            );
-        } else {
-            // Issue draw calls directly - useful for renderdoc
-            for command in draw_indirect_buffer.as_slice() {
-                device.cmd_draw_indexed(
-                    command_buffer,
-                    command.index_count,
-                    command.instance_count,
-                    command.first_index,
-                    command.vertex_offset,
-                    command.first_instance,
-                )
+        let device = &vulkan_context.device;
+        let frame = &mut render_context.frames[render_context.frame_index];
+        let command_buffer = frame.command_buffer;
+        let draw_data_buffer = &mut frame.draw_data_buffer;
+        draw_data_buffer.clear();
+
+        let mut instance_offset = 0;
+        let mut current_primitive_id = u32::MAX;
+        let mut instance_count = 0;
+        let cull_data = frame.primitive_cull_data_buffer.as_slice();
+
+        for cull_result in cull_data {
+            // If we haven't yet set our primitive ID, set it now.
+            if current_primitive_id == u32::MAX {
+                current_primitive_id = cull_result.index_offset;
             }
+
+            // We're finished with this primitive. Record the command and increase our offset.
+            if cull_result.index_offset != current_primitive_id {
+                let primitive = &primitive_map.get(&current_primitive_id).unwrap().primitive;
+
+                // Don't record commands for primitives which have no instances, eg. have been culled.
+                if instance_count > 0 {
+                    device.cmd_draw_indexed(
+                        command_buffer,
+                        primitive.indices_count,
+                        instance_count,
+                        primitive.index_buffer_offset,
+                        primitive.vertex_buffer_offset as _,
+                        instance_offset,
+                    );
+                }
+
+                current_primitive_id = cull_result.index_offset;
+                instance_offset += instance_count;
+                instance_count = 0;
+            }
+
+            // If this primitive is visible, increase the instance count and record its draw data.
+            if cull_result.visible {
+                draw_data_buffer.push(&cull_result.draw_data);
+                instance_count += 1;
+            }
+        }
+
+        // Finally, record the last primitive. This is counterintuitive at first glance, but the loop above only
+        // records a command when the primitive has changed. If we don't do this, the last primitive will never
+        // be drawn.
+        if instance_count > 0 {
+            let primitive = &primitive_map.get(&current_primitive_id).unwrap().primitive;
+            device.cmd_draw_indexed(
+                command_buffer,
+                primitive.indices_count,
+                instance_count,
+                primitive.index_buffer_offset,
+                primitive.vertex_buffer_offset as _,
+                instance_offset,
+            );
         }
     }
 
+    // OK. We're all done!
     render_context.end_pbr_render_pass(vulkan_context);
 }
 
@@ -101,8 +190,9 @@ mod tests {
     use std::{collections::hash_map::DefaultHasher, hash::Hasher};
 
     use super::*;
+    use ash::vk;
     use ash::vk::Handle;
-    use image::{jpeg::JpegEncoder, DynamicImage, RgbaImage};
+    use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
     use nalgebra::UnitQuaternion;
     use openxr::{Fovf, Quaternionf, Vector3f};
 

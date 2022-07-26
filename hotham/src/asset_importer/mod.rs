@@ -222,8 +222,6 @@ pub fn add_model_to_world(
     let source_entities = source_world.iter();
     let mut entity_map = HashMap::new();
 
-    println!("Adding {} to world", name);
-
     // Reserve some empty entities in the new world for us to use.
     let new_entities = destination_world.reserve_entities(source_entities.len() as _);
 

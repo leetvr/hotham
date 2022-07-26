@@ -9,7 +9,6 @@
 struct DrawData {
     mat4 transform;
     mat4 inverseTranspose;
-    vec4 boundingSphere;
     uint materialID;
     uint skinID;
 };

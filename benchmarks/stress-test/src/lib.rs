@@ -3,11 +3,13 @@ use std::{
     time::{Duration, Instant},
 };
 
+pub mod systems;
+
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{Mesh, Transform, TransformMatrix, Visible},
     hecs::{With, World},
-    nalgebra::Vector3,
+    nalgebra::{UnitQuaternion, Vector3},
     rendering::{
         material::Material,
         mesh_data::MeshData,
@@ -24,6 +26,7 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
+use systems::setup_cubes;
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -34,8 +37,8 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let test = StressTest::ManyHelmets;
-    let (world, models) = init(&mut engine, &test);
+    let mut test = StressTest::ManyHelmets;
+    let (world, models) = init(&mut engine, &mut test);
     let queries = Default::default();
     let timer = Default::default();
 
@@ -105,7 +108,7 @@ pub enum StressTest {
     Sponza,
 }
 
-fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World>) {
+fn init(engine: &mut Engine, test: &mut StressTest) -> (World, HashMap<String, World>) {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let mut world = World::default();
@@ -117,7 +120,10 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
 
-            add_model_to_world("Cube", &models, &mut world, None).expect("Could not find cube?");
+            let resolution = 35; // 42,875 cubes
+
+            setup_cubes(&mut world, resolution, &models);
+
             models
         }
         StressTest::ManyHelmets => {
@@ -132,9 +138,14 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
 
-            for _ in 0..100 {
-                add_model_to_world("Damaged Helmet", &models, &mut world, None)
+            for _ in 0..20 {
+                let e = add_model_to_world("Damaged Helmet", &models, &mut world, None)
                     .expect("Could not find cube?");
+                let mut t = world.get_mut::<Transform>(e).unwrap();
+                t.rotation = UnitQuaternion::from_axis_angle(
+                    &Vector3::x_axis(),
+                    std::f32::consts::FRAC_2_PI,
+                );
             }
             models
         }
@@ -189,11 +200,11 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
             physics_context,
         );
 
-        match tick_props.test {
-            StressTest::ManyCubes => model_system(world, models, timer, "Cube"),
+        match &mut tick_props.test {
+            // StressTest::ManyCubes => rotate_models(world, timer.total_time().as_secs_f32()),
             StressTest::ManyHelmets => model_system(world, models, timer, "Damaged Helmet"),
             StressTest::ManyVertices => subdivide_mesh_system(world, render_context, timer),
-            StressTest::Sponza => {}
+            _ => {}
         }
 
         animation_system(&mut queries.animation_query, world);
@@ -239,7 +250,10 @@ fn model_system(
     model_name: &str,
 ) {
     if timer.tick() {
-        add_model_to_world(model_name, models, world, None).expect("Could not find object?");
+        {
+            add_model_to_world(model_name, models, world, None).expect("Could not find object?");
+        }
+
         rearrange_models(world);
     }
 
@@ -249,8 +263,7 @@ fn model_system(
 fn rotate_models(world: &mut World, total_time: f32) {
     for (_, transform) in world.query_mut::<With<Mesh, &mut Transform>>() {
         transform.rotation =
-            hotham::nalgebra::Rotation::from_axis_angle(&Vector3::y_axis(), total_time.sin() * 2.)
-                .into();
+            UnitQuaternion::from_euler_angles(90.0_f32.to_radians(), total_time.sin() * 2., 0.);
     }
 }
 
@@ -258,19 +271,26 @@ fn rearrange_models(world: &mut World) {
     let query = world.query_mut::<With<Mesh, &mut Transform>>();
     let query_iter = query.into_iter();
     let num_models = query_iter.len() as f32;
-    let slice = std::f32::consts::TAU / num_models;
-    let scale = 1. / num_models;
 
-    for (n, (_, transform)) in query_iter.enumerate() {
-        let radius = slice * (n as f32);
-        let rotation = hotham::nalgebra::Rotation::from_axis_angle(&Vector3::y_axis(), radius);
-        let distance = [0., 0., -2.].into();
-        let height: Vector3<f32> = [0., 0.7, 0.].into();
-        let translation = rotation.transform_vector(&distance);
+    let column_size = num_models.sqrt() as usize;
+    let scale = 2. / column_size as f32;
+    let half_column_size = column_size as f32 / 2.;
+    let mut row = 0;
+    let mut column = 0;
 
-        transform.translation = translation;
-        transform.translation += height;
+    for (_, transform) in query_iter {
+        if column >= column_size {
+            column = 0;
+            row += 1;
+        }
+
+        transform.translation.x = (column as f32) - half_column_size;
+        transform.translation.y = (row as f32) - 0.5;
+        transform.translation.z = -4.0;
+
         transform.scale = Vector3::repeat(scale);
+
+        column += 1;
     }
 
     println!("[HOTHAM_STRESS_TEST] There are now {} models", num_models);

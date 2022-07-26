@@ -23,7 +23,7 @@ out gl_PerVertex
 
 void main()
 {
-	DrawData d = drawDataBuffer.data[gl_DrawID];
+	DrawData d = drawDataBuffer.data[gl_InstanceIndex];
 
 	if (d.skinID == NO_SKIN) {
 		// Mesh has no skin
@@ -43,7 +43,6 @@ void main()
 			inWeight.w * jointMatrices[int(inJoint.w)];
 
 		outWorldPos = d.transform * skinMatrix * vec4(inPos, 1.0);
-		// TODO we should probably be using the inverse transpose here instead?
 		outNormal = normalize(mat3(d.inverseTranspose) * mat3(skinMatrix) * inNormal);
 	}
 

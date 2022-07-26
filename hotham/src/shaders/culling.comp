@@ -1,6 +1,6 @@
 #version 460
 
-layout (local_size_x = 256) in;
+layout (local_size_x = 1024) in;
 struct VkDrawIndexedIndirectCommand
 {
     uint indexCount;
@@ -10,23 +10,26 @@ struct VkDrawIndexedIndirectCommand
     uint firstInstance;
 };
 
+
 struct DrawData {
     mat4 transform;
     mat4 inverseTranspose;
-    vec4 boundingSphere;
     uint materialID;
     uint skinID;
 };
 
-layout(std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
-    DrawData data[];
-} drawDataBuffer;
+struct PrimitiveCullData {
+    DrawData drawData;
+    vec4 boundingSphere;
+    uint indexOffset;
+    bool visible;
+};
 
-layout(std430, set = 0, binding = 1) writeonly buffer DrawCommandsBuffer {
-    VkDrawIndexedIndirectCommand drawCommands[];
-} drawCommandsBuffer;
+layout(std430, set = 0, binding = 0)  buffer block {
+    PrimitiveCullData data[];
+} primitiveCullDataBuffer;
 
-layout(set = 0, binding = 2) uniform CullData {
+layout(set = 0, binding = 1) uniform CullData {
     mat4 leftClipPlanes;
     mat4 rightClipPlanes;
     uint drawCalls;
@@ -37,14 +40,14 @@ void main() {
 
     if (id >= cullData.drawCalls) { return; }
 
-    DrawData d = drawDataBuffer.data[id];
+    PrimitiveCullData d = primitiveCullDataBuffer.data[id];
     vec4 center4 = vec4(d.boundingSphere.xyz, 1);
     vec4 negRadius4 = -d.boundingSphere.wwww;
 
-    // Treat as visible if at least one eye may see it
-    bool isVisible = any(bvec2(
+    // Perform a plane intersection check against each eye's clip plane.
+    // If the primitive is visible in either eye, we consider it visible.
+    primitiveCullDataBuffer.data[id].visible = any(bvec2(
         all(greaterThan(cullData.leftClipPlanes * center4, negRadius4)),
         all(greaterThan(cullData.rightClipPlanes * center4, negRadius4))
     ));
-    drawCommandsBuffer.drawCommands[id].instanceCount = uint(isVisible);
 }

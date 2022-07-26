@@ -14,6 +14,8 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     },
 ];
 
+const CULLING_TIMEOUT: u64 = 1_000_000_000; // 1 second
+
 use crate::{
     rendering::{
         camera::Camera,
@@ -42,7 +44,6 @@ static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulka
 pub const PIPELINE_DEPTH: usize = 2;
 
 pub struct RenderContext {
-    pub frames: [Frame; PIPELINE_DEPTH],
     pub frame_index: usize,
     pub pipeline: vk::Pipeline,
     pub compute_pipeline: vk::Pipeline,
@@ -53,6 +54,7 @@ pub struct RenderContext {
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
     pub resources: Resources,
+    pub(crate) frames: [Frame; PIPELINE_DEPTH],
     pub(crate) swapchain: Swapchain,
     pub(crate) descriptors: Descriptors,
 }
@@ -216,15 +218,9 @@ impl RenderContext {
         let device = &vulkan_context.device;
         let frame_index = self.frame_index;
         let frame = &mut self.frames[self.frame_index];
-        let draw_indirect_buffer = &frame.draw_indirect_buffer;
-        let command_buffer = frame.command_buffer;
-        let buffer_memory_barrier = vk::BufferMemoryBarrier::builder()
-            .buffer(draw_indirect_buffer.buffer)
-            .size(vk::WHOLE_SIZE)
-            .src_access_mask(vk::AccessFlags::SHADER_WRITE)
-            .dst_access_mask(vk::AccessFlags::INDIRECT_COMMAND_READ)
-            .src_queue_family_index(0)
-            .dst_queue_family_index(0);
+        let primitive_cull_buffer = &frame.primitive_cull_data_buffer;
+        let command_buffer = frame.compute_command_buffer;
+        let fence = frame.compute_fence;
 
         let near = 0.05;
         let far = 100.0;
@@ -252,7 +248,7 @@ impl RenderContext {
         // This link points to a paper describing the math behind these expressions:
         // https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
         let normalize_plane = |p: RowVector4<_>| p / p.columns(0, 3).norm();
-        let cull_data = CullData {
+        let cull_data = CullParams {
             left_clip_planes: Matrix4::<_>::from_rows(&[
                 normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(0)),
                 normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(0)),
@@ -265,16 +261,23 @@ impl RenderContext {
                 normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(2)),
                 normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(2)),
             ]),
-            draw_calls: draw_indirect_buffer.len as u32,
+            draw_calls: primitive_cull_buffer.len as u32,
         };
 
         unsafe {
-            frame.cull_data_buffer.overwrite(&[cull_data]);
+            frame.cull_params_buffer.overwrite(&[cull_data]);
         }
 
-        let group_count_x = (draw_indirect_buffer.len / 256) + 1;
+        let group_count_x = (primitive_cull_buffer.len / 1024) + 1;
 
         unsafe {
+            device
+                .begin_command_buffer(
+                    command_buffer,
+                    &vk::CommandBufferBeginInfo::builder()
+                        .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+                )
+                .unwrap();
             device.cmd_bind_pipeline(
                 command_buffer,
                 vk::PipelineBindPoint::COMPUTE,
@@ -289,15 +292,20 @@ impl RenderContext {
                 &[],
             );
             device.cmd_dispatch(command_buffer, group_count_x as u32, 1, 1);
-            device.cmd_pipeline_barrier(
-                command_buffer,
-                vk::PipelineStageFlags::COMPUTE_SHADER,
-                vk::PipelineStageFlags::DRAW_INDIRECT,
-                vk::DependencyFlags::empty(),
-                &[],
-                slice_from_ref(&buffer_memory_barrier),
-                &[],
-            );
+            device.end_command_buffer(command_buffer).unwrap();
+            let submit_info =
+                vk::SubmitInfo::builder().command_buffers(slice_from_ref(&command_buffer));
+            device
+                .queue_submit(
+                    vulkan_context.graphics_queue,
+                    slice_from_ref(&submit_info),
+                    fence,
+                )
+                .unwrap();
+            device
+                .wait_for_fences(slice_from_ref(&fence), true, CULLING_TIMEOUT)
+                .unwrap_or_else(|e| panic!("@@@ TIMEOUT WAITING FOR CULLING SHADER - {:?} @@@", e));
+            device.reset_fences(slice_from_ref(&fence)).unwrap();
         }
     }
 
@@ -744,7 +752,7 @@ fn create_pipeline_layout(
 
 #[repr(C)]
 #[derive(Debug, Clone)]
-pub struct CullData {
+pub struct CullParams {
     /// Four clip planes per camera, one plane per row.
     pub left_clip_planes: Matrix4<f32>,
     pub right_clip_planes: Matrix4<f32>,
