@@ -54,7 +54,7 @@ mod tests {
     use anyhow::Result;
     use ash::vk::{self, Handle};
     use egui::Pos2;
-    use image::{jpeg::JpegEncoder, DynamicImage, RgbaImage};
+    use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
     use nalgebra::UnitQuaternion;
     use openxr::{Fovf, Quaternionf, Vector3f};
     use std::process::Command;
