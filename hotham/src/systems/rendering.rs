@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryInto};
 
 use crate::{
     components::{skin::NO_SKIN, Mesh, Skin, Transform, TransformMatrix, Visible},
@@ -67,6 +67,7 @@ pub fn rendering_system(
                 });
         }
     }
+    let primitive_map = primitive_map;
 
     // Next organize this data into a layout that's easily consumed by the compute shader.
     // ORDER IS IMPORTANT HERE! The final buffer should look something like:
@@ -86,19 +87,10 @@ pub fn rendering_system(
 
     for instanced_primitive in primitive_map.values() {
         let primitive = &instanced_primitive.primitive;
-        for instance in &instanced_primitive.instances {
+        for (i, instance) in instanced_primitive.instances.iter().enumerate() {
             unsafe {
                 cull_data.push(&PrimitiveCullData {
-                    draw_data: DrawData {
-                        transform: instance.transform_matrix,
-                        inverse_transpose: instance
-                            .transform_matrix
-                            .try_inverse()
-                            .unwrap()
-                            .transpose(),
-                        material_id: primitive.material_id,
-                        skin_id: instance.skin_id,
-                    },
+                    index_instance: i.try_into().unwrap(),
                     index_offset: primitive.index_buffer_offset,
                     bounding_sphere: instance.bounding_sphere,
                     visible: false,
@@ -158,7 +150,15 @@ pub fn rendering_system(
 
             // If this primitive is visible, increase the instance count and record its draw data.
             if cull_result.visible {
-                draw_data_buffer.push(&cull_result.draw_data);
+                let instanced_primitive = primitive_map.get(&current_primitive_id).unwrap();
+                let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
+                let draw_data = DrawData {
+                    transform: instance.transform_matrix,
+                    inverse_transpose: instance.transform_matrix.try_inverse().unwrap().transpose(),
+                    material_id: instanced_primitive.primitive.material_id,
+                    skin_id: instance.skin_id,
+                };
+                draw_data_buffer.push(&draw_data);
                 instance_count += 1;
             }
         }

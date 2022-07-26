@@ -139,8 +139,8 @@ pub struct DrawData {
 #[derive(Debug, Default, Clone)]
 #[repr(C, align(16))]
 pub(crate) struct PrimitiveCullData {
-    pub draw_data: DrawData,
     pub bounding_sphere: Vector4<f32>,
+    pub index_instance: u32,
     pub index_offset: u32,
     pub visible: bool,
 }

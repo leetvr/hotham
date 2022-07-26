@@ -10,17 +10,9 @@ struct VkDrawIndexedIndirectCommand
     uint firstInstance;
 };
 
-
-struct DrawData {
-    mat4 transform;
-    mat4 inverseTranspose;
-    uint materialID;
-    uint skinID;
-};
-
 struct PrimitiveCullData {
-    DrawData drawData;
     vec4 boundingSphere;
+    uint indexInstance;
     uint indexOffset;
     bool visible;
 };
