@@ -49,12 +49,7 @@ impl Frame {
                 None,
             )
         }?;
-        let compute_fence = unsafe {
-            device.create_fence(
-                &vk::FenceCreateInfo::builder(),
-                None,
-            )
-        }?;
+        let compute_fence = unsafe { device.create_fence(&vk::FenceCreateInfo::builder(), None) }?;
 
         let command_buffers = unsafe {
             device.allocate_command_buffers(
