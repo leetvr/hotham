@@ -1,13 +1,13 @@
 use hotham::{
     asset_importer::{self, add_model_to_world, Models},
-    components::{Transform, Info},
-    hecs::{World, With},
+    components::{Transform, Info, Parent},
+    hecs::{World, With, CommandBuffer},
     systems::{
         rendering::rendering_system, skinning::skinning_system,
         update_parent_transform_matrix_system,
         update_transform_matrix_system, Queries,
     },
-    xr, Engine, HothamResult, TickData, nalgebra::UnitQuaternion,
+    xr, Engine, HothamResult, TickData, nalgebra::{UnitQuaternion, Translation3},
 };
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -65,6 +65,7 @@ fn tick(
             &mut queries.roots_query,
             world,
         );
+        box_system(world);
         skinning_system(&mut queries.skins_query, world, render_context);
     }
 
@@ -85,18 +86,35 @@ fn add_box(
     models: &Models,
     world: &mut World,
 ) {
-    let box_entity = add_model_to_world("Armature", models, world, None).unwrap();
-    world.insert_one(box_entity, Armature{}).unwrap();
+    let _box_entity = add_model_to_world("Armature", models, world, None).unwrap();
+    // world.insert_one(box_entity, Armature{}).unwrap();
 
-    // move it backwards so we can see it
-    for (_e, transform) in world.query_mut::<With<Armature, &mut Transform>>() {
-        transform.translation = [0.0, 0.0, -5.0].into();
+    let mut cmd_buffer = CommandBuffer::new();
+    for (e, (_info, _parent)) in world.query::<(&Info, &mut Parent)>().iter() {
+        cmd_buffer.remove::<(Parent,)>(e);
+        cmd_buffer.insert(e, (Armature,));
     }
+    cmd_buffer.run_on(world);
 
     // rotate one of the bones a bit
     for (_e, (info, transform)) in world.query::<(&Info, &mut Transform)>().iter() {
         if info.name == "Bone.002" {
             transform.rotation = UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3);
+        }
+    }
+
+    // move it backwards so we can see it
+    for (_e, transform) in world.query_mut::<With<Armature, &mut Transform>>() {
+        let offset: Translation3<f32> = [0.0, 0.0, -5.0].into();
+        transform.translation += offset.vector;
+    }
+}
+
+fn box_system(world: &mut World) {
+    // rotate one of the bones a bit
+    for (_e, (info, transform)) in world.query::<(&Info, &mut Transform)>().iter() {
+        if info.name == "Bone.002" {
+            transform.rotation *= UnitQuaternion::from_euler_angles(0.001, 0.002, 0.003);
         }
     }
 }
