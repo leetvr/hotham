@@ -2,7 +2,8 @@ use gltf::scene::Transform as TransformData;
 use nalgebra::{vector, Isometry3, Quaternion, Unit, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
-/// Component that represents the transform of the entity in world space
+/// Component that represents the transform of the entity from local to parent space.
+/// This is the same as local to world space if there is no parent.
 /// Added automatically by `gltf_loader`, will be overridden if the entity also contains a `rigid_body` and
 /// `update_rigid_body_transforms_system` is running
 #[derive(Clone, PartialEq, Debug, Copy, Deserialize, Serialize)]
