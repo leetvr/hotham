@@ -62,7 +62,7 @@ pub fn rendering_system(
                 .instances
                 .push(Instance {
                     transform_matrix: transform_matrix.0,
-                    bounding_sphere: primitive.get_bounding_sphere(transform),
+                    bounding_sphere: primitive.get_bounding_sphere(transform_matrix),
                     skin_id,
                 });
         }
