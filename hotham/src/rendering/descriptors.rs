@@ -3,7 +3,8 @@ use std::convert::TryInto;
 use crate::resources::{render_context::PIPELINE_DEPTH, VulkanContext};
 use ash::vk;
 
-static TEXTURE_BINDING: u32 = 4;
+const TEXTURE_BINDING: u32 = 4;
+const TEXTURE_BINDING_DESCRIPTOR_COUNT: u32 = 10_000;
 
 /// A wrapper around all the various bits of descriptor functionality
 #[derive(Clone, Debug)]
@@ -74,7 +75,10 @@ unsafe fn allocate_descriptor_sets(
     layout: vk::DescriptorSetLayout,
 ) -> [vk::DescriptorSet; PIPELINE_DEPTH] {
     let mut descriptor_counts = vk::DescriptorSetVariableDescriptorCountAllocateInfo::builder()
-        .descriptor_counts(&[10_000, 10_000, 10_000]);
+        .descriptor_counts(&[
+            TEXTURE_BINDING_DESCRIPTOR_COUNT,
+            TEXTURE_BINDING_DESCRIPTOR_COUNT,
+        ]);
     let layouts = [layout; PIPELINE_DEPTH];
 
     vulkan_context
@@ -152,13 +156,13 @@ unsafe fn create_descriptor_layouts(
             binding: TEXTURE_BINDING,
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
-            descriptor_count: 10_000,
+            descriptor_count: TEXTURE_BINDING_DESCRIPTOR_COUNT,
             ..Default::default()
         },
     ];
 
     let compute_bindings = [
-        // Draw Data
+        // Primitive Cull Data
         vk::DescriptorSetLayoutBinding {
             binding: 0,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
@@ -166,17 +170,9 @@ unsafe fn create_descriptor_layouts(
             descriptor_count: 1,
             ..Default::default()
         },
-        // Draw Indirect Buffer
+        // Cull Params
         vk::DescriptorSetLayoutBinding {
             binding: 1,
-            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-            stage_flags: vk::ShaderStageFlags::COMPUTE,
-            descriptor_count: 1,
-            ..Default::default()
-        },
-        // Cull Data
-        vk::DescriptorSetLayoutBinding {
-            binding: 2,
             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
             stage_flags: vk::ShaderStageFlags::COMPUTE,
             descriptor_count: 1,

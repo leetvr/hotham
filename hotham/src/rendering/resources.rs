@@ -129,10 +129,18 @@ pub struct DrawData {
     pub transform: Matrix4<f32>,
     /// The inverse transpose of the transform of the parent mesh
     pub inverse_transpose: Matrix4<f32>,
-    /// A bounding sphere for the primitive in x, y, z, radius format
-    pub bounding_sphere: Vector4<f32>,
     /// The ID of the material to use.
     pub material_id: u32,
     /// An optional skin to use.
     pub skin_id: u32,
+}
+
+/// Information for the culling shader on how to cull this primitive.
+#[derive(Debug, Default, Clone)]
+#[repr(C, align(16))]
+pub(crate) struct PrimitiveCullData {
+    pub draw_data: DrawData,
+    pub bounding_sphere: Vector4<f32>,
+    pub index_offset: u32,
+    pub visible: bool,
 }
