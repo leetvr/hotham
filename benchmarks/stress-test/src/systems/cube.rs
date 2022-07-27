@@ -19,8 +19,8 @@ pub fn setup_cubes(world: &mut World, resolution: usize, models: &Models) {
                 let mut t = world.get_mut::<Transform>(c).unwrap();
                 t.scale = scale;
                 t.translation.y = floor as f32 / scale_factor;
-                t.translation.x = (column as f32 / scale_factor) - x_offset;
-                t.translation.z = (row as f32 / scale_factor) - half_resolution - 2.0;
+                t.translation.x = column as f32 / scale_factor - x_offset;
+                t.translation.z = row as f32 / scale_factor - half_resolution - 2.0;
             }
         }
     }

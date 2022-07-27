@@ -68,7 +68,7 @@ pub fn rendering_system(
         }
     }
 
-    // Next organise this data into a layout that's easily consumed by the compute shader.
+    // Next organize this data into a layout that's easily consumed by the compute shader.
     // ORDER IS IMPORTANT HERE! The final buffer should look something like:
     //
     // primitive_a
@@ -80,14 +80,14 @@ pub fn rendering_system(
     // primitive_e
     //
     // ..etc. The most important thing is that each instances are grouped by their primitive.
-    unsafe {
-        let frame = &mut render_context.frames[render_context.frame_index];
-        let cull_data = &mut frame.primitive_cull_data_buffer;
-        cull_data.clear();
+    let frame = &mut render_context.frames[render_context.frame_index];
+    let cull_data = &mut frame.primitive_cull_data_buffer;
+    cull_data.clear();
 
-        for instanced_primitive in primitive_map.values() {
-            let primitive = &instanced_primitive.primitive;
-            for instance in &instanced_primitive.instances {
+    for instanced_primitive in primitive_map.values() {
+        let primitive = &instanced_primitive.primitive;
+        for instance in &instanced_primitive.instances {
+            unsafe {
                 cull_data.push(&PrimitiveCullData {
                     draw_data: DrawData {
                         transform: instance.transform_matrix,
@@ -101,7 +101,7 @@ pub fn rendering_system(
                     },
                     index_offset: primitive.index_buffer_offset,
                     bounding_sphere: instance.bounding_sphere,
-                    visible: false,
+                    visible: true,
                 });
             }
         }
@@ -111,7 +111,7 @@ pub fn rendering_system(
     render_context.update_scene_data(views).unwrap();
 
     // Execute the culling shader on the GPU.
-    render_context.cull_objects(vulkan_context);
+    // render_context.cull_objects(vulkan_context);
 
     // Begin the render pass, bind descriptor sets.
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
