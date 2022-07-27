@@ -101,7 +101,7 @@ pub fn rendering_system(
                     },
                     index_offset: primitive.index_buffer_offset,
                     bounding_sphere: instance.bounding_sphere,
-                    visible: true,
+                    visible: false,
                 });
             }
         }
@@ -111,7 +111,7 @@ pub fn rendering_system(
     render_context.update_scene_data(views).unwrap();
 
     // Execute the culling shader on the GPU.
-    // render_context.cull_objects(vulkan_context);
+    render_context.cull_objects(vulkan_context);
 
     // Begin the render pass, bind descriptor sets.
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
