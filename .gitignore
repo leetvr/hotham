@@ -3,7 +3,7 @@ Cargo.lock
 target
 
 # Ignore test assets
-sponza* 
+sponza*
 
 # Note that we NEVER care about uncompressed glTF stuff
 *.gltf
@@ -15,3 +15,6 @@ sponza*
 
 # Ignore logs
 *.log
+
+# Don't ignore images from rendering tests
+!render_*.jpg
