@@ -346,8 +346,7 @@ mod tests {
         let (mut render_context, vulkan_context) = RenderContext::testing();
 
         let data: Vec<&[u8]> = vec![
-            // TODO: Fix
-            // include_bytes!("../../../test_assets/damaged_helmet_desktop.glb"),
+            include_bytes!("../../../test_assets/damaged_helmet.glb"),
             include_bytes!("../../../test_assets/asteroid.glb"),
         ];
         let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
@@ -356,8 +355,8 @@ mod tests {
                 "Damaged Helmet",
                 0,
                 46356,
-                vector![0., 1.4, 0.],
-                Quaternion::new(0.707, 0.707, 0., 0.),
+                vector![0., 0., 0.],
+                Quaternion::new(0.70710677, 0.70710677, 0., 0.),
             ),
             (
                 "Asteroid",
@@ -469,12 +468,12 @@ mod tests {
 
         // Make sure we got all the nodes
         let transforms = world.query_mut::<&Transform>().into_iter();
-        assert_eq!(transforms.len(), 28);
+        assert_eq!(transforms.len(), 27);
 
         // Make sure we got all the Parent -> Child relationships
         {
             let mut transforms_with_parents = world.query::<(&Transform, &Parent)>();
-            assert_eq!(transforms_with_parents.iter().len(), 27);
+            assert_eq!(transforms_with_parents.iter().len(), 26);
             for (_, (_, parent)) in transforms_with_parents.iter() {
                 assert!(world.contains(parent.0));
             }
