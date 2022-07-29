@@ -220,31 +220,12 @@ impl RenderContext {
         let command_buffer = frame.compute_command_buffer;
         let fence = frame.compute_fence;
 
-        let near = 0.05;
-        let far = 100.0;
-
-        // Compute left_frustum_from_world
-        let left_frustum_from_left_camera = get_projection(self.views[0].fov, near, far);
-        let left_camera_from_world = self.cameras[0]
-            .position
-            .to_homogeneous()
-            .try_inverse()
-            .unwrap();
-        let left_frustum_from_world = left_frustum_from_left_camera * left_camera_from_world;
-
-        // Compute right_frustum_from_world
-        let right_frustum_from_right_camera = get_projection(self.views[1].fov, near, far);
-        let right_camera_from_world = self.cameras[1]
-            .position
-            .to_homogeneous()
-            .try_inverse()
-            .unwrap();
-        let right_frustum_from_world = right_frustum_from_right_camera * right_camera_from_world;
-
         // Normals of the clipping planes are pointing towards the inside of the frustum.
         // We are only using four planes per camera. The near and far planes are not used.
         // This link points to a paper describing the math behind these expressions:
         // https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
+        let left_frustum_from_world = self.scene_data.view_projection[0];
+        let right_frustum_from_world = self.scene_data.view_projection[1];
         let normalize_plane = |p: RowVector4<_>| p / p.columns(0, 3).norm();
         let cull_data = CullParams {
             left_clip_planes: Matrix4::<_>::from_rows(&[
