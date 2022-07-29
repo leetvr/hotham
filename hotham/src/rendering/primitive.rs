@@ -143,7 +143,13 @@ impl Primitive {
         let center_in_local: Point3<_> = self.bounding_sphere.xyz().into();
         let center_in_world =
             Point3::<_>::from_homogeneous(transform.0 * center_in_local.to_homogeneous()).unwrap();
+
+        // The linear part contains the rotation and scale, we are interested in the scale.
         let world_from_local_linear_part = transform.0.fixed_slice::<3, 3>(0, 0);
+
+        // The scale of the sphere is taken as the largest scale in any dimension.
+        // If the scale is non-uniform, there could be a tighter bounding sphere.
+        // If the scale is uniform, the quality of the bounding sphere will be unchanged.
         let scale = world_from_local_linear_part
             .column(0)
             .magnitude_squared()
