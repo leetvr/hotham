@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::TryInto};
 
 use crate::{
-    components::{skin::NO_SKIN, Mesh, Skin, Transform, TransformMatrix, Visible},
+    components::{skin::NO_SKIN, Mesh, Skin, TransformMatrix, Visible},
     rendering::{
         primitive::Primitive,
         resources::{DrawData, PrimitiveCullData},
@@ -32,7 +32,7 @@ struct InstancedPrimitive {
 /// - AFTER: ensure you have called render_context.end_frame
 #[allow(clippy::type_complexity)]
 pub fn rendering_system(
-    query: &mut PreparedQuery<With<Visible, (&Mesh, &Transform, &TransformMatrix, Option<&Skin>)>>,
+    query: &mut PreparedQuery<With<Visible, (&Mesh, &TransformMatrix, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
@@ -47,7 +47,7 @@ pub fn rendering_system(
     let mut primitive_map: HashMap<u32, InstancedPrimitive> = Default::default();
     let meshes = &render_context.resources.mesh_data;
 
-    for (_, (mesh, transform, transform_matrix, skin)) in query.query_mut(world) {
+    for (_, (mesh, transform_matrix, skin)) in query.query_mut(world) {
         let mesh = meshes.get(mesh.handle).unwrap();
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
         for primitive in &mesh.primitives {
