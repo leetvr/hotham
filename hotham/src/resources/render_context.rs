@@ -154,7 +154,7 @@ impl RenderContext {
         )
     }
 
-    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) -> Result<()> {
+    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) {
         self.views = views.to_owned();
 
         // View (camera)
@@ -163,7 +163,7 @@ impl RenderContext {
             .iter_mut()
             .enumerate()
             .map(|(n, c)| c.update(&views[n]))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
 
         // Projection
         let near = 0.05;
@@ -187,8 +187,6 @@ impl RenderContext {
             scene_data.view_projection = self.scene_data.view_projection;
             scene_data.debug_data = self.scene_data.debug_data;
         }
-
-        Ok(())
     }
 
     /// Start rendering a frame
