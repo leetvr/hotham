@@ -116,7 +116,7 @@ mod tests {
 
     use crate::{
         resources::{audio_context::MusicTrack, XrContext},
-        VIEW_TYPE,
+        HothamError, VIEW_TYPE,
     };
 
     use super::*;
@@ -210,7 +210,11 @@ mod tests {
     }
 
     fn update_xr(xr_context: &mut XrContext) {
-        xr_context.begin_frame().unwrap();
+        match xr_context.begin_frame() {
+            Err(HothamError::NotRendering) => (),
+            Ok(_) => (),
+            err => panic!("Error beginning frame: {:?}", err),
+        };
         let (view_state_flags, views) = xr_context
             .session
             .locate_views(
