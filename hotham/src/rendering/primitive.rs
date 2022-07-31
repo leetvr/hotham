@@ -141,11 +141,11 @@ impl Primitive {
     /// Get a bounding sphere for the primitive, applying a transform
     pub fn get_bounding_sphere(&self, transform: &GlobalTransform) -> Vector4<f32> {
         let center_in_local: Point3<_> = self.bounding_sphere.xyz().into();
-        let center_in_world =
+        let center_in_global =
             Point3::<_>::from_homogeneous(transform.0 * center_in_local.to_homogeneous()).unwrap();
 
         // The linear part contains the rotation and scale, we are interested in the scale.
-        let world_from_local_linear_part = transform.0.fixed_slice::<3, 3>(0, 0);
+        let global_from_local_linear_part = transform.0.fixed_slice::<3, 3>(0, 0);
 
         // The scale of the sphere is taken as the largest scale in any dimension.
         // If the scale is uniform, the quality of the bounding sphere will be unchanged.
@@ -154,19 +154,19 @@ impl Primitive {
         // If the case with skew becomes a problem in practice, there are several ways to solve it, eg:
         // * Using singular value decomposition can give a solution similar to the axis aligned case.
         // * Using a fudge factor can ensure correctness with a bounding sphere that usually is bigger than it needs to be.
-        let scale = world_from_local_linear_part
+        let scale = global_from_local_linear_part
             .column(0)
             .magnitude_squared()
-            .max(world_from_local_linear_part.column(1).magnitude_squared())
-            .max(world_from_local_linear_part.column(2).magnitude_squared())
+            .max(global_from_local_linear_part.column(1).magnitude_squared())
+            .max(global_from_local_linear_part.column(2).magnitude_squared())
             .sqrt();
-        let radius_in_world = self.bounding_sphere.w * scale;
+        let radius_in_global = self.bounding_sphere.w * scale;
 
         [
-            center_in_world.x,
-            center_in_world.y,
-            center_in_world.z,
-            radius_in_world,
+            center_in_global.x,
+            center_in_global.y,
+            center_in_global.z,
+            radius_in_global,
         ]
         .into()
     }
