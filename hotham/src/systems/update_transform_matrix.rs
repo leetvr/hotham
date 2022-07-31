@@ -1,12 +1,12 @@
 use nalgebra::Matrix4;
 
-use crate::components::{GlobalTransform, Transform};
+use crate::components::{GlobalTransform, LocalTransform};
 use hecs::{PreparedQuery, World};
 
 /// Update transform matrix system
-/// Walks through each Transform and applies it to a 4x4 matrix used by the vertex shader
+/// Walks through each LocalTransform and applies it to a 4x4 matrix used by the vertex shader
 pub fn update_transform_matrix_system(
-    query: &mut PreparedQuery<(&Transform, &mut GlobalTransform)>,
+    query: &mut PreparedQuery<(&LocalTransform, &mut GlobalTransform)>,
     world: &mut World,
 ) {
     for (_, (transform, transform_matrix)) in query.query_mut(world) {
@@ -18,7 +18,7 @@ pub fn update_transform_matrix_system(
 
 #[cfg(test)]
 mod tests {
-    use crate::components::Transform;
+    use crate::components::LocalTransform;
     use approx::assert_relative_eq;
     use nalgebra::{vector, UnitQuaternion};
 
@@ -27,7 +27,7 @@ mod tests {
     #[test]
     pub fn test_update_transform_matrix() {
         let mut world = World::new();
-        let transform = Transform::default();
+        let transform = LocalTransform::default();
         let transform_matrix = GlobalTransform::default();
 
         let entity = world.spawn((transform, transform_matrix));
@@ -41,7 +41,7 @@ mod tests {
         let test_rotation = UnitQuaternion::from_euler_angles(0.3, 0.3, 0.3);
 
         {
-            let mut transform = world.get_mut::<Transform>(entity).unwrap();
+            let mut transform = world.get_mut::<LocalTransform>(entity).unwrap();
             transform.translation = test_translation;
             transform.rotation = test_rotation;
             transform.scale = test_translation;

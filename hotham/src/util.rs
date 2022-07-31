@@ -42,7 +42,7 @@ pub fn get_world_with_hands(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
 ) -> World {
-    use crate::components::{Skin, Transform};
+    use crate::components::{LocalTransform, Skin};
 
     let data: Vec<&[u8]> = vec![
         include_bytes!("../../test_assets/left_hand.glb"),
@@ -55,13 +55,13 @@ pub fn get_world_with_hands(
     // Add two hands
     let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
     {
-        let mut transform = world.get_mut::<Transform>(left_hand).unwrap();
+        let mut transform = world.get_mut::<LocalTransform>(left_hand).unwrap();
         transform.translation = [-0.2, 1.4, 0.0].into();
     }
 
     let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
     {
-        let mut transform = world.get_mut::<Transform>(right_hand).unwrap();
+        let mut transform = world.get_mut::<LocalTransform>(right_hand).unwrap();
         transform.translation = [0.2, 1.4, 0.0].into();
     }
 

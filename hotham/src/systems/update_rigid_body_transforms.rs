@@ -2,13 +2,13 @@ use hecs::{PreparedQuery, World};
 use nalgebra::UnitQuaternion;
 
 use crate::{
-    components::{RigidBody, Transform},
+    components::{LocalTransform, RigidBody},
     resources::PhysicsContext,
 };
 
 /// Walks through each pair of `RigidBody`s and `Transforms` and sets the `Transform` accordingly
 pub fn update_rigid_body_transforms_system(
-    query: &mut PreparedQuery<(&RigidBody, &mut Transform)>,
+    query: &mut PreparedQuery<(&RigidBody, &mut LocalTransform)>,
     world: &mut World,
     physics_context: &PhysicsContext,
 ) {
@@ -42,7 +42,7 @@ mod tests {
         let mut world = World::default();
         let mut physics_context = PhysicsContext::default();
 
-        let entity = world.spawn((Transform::default(),));
+        let entity = world.spawn((LocalTransform::default(),));
         let mut rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
         let rotation = UnitQuaternion::from_euler_angles(0.1, 0.2, 0.3);
         let position = Isometry::from_parts(vector![1.0, 2.0, 3.0].into(), rotation);
@@ -51,7 +51,7 @@ mod tests {
         let handle = physics_context.rigid_bodies.insert(rigid_body);
         world.insert_one(entity, RigidBody { handle }).unwrap();
 
-        let mut query = PreparedQuery::<(&RigidBody, &mut Transform)>::default();
+        let mut query = PreparedQuery::<(&RigidBody, &mut LocalTransform)>::default();
 
         // Run the schedule 4 times. Why 4 times? I can't remember.
         schedule(&mut physics_context, &mut query, &mut world);
@@ -59,14 +59,14 @@ mod tests {
         schedule(&mut physics_context, &mut query, &mut world);
         schedule(&mut physics_context, &mut query, &mut world);
 
-        let transform = world.get::<Transform>(entity).unwrap();
+        let transform = world.get::<LocalTransform>(entity).unwrap();
         assert_relative_eq!(transform.translation, vector![1.0, 2.0, 3.0]);
         assert_relative_eq!(transform.rotation, rotation);
     }
 
     fn schedule(
         physics_context: &mut PhysicsContext,
-        query: &mut PreparedQuery<(&RigidBody, &mut Transform)>,
+        query: &mut PreparedQuery<(&RigidBody, &mut LocalTransform)>,
         world: &mut World,
     ) {
         physics_context.update();

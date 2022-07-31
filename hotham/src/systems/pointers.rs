@@ -22,7 +22,9 @@ const ROTATION_OFFSET: Quaternion<f32> =
     Quaternion::new(-0.558_149_8, 0.827_491_2, 0.034_137_9, -0.050_611_5);
 
 use crate::{
-    components::{hand::Handedness, panel::PanelInput, Info, Panel, Pointer, Transform, Visible},
+    components::{
+        hand::Handedness, panel::PanelInput, Info, LocalTransform, Panel, Pointer, Visible,
+    },
     resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
@@ -30,7 +32,7 @@ use crate::{
 /// Pointers system
 /// Allows users to interact with `Panel`s using their controllers
 pub fn pointers_system(
-    query: &mut PreparedQuery<With<Visible, (&mut Pointer, &mut Transform)>>,
+    query: &mut PreparedQuery<With<Visible, (&mut Pointer, &mut LocalTransform)>>,
     world: &mut World,
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
@@ -172,7 +174,7 @@ mod tests {
     #[test]
     pub fn test_pointers_system() {
         use crate::{
-            components::{Collider, Panel, Transform},
+            components::{Collider, LocalTransform, Panel},
             resources::{
                 physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
                 RenderContext,
@@ -239,12 +241,12 @@ mod tests {
                 handedness: Handedness::Left,
                 trigger_value: 0.0,
             },
-            Transform::default(),
+            LocalTransform::default(),
         ));
 
         tick(&mut physics_context, &mut world, &mut xr_context);
 
-        let transform = world.get_mut::<Transform>(pointer_entity).unwrap();
+        let transform = world.get_mut::<LocalTransform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
         assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);

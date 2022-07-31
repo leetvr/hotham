@@ -7,7 +7,7 @@ pub mod systems;
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{GlobalTransform, Mesh, Transform, Visible},
+    components::{GlobalTransform, LocalTransform, Mesh, Visible},
     hecs::{With, World},
     nalgebra::{UnitQuaternion, Vector3},
     rendering::{
@@ -141,7 +141,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             for _ in 0..20 {
                 let e = add_model_to_world("Damaged Helmet", &models, &mut world, None)
                     .expect("Could not find cube?");
-                let mut t = world.get_mut::<Transform>(e).unwrap();
+                let mut t = world.get_mut::<LocalTransform>(e).unwrap();
                 t.rotation = UnitQuaternion::from_axis_angle(
                     &Vector3::x_axis(),
                     std::f32::consts::FRAC_PI_2,
@@ -258,14 +258,14 @@ fn model_system(
 }
 
 fn rotate_models(world: &mut World, total_time: f32) {
-    for (_, transform) in world.query_mut::<With<Mesh, &mut Transform>>() {
+    for (_, transform) in world.query_mut::<With<Mesh, &mut LocalTransform>>() {
         transform.rotation =
             UnitQuaternion::from_euler_angles(90.0_f32.to_radians(), total_time.sin() * 2., 0.);
     }
 }
 
 fn rearrange_models(world: &mut World) {
-    let query = world.query_mut::<With<Mesh, &mut Transform>>();
+    let query = world.query_mut::<With<Mesh, &mut LocalTransform>>();
     let query_iter = query.into_iter();
     let num_models = query_iter.len() as f32;
 
@@ -308,7 +308,7 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
         render_context,
     );
     update_mesh(1, &mesh, render_context);
-    let transform = Transform {
+    let transform = LocalTransform {
         translation: [0., 1., -1.].into(),
         ..Default::default()
     };

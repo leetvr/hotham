@@ -52,7 +52,7 @@ mod tests {
     use nalgebra::vector;
 
     use crate::{
-        components::{Info, Transform},
+        components::{Info, LocalTransform},
         systems::update_transform_matrix_system,
     };
 
@@ -102,7 +102,7 @@ mod tests {
                 name: format!("Node {}", n),
                 node_id: n,
             };
-            let transform = Transform {
+            let transform = LocalTransform {
                 translation: vector![1.0, 1.0, 1.0],
                 ..Default::default()
             };
@@ -123,7 +123,7 @@ mod tests {
 
         let root_entity = node_entity.get(&0).unwrap();
         {
-            let mut transform = world.get_mut::<Transform>(*root_entity).unwrap();
+            let mut transform = world.get_mut::<LocalTransform>(*root_entity).unwrap();
             transform.translation = vector![100.0, 100.0, 100.0];
         }
         schedule(&mut world);

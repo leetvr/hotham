@@ -61,7 +61,7 @@ mod tests {
     use rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder};
 
     use crate::{
-        components::{hand::Handedness, Info, Transform},
+        components::{hand::Handedness, Info, LocalTransform},
         resources::PhysicsContext,
         systems::update_rigid_body_transforms_system,
     };
@@ -149,7 +149,7 @@ mod tests {
         query: &mut PreparedQuery<(&mut Hand, &Collider)>,
         world: &mut World,
         physics_context: &mut PhysicsContext,
-        rigid_body_query: &mut PreparedQuery<(&RigidBody, &mut Transform)>,
+        rigid_body_query: &mut PreparedQuery<(&RigidBody, &mut LocalTransform)>,
     ) {
         grabbing_system(query, world, physics_context);
         physics_context.update();

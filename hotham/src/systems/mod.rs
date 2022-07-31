@@ -26,8 +26,8 @@ pub use update_rigid_body_transforms::update_rigid_body_transforms_system;
 pub use update_transform_matrix::update_transform_matrix_system;
 
 use crate::components::{
-    AnimationController, Collider, GlobalTransform, Hand, Info, Joint, Mesh, Panel, Parent,
-    Pointer, RigidBody, Skin, SoundEmitter, Transform, UIPanel, Visible,
+    AnimationController, Collider, GlobalTransform, Hand, Info, Joint, LocalTransform, Mesh, Panel,
+    Parent, Pointer, RigidBody, Skin, SoundEmitter, UIPanel, Visible,
 };
 use hecs::{PreparedQuery, With, Without};
 
@@ -47,7 +47,7 @@ pub struct Queries<'a> {
     pub rendering_query:
         PreparedQuery<With<Visible, (&'a Mesh, &'a GlobalTransform, Option<&'a Skin>)>>,
     pub roots_query: PreparedQuery<Without<Parent, &'a GlobalTransform>>,
-    pub update_rigid_body_transforms_query: PreparedQuery<(&'a RigidBody, &'a mut Transform)>,
-    pub update_transform_matrix_query: PreparedQuery<(&'a Transform, &'a mut GlobalTransform)>,
-    pub pointers_query: PreparedQuery<With<Visible, (&'a mut Pointer, &'a mut Transform)>>,
+    pub update_rigid_body_transforms_query: PreparedQuery<(&'a RigidBody, &'a mut LocalTransform)>,
+    pub update_transform_matrix_query: PreparedQuery<(&'a LocalTransform, &'a mut GlobalTransform)>,
+    pub pointers_query: PreparedQuery<With<Visible, (&'a mut Pointer, &'a mut LocalTransform)>>,
 }

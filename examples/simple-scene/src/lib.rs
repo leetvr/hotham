@@ -1,6 +1,6 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, Transform},
+    components::{hand::Handedness, LocalTransform},
     hecs::World,
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
@@ -73,7 +73,7 @@ fn add_helmet(
 ) {
     let helmet = add_model_to_world("Damaged Helmet", models, world, None)
         .expect("Could not find Damaged Helmet");
-    let mut transform = world.get_mut::<Transform>(helmet).unwrap();
+    let mut transform = world.get_mut::<LocalTransform>(helmet).unwrap();
     transform.translation.z = -1.;
     transform.translation.y = 1.4;
     transform.scale = [0.5, 0.5, 0.5].into();
