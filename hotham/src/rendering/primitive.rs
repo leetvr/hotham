@@ -148,8 +148,12 @@ impl Primitive {
         let world_from_local_linear_part = transform.0.fixed_slice::<3, 3>(0, 0);
 
         // The scale of the sphere is taken as the largest scale in any dimension.
-        // If the scale is non-uniform, there could be a tighter bounding sphere.
         // If the scale is uniform, the quality of the bounding sphere will be unchanged.
+        // If the scale is non-uniform and axis aligned in local space, there could be a tighter bounding sphere.
+        // If the scale is non-uniform and not axis aligned in local space (skew), the bounding sphere may be too tight.
+        // If the case with skew becomes a problem in practice, there are several ways to solve it, eg:
+        // * Using singular value decomposition can give a solution similar to the axis aligned case.
+        // * Using a fudge factor can ensure correctness with a bounding sphere that usually is bigger than it needs to be.
         let scale = world_from_local_linear_part
             .column(0)
             .magnitude_squared()
