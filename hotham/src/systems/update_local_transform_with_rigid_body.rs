@@ -6,8 +6,8 @@ use crate::{
     resources::PhysicsContext,
 };
 
-/// Walks through each pair of `RigidBody`s and `Transforms` and sets the `Transform` accordingly
-pub fn update_rigid_body_transforms_system(
+/// Walks through each pair of `RigidBody`s and `LocalTransform`s and sets the `LocalTransform` accordingly
+pub fn update_local_transform_with_rigid_body_system(
     query: &mut PreparedQuery<(&RigidBody, &mut LocalTransform)>,
     world: &mut World,
     physics_context: &PhysicsContext,
@@ -38,7 +38,7 @@ mod tests {
     };
 
     #[test]
-    pub fn test_update_rigid_body_transforms_system() {
+    pub fn test_update_local_transform_with_rigid_body_system() {
         let mut world = World::default();
         let mut physics_context = PhysicsContext::default();
 
@@ -70,6 +70,6 @@ mod tests {
         world: &mut World,
     ) {
         physics_context.update();
-        update_rigid_body_transforms_system(query, world, physics_context);
+        update_local_transform_with_rigid_body_system(query, world, physics_context);
     }
 }

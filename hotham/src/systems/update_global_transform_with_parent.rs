@@ -5,10 +5,10 @@ use hecs::{Entity, PreparedQuery, Without, World};
 
 use nalgebra::Matrix4;
 
-/// Update parent transform matrix system
+/// Update global transform with parent transform system
 /// Walks through each entity that has a Parent and builds a hierarchy
 /// Then transforms each entity based on the hierarchy
-pub fn update_parent_transform_matrix_system(
+pub fn update_global_transform_with_parent_system(
     parent_query: &mut PreparedQuery<&Parent>,
     roots_query: &mut PreparedQuery<Without<Parent, &GlobalTransform>>,
     world: &mut World,
@@ -22,11 +22,11 @@ pub fn update_parent_transform_matrix_system(
 
     let mut roots = roots_query.query(world);
     for (root, root_matrix) in roots.iter() {
-        update_transform_matrix(&root_matrix.0, root, &hierarchy, world);
+        update_global_transforms_recursively(&root_matrix.0, root, &hierarchy, world);
     }
 }
 
-fn update_transform_matrix(
+fn update_global_transforms_recursively(
     parent_matrix: &Matrix4<f32>,
     entity: Entity,
     hierarchy: &HashMap<Entity, Vec<Entity>>,
@@ -39,7 +39,7 @@ fn update_transform_matrix(
                 *child_matrix = parent_matrix * *child_matrix;
             }
             let child_matrix = world.get::<GlobalTransform>(*child).unwrap().0;
-            update_transform_matrix(&child_matrix, *child, hierarchy, world);
+            update_global_transforms_recursively(&child_matrix, *child, hierarchy, world);
         }
     }
 }
@@ -53,7 +53,7 @@ mod tests {
 
     use crate::{
         components::{Info, LocalTransform},
-        systems::update_transform_matrix_system,
+        systems::update_global_transform_system,
     };
 
     use super::*;
@@ -173,8 +173,8 @@ mod tests {
     }
 
     fn schedule(world: &mut World) {
-        update_transform_matrix_system(&mut Default::default(), world);
-        update_parent_transform_matrix_system(
+        update_global_transform_system(&mut Default::default(), world);
+        update_global_transform_with_parent_system(
             &mut Default::default(),
             &mut Default::default(),
             world,

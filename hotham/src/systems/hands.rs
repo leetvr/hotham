@@ -120,7 +120,7 @@ mod tests {
 
     use crate::{
         components::LocalTransform, resources::XrContext,
-        systems::update_rigid_body_transforms_system,
+        systems::update_local_transform_with_rigid_body_system,
     };
 
     #[test]
@@ -172,7 +172,11 @@ mod tests {
     ) {
         hands_system(&mut Default::default(), world, xr_context, physics_context);
         physics_context.update();
-        update_rigid_body_transforms_system(&mut Default::default(), world, physics_context);
+        update_local_transform_with_rigid_body_system(
+            &mut Default::default(),
+            world,
+            physics_context,
+        );
     }
 
     fn add_hand_to_world(

@@ -105,7 +105,7 @@ mod tests {
         use hotham::{
             components::{GlobalTransform, LocalTransform},
             resources::{PhysicsContext, XrContext},
-            systems::update_rigid_body_transforms_system,
+            systems::update_local_transform_with_rigid_body_system,
         };
 
         let mut world = World::new();
@@ -130,7 +130,7 @@ mod tests {
             &mut physics_context,
         );
         physics_context.update();
-        update_rigid_body_transforms_system(
+        update_local_transform_with_rigid_body_system(
             &mut rigid_body_transforms_query,
             &mut world,
             &physics_context,

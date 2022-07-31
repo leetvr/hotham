@@ -200,7 +200,7 @@ mod tests {
         asset_importer,
         rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
         resources::RenderContext,
-        systems::{update_parent_transform_matrix_system, update_transform_matrix_system},
+        systems::{update_global_transform_system, update_global_transform_with_parent_system},
         util::get_from_device_memory,
         COLOR_FORMAT,
     };
@@ -367,8 +367,8 @@ mod tests {
         let views = vec![view.clone(), view];
         render_context.begin_frame(vulkan_context);
         render_context.scene_data.debug_data.y = debug_view_equation;
-        update_transform_matrix_system(&mut Default::default(), world);
-        update_parent_transform_matrix_system(
+        update_global_transform_system(&mut Default::default(), world);
+        update_global_transform_with_parent_system(
             &mut Default::default(),
             &mut Default::default(),
             world,

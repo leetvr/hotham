@@ -8,9 +8,9 @@ pub mod hands;
 pub mod pointers;
 pub mod rendering;
 pub mod skinning;
-pub mod update_parent_transform_matrix;
-pub mod update_rigid_body_transforms;
-pub mod update_transform_matrix;
+pub mod update_global_transform;
+pub mod update_global_transform_with_parent;
+pub mod update_local_transform_with_rigid_body;
 
 pub use animation::animation_system;
 pub use audio::audio_system;
@@ -21,9 +21,9 @@ pub use hands::hands_system;
 pub use pointers::pointers_system;
 pub use rendering::rendering_system;
 pub use skinning::skinning_system;
-pub use update_parent_transform_matrix::update_parent_transform_matrix_system;
-pub use update_rigid_body_transforms::update_rigid_body_transforms_system;
-pub use update_transform_matrix::update_transform_matrix_system;
+pub use update_global_transform::update_global_transform_system;
+pub use update_global_transform_with_parent::update_global_transform_with_parent_system;
+pub use update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system;
 
 use crate::components::{
     AnimationController, Collider, GlobalTransform, Hand, Info, Joint, LocalTransform, Mesh, Panel,
@@ -48,6 +48,6 @@ pub struct Queries<'a> {
         PreparedQuery<With<Visible, (&'a Mesh, &'a GlobalTransform, Option<&'a Skin>)>>,
     pub roots_query: PreparedQuery<Without<Parent, &'a GlobalTransform>>,
     pub update_rigid_body_transforms_query: PreparedQuery<(&'a RigidBody, &'a mut LocalTransform)>,
-    pub update_transform_matrix_query: PreparedQuery<(&'a LocalTransform, &'a mut GlobalTransform)>,
+    pub update_global_transform_query: PreparedQuery<(&'a LocalTransform, &'a mut GlobalTransform)>,
     pub pointers_query: PreparedQuery<With<Visible, (&'a mut Pointer, &'a mut LocalTransform)>>,
 }

@@ -5,7 +5,7 @@ use hecs::{PreparedQuery, World};
 
 /// Update transform matrix system
 /// Walks through each LocalTransform and applies it to a 4x4 matrix used by the vertex shader
-pub fn update_transform_matrix_system(
+pub fn update_global_transform_system(
     query: &mut PreparedQuery<(&LocalTransform, &mut GlobalTransform)>,
     world: &mut World,
 ) {
@@ -25,7 +25,7 @@ mod tests {
     use super::*;
 
     #[test]
-    pub fn test_update_transform_matrix() {
+    pub fn test_update_global_transform_system() {
         let mut world = World::new();
         let transform = LocalTransform::default();
         let transform_matrix = GlobalTransform::default();
@@ -47,7 +47,7 @@ mod tests {
             transform.scale = test_translation;
         }
 
-        update_transform_matrix_system(&mut Default::default(), &mut world);
+        update_global_transform_system(&mut Default::default(), &mut world);
 
         let expected_matrix = Matrix4::new_translation(&test_translation)
             * Matrix4::from(test_rotation)
