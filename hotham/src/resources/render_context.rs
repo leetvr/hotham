@@ -8,7 +8,7 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     },
     vk::ClearValue {
         depth_stencil: vk::ClearDepthStencilValue {
-            depth: 1.0,
+            depth: 0.0,
             stencil: 0,
         },
     },
@@ -154,7 +154,7 @@ impl RenderContext {
         )
     }
 
-    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) -> Result<()> {
+    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) {
         self.views = views.to_owned();
 
         // View (camera)
@@ -163,18 +163,17 @@ impl RenderContext {
             .iter_mut()
             .enumerate()
             .map(|(n, c)| c.update(&views[n]))
-            .collect::<Result<Vec<_>>>()?;
+            .collect::<Vec<_>>();
 
         // Projection
         let near = 0.05;
-        let far = 100.0;
 
         let fov_left = views[0].fov;
         let fov_right = views[1].fov;
 
         self.scene_data.view_projection = [
-            get_projection(fov_left, near, far) * view_matrices[0],
-            get_projection(fov_right, near, far) * view_matrices[1],
+            Frustum::from(fov_left).projection(near) * view_matrices[0],
+            Frustum::from(fov_right).projection(near) * view_matrices[1],
         ];
 
         self.scene_data.camera_position = [self.cameras[0].position(), self.cameras[1].position()];
@@ -187,8 +186,6 @@ impl RenderContext {
             scene_data.view_projection = self.scene_data.view_projection;
             scene_data.debug_data = self.scene_data.debug_data;
         }
-
-        Ok(())
     }
 
     /// Start rendering a frame
@@ -421,39 +418,44 @@ pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(std::mem::transmute(p), size_of::<T>()) }
 }
 
-fn get_projection(fov: xr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
-    let tan_left = f32::tan(fov.angle_left);
-    let tan_right = f32::tan(fov.angle_right);
+#[derive(Debug, Copy, Clone)]
+pub struct Frustum {
+    pub left: f32,
+    pub right: f32,
+    pub up: f32,
+    pub down: f32,
+}
 
-    let tan_down = f32::tan(fov.angle_down);
-    let tan_up = f32::tan(fov.angle_up);
-    let tan_angle_width = tan_right - tan_left;
-    let tan_angle_height = tan_down - tan_up;
+impl Frustum {
+    #[rustfmt::skip]
+    /// Compute right-handed y-up inverse Z perspective projection matrix
+    pub fn projection(&self, znear: f32) -> Matrix4<f32> {
+        // Based on http://dev.theomader.com/depth-precision/ + OpenVR docs
+        let left = self.left.tan();
+        let right = self.right.tan();
+        let down = self.down.tan();
+        let up = self.up.tan();
+        let idx = 1.0 / (right - left);
+        let idy = 1.0 / (down - up);
+        let sx = right + left;
+        let sy = down + up;
+        Matrix4::new(
+            2.0 * idx, 0.0, sx * idx, 0.0,
+            0.0, 2.0 * idy, sy * idy, 0.0,
+            0.0,       0.0,      0.0, znear,
+            0.0,       0.0,     -1.0, 0.0)
+    }
+}
 
-    let c0r0 = 2.0 / tan_angle_width;
-    let c1r0 = 0.0;
-    let c2r0 = (tan_right + tan_left) / tan_angle_width;
-    let c3r0 = 0.0;
-
-    let c0r1 = 0.0;
-    let c1r1 = 2.0 / tan_angle_height;
-    let c2r1 = (tan_up + tan_down) / tan_angle_height;
-    let c3r1 = 0.0;
-
-    let c0r2 = 0.0;
-    let c1r2 = 0.0;
-    let c2r2 = -(far) / (far - near);
-    let c3r2 = -(far * near) / (far - near);
-
-    let c0r3 = 0.0;
-    let c1r3 = 0.0;
-    let c2r3 = -1.0;
-    let c3r3 = 0.0;
-
-    Matrix4::from_column_slice(&[
-        c0r0, c0r1, c0r2, c0r3, c1r0, c1r1, c1r2, c1r3, c2r0, c2r1, c2r2, c2r3, c3r0, c3r1, c3r2,
-        c3r3,
-    ])
+impl From<xr::Fovf> for Frustum {
+    fn from(x: xr::Fovf) -> Self {
+        Self {
+            left: x.angle_left,
+            right: x.angle_right,
+            up: x.angle_up,
+            down: x.angle_down,
+        }
+    }
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
@@ -633,7 +635,7 @@ fn create_pipeline(
     let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
         .depth_test_enable(true)
         .depth_write_enable(true)
-        .depth_compare_op(vk::CompareOp::LESS)
+        .depth_compare_op(vk::CompareOp::GREATER)
         .depth_bounds_test_enable(false)
         .min_depth_bounds(0.0)
         .max_depth_bounds(1.0)

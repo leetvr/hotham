@@ -1,4 +1,3 @@
-use anyhow::{anyhow, Result};
 use nalgebra::{vector, Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3, Vector4};
 use openxr::View;
 
@@ -25,13 +24,13 @@ impl Default for Camera {
 
 impl Camera {
     /// Update the camera's position from an OpenXR view
-    pub fn update(&mut self, view: &View) -> Result<Matrix4<f32>> {
+    pub fn update(&mut self, view: &View) -> Matrix4<f32> {
         // Convert values from OpenXR format
         let camera_position = posef_to_isometry(view.pose);
         self.position = camera_position;
 
-        self.view_matrix = self.build_matrix()?;
-        Ok(self.view_matrix)
+        self.view_matrix = self.build_matrix();
+        self.view_matrix
     }
 
     /// Get the camera's position
@@ -41,10 +40,7 @@ impl Camera {
     }
 
     /// Build the camera's view matrix
-    pub fn build_matrix(&self) -> Result<Matrix4<f32>> {
-        self.position
-            .to_homogeneous()
-            .try_inverse()
-            .ok_or_else(|| anyhow!("Unable to invert view Matrix!"))
+    pub fn build_matrix(&self) -> Matrix4<f32> {
+        self.position.inverse().to_homogeneous()
     }
 }
