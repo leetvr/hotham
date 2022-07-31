@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::components::{Parent, TransformMatrix};
+use crate::components::{GlobalTransform, Parent};
 use hecs::{Entity, PreparedQuery, Without, World};
 
 use nalgebra::Matrix4;
@@ -10,7 +10,7 @@ use nalgebra::Matrix4;
 /// Then transforms each entity based on the hierarchy
 pub fn update_parent_transform_matrix_system(
     parent_query: &mut PreparedQuery<&Parent>,
-    roots_query: &mut PreparedQuery<Without<Parent, &TransformMatrix>>,
+    roots_query: &mut PreparedQuery<Without<Parent, &GlobalTransform>>,
     world: &mut World,
 ) {
     // Build hierarchy
@@ -35,10 +35,10 @@ fn update_transform_matrix(
     if let Some(children) = hierarchy.get(&entity) {
         for child in children {
             {
-                let child_matrix = &mut world.get_mut::<TransformMatrix>(*child).unwrap().0;
+                let child_matrix = &mut world.get_mut::<GlobalTransform>(*child).unwrap().0;
                 *child_matrix = parent_matrix * *child_matrix;
             }
-            let child_matrix = world.get::<TransformMatrix>(*child).unwrap().0;
+            let child_matrix = world.get::<GlobalTransform>(*child).unwrap().0;
             update_transform_matrix(&child_matrix, *child, hierarchy, world);
         }
     }
@@ -61,7 +61,7 @@ mod tests {
     pub fn test_transform_system() {
         let mut world = World::new();
         let parent_transform_matrix =
-            TransformMatrix(Matrix4::new_translation(&vector![1.0, 1.0, 100.0]));
+            GlobalTransform(Matrix4::new_translation(&vector![1.0, 1.0, 100.0]));
 
         let parent = world.spawn((parent_transform_matrix,));
         let child = world.spawn((parent_transform_matrix, Parent(parent)));
@@ -70,13 +70,13 @@ mod tests {
         schedule(&mut world);
 
         {
-            let transform_matrix = world.get_mut::<TransformMatrix>(grandchild).unwrap();
+            let transform_matrix = world.get_mut::<GlobalTransform>(grandchild).unwrap();
             let expected_matrix = Matrix4::new_translation(&vector![3.0, 3.0, 300.0]);
             assert_relative_eq!(transform_matrix.0, expected_matrix);
         }
 
         {
-            let transform_matrix = world.get_mut::<TransformMatrix>(child).unwrap();
+            let transform_matrix = world.get_mut::<GlobalTransform>(child).unwrap();
             let expected_matrix = Matrix4::new_translation(&vector![2.0, 2.0, 200.0]);
             assert_relative_eq!(transform_matrix.0, expected_matrix);
         }
@@ -106,7 +106,7 @@ mod tests {
                 translation: vector![1.0, 1.0, 1.0],
                 ..Default::default()
             };
-            let matrix = TransformMatrix::default();
+            let matrix = GlobalTransform::default();
             let entity = world.spawn((info, transform, matrix));
             node_entity.insert(n, entity);
             entity_node.insert(entity, n);
@@ -129,14 +129,14 @@ mod tests {
         schedule(&mut world);
 
         for (_, (transform_matrix, parent, info)) in
-            world.query::<(&TransformMatrix, &Parent, &Info)>().iter()
+            world.query::<(&GlobalTransform, &Parent, &Info)>().iter()
         {
             let mut depth = 1;
 
             let mut parent_entity = parent.0;
             let mut parent_matrices = vec![];
             loop {
-                let parent_transform_matrix = world.get::<TransformMatrix>(parent_entity).unwrap();
+                let parent_transform_matrix = world.get::<GlobalTransform>(parent_entity).unwrap();
                 parent_matrices.push(parent_transform_matrix.0);
 
                 // Walk up the tree until we find the root.

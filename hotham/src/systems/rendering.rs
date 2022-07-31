@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::TryInto};
 
 use crate::{
-    components::{skin::NO_SKIN, Mesh, Skin, TransformMatrix, Visible},
+    components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Visible},
     rendering::{
         primitive::Primitive,
         resources::{DrawData, PrimitiveCullData},
@@ -32,7 +32,7 @@ struct InstancedPrimitive {
 /// - AFTER: ensure you have called render_context.end_frame
 #[allow(clippy::type_complexity)]
 pub fn rendering_system(
-    query: &mut PreparedQuery<With<Visible, (&Mesh, &TransformMatrix, Option<&Skin>)>>,
+    query: &mut PreparedQuery<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,

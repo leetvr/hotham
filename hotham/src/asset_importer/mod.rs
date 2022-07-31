@@ -1,7 +1,7 @@
 use crate::{
     components::{
-        animation_controller::AnimationController, Info, Mesh, Parent, Root, Skin, Transform,
-        TransformMatrix, Visible,
+        animation_controller::AnimationController, GlobalTransform, Info, Mesh, Parent, Root, Skin,
+        Transform, Visible,
     },
     rendering::material::Material,
     resources::{RenderContext, VulkanContext},
@@ -163,7 +163,7 @@ fn load_node(
     is_root: bool,
 ) -> Entity {
     let transform = Transform::load(node_data.transform());
-    let transform_matrix = TransformMatrix(node_data.transform().matrix().into());
+    let global_transform = GlobalTransform(node_data.transform().matrix().into());
     let info = Info {
         name: node_data
             .name()
@@ -171,7 +171,7 @@ fn load_node(
             .unwrap_or(format!("Node {}", node_data.index())),
         node_id: node_data.index(),
     };
-    let this_entity = world.spawn((transform, transform_matrix, info));
+    let this_entity = world.spawn((transform, global_transform, info));
     import_context
         .node_entity_map
         .insert(node_data.index(), this_entity);
@@ -239,9 +239,9 @@ pub fn add_model_to_world(
                 .unwrap();
         }
 
-        if let Ok(transform_matrix) = source_world.get_mut::<TransformMatrix>(*source_entity) {
+        if let Ok(global_transform) = source_world.get_mut::<GlobalTransform>(*source_entity) {
             destination_world
-                .insert_one(*destination_entity, *transform_matrix)
+                .insert_one(*destination_entity, *global_transform)
                 .unwrap();
         }
 
@@ -390,7 +390,7 @@ mod tests {
 
             let model = model.unwrap();
             let (info, transform, mesh, ..) = world
-                .query_one_mut::<(&Info, &Transform, &Mesh, &TransformMatrix, &Root)>(model)
+                .query_one_mut::<(&Info, &Transform, &Mesh, &GlobalTransform, &Root)>(model)
                 .unwrap();
             let mesh = render_context.resources.mesh_data.get(mesh.handle).unwrap();
             let primitive = &mesh.primitives[0];
@@ -463,7 +463,7 @@ mod tests {
 
         // Make sure we imported the mesh
         let meshes = world
-            .query_mut::<(&Mesh, &Transform, &TransformMatrix)>()
+            .query_mut::<(&Mesh, &Transform, &GlobalTransform)>()
             .into_iter();
         assert_eq!(meshes.len(), 1);
 

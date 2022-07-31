@@ -103,7 +103,7 @@ mod tests {
     #[test]
     fn test_sabers() {
         use hotham::{
-            components::{Transform, TransformMatrix},
+            components::{GlobalTransform, Transform},
             resources::{PhysicsContext, XrContext},
             systems::update_rigid_body_transforms_system,
         };
@@ -116,7 +116,7 @@ mod tests {
             Color::Red,
             Saber {},
             Transform::default(),
-            TransformMatrix::default(),
+            GlobalTransform::default(),
         ));
         add_saber_physics(&mut world, &mut physics_context, saber);
 

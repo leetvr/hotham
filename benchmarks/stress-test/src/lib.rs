@@ -7,7 +7,7 @@ pub mod systems;
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{Mesh, Transform, TransformMatrix, Visible},
+    components::{GlobalTransform, Mesh, Transform, Visible},
     hecs::{With, World},
     nalgebra::{UnitQuaternion, Vector3},
     rendering::{
@@ -313,7 +313,7 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
         ..Default::default()
     };
 
-    world.spawn((Visible {}, mesh, transform, TransformMatrix::default()));
+    world.spawn((Visible {}, mesh, transform, GlobalTransform::default()));
 }
 
 fn update_mesh(step: usize, mesh: &Mesh, render_context: &mut RenderContext) {

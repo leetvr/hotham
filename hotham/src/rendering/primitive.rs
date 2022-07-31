@@ -1,6 +1,6 @@
 use crate::{
     asset_importer::ImportContext,
-    components::TransformMatrix,
+    components::GlobalTransform,
     rendering::{material::NO_MATERIAL, vertex::Vertex},
     resources::render_context,
 };
@@ -139,7 +139,7 @@ impl Primitive {
     }
 
     /// Get a bounding sphere for the primitive, applying a transform
-    pub fn get_bounding_sphere(&self, transform: &TransformMatrix) -> Vector4<f32> {
+    pub fn get_bounding_sphere(&self, transform: &GlobalTransform) -> Vector4<f32> {
         let center_in_local: Point3<_> = self.bounding_sphere.xyz().into();
         let center_in_world =
             Point3::<_>::from_homogeneous(transform.0 * center_in_local.to_homogeneous()).unwrap();

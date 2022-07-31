@@ -1,12 +1,12 @@
 use nalgebra::Matrix4;
 
-use crate::components::{Transform, TransformMatrix};
+use crate::components::{GlobalTransform, Transform};
 use hecs::{PreparedQuery, World};
 
 /// Update transform matrix system
 /// Walks through each Transform and applies it to a 4x4 matrix used by the vertex shader
 pub fn update_transform_matrix_system(
-    query: &mut PreparedQuery<(&Transform, &mut TransformMatrix)>,
+    query: &mut PreparedQuery<(&Transform, &mut GlobalTransform)>,
     world: &mut World,
 ) {
     for (_, (transform, transform_matrix)) in query.query_mut(world) {
@@ -28,12 +28,12 @@ mod tests {
     pub fn test_update_transform_matrix() {
         let mut world = World::new();
         let transform = Transform::default();
-        let transform_matrix = TransformMatrix::default();
+        let transform_matrix = GlobalTransform::default();
 
         let entity = world.spawn((transform, transform_matrix));
 
         {
-            let matrix = world.get_mut::<TransformMatrix>(entity).unwrap();
+            let matrix = world.get_mut::<GlobalTransform>(entity).unwrap();
             assert_eq!(matrix.0, Matrix4::identity());
         }
 
@@ -53,7 +53,7 @@ mod tests {
             * Matrix4::from(test_rotation)
             * Matrix4::new_nonuniform_scaling(&vector![5.0, 1.0, 2.0]);
 
-        let matrix = world.get_mut::<TransformMatrix>(entity).unwrap();
+        let matrix = world.get_mut::<GlobalTransform>(entity).unwrap();
         assert_relative_eq!(matrix.0, expected_matrix);
     }
 }
