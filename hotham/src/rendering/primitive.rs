@@ -1,11 +1,11 @@
 use crate::{
     asset_importer::ImportContext,
-    components::Transform,
+    components::TransformMatrix,
     rendering::{material::NO_MATERIAL, vertex::Vertex},
     resources::render_context,
 };
 use itertools::izip;
-use nalgebra::{vector, Vector3, Vector4};
+use nalgebra::{vector, Point3, Vector3, Vector4};
 use render_context::RenderContext;
 
 /// Geometry for a mesh
@@ -139,14 +139,36 @@ impl Primitive {
     }
 
     /// Get a bounding sphere for the primitive, applying a transform
-    pub fn get_bounding_sphere(&self, transform: &Transform) -> Vector4<f32> {
-        let mut center = self.bounding_sphere.xyz();
-        let mut radius = self.bounding_sphere.w;
+    pub fn get_bounding_sphere(&self, transform: &TransformMatrix) -> Vector4<f32> {
+        let center_in_local: Point3<_> = self.bounding_sphere.xyz().into();
+        let center_in_world =
+            Point3::<_>::from_homogeneous(transform.0 * center_in_local.to_homogeneous()).unwrap();
 
-        center += transform.translation;
-        radius *= transform.scale.max();
+        // The linear part contains the rotation and scale, we are interested in the scale.
+        let world_from_local_linear_part = transform.0.fixed_slice::<3, 3>(0, 0);
 
-        [center.x, center.y, center.z, radius].into()
+        // The scale of the sphere is taken as the largest scale in any dimension.
+        // If the scale is uniform, the quality of the bounding sphere will be unchanged.
+        // If the scale is non-uniform and axis aligned in local space, there could be a tighter bounding sphere.
+        // If the scale is non-uniform and not axis aligned in local space (skew), the bounding sphere may be too tight.
+        // If the case with skew becomes a problem in practice, there are several ways to solve it, eg:
+        // * Using singular value decomposition can give a solution similar to the axis aligned case.
+        // * Using a fudge factor can ensure correctness with a bounding sphere that usually is bigger than it needs to be.
+        let scale = world_from_local_linear_part
+            .column(0)
+            .magnitude_squared()
+            .max(world_from_local_linear_part.column(1).magnitude_squared())
+            .max(world_from_local_linear_part.column(2).magnitude_squared())
+            .sqrt();
+        let radius_in_world = self.bounding_sphere.w * scale;
+
+        [
+            center_in_world.x,
+            center_in_world.y,
+            center_in_world.z,
+            radius_in_world,
+        ]
+        .into()
     }
 }
 
