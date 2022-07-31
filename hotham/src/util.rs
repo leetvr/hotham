@@ -2,8 +2,11 @@
 #![allow(deprecated)]
 
 use anyhow::Result;
-use nalgebra::{Isometry, Isometry3, Quaternion, Translation3, Unit, UnitQuaternion, Vector3};
-use openxr::{Posef, SpaceLocation, SpaceLocationFlags, ViewStateFlags};
+use nalgebra::{
+    Isometry, Isometry3, Matrix3, Matrix4, Quaternion, Rotation3, Translation3, Unit,
+    UnitQuaternion, Vector3,
+};
+use openxr::{Posef, Quaternionf, SpaceLocation, SpaceLocationFlags, Vector3f, ViewStateFlags};
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
@@ -75,6 +78,7 @@ pub fn get_world_with_hands(
 }
 
 /// Convert a `Posef` from OpenXR into a `nalgebra::Isometry3`
+#[inline]
 pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
     let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
     let translation: Translation3<f32> = Translation3::from(translation);
@@ -86,6 +90,33 @@ pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
         rotation,
         translation,
     }
+}
+
+/// Convert a `nalgebra::Isometry3` into a `Posef` from OpenXR
+#[inline]
+pub fn isometry_to_posef(isometry: Isometry3<f32>) -> Posef {
+    Posef {
+        orientation: Quaternionf {
+            x: isometry.rotation.i,
+            y: isometry.rotation.j,
+            z: isometry.rotation.k,
+            w: isometry.rotation.w,
+        },
+        position: Vector3f {
+            x: isometry.translation.vector.x,
+            y: isometry.translation.vector.y,
+            z: isometry.translation.vector.z,
+        },
+    }
+}
+
+/// Convert a `Matrix4` into a `nalgebra::Isometry3`
+#[inline]
+pub fn matrix_to_isometry(m: Matrix4<f32>) -> Isometry3<f32> {
+    let translation = m.column(3).xyz();
+    let m: Matrix3<f32> = m.fixed_slice::<3, 3>(0, 0).into();
+    let rotation = Rotation3::from_matrix(&m);
+    Isometry3::from_parts(translation.into(), rotation.into())
 }
 
 #[cfg(test)]

@@ -16,6 +16,7 @@ pub mod rigid_body;
 pub mod root;
 pub mod skin;
 pub mod sound_emitter;
+pub mod stage;
 pub mod ui_panel;
 pub mod visible;
 
@@ -36,5 +37,6 @@ pub use rigid_body::RigidBody;
 pub use root::Root;
 pub use skin::Skin;
 pub use sound_emitter::SoundEmitter;
+pub use stage::Stage;
 pub use ui_panel::UIPanel;
 pub use visible::Visible;
