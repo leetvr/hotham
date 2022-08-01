@@ -11,7 +11,7 @@ layout (location = 2) in vec2 inUV;
 layout (location = 3) in vec4 inJoint;
 layout (location = 4) in vec4 inWeight;
 
-layout (location = 0) out vec4 outWorldPos;
+layout (location = 0) out vec4 outGlobalPos;
 layout (location = 1) out vec3 outNormal;
 layout (location = 2) out vec2 outUV;
 layout (location = 3) flat out uint outMaterialID;
@@ -27,7 +27,7 @@ void main()
 
 	if (d.skinID == NO_SKIN) {
 		// Mesh has no skin
-		outWorldPos = d.transform * vec4(inPos, 1.0);
+		outGlobalPos = d.globalFromLocal * vec4(inPos, 1.0);
 		if (length(inNormal) == 0.0) {
 			outNormal = inNormal;
 		} else {
@@ -42,11 +42,11 @@ void main()
 			inWeight.z * jointMatrices[int(inJoint.z)] +
 			inWeight.w * jointMatrices[int(inJoint.w)];
 
-		outWorldPos = d.transform * skinMatrix * vec4(inPos, 1.0);
+		outGlobalPos = d.globalFromLocal * skinMatrix * vec4(inPos, 1.0);
 		outNormal = normalize(mat3(d.inverseTranspose) * mat3(skinMatrix) * inNormal);
 	}
 
 	outUV = inUV;
 	outMaterialID = d.materialID;
-	gl_Position = sceneData.viewProjection[gl_ViewIndex] * outWorldPos;
+	gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGlobalPos;
 }
