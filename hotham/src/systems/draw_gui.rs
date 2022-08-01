@@ -179,6 +179,9 @@ mod tests {
             world,
         );
 
+        // Render
+        render_context.begin_frame(&vulkan_context);
+
         // Draw the GUI
         println!("[DRAW_GUI_TEST] draw_gui_system");
         draw_gui_system(
@@ -190,10 +193,8 @@ mod tests {
             haptic_context,
         );
 
-        // Render
-        println!("[DRAW_GUI_TEST] rendering_system");
-        render_context.begin_frame(&vulkan_context);
         let views = get_views();
+        println!("[DRAW_GUI_TEST] rendering_system");
         rendering_system(
             &mut Default::default(),
             world,
