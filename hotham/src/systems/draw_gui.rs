@@ -69,7 +69,8 @@ mod tests {
         rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
-            rendering_system, update_parent_transform_matrix_system, update_transform_matrix_system,
+            rendering_system, update_global_transform_system,
+            update_global_transform_with_parent_system,
         },
         util::get_from_device_memory,
         COLOR_FORMAT,
@@ -170,10 +171,10 @@ mod tests {
         haptic_context.right_hand_amplitude_this_frame = 0.;
 
         // Update transforms, etc.
-        update_transform_matrix_system(&mut Default::default(), world);
+        update_global_transform_system(&mut Default::default(), world);
 
         // Update parent transform matrix
-        update_parent_transform_matrix_system(
+        update_global_transform_with_parent_system(
             &mut Default::default(),
             &mut Default::default(),
             world,

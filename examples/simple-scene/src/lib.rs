@@ -1,6 +1,6 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, Transform},
+    components::{hand::Handedness, LocalTransform},
     hecs::World,
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
@@ -9,9 +9,9 @@ use hotham::{
     schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
-        rendering::rendering_system, skinning::skinning_system,
-        update_parent_transform_matrix_system, update_rigid_body_transforms_system,
-        update_transform_matrix_system, Queries,
+        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
+        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
+        Queries,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -73,7 +73,7 @@ fn add_helmet(
 ) {
     let helmet = add_model_to_world("Damaged Helmet", models, world, None)
         .expect("Could not find Damaged Helmet");
-    let mut transform = world.get_mut::<Transform>(helmet).unwrap();
+    let mut transform = world.get_mut::<LocalTransform>(helmet).unwrap();
     transform.translation.z = -1.;
     transform.translation.y = 1.4;
     transform.scale = [0.5, 0.5, 0.5].into();
@@ -107,14 +107,14 @@ fn tick(
         grabbing_system(&mut queries.grabbing_query, world, physics_context);
         physics_step(physics_context);
         collision_system(&mut queries.collision_query, world, physics_context);
-        update_rigid_body_transforms_system(
+        update_local_transform_with_rigid_body_system(
             &mut queries.update_rigid_body_transforms_query,
             world,
             physics_context,
         );
         animation_system(&mut queries.animation_query, world);
-        update_transform_matrix_system(&mut queries.update_transform_matrix_query, world);
-        update_parent_transform_matrix_system(
+        update_global_transform_system(&mut queries.update_global_transform_query, world);
+        update_global_transform_with_parent_system(
             &mut queries.parent_query,
             &mut queries.roots_query,
             world,

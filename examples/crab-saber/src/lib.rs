@@ -8,8 +8,8 @@ use hotham::{
     schedule_functions::{apply_haptic_feedback, physics_step},
     systems::{
         audio_system, collision_system, draw_gui_system, rendering_system,
-        update_parent_transform_matrix_system, update_rigid_body_transforms_system,
-        update_transform_matrix_system,
+        update_global_transform_system, update_global_transform_with_parent_system,
+        update_local_transform_with_rigid_body_system,
     },
     systems::{pointers_system, Queries},
     xr::{self, SessionState},
@@ -98,13 +98,13 @@ fn tick(
         );
 
         // Update the world
-        update_rigid_body_transforms_system(
+        update_local_transform_with_rigid_body_system(
             &mut hotham_queries.update_rigid_body_transforms_query,
             world,
             physics_context,
         );
-        update_transform_matrix_system(&mut hotham_queries.update_transform_matrix_query, world);
-        update_parent_transform_matrix_system(
+        update_global_transform_system(&mut hotham_queries.update_global_transform_query, world);
+        update_global_transform_with_parent_system(
             &mut hotham_queries.parent_query,
             &mut hotham_queries.roots_query,
             world,

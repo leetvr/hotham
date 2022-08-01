@@ -1,7 +1,7 @@
 use std::{collections::HashMap, convert::TryInto};
 
 use crate::{
-    components::{skin::NO_SKIN, Mesh, Skin, TransformMatrix, Visible},
+    components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Visible},
     rendering::{
         primitive::Primitive,
         resources::{DrawData, PrimitiveCullData},
@@ -32,7 +32,7 @@ struct InstancedPrimitive {
 /// - AFTER: ensure you have called render_context.end_frame
 #[allow(clippy::type_complexity)]
 pub fn rendering_system(
-    query: &mut PreparedQuery<With<Visible, (&Mesh, &TransformMatrix, Option<&Skin>)>>,
+    query: &mut PreparedQuery<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
@@ -200,7 +200,7 @@ mod tests {
         asset_importer,
         rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
         resources::RenderContext,
-        systems::{update_parent_transform_matrix_system, update_transform_matrix_system},
+        systems::{update_global_transform_system, update_global_transform_with_parent_system},
         util::get_from_device_memory,
         COLOR_FORMAT,
     };
@@ -394,8 +394,8 @@ mod tests {
         render_context.begin_frame(vulkan_context);
         render_context.scene_data.debug_data.x = debug_data_x;
         render_context.scene_data.debug_data.y = debug_data_y;
-        update_transform_matrix_system(&mut Default::default(), world);
-        update_parent_transform_matrix_system(
+        update_global_transform_system(&mut Default::default(), world);
+        update_global_transform_with_parent_system(
             &mut Default::default(),
             &mut Default::default(),
             world,

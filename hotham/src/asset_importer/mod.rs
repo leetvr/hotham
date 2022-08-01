@@ -1,7 +1,7 @@
 use crate::{
     components::{
-        animation_controller::AnimationController, Info, Mesh, Parent, Root, Skin, Transform,
-        TransformMatrix, Visible,
+        animation_controller::AnimationController, GlobalTransform, Info, LocalTransform, Mesh,
+        Parent, Root, Skin, Visible,
     },
     rendering::material::Material,
     resources::{RenderContext, VulkanContext},
@@ -162,8 +162,8 @@ fn load_node(
     world: &mut World,
     is_root: bool,
 ) -> Entity {
-    let transform = Transform::load(node_data.transform());
-    let transform_matrix = TransformMatrix(node_data.transform().matrix().into());
+    let transform = LocalTransform::load(node_data.transform());
+    let global_transform = GlobalTransform(node_data.transform().matrix().into());
     let info = Info {
         name: node_data
             .name()
@@ -171,7 +171,7 @@ fn load_node(
             .unwrap_or(format!("Node {}", node_data.index())),
         node_id: node_data.index(),
     };
-    let this_entity = world.spawn((transform, transform_matrix, info));
+    let this_entity = world.spawn((transform, global_transform, info));
     import_context
         .node_entity_map
         .insert(node_data.index(), this_entity);
@@ -233,15 +233,15 @@ pub fn add_model_to_world(
 
     // Go through each entity in the source world and clone its components into the new world.
     for (source_entity, destination_entity) in &entity_map {
-        if let Ok(transform) = source_world.get_mut::<Transform>(*source_entity) {
+        if let Ok(transform) = source_world.get_mut::<LocalTransform>(*source_entity) {
             destination_world
                 .insert_one(*destination_entity, *transform)
                 .unwrap();
         }
 
-        if let Ok(transform_matrix) = source_world.get_mut::<TransformMatrix>(*source_entity) {
+        if let Ok(global_transform) = source_world.get_mut::<GlobalTransform>(*source_entity) {
             destination_world
-                .insert_one(*destination_entity, *transform_matrix)
+                .insert_one(*destination_entity, *global_transform)
                 .unwrap();
         }
 
@@ -337,7 +337,7 @@ pub fn add_model_to_world(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::{Root, Transform};
+    use crate::components::{LocalTransform, Root};
     use approx::assert_relative_eq;
     use nalgebra::{vector, Quaternion, UnitQuaternion};
 
@@ -389,7 +389,7 @@ mod tests {
 
             let model = model.unwrap();
             let (info, transform, mesh, ..) = world
-                .query_one_mut::<(&Info, &Transform, &Mesh, &TransformMatrix, &Root)>(model)
+                .query_one_mut::<(&Info, &LocalTransform, &Mesh, &GlobalTransform, &Root)>(model)
                 .unwrap();
             let mesh = render_context.resources.mesh_data.get(mesh.handle).unwrap();
             let primitive = &mesh.primitives[0];
@@ -452,7 +452,9 @@ mod tests {
         let _hand = add_model_to_world("Left Hand", &models, &mut world, None);
 
         // Make sure there is only one root
-        let mut roots = world.query_mut::<(&Root, &Info, &Transform)>().into_iter();
+        let mut roots = world
+            .query_mut::<(&Root, &Info, &LocalTransform)>()
+            .into_iter();
         assert_eq!(roots.len(), 1);
         let root = roots.next().unwrap().1;
         assert_eq!(&root.1.name, "Left Hand");
@@ -462,18 +464,18 @@ mod tests {
 
         // Make sure we imported the mesh
         let meshes = world
-            .query_mut::<(&Mesh, &Transform, &TransformMatrix)>()
+            .query_mut::<(&Mesh, &LocalTransform, &GlobalTransform)>()
             .into_iter();
         assert_eq!(meshes.len(), 1);
 
         // Make sure we got all the nodes
-        let transforms = world.query_mut::<&Transform>().into_iter();
+        let transforms = world.query_mut::<&LocalTransform>().into_iter();
         assert_eq!(transforms.len(), 27);
 
         // Make sure we got all the Parent -> Child relationships
         {
-            let mut transforms_with_parents = world.query::<(&Transform, &Parent)>();
-            assert_eq!(transforms_with_parents.iter().len(), 26);
+            let mut transforms_with_parents = world.query::<(&LocalTransform, &Parent)>();
+            assert_eq!(transforms_with_parents.iter().len(), 27);
             for (_, (_, parent)) in transforms_with_parents.iter() {
                 assert!(world.contains(parent.0));
             }

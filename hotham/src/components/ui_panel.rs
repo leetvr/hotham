@@ -17,7 +17,7 @@ use crate::resources::physics_context::PANEL_COLLISION_GROUP;
 use crate::resources::{GuiContext, PhysicsContext};
 use crate::resources::{RenderContext, VulkanContext};
 
-use super::{Collider, Transform, TransformMatrix, Visible};
+use super::{Collider, GlobalTransform, LocalTransform, Visible};
 
 /// A component added to an entity to display a 2D "panel" in space
 /// Used by `panels_system`
@@ -121,11 +121,11 @@ pub fn add_ui_panel_to_world(
             raw_input,
             buttons,
         },
-        Transform {
+        LocalTransform {
             translation,
             ..Default::default()
         },
-        TransformMatrix::default(),
+        GlobalTransform::default(),
         Visible {},
     );
 

@@ -1,4 +1,4 @@
-use crate::components::{animation_controller::AnimationController, Transform};
+use crate::components::{animation_controller::AnimationController, LocalTransform};
 use hecs::{PreparedQuery, World};
 
 /// Animation system
@@ -10,7 +10,7 @@ pub fn animation_system(query: &mut PreparedQuery<&AnimationController>, world: 
         let blend_amount = controller.blend_amount;
 
         for target in &controller.targets {
-            let mut transform = world.get_mut::<Transform>(target.target).unwrap();
+            let mut transform = world.get_mut::<LocalTransform>(target.target).unwrap();
             transform.translation =
                 target.translations[blend_from].lerp(&target.translations[blend_to], blend_amount);
             transform.rotation =
@@ -49,20 +49,20 @@ mod tests {
 
         // Collect all the transforms in the world so we can compare them later.
         let transforms_before = world
-            .query_mut::<&Transform>()
+            .query_mut::<&LocalTransform>()
             .into_iter()
             .map(|r| r.1.clone())
-            .collect::<Vec<Transform>>();
+            .collect::<Vec<LocalTransform>>();
 
         // Run the animation system
         animation_system(&mut Default::default(), &mut world);
 
         // Collect all the transforms after the system has been run.
         let transforms_after = world
-            .query_mut::<&Transform>()
+            .query_mut::<&LocalTransform>()
             .into_iter()
             .map(|r| r.1.clone())
-            .collect::<Vec<Transform>>();
+            .collect::<Vec<LocalTransform>>();
 
         // Make sure our transforms have been modified!
         assert_ne!(transforms_before, transforms_after);
