@@ -126,7 +126,7 @@ impl Resources {
 #[repr(C, align(16))]
 pub struct DrawData {
     /// The transform of the parent mesh
-    pub transform: Matrix4<f32>,
+    pub global_from_local: Matrix4<f32>,
     /// The inverse transpose of the transform of the parent mesh
     pub inverse_transpose: Matrix4<f32>,
     /// The ID of the material to use.

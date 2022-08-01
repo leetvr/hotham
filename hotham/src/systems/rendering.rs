@@ -14,7 +14,7 @@ use nalgebra::{Matrix4, Vector4};
 use openxr as xr;
 
 struct Instance {
-    transform_matrix: Matrix4<f32>,
+    global_from_local: Matrix4<f32>,
     bounding_sphere: Vector4<f32>,
     skin_id: u32,
 }
@@ -47,7 +47,7 @@ pub fn rendering_system(
     let mut primitive_map: HashMap<u32, InstancedPrimitive> = Default::default();
     let meshes = &render_context.resources.mesh_data;
 
-    for (_, (mesh, transform_matrix, skin)) in query.query_mut(world) {
+    for (_, (mesh, global_transform, skin)) in query.query_mut(world) {
         let mesh = meshes.get(mesh.handle).unwrap();
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
         for primitive in &mesh.primitives {
@@ -61,8 +61,8 @@ pub fn rendering_system(
                 })
                 .instances
                 .push(Instance {
-                    transform_matrix: transform_matrix.0,
-                    bounding_sphere: primitive.get_bounding_sphere(transform_matrix),
+                    global_from_local: global_transform.0,
+                    bounding_sphere: primitive.get_bounding_sphere(global_transform),
                     skin_id,
                 });
         }
@@ -153,8 +153,12 @@ pub fn rendering_system(
                 let instanced_primitive = primitive_map.get(&current_primitive_id).unwrap();
                 let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
                 let draw_data = DrawData {
-                    transform: instance.transform_matrix,
-                    inverse_transpose: instance.transform_matrix.try_inverse().unwrap().transpose(),
+                    global_from_local: instance.global_from_local,
+                    inverse_transpose: instance
+                        .global_from_local
+                        .try_inverse()
+                        .unwrap()
+                        .transpose(),
                     material_id: instanced_primitive.primitive.material_id,
                     skin_id: instance.skin_id,
                 };
