@@ -245,44 +245,60 @@ mod tests {
                 .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
         let params = vec![
-            ("Normal", 0.0),
-            ("Diffuse", 1.0),
-            ("F", 2.0),
-            ("G", 3.0),
-            ("D", 4.0),
-            ("Specular", 5.0),
+            ("Full", 0.0, 0.0),
+            ("Normals", 2.0, 0.0),
+            ("Diffuse", 0.0, 1.0),
+            ("F", 0.0, 2.0),
+            ("G", 0.0, 3.0),
+            ("D", 0.0, 4.0),
+            ("Specular", 0.0, 5.0),
         ];
 
-        for (name, debug_view_equation) in &params {
-            render_object_with_debug_equation(
-                &vulkan_context,
-                &mut render_context,
-                &mut world,
-                resolution,
-                image.clone(),
-                name,
-                *debug_view_equation,
-            );
-        }
+        let errors: Vec<_> = params
+            .iter()
+            .filter_map(|(name, debug_data_x, debug_data_y)| {
+                render_object_with_debug_data(
+                    &vulkan_context,
+                    &mut render_context,
+                    &mut world,
+                    resolution,
+                    image.clone(),
+                    name,
+                    *debug_data_x,
+                    *debug_data_y,
+                )
+                .err()
+            })
+            .collect();
+        assert!(errors.is_empty(), "{:#?}", errors);
     }
 
-    fn render_object_with_debug_equation(
+    fn render_object_with_debug_data(
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,
         world: &mut World,
         resolution: vk::Extent2D,
         image: Image,
         name: &str,
-        debug_view_equation: f32,
-    ) {
+        debug_data_x: f32,
+        debug_data_y: f32,
+    ) -> Result<(), String> {
         // Render the scene
         let mut renderdoc = begin_renderdoc();
-        render(render_context, vulkan_context, debug_view_equation, world);
-        end_renderdoc(&mut renderdoc);
+        render(
+            render_context,
+            vulkan_context,
+            debug_data_x,
+            debug_data_y,
+            world,
+        );
+        if let Ok(renderdoc) = renderdoc.as_mut() {
+            end_renderdoc(renderdoc);
+        }
 
         // Save the resulting image to the disk and get its hash, along with a "known good" hash
         // of what the image *should* be.
-        save_image_to_disk(resolution, vulkan_context, image, name);
+        save_image_to_disk(resolution, vulkan_context, image, name)
     }
 
     fn save_image_to_disk(
@@ -290,7 +306,7 @@ mod tests {
         vulkan_context: &VulkanContext,
         image: Image,
         name: &str,
-    ) {
+    ) -> Result<(), String> {
         let size = (resolution.height * resolution.width * 4) as usize;
         let image_data = vec![0; size];
         let buffer = Buffer::new(
@@ -326,13 +342,23 @@ mod tests {
         let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
         let known_good_hash = hash_file(&known_good_path);
 
-        assert_eq!(output_hash, known_good_hash, "Bad render: {}", name);
+        if !output_hash.is_ok() {
+            return Err(format!("Failed to hash output image: {}", name));
+        }
+        if !known_good_hash.is_ok() {
+            return Err(format!("Failed to hash known good image: {}", name));
+        }
+        if output_hash != known_good_hash {
+            return Err(format!("Bad render: {}", name));
+        }
+        Ok(())
     }
 
     fn render(
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
-        debug_view_equation: f32,
+        debug_data_x: f32,
+        debug_data_y: f32,
         world: &mut World,
     ) {
         // SPONZA
@@ -348,9 +374,9 @@ mod tests {
         let rotation: mint::Quaternion<f32> =
             UnitQuaternion::from_euler_angles(0., 45_f32.to_radians(), 0.).into();
         let position = Vector3f {
-            x: 0.8,
-            y: 1.4,
-            z: 0.8,
+            x: 1.4,
+            y: 0.0,
+            z: 1.4,
         };
         let view = openxr::View {
             pose: openxr::Posef {
@@ -366,7 +392,8 @@ mod tests {
         };
         let views = vec![view.clone(), view];
         render_context.begin_frame(vulkan_context);
-        render_context.scene_data.debug_data.y = debug_view_equation;
+        render_context.scene_data.debug_data.x = debug_data_x;
+        render_context.scene_data.debug_data.y = debug_data_y;
         update_global_transform_system(&mut Default::default(), world);
         update_global_transform_with_parent_system(
             &mut Default::default(),
@@ -384,21 +411,24 @@ mod tests {
         render_context.end_frame(vulkan_context);
     }
 
-    fn hash_file(file_path: &str) -> u64 {
+    fn hash_file(file_path: &str) -> Result<u64, ()> {
         let mut hasher = DefaultHasher::new();
-        let bytes = std::fs::read(&file_path).unwrap();
+        let bytes = match std::fs::read(&file_path) {
+            Ok(it) => it,
+            Err(_) => return Err(()),
+        };
         bytes.iter().for_each(|b| hasher.write_u8(*b));
-        return hasher.finish();
+        return Ok(hasher.finish());
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
     use renderdoc::RenderDoc;
 
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn begin_renderdoc() -> RenderDoc<renderdoc::V141> {
-        let mut renderdoc = RenderDoc::<renderdoc::V141>::new().unwrap();
+    fn begin_renderdoc() -> Result<RenderDoc<renderdoc::V141>, renderdoc::Error> {
+        let mut renderdoc = RenderDoc::<renderdoc::V141>::new()?;
         renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
-        renderdoc
+        Ok(renderdoc)
     }
 
     #[cfg(not(any(target_os = "macos", target_os = "ios")))]
