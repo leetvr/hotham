@@ -139,13 +139,14 @@ impl Primitive {
     }
 
     /// Get a bounding sphere for the primitive, applying a transform
-    pub fn get_bounding_sphere(&self, transform: &GlobalTransform) -> Vector4<f32> {
+    pub fn get_bounding_sphere(&self, global_transform: &GlobalTransform) -> Vector4<f32> {
         let center_in_local: Point3<_> = self.bounding_sphere.xyz().into();
         let center_in_global =
-            Point3::<_>::from_homogeneous(transform.0 * center_in_local.to_homogeneous()).unwrap();
+            Point3::<_>::from_homogeneous(global_transform.0 * center_in_local.to_homogeneous())
+                .unwrap();
 
         // The linear part contains the rotation and scale, we are interested in the scale.
-        let global_from_local_linear_part = transform.0.fixed_slice::<3, 3>(0, 0);
+        let global_from_local_linear_part = global_transform.0.fixed_slice::<3, 3>(0, 0);
 
         // The scale of the sphere is taken as the largest scale in any dimension.
         // If the scale is uniform, the quality of the bounding sphere will be unchanged.
