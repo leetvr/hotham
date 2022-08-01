@@ -3,7 +3,7 @@ use nalgebra::Matrix4;
 use crate::components::{GlobalTransform, LocalTransform};
 use hecs::{PreparedQuery, World};
 
-/// Update transform matrix system
+/// Update global transform matrix system
 /// Walks through each LocalTransform and applies it to a 4x4 matrix used by the vertex shader
 pub fn update_global_transform_system(
     query: &mut PreparedQuery<(&LocalTransform, &mut GlobalTransform)>,
