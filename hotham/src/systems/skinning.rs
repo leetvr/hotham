@@ -13,10 +13,10 @@ pub fn skinning_system(
     world: &mut World,
     render_context: &mut RenderContext,
 ) {
-    for (_, (skin, transform_matrix)) in skins_query.query(world).iter() {
+    for (_, (skin, global_transform)) in skins_query.query(world).iter() {
         let buffer = unsafe { render_context.resources.skins_buffer.as_slice_mut() };
         let joint_matrices = &mut buffer[skin.id as usize];
-        let inverse_transform = transform_matrix.0.try_inverse().unwrap();
+        let inverse_transform = global_transform.0.try_inverse().unwrap();
 
         for (n, (joint, inverse_bind_matrix)) in skin
             .joints
@@ -57,8 +57,8 @@ mod tests {
         // Muck all the joints up
         for (_, skin) in world.query::<&Skin>().iter() {
             for joint in &skin.joints {
-                let mut transform_matrix = world.get_mut::<GlobalTransform>(*joint).unwrap();
-                transform_matrix.0 = Matrix4::zeros();
+                let mut global_transform = world.get_mut::<GlobalTransform>(*joint).unwrap();
+                global_transform.0 = Matrix4::zeros();
             }
         }
         skinning_system(&mut Default::default(), &mut world, &mut render_context);
