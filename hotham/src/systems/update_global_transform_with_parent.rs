@@ -102,12 +102,12 @@ mod tests {
                 name: format!("Node {}", n),
                 node_id: n,
             };
-            let transform = LocalTransform {
+            let local_transform = LocalTransform {
                 translation: vector![1.0, 1.0, 1.0],
                 ..Default::default()
             };
             let matrix = GlobalTransform::default();
-            let entity = world.spawn((info, transform, matrix));
+            let entity = world.spawn((info, local_transform, matrix));
             node_entity.insert(n, entity);
             entity_node.insert(entity, n);
         }
@@ -123,8 +123,8 @@ mod tests {
 
         let root_entity = node_entity.get(&0).unwrap();
         {
-            let mut transform = world.get_mut::<LocalTransform>(*root_entity).unwrap();
-            transform.translation = vector![100.0, 100.0, 100.0];
+            let mut local_transform = world.get_mut::<LocalTransform>(*root_entity).unwrap();
+            local_transform.translation = vector![100.0, 100.0, 100.0];
         }
         schedule(&mut world);
 

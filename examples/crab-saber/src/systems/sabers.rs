@@ -136,8 +136,11 @@ mod tests {
             &physics_context,
         );
 
-        let transform = world.get::<LocalTransform>(saber).unwrap();
-        approx::assert_relative_eq!(transform.translation, [-0.2, 1.328827, -0.433918].into());
+        let local_transform = world.get::<LocalTransform>(saber).unwrap();
+        approx::assert_relative_eq!(
+            local_transform.translation,
+            [-0.2, 1.328827, -0.433918].into()
+        );
     }
 
     #[test]

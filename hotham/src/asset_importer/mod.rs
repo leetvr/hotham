@@ -162,7 +162,7 @@ fn load_node(
     world: &mut World,
     is_root: bool,
 ) -> Entity {
-    let transform = LocalTransform::load(node_data.transform());
+    let local_transform = LocalTransform::load(node_data.transform());
     let global_transform = GlobalTransform(node_data.transform().matrix().into());
     let info = Info {
         name: node_data
@@ -171,7 +171,7 @@ fn load_node(
             .unwrap_or(format!("Node {}", node_data.index())),
         node_id: node_data.index(),
     };
-    let this_entity = world.spawn((transform, global_transform, info));
+    let this_entity = world.spawn((local_transform, global_transform, info));
     import_context
         .node_entity_map
         .insert(node_data.index(), this_entity);
@@ -233,9 +233,9 @@ pub fn add_model_to_world(
 
     // Go through each entity in the source world and clone its components into the new world.
     for (source_entity, destination_entity) in &entity_map {
-        if let Ok(transform) = source_world.get_mut::<LocalTransform>(*source_entity) {
+        if let Ok(local_transform) = source_world.get_mut::<LocalTransform>(*source_entity) {
             destination_world
-                .insert_one(*destination_entity, *transform)
+                .insert_one(*destination_entity, *local_transform)
                 .unwrap();
         }
 
@@ -388,7 +388,7 @@ mod tests {
             assert!(model.is_some(), "Model {} could not be added", name);
 
             let model = model.unwrap();
-            let (info, transform, mesh, ..) = world
+            let (info, local_transform, mesh, ..) = world
                 .query_one_mut::<(&Info, &LocalTransform, &Mesh, &GlobalTransform, &Root)>(model)
                 .unwrap();
             let mesh = render_context.resources.mesh_data.get(mesh.handle).unwrap();
@@ -419,12 +419,12 @@ mod tests {
 
             // Ensure the transform was populated correctly
             assert_eq!(
-                transform.translation, *translation,
+                local_transform.translation, *translation,
                 "Model {} has wrong translation",
                 name
             );
             assert_eq!(
-                transform.rotation,
+                local_transform.rotation,
                 UnitQuaternion::new_normalize(*rotation),
                 "Model {} has wrong rotation",
                 name

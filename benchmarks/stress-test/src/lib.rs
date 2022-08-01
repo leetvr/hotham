@@ -258,8 +258,8 @@ fn model_system(
 }
 
 fn rotate_models(world: &mut World, total_time: f32) {
-    for (_, transform) in world.query_mut::<With<Mesh, &mut LocalTransform>>() {
-        transform.rotation =
+    for (_, local_transform) in world.query_mut::<With<Mesh, &mut LocalTransform>>() {
+        local_transform.rotation =
             UnitQuaternion::from_euler_angles(90.0_f32.to_radians(), total_time.sin() * 2., 0.);
     }
 }
@@ -275,17 +275,17 @@ fn rearrange_models(world: &mut World) {
     let mut row = 0;
     let mut column = 0;
 
-    for (_, transform) in query_iter {
+    for (_, local_transform) in query_iter {
         if column >= column_size {
             column = 0;
             row += 1;
         }
 
-        transform.translation.x = (column as f32) - half_column_size;
-        transform.translation.y = (row as f32) - 0.5;
-        transform.translation.z = -4.0;
+        local_transform.translation.x = (column as f32) - half_column_size;
+        local_transform.translation.y = (row as f32) - 0.5;
+        local_transform.translation.z = -4.0;
 
-        transform.scale = Vector3::repeat(scale);
+        local_transform.scale = Vector3::repeat(scale);
 
         column += 1;
     }
@@ -308,12 +308,17 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
         render_context,
     );
     update_mesh(1, &mesh, render_context);
-    let transform = LocalTransform {
+    let local_transform = LocalTransform {
         translation: [0., 1., -1.].into(),
         ..Default::default()
     };
 
-    world.spawn((Visible {}, mesh, transform, GlobalTransform::default()));
+    world.spawn((
+        Visible {},
+        mesh,
+        local_transform,
+        GlobalTransform::default(),
+    ));
 }
 
 fn update_mesh(step: usize, mesh: &Mesh, render_context: &mut RenderContext) {

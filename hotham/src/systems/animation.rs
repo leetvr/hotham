@@ -10,12 +10,12 @@ pub fn animation_system(query: &mut PreparedQuery<&AnimationController>, world: 
         let blend_amount = controller.blend_amount;
 
         for target in &controller.targets {
-            let mut transform = world.get_mut::<LocalTransform>(target.target).unwrap();
-            transform.translation =
+            let mut local_transform = world.get_mut::<LocalTransform>(target.target).unwrap();
+            local_transform.translation =
                 target.translations[blend_from].lerp(&target.translations[blend_to], blend_amount);
-            transform.rotation =
+            local_transform.rotation =
                 target.rotations[blend_from].slerp(&target.rotations[blend_to], blend_amount);
-            transform.scale =
+            local_transform.scale =
                 target.scales[blend_from].lerp(&target.scales[blend_to], blend_amount);
         }
     }

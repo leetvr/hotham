@@ -12,17 +12,17 @@ pub fn update_local_transform_with_rigid_body_system(
     world: &mut World,
     physics_context: &PhysicsContext,
 ) {
-    for (_, (rigid_body, transform)) in query.query_mut(world) {
+    for (_, (rigid_body, local_transform)) in query.query_mut(world) {
         let rigid_body = &physics_context.rigid_bodies[rigid_body.handle];
         let position = rigid_body.position();
 
         // Update translation
-        transform.translation.x = position.translation.x;
-        transform.translation.y = position.translation.y;
-        transform.translation.z = position.translation.z;
+        local_transform.translation.x = position.translation.x;
+        local_transform.translation.y = position.translation.y;
+        local_transform.translation.z = position.translation.z;
 
         // Update rotation
-        transform.rotation = UnitQuaternion::new_normalize(*position.rotation.quaternion());
+        local_transform.rotation = UnitQuaternion::new_normalize(*position.rotation.quaternion());
     }
 }
 
@@ -59,9 +59,9 @@ mod tests {
         schedule(&mut physics_context, &mut query, &mut world);
         schedule(&mut physics_context, &mut query, &mut world);
 
-        let transform = world.get::<LocalTransform>(entity).unwrap();
-        assert_relative_eq!(transform.translation, vector![1.0, 2.0, 3.0]);
-        assert_relative_eq!(transform.rotation, rotation);
+        let local_transform = world.get::<LocalTransform>(entity).unwrap();
+        assert_relative_eq!(local_transform.translation, vector![1.0, 2.0, 3.0]);
+        assert_relative_eq!(local_transform.rotation, rotation);
     }
 
     fn schedule(

@@ -130,12 +130,12 @@ mod tests {
 
         schedule(&mut world, &mut xr_context, &mut physics_context);
 
-        let (transform, hand, animation_controller) = world
+        let (local_transform, hand, animation_controller) = world
             .query_one_mut::<(&LocalTransform, &Hand, &AnimationController)>(hand)
             .unwrap();
 
         assert_relative_eq!(hand.grip_value, 0.0);
-        assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
+        assert_relative_eq!(local_transform.translation, vector![-0.2, 1.4, -0.5]);
         assert_relative_eq!(animation_controller.blend_amount, 0.0);
     }
 
@@ -153,8 +153,8 @@ mod tests {
 
         schedule(&mut world, &mut xr_context, &mut physics_context);
 
-        let transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
-        assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
+        let local_transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
+        assert_relative_eq!(local_transform.translation, vector![-0.2, 1.4, -0.5]);
     }
 
     // HELPER FUNCTIONS
