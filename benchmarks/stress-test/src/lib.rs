@@ -7,7 +7,7 @@ pub mod systems;
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{Mesh, Transform, TransformMatrix, Visible},
+    components::{GlobalTransform, LocalTransform, Mesh, Visible},
     hecs::{With, World},
     nalgebra::{UnitQuaternion, Vector3},
     rendering::{
@@ -20,9 +20,9 @@ use hotham::{
     schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, grabbing_system, hands_system,
-        rendering::rendering_system, skinning::skinning_system,
-        update_parent_transform_matrix_system, update_rigid_body_transforms_system,
-        update_transform_matrix_system, Queries,
+        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
+        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
+        Queries,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -141,7 +141,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             for _ in 0..20 {
                 let e = add_model_to_world("Damaged Helmet", &models, &mut world, None)
                     .expect("Could not find cube?");
-                let mut t = world.get_mut::<Transform>(e).unwrap();
+                let mut t = world.get_mut::<LocalTransform>(e).unwrap();
                 t.rotation = UnitQuaternion::from_axis_angle(
                     &Vector3::x_axis(),
                     std::f32::consts::FRAC_PI_2,
@@ -194,7 +194,7 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
         grabbing_system(&mut queries.grabbing_query, world, physics_context);
         physics_step(physics_context);
         collision_system(&mut queries.collision_query, world, physics_context);
-        update_rigid_body_transforms_system(
+        update_local_transform_with_rigid_body_system(
             &mut queries.update_rigid_body_transforms_query,
             world,
             physics_context,
@@ -208,8 +208,8 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
         }
 
         animation_system(&mut queries.animation_query, world);
-        update_transform_matrix_system(&mut queries.update_transform_matrix_query, world);
-        update_parent_transform_matrix_system(
+        update_global_transform_system(&mut queries.update_global_transform_query, world);
+        update_global_transform_with_parent_system(
             &mut queries.parent_query,
             &mut queries.roots_query,
             world,
@@ -258,14 +258,14 @@ fn model_system(
 }
 
 fn rotate_models(world: &mut World, total_time: f32) {
-    for (_, transform) in world.query_mut::<With<Mesh, &mut Transform>>() {
+    for (_, transform) in world.query_mut::<With<Mesh, &mut LocalTransform>>() {
         transform.rotation =
             UnitQuaternion::from_euler_angles(90.0_f32.to_radians(), total_time.sin() * 2., 0.);
     }
 }
 
 fn rearrange_models(world: &mut World) {
-    let query = world.query_mut::<With<Mesh, &mut Transform>>();
+    let query = world.query_mut::<With<Mesh, &mut LocalTransform>>();
     let query_iter = query.into_iter();
     let num_models = query_iter.len() as f32;
 
@@ -308,12 +308,12 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
         render_context,
     );
     update_mesh(1, &mesh, render_context);
-    let transform = Transform {
+    let transform = LocalTransform {
         translation: [0., 1., -1.].into(),
         ..Default::default()
     };
 
-    world.spawn((Visible {}, mesh, transform, TransformMatrix::default()));
+    world.spawn((Visible {}, mesh, transform, GlobalTransform::default()));
 }
 
 fn update_mesh(step: usize, mesh: &Mesh, render_context: &mut RenderContext) {

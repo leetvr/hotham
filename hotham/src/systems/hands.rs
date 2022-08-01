@@ -119,7 +119,8 @@ mod tests {
     };
 
     use crate::{
-        components::Transform, resources::XrContext, systems::update_rigid_body_transforms_system,
+        components::LocalTransform, resources::XrContext,
+        systems::update_local_transform_with_rigid_body_system,
     };
 
     #[test]
@@ -130,7 +131,7 @@ mod tests {
         schedule(&mut world, &mut xr_context, &mut physics_context);
 
         let (transform, hand, animation_controller) = world
-            .query_one_mut::<(&Transform, &Hand, &AnimationController)>(hand)
+            .query_one_mut::<(&LocalTransform, &Hand, &AnimationController)>(hand)
             .unwrap();
 
         assert_relative_eq!(hand.grip_value, 0.0);
@@ -147,12 +148,12 @@ mod tests {
         let handle = physics_context
             .rigid_bodies
             .insert(grabbed_object_rigid_body);
-        let grabbed_entity = world.spawn((RigidBody { handle }, Transform::default()));
+        let grabbed_entity = world.spawn((RigidBody { handle }, LocalTransform::default()));
         add_hand_to_world(&mut physics_context, &mut world, Some(grabbed_entity));
 
         schedule(&mut world, &mut xr_context, &mut physics_context);
 
-        let transform = world.get_mut::<Transform>(grabbed_entity).unwrap();
+        let transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
         assert_relative_eq!(transform.translation, vector![-0.2, 1.4, -0.5]);
     }
 
@@ -171,7 +172,11 @@ mod tests {
     ) {
         hands_system(&mut Default::default(), world, xr_context, physics_context);
         physics_context.update();
-        update_rigid_body_transforms_system(&mut Default::default(), world, physics_context);
+        update_local_transform_with_rigid_body_system(
+            &mut Default::default(),
+            world,
+            physics_context,
+        );
     }
 
     fn add_hand_to_world(
@@ -185,7 +190,7 @@ mod tests {
         let mut hand = Hand::left();
         hand.grip_value = 100.0; // bogus value
         hand.grabbed_entity = grabbed_entity;
-        let hand = world.spawn((animation_controller, hand, Transform::default()));
+        let hand = world.spawn((animation_controller, hand, LocalTransform::default()));
         {
             // Give it a collider and rigid-body
             let collider = ColliderBuilder::capsule_y(0.05, 0.02)

@@ -2,14 +2,14 @@ use hecs::{PreparedQuery, World};
 use render_context::RenderContext;
 
 use crate::{
-    components::{Skin, TransformMatrix},
+    components::{GlobalTransform, Skin},
     resources::render_context,
 };
 
 /// Skinning system
 /// Walks through each joint in the system and builds up the `joint_matrices` that will be sent to the vertex shader
 pub fn skinning_system(
-    skins_query: &mut PreparedQuery<(&Skin, &TransformMatrix)>,
+    skins_query: &mut PreparedQuery<(&Skin, &GlobalTransform)>,
     world: &mut World,
     render_context: &mut RenderContext,
 ) {
@@ -24,7 +24,7 @@ pub fn skinning_system(
             .zip(skin.inverse_bind_matrices.iter())
             .enumerate()
         {
-            let joint_transform = world.get::<TransformMatrix>(*joint).unwrap().0;
+            let joint_transform = world.get::<GlobalTransform>(*joint).unwrap().0;
             let joint_matrix = inverse_transform * joint_transform * inverse_bind_matrix;
             joint_matrices[n] = joint_matrix;
         }
@@ -57,7 +57,7 @@ mod tests {
         // Muck all the joints up
         for (_, skin) in world.query::<&Skin>().iter() {
             for joint in &skin.joints {
-                let mut transform_matrix = world.get_mut::<TransformMatrix>(*joint).unwrap();
+                let mut transform_matrix = world.get_mut::<GlobalTransform>(*joint).unwrap();
                 transform_matrix.0 = Matrix4::zeros();
             }
         }

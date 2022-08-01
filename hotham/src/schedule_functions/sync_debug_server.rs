@@ -6,7 +6,7 @@ use hotham_debug_server::{
 use uuid::Uuid;
 
 use crate::{
-    components::{Collider, Info, Transform},
+    components::{Collider, Info, LocalTransform},
     resources::PhysicsContext,
 };
 
@@ -39,7 +39,7 @@ pub fn world_to_debug_data(
 ) -> DebugFrame {
     let mut entities = Vec::new();
     for (entity, info) in world.query::<&Info>().iter() {
-        let transform = world.get_mut::<Transform>(entity).ok();
+        let transform = world.get_mut::<LocalTransform>(entity).ok();
         let collider = world.get_mut::<Collider>(entity).ok();
         let collider = collider.and_then(|c| physics_context.colliders.get(c.handle));
         let entity_id = entity.id() as _;
@@ -62,7 +62,7 @@ pub fn world_to_debug_data(
     }
 }
 
-fn parse_transform(transform: &Transform) -> DebugTransform {
+fn parse_transform(transform: &LocalTransform) -> DebugTransform {
     let t = transform.translation;
     let r = transform.rotation.quaternion();
     let s = transform.scale;
@@ -110,7 +110,7 @@ mod tests {
     use rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder, RigidBodyType};
 
     use crate::{
-        components::{Info, Transform},
+        components::{Info, LocalTransform},
         resources::PhysicsContext,
     };
 
@@ -124,7 +124,7 @@ mod tests {
                 name: "Test".to_string(),
                 node_id: 2,
             },
-            Transform {
+            LocalTransform {
                 translation: vector![1., 2., 3.],
                 scale: vector![3., 2., 1.],
                 rotation: UnitQuaternion::from_euler_angles(0., 0., 0.),
@@ -145,7 +145,7 @@ mod tests {
                 name: "Test 2".to_string(),
                 node_id: 3,
             },
-            Transform {
+            LocalTransform {
                 translation: vector![4., 5., 6.],
                 scale: vector![6., 5., 4.],
                 rotation: UnitQuaternion::from_euler_angles(0., 0., 0.),

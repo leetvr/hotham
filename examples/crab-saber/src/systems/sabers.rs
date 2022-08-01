@@ -103,9 +103,9 @@ mod tests {
     #[test]
     fn test_sabers() {
         use hotham::{
-            components::{Transform, TransformMatrix},
+            components::{GlobalTransform, LocalTransform},
             resources::{PhysicsContext, XrContext},
-            systems::update_rigid_body_transforms_system,
+            systems::update_local_transform_with_rigid_body_system,
         };
 
         let mut world = World::new();
@@ -115,8 +115,8 @@ mod tests {
         let saber = world.spawn((
             Color::Red,
             Saber {},
-            Transform::default(),
-            TransformMatrix::default(),
+            LocalTransform::default(),
+            GlobalTransform::default(),
         ));
         add_saber_physics(&mut world, &mut physics_context, saber);
 
@@ -130,13 +130,13 @@ mod tests {
             &mut physics_context,
         );
         physics_context.update();
-        update_rigid_body_transforms_system(
+        update_local_transform_with_rigid_body_system(
             &mut rigid_body_transforms_query,
             &mut world,
             &physics_context,
         );
 
-        let transform = world.get::<Transform>(saber).unwrap();
+        let transform = world.get::<LocalTransform>(saber).unwrap();
         approx::assert_relative_eq!(transform.translation, [-0.2, 1.328827, -0.433918].into());
     }
 
