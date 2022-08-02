@@ -60,25 +60,25 @@ mod tests {
     #[test]
     pub fn test_transform_system() {
         let mut world = World::new();
-        let parent_transform_matrix =
+        let parent_global_transform =
             GlobalTransform(Matrix4::new_translation(&vector![1.0, 1.0, 100.0]));
 
-        let parent = world.spawn((parent_transform_matrix,));
-        let child = world.spawn((parent_transform_matrix, Parent(parent)));
-        let grandchild = world.spawn((parent_transform_matrix, Parent(child)));
+        let parent = world.spawn((parent_global_transform,));
+        let child = world.spawn((parent_global_transform, Parent(parent)));
+        let grandchild = world.spawn((parent_global_transform, Parent(child)));
 
         schedule(&mut world);
 
         {
-            let transform_matrix = world.get_mut::<GlobalTransform>(grandchild).unwrap();
+            let global_transform = world.get_mut::<GlobalTransform>(grandchild).unwrap();
             let expected_matrix = Matrix4::new_translation(&vector![3.0, 3.0, 300.0]);
-            assert_relative_eq!(transform_matrix.0, expected_matrix);
+            assert_relative_eq!(global_transform.0, expected_matrix);
         }
 
         {
-            let transform_matrix = world.get_mut::<GlobalTransform>(child).unwrap();
+            let global_transform = world.get_mut::<GlobalTransform>(child).unwrap();
             let expected_matrix = Matrix4::new_translation(&vector![2.0, 2.0, 200.0]);
-            assert_relative_eq!(transform_matrix.0, expected_matrix);
+            assert_relative_eq!(global_transform.0, expected_matrix);
         }
     }
 
@@ -102,12 +102,12 @@ mod tests {
                 name: format!("Node {}", n),
                 node_id: n,
             };
-            let transform = LocalTransform {
+            let local_transform = LocalTransform {
                 translation: vector![1.0, 1.0, 1.0],
                 ..Default::default()
             };
             let matrix = GlobalTransform::default();
-            let entity = world.spawn((info, transform, matrix));
+            let entity = world.spawn((info, local_transform, matrix));
             node_entity.insert(n, entity);
             entity_node.insert(entity, n);
         }
@@ -123,12 +123,12 @@ mod tests {
 
         let root_entity = node_entity.get(&0).unwrap();
         {
-            let mut transform = world.get_mut::<LocalTransform>(*root_entity).unwrap();
-            transform.translation = vector![100.0, 100.0, 100.0];
+            let mut local_transform = world.get_mut::<LocalTransform>(*root_entity).unwrap();
+            local_transform.translation = vector![100.0, 100.0, 100.0];
         }
         schedule(&mut world);
 
-        for (_, (transform_matrix, parent, info)) in
+        for (_, (global_transform, parent, info)) in
             world.query::<(&GlobalTransform, &Parent, &Info)>().iter()
         {
             let mut depth = 1;
@@ -136,8 +136,8 @@ mod tests {
             let mut parent_entity = parent.0;
             let mut parent_matrices = vec![];
             loop {
-                let parent_transform_matrix = world.get::<GlobalTransform>(parent_entity).unwrap();
-                parent_matrices.push(parent_transform_matrix.0);
+                let parent_global_transform = world.get::<GlobalTransform>(parent_entity).unwrap();
+                parent_matrices.push(parent_global_transform.0);
 
                 // Walk up the tree until we find the root.
                 if let Ok(grand_parent) = world.get::<Parent>(parent_entity) {
@@ -145,10 +145,10 @@ mod tests {
                     parent_entity = grand_parent.0;
                 } else {
                     let expected_matrix = get_expected_matrix(depth);
-                    if !relative_eq!(expected_matrix, transform_matrix.0) {
+                    if !relative_eq!(expected_matrix, global_transform.0) {
                         panic!(
                             "[Node {}] - {:?} did not equal {:?} at depth {}",
-                            info.node_id, transform_matrix.0, expected_matrix, depth
+                            info.node_id, global_transform.0, expected_matrix, depth
                         );
                     }
                     break;

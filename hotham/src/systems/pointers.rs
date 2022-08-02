@@ -38,7 +38,7 @@ pub fn pointers_system(
     physics_context: &mut PhysicsContext,
 ) {
     let input = &xr_context.input;
-    for (_, (pointer, transform)) in query.query(world).iter() {
+    for (_, (pointer, local_transform)) in query.query(world).iter() {
         // Get our the space and path of the pointer.
         let time = xr_context.frame_state.predicted_display_time;
         let (space, path) = match pointer.handedness {
@@ -58,8 +58,8 @@ pub fn pointers_system(
         let mut position = posef_to_isometry(pose);
         apply_grip_offset(&mut position);
 
-        transform.translation = position.translation.vector;
-        transform.rotation = position.rotation;
+        local_transform.translation = position.translation.vector;
+        local_transform.rotation = position.rotation;
 
         // get trigger value
         let trigger_value =
@@ -68,10 +68,12 @@ pub fn pointers_system(
                 .current_state;
         pointer.trigger_value = trigger_value;
 
-        let ray_direction = transform.rotation.transform_vector(&vector![0., 1.0, 0.]);
+        let ray_direction = local_transform
+            .rotation
+            .transform_vector(&vector![0., 1.0, 0.]);
 
         // Sweet baby ray
-        let ray = Ray::new(Point::from(transform.translation), ray_direction);
+        let ray = Ray::new(Point::from(local_transform.translation), ray_direction);
         let max_toi = 40.0;
         let solid = true;
         let groups = InteractionGroups::new(0b10, 0b10);
@@ -246,10 +248,13 @@ mod tests {
 
         tick(&mut physics_context, &mut world, &mut xr_context);
 
-        let transform = world.get_mut::<LocalTransform>(pointer_entity).unwrap();
+        let local_transform = world.get_mut::<LocalTransform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
-        assert_relative_eq!(transform.translation, vector![-0.2, 1.328827, -0.433918]);
+        assert_relative_eq!(
+            local_transform.translation,
+            vector![-0.2, 1.328827, -0.433918]
+        );
 
         dbg!(panel_entity);
         let panel = world.get_mut::<Panel>(panel_entity).unwrap();

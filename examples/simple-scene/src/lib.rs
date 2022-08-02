@@ -73,12 +73,12 @@ fn add_helmet(
 ) {
     let helmet = add_model_to_world("Damaged Helmet", models, world, None)
         .expect("Could not find Damaged Helmet");
-    let mut transform = world.get_mut::<LocalTransform>(helmet).unwrap();
-    transform.translation.z = -1.;
-    transform.translation.y = 1.4;
-    transform.scale = [0.5, 0.5, 0.5].into();
-    let position = transform.position();
-    drop(transform);
+    let mut local_transform = world.get_mut::<LocalTransform>(helmet).unwrap();
+    local_transform.translation.z = -1.;
+    local_transform.translation.y = 1.4;
+    local_transform.scale = [0.5, 0.5, 0.5].into();
+    let position = local_transform.position();
+    drop(local_transform);
     let collider = ColliderBuilder::ball(0.35)
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::COLLISION_EVENTS)

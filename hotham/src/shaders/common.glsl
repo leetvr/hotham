@@ -7,7 +7,7 @@
 #define MAX_JOINTS 64
 
 struct DrawData {
-    mat4 transform;
+    mat4 globalFromLocal;
     mat4 inverseTranspose;
     uint materialID;
     uint skinID;
@@ -44,7 +44,7 @@ layout(std430, set = 0, binding = 2) readonly buffer SkinsBuffer {
     mat4 jointMatrices[100][64]; // dynamically sized array of 64 element long arrays of mat4.
 } skinsBuffer;
 
-layout (set = 0, binding = 3) readonly uniform SceneData { 
+layout (set = 0, binding = 3) readonly uniform SceneData {
     mat4 viewProjection[2];
     vec4 cameraPosition[2];
     vec4 lightDirection;

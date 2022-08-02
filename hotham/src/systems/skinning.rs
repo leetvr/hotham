@@ -13,20 +13,20 @@ pub fn skinning_system(
     world: &mut World,
     render_context: &mut RenderContext,
 ) {
-    for (_, (skin, transform_matrix)) in skins_query.query(world).iter() {
+    for (_, (skin, global_transform)) in skins_query.query(world).iter() {
         let buffer = unsafe { render_context.resources.skins_buffer.as_slice_mut() };
         let joint_matrices = &mut buffer[skin.id as usize];
-        let inverse_transform = transform_matrix.0.try_inverse().unwrap();
+        let local_from_global = global_transform.0.try_inverse().unwrap();
 
-        for (n, (joint, inverse_bind_matrix)) in skin
+        for (n, (joint, joint_from_mesh)) in skin
             .joints
             .iter()
             .zip(skin.inverse_bind_matrices.iter())
             .enumerate()
         {
-            let joint_transform = world.get::<GlobalTransform>(*joint).unwrap().0;
-            let joint_matrix = inverse_transform * joint_transform * inverse_bind_matrix;
-            joint_matrices[n] = joint_matrix;
+            let global_from_joint = world.get::<GlobalTransform>(*joint).unwrap().0;
+            let local_from_mesh = local_from_global * global_from_joint * joint_from_mesh;
+            joint_matrices[n] = local_from_mesh;
         }
     }
 }
@@ -57,8 +57,8 @@ mod tests {
         // Muck all the joints up
         for (_, skin) in world.query::<&Skin>().iter() {
             for joint in &skin.joints {
-                let mut transform_matrix = world.get_mut::<GlobalTransform>(*joint).unwrap();
-                transform_matrix.0 = Matrix4::zeros();
+                let mut global_transform = world.get_mut::<GlobalTransform>(*joint).unwrap();
+                global_transform.0 = Matrix4::zeros();
             }
         }
         skinning_system(&mut Default::default(), &mut world, &mut render_context);

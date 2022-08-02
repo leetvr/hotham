@@ -9,7 +9,7 @@ const float epsilon = 1e-6;
 #define DEFAULT_IBL_SCALE 0.4
 
 // Inputs
-layout (location = 0) in vec3 inWorldPos;
+layout (location = 0) in vec3 inGlobalPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in uint inMaterialID;
@@ -71,8 +71,8 @@ vec3 getNormal(uint normalTextureID)
 	tangentNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
 	tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy));
 
-	vec3 q1 = dFdx(inWorldPos);
-	vec3 q2 = dFdy(inWorldPos);
+	vec3 q1 = dFdx(inGlobalPos);
+	vec3 q2 = dFdy(inGlobalPos);
 	vec2 st1 = dFdx(inUV);
 	vec2 st2 = dFdy(inUV);
 
@@ -251,7 +251,7 @@ void main()
 	vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
 
 	vec3 n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
-	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inWorldPos);    // Vector from surface point to camera
+	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);    // Vector from surface point to camera
 	vec3 l = normalize(sceneData.lightDirection.xyz);     // Vector from surface point to light
 	vec3 h = normalize(l+v);                        // Half vector between both l and v
 	vec3 reflection = -normalize(reflect(v, n));
