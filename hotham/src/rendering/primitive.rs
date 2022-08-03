@@ -127,8 +127,11 @@ impl Primitive {
         // All the materials in this glTF file will be imported into the material buffer, so all we need
         // to do is grab the index of this material and add it to the running offset. If we don't do this,
         // importing multiple glTF files will result in sadness, misery, and really ugly looking scenes.
-        let material_id = primitive_data.material().index().unwrap_or(NO_MATERIAL) as u32
-            + import_context.material_buffer_offset;
+        let material_id = if let Some(id) = primitive_data.material().index() {
+            id as u32 + import_context.material_buffer_offset
+        } else {
+            NO_MATERIAL as u32
+        };
 
         Primitive::new(
             &vertices,

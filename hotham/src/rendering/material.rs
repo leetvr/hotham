@@ -53,22 +53,7 @@ pub struct Material {
 
 impl Default for Material {
     fn default() -> Self {
-        Self {
-            base_color_factor: Default::default(),
-            emissive_factor: Default::default(),
-            diffuse_factor: Default::default(),
-            specular_factor: Default::default(),
-            workflow: UNLIT_WORKFLOW,
-            base_color_texture_set: NO_TEXTURE,
-            physical_descriptor_texture_id: NO_TEXTURE,
-            normal_texture_set: NO_TEXTURE,
-            occlusion_texture_set: NO_TEXTURE,
-            emissive_texture_set: NO_TEXTURE,
-            metallic_factor: Default::default(),
-            roughness_factor: Default::default(),
-            alpha_mask: Default::default(),
-            alpha_mask_cutoff: Default::default(),
-        }
+        Material::gltf_default()
     }
 }
 
@@ -168,9 +153,29 @@ impl Material {
     /// Create a simple, unlit, white coloured material.
     pub fn unlit_white() -> Material {
         Material {
-            base_color_factor: vector![1., 1., 1., 1.],
             workflow: UNLIT_WORKFLOW,
             ..Default::default()
+        }
+    }
+
+    /// The default material, reasonably close to what's defined by the glTF 2.0 spec
+    /// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material-pbrmetallicroughness
+    pub fn gltf_default() -> Self {
+        Self {
+            base_color_factor: [1., 1., 1., 1.].into(),
+            emissive_factor: Default::default(),
+            diffuse_factor: Default::default(),
+            specular_factor: Default::default(),
+            workflow: METALLIC_ROUGHNESS_WORKFLOW,
+            base_color_texture_set: NO_TEXTURE,
+            physical_descriptor_texture_id: NO_TEXTURE,
+            normal_texture_set: NO_TEXTURE,
+            occlusion_texture_set: NO_TEXTURE,
+            emissive_texture_set: NO_TEXTURE,
+            metallic_factor: 1.0,
+            roughness_factor: 1.0,
+            alpha_mask: Default::default(),
+            alpha_mask_cutoff: Default::default(),
         }
     }
 }
