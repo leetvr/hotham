@@ -37,7 +37,7 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let test = StressTest::ManyCubes;
+    let test = StressTest::CullingStressTest;
     let (world, models) = init(&mut engine, &test);
     let queries = Default::default();
     let timer = Default::default();
@@ -106,6 +106,8 @@ pub enum StressTest {
     ManyVertices,
     /// Load the New Sponza scene into the engine
     Sponza,
+    /// Load a scene with thousands of objects to test culling
+    CullingStressTest,
 }
 
 fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World>) {
@@ -124,6 +126,17 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
 
             setup_cubes(&mut world, resolution, &models);
 
+            models
+        }
+        StressTest::CullingStressTest => {
+            let glb_buffers: Vec<&[u8]> = vec![include_bytes!(
+                "../../../test_assets/culling_stress_test.glb"
+            )];
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
+
+            add_model_to_world("Asteroid and Debris", &models, &mut world, None).unwrap();
             models
         }
         StressTest::ManyHelmets => {
