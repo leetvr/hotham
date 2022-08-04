@@ -228,14 +228,14 @@ impl RenderContext {
             left_clip_planes: Matrix4::<_>::from_rows(&[
                 normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(0)),
                 normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(0)),
-                normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(2)),
-                normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(2)),
+                normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(1)),
+                normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(1)),
             ]),
             right_clip_planes: Matrix4::<_>::from_rows(&[
                 normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(0)),
                 normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(0)),
-                normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(2)),
-                normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(2)),
+                normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(1)),
+                normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(1)),
             ]),
             draw_calls: primitive_cull_buffer.len as u32,
         };
