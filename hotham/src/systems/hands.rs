@@ -1,10 +1,10 @@
 use crate::{
     asset_importer::add_model_to_world,
-    components::{hand::Handedness, AnimationController, Hand, RigidBody},
+    components::{hand::Handedness, AnimationController, Hand, RigidBody, Stage},
     resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
-use hecs::{PreparedQuery, World};
+use hecs::{PreparedQuery, With, World};
 use rapier3d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
 };
@@ -17,6 +17,13 @@ pub fn hands_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
+    // Get the isometry of the stage
+    let stage_isometry = world
+        .query_mut::<With<Stage, &RigidBody>>()
+        .into_iter()
+        .next()
+        .map(|(_, rigid_body)| *physics_context.rigid_bodies[rigid_body.handle].position());
+
     let input = &xr_context.input;
     for (_, (hand, animation_controller, rigid_body_component)) in query.query(world).iter() {
         // Get our the space and path of the hand.
@@ -43,7 +50,10 @@ pub fn hands_system(
             .unwrap();
 
         let position = posef_to_isometry(pose);
-        rigid_body.set_next_kinematic_position(position);
+        match stage_isometry {
+            Some(stage) => rigid_body.set_next_kinematic_position(stage * position),
+            None => rigid_body.set_next_kinematic_position(position),
+        }
 
         if let Some(grabbed_entity) = hand.grabbed_entity {
             let handle = world.get::<RigidBody>(grabbed_entity).unwrap().handle;
