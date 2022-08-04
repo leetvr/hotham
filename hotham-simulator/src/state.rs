@@ -216,14 +216,14 @@ impl State {
 
         let dt = delta.as_secs_f32();
         let movement_speed = 2f32 * dt;
-        let mouse_sensitivity = 4f32 * dt;
+        let mouse_sensitivity = 0.2 * std::f32::consts::TAU / 360f32;
 
         while let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
             match input_event {
                 DeviceEvent::Key(keyboard_input) => self.input_state.process_event(keyboard_input),
                 DeviceEvent::MouseMotion { delta: (x, y) } => {
-                    x_rot = -x as _;
-                    y_rot = -y as _;
+                    x_rot -= x as f32;
+                    y_rot -= y as f32;
                 }
                 _ => {}
             }
