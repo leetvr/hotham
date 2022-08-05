@@ -1129,9 +1129,10 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_window_id) => {}
+            
                 Event::DeviceEvent { event, .. } => {
-                    if let DeviceEvent::MouseMotion { delta } = event {
-                        if mouse_pressed {
+                    if mouse_pressed {
+                        if let DeviceEvent::MouseMotion { delta } = event {
                             mouse_event_tx.send(delta).unwrap();
                         }
                     }
@@ -2083,3 +2084,4 @@ pub fn find_memory_type(
 
     panic!("Unable to find suitable memory type")
 }
+
