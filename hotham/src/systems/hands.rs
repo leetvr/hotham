@@ -18,11 +18,13 @@ pub fn hands_system(
     physics_context: &mut PhysicsContext,
 ) {
     // Get the isometry of the stage
-    let stage_isometry = world
+    let global_from_stage = world
         .query_mut::<With<Stage, &RigidBody>>()
         .into_iter()
         .next()
-        .map(|(_, rigid_body)| *physics_context.rigid_bodies[rigid_body.handle].position());
+        .map_or(Default::default(), |(_, rigid_body)| {
+            *physics_context.rigid_bodies[rigid_body.handle].position()
+        });
 
     let input = &xr_context.input;
     for (_, (hand, animation_controller, rigid_body_component)) in query.query(world).iter() {
@@ -41,27 +43,25 @@ pub fn hands_system(
             continue;
         }
 
-        let pose = space.pose;
+        // Get global transform
+        let stage_from_local = posef_to_isometry(space.pose);
+        let global_from_local = global_from_stage * stage_from_local;
 
-        // apply transform
+        // Apply transform
         let rigid_body = physics_context
             .rigid_bodies
             .get_mut(rigid_body_component.handle)
             .unwrap();
 
-        let position = posef_to_isometry(pose);
-        match stage_isometry {
-            Some(stage) => rigid_body.set_next_kinematic_position(stage * position),
-            None => rigid_body.set_next_kinematic_position(position),
-        }
+        rigid_body.set_next_kinematic_position(global_from_local);
 
         if let Some(grabbed_entity) = hand.grabbed_entity {
             let handle = world.get::<RigidBody>(grabbed_entity).unwrap().handle;
             let rigid_body = physics_context.rigid_bodies.get_mut(handle).unwrap();
-            rigid_body.set_next_kinematic_position(position);
+            rigid_body.set_next_kinematic_position(global_from_local);
         }
 
-        // get grip value
+        // Get grip value
         let grip_value = openxr::ActionInput::get(&input.grab_action, &xr_context.session, path)
             .unwrap()
             .current_state;
