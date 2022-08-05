@@ -1,10 +1,10 @@
 use crate::{
     asset_importer::add_model_to_world,
-    components::{hand::Handedness, AnimationController, Hand, RigidBody},
+    components::{hand::Handedness, AnimationController, Hand, RigidBody, Stage},
     resources::{PhysicsContext, XrContext},
     util::{is_space_valid, posef_to_isometry},
 };
-use hecs::{PreparedQuery, World};
+use hecs::{PreparedQuery, With, World};
 use rapier3d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
 };
@@ -17,6 +17,15 @@ pub fn hands_system(
     xr_context: &XrContext,
     physics_context: &mut PhysicsContext,
 ) {
+    // Get the isometry of the stage
+    let global_from_stage = world
+        .query_mut::<With<Stage, &RigidBody>>()
+        .into_iter()
+        .next()
+        .map_or(Default::default(), |(_, rigid_body)| {
+            *physics_context.rigid_bodies[rigid_body.handle].position()
+        });
+
     let input = &xr_context.input;
     for (_, (hand, animation_controller, rigid_body_component)) in query.query(world).iter() {
         // Get our the space and path of the hand.
@@ -34,24 +43,25 @@ pub fn hands_system(
             continue;
         }
 
-        let pose = space.pose;
+        // Get global transform
+        let stage_from_local = posef_to_isometry(space.pose);
+        let global_from_local = global_from_stage * stage_from_local;
 
-        // apply transform
+        // Apply transform
         let rigid_body = physics_context
             .rigid_bodies
             .get_mut(rigid_body_component.handle)
             .unwrap();
 
-        let position = posef_to_isometry(pose);
-        rigid_body.set_next_kinematic_position(position);
+        rigid_body.set_next_kinematic_position(global_from_local);
 
         if let Some(grabbed_entity) = hand.grabbed_entity {
             let handle = world.get::<RigidBody>(grabbed_entity).unwrap().handle;
             let rigid_body = physics_context.rigid_bodies.get_mut(handle).unwrap();
-            rigid_body.set_next_kinematic_position(position);
+            rigid_body.set_next_kinematic_position(global_from_local);
         }
 
-        // get grip value
+        // Get grip value
         let grip_value = openxr::ActionInput::get(&input.grab_action, &xr_context.session, path)
             .unwrap()
             .current_state;
