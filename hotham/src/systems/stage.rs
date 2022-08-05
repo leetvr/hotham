@@ -1,29 +1,27 @@
 use crate::{
-    components::{GlobalTransform, Hand, LocalTransform, Parent, Stage},
-    hecs::{CommandBuffer, Entity, With, World},
+    components::{GlobalTransform, LocalTransform, RigidBody, Stage},
+    hecs::{Entity, With, World},
+    rapier3d::prelude::RigidBodyBuilder,
+    resources::PhysicsContext,
     util::{isometry_to_posef, matrix_to_isometry, posef_to_isometry},
     xr,
 };
 
 /// Setup Stage entities to track player's frame of reference in global space
-///
-/// This should be run after `add_hand`.
-pub fn add_stage(world: &mut World) -> Entity {
-    // Add Stage entity to track the position of the player's space with respect to the game-world
-    let stage_e = world.spawn((
+pub fn add_stage(world: &mut World, physics_context: &mut PhysicsContext) -> Entity {
+    let rigid_body = {
+        let rigid_body = RigidBodyBuilder::fixed().build();
+        RigidBody {
+            handle: physics_context.rigid_bodies.insert(rigid_body),
+        }
+    };
+
+    world.spawn((
         Stage {},
         GlobalTransform::default(),
         LocalTransform::default(),
-    ));
-
-    // Make hands children of Stage
-    let mut cmd_buffer = CommandBuffer::new();
-    for (hand_e, _) in world.query_mut::<&Hand>() {
-        cmd_buffer.insert(hand_e, (Parent(stage_e),));
-    }
-    cmd_buffer.run_on(world);
-
-    stage_e
+        rigid_body,
+    ))
 }
 
 /// Update player's views to take into account the current position of the Stage in global space
