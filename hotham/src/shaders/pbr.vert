@@ -31,7 +31,7 @@ void main()
 		if (length(inNormal) == 0.0) {
 			outNormal = inNormal;
 		} else {
-			outNormal = normalize(mat3(d.inverseTranspose) * inNormal);
+			outNormal = normalize(transpose(mat3(d.localFromGlobal)) * inNormal);
 		}
 	} else {
 		// Mesh is skinned
@@ -43,7 +43,7 @@ void main()
 			inWeight.w * jointMatrices[int(inJoint.w)];
 
 		outGlobalPos = d.globalFromLocal * skinMatrix * vec4(inPos, 1.0);
-		outNormal = normalize(mat3(d.inverseTranspose) * mat3(skinMatrix) * inNormal);
+		outNormal = normalize(transpose(mat3(d.localFromGlobal)) * mat3(skinMatrix) * inNormal);
 	}
 
 	outUV = inUV;
