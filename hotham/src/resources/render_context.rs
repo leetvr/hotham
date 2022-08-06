@@ -19,7 +19,7 @@ const CULLING_TIMEOUT: u64 = u64::MAX;
 use crate::{
     rendering::{
         camera::Camera,
-        descriptors::Descriptors,
+        descriptors::{Descriptors, DRAW_DATA_BINDING},
         frame::Frame,
         image::Image,
         resources::Resources,
@@ -581,7 +581,7 @@ fn create_pipeline(
 
     // Vertex input state
     let vertex_binding_description = vk::VertexInputBindingDescription::builder()
-        .binding(0)
+        .binding(DRAW_DATA_BINDING)
         .stride(size_of::<Vertex>() as _)
         .input_rate(vk::VertexInputRate::VERTEX)
         .build();

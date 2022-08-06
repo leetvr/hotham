@@ -3,8 +3,15 @@ use std::convert::TryInto;
 use crate::resources::{render_context::PIPELINE_DEPTH, VulkanContext};
 use ash::vk;
 
-const TEXTURE_BINDING: u32 = 4;
+pub const DRAW_DATA_BINDING: u32 = 0;
+pub const MATERIALS_BINDING: u32 = 1;
+pub const SKINS_BINDING: u32 = 2;
+pub const SCENE_DATA_BINDING: u32 = 3;
+pub const TEXTURE_BINDING: u32 = 4;
 const TEXTURE_BINDING_DESCRIPTOR_COUNT: u32 = 10_000;
+
+pub const PRIMITIVE_CULL_DATA_BINDING: u32 = 0;
+pub const CULL_PARAMS_BINDING: u32 = 1;
 
 /// A wrapper around all the various bits of descriptor functionality
 #[derive(Clone, Debug)]
@@ -121,7 +128,7 @@ unsafe fn create_descriptor_layouts(
     let graphics_bindings = [
         // Draw Data
         vk::DescriptorSetLayoutBinding {
-            binding: 0,
+            binding: DRAW_DATA_BINDING,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
             stage_flags: vk::ShaderStageFlags::VERTEX,
             descriptor_count: 1,
@@ -129,7 +136,7 @@ unsafe fn create_descriptor_layouts(
         },
         // Materials
         vk::DescriptorSetLayoutBinding {
-            binding: 1,
+            binding: MATERIALS_BINDING,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1,
@@ -137,7 +144,7 @@ unsafe fn create_descriptor_layouts(
         },
         // Skins
         vk::DescriptorSetLayoutBinding {
-            binding: 2,
+            binding: SKINS_BINDING,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
             stage_flags: vk::ShaderStageFlags::VERTEX,
             descriptor_count: 1,
@@ -145,7 +152,7 @@ unsafe fn create_descriptor_layouts(
         },
         // Scene Data
         vk::DescriptorSetLayoutBinding {
-            binding: 3,
+            binding: SCENE_DATA_BINDING,
             descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
             stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1,

@@ -6,8 +6,12 @@ use vulkan_context::VulkanContext;
 use crate::resources::vulkan_context;
 
 use super::{
-    buffer::Buffer, descriptors::Descriptors, image::Image, material::Material,
-    mesh_data::MeshData, vertex::Vertex,
+    buffer::Buffer,
+    descriptors::{Descriptors, MATERIALS_BINDING, SKINS_BINDING},
+    image::Image,
+    material::Material,
+    mesh_data::MeshData,
+    vertex::Vertex,
 };
 
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
@@ -64,7 +68,7 @@ impl Resources {
             MATERIAL_BUFFER_SIZE,
         );
         for set in descriptors.sets {
-            materials_buffer.update_descriptor_set(&vulkan_context.device, set, 1);
+            materials_buffer.update_descriptor_set(&vulkan_context.device, set, MATERIALS_BINDING);
         }
 
         // RESERVE index 0 for the default material, available as the material::NO_MATERIAL constant.
@@ -77,7 +81,7 @@ impl Resources {
         );
 
         for set in descriptors.sets {
-            skins_buffer.update_descriptor_set(&vulkan_context.device, set, 2);
+            skins_buffer.update_descriptor_set(&vulkan_context.device, set, SKINS_BINDING);
         }
 
         let texture_sampler = vulkan_context
