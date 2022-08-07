@@ -20,6 +20,12 @@ Hotham is a complex project with many moving parts! Have no fear - we've written
 # Sponsoring
 Hotham's development is only possible thanks to the support of the community. It's currently being developed on full time by [@kanerogers](https://github.com/kanerogers) If you'd like to help make VR development in Rust possible, please [consider becoming a donor](https://github.com/sponsors/leetvr). 💗
 
+## Featured sponsors
+These generous people contribute $50 or more each month to support Hotham ❤️
+
+<p>
+   <a href="https://github.com/artob"><img src="https://avatars.githubusercontent.com/u/4963?v=4" width="50px" alt="Arto Bendiken" />
+</p>
 
 # Progress 🔨
 - [x] Vulkan renderer
