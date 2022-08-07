@@ -99,13 +99,13 @@ fn add_sphere(
 ) {
     let entity = add_model_to_world("Sphere", models, world, None).expect("Could not find Sphere");
     let mut local_transform = world.get_mut::<LocalTransform>(entity).unwrap();
-    local_transform.translation.x = 1.0;
-    local_transform.translation.z = -1.5;
+    local_transform.translation.x = 0.5;
+    local_transform.translation.z = -1.0;
     local_transform.translation.y = 1.4;
     local_transform.scale = [0.5, 0.5, 0.5].into();
     let position = local_transform.position();
     drop(local_transform);
-    let collider = ColliderBuilder::ball(0.25)
+    let collider = ColliderBuilder::ball(0.5)
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::COLLISION_EVENTS)
         .build();
