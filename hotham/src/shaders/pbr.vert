@@ -15,6 +15,7 @@ layout (location = 0) out vec4 outGlobalPos;
 layout (location = 1) out vec3 outNormal;
 layout (location = 2) out vec2 outUV;
 layout (location = 3) flat out uint outMaterialID;
+layout (location = 4) flat out uint outInstanceID;
 
 out gl_PerVertex
 {
@@ -48,5 +49,6 @@ void main()
 
 	outUV = inUV;
 	outMaterialID = d.materialID;
+	outInstanceID = gl_InstanceIndex;
 	gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGlobalPos;
 }

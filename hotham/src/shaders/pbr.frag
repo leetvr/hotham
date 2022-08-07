@@ -13,9 +13,11 @@ layout (location = 0) in vec3 inGlobalPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in uint inMaterialID;
+layout (location = 4) flat in uint inInstanceID;
 
 // Outputs
 layout(location = 0) out vec4 outColor;
+layout (depth_less) out float gl_FragDepth;
 
 // Encapsulate the various inputs used by the various functions in the shading equation
 // We store values in this struct to simplify the integration of alternative implementations
@@ -176,10 +178,85 @@ void main()
 	vec3 f0 = vec3(0.04);
 	Material material = materialBuffer.materials[inMaterialID];
 
+	vec3 globalPos;
+	vec2 uv;
+	vec3 n;
+
+	if (material.hologramType == NO_HOLOGRAM) {
+		globalPos = inGlobalPos;
+		gl_FragDepth = gl_FragCoord.z;
+
+		// vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * vec4(globalPos, 1);
+		// float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
+		// gl_FragDepth = f_ndc_depth;
+
+		uv = inUV;
+		n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
+	} else if (material.hologramType == HOLOGRAM_SPHERE) {
+		vec3 sphereCenterInLocal = material.hologramData.xyz;
+		float radius = material.hologramData.w;
+
+		DrawData draw_data = drawDataBuffer.data[inInstanceID];
+		vec3 rayDirectionInGlobal = normalize(inGlobalPos - sceneData.cameraPosition[gl_ViewIndex].xyz);
+		vec3 rayDirectionInLocal = normalize(mat3(draw_data.localFromGlobal) * rayDirectionInGlobal);
+		vec3 rayOriginInLocalSphere = vec3(draw_data.localFromGlobal * vec4(inGlobalPos, 1)) - sphereCenterInLocal;
+
+		// Find intersection with sphere, if any
+		float a = dot(rayDirectionInLocal, rayDirectionInLocal);
+		float b = 2.0 * dot(rayOriginInLocalSphere, rayDirectionInLocal);
+		float c = dot(rayOriginInLocalSphere, rayOriginInLocalSphere) - radius * radius;
+
+		// Discriminant from quadratic formula
+		// b^2 - 4ac
+		float discriminant = b * b - 4.0 * a * c;
+
+		if (discriminant < 0.0) {
+			// gl_FragDepth = gl_FragCoord.z;
+			// outColor.rgba = vec4(a, b, c, 1);
+			// return;
+			discard;
+		}
+
+		// Pick closest solution, but still in front of us
+		float t0 = (-b - sqrt(discriminant)) / (2.0 * a);
+		float t1 = (-b + sqrt(discriminant)) / (2.0 * a);
+		// Test if the sphere is completely behind us
+		if (t1 < 0.0) {
+			gl_FragDepth = gl_FragCoord.z;
+			outColor.rgba = vec4(1, 1, 0, 0);
+			return;
+			// discard;
+		}
+		float t = max(0, t0);
+		vec3 hitPointInLocalSphere = rayOriginInLocalSphere + rayDirectionInLocal * t;
+
+		// Store result of traced ray
+		globalPos = vec3(draw_data.globalFromLocal * vec4(hitPointInLocalSphere + sphereCenterInLocal, 1));
+		vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * vec4(globalPos, 1);
+		float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
+		gl_FragDepth = f_ndc_depth;
+		uv = hitPointInLocalSphere.xy;
+		n = normalize(transpose(mat3(draw_data.localFromGlobal)) * hitPointInLocalSphere);
+
+		// Apply normal texture if there is one
+		if (material.normalTextureID != NO_TEXTURE) {
+			// We swizzle our normals to save on texture reads: https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-normal-maps
+			vec3 tangentNormal;
+			tangentNormal.xy = texture(textures[material.normalTextureID], uv).ga * 2.0 - 1.0;
+			tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy));
+
+			vec3 T = normalize(cross(vec3(0,0,1), n));
+			vec3 B = normalize(cross(T, n));
+			mat3 TBN = mat3(T, B, n);
+
+			n = normalize(TBN * tangentNormal);
+		}
+	}
+
 	if (material.baseColorTextureID == NO_TEXTURE) {
 		baseColor = material.baseColorFactor;
 	} else {
-		baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
+		baseColor = texture(textures[material.baseColorTextureID], uv) * material.baseColorFactor;
 	}
 
 	if (material.alphaMask == 1.0f) {
@@ -201,7 +278,7 @@ void main()
 		} else {
 			// Roughness is stored in the 'g' channel, metallic is stored in the 'a' channel, as per
 			// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
-			vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], inUV);
+			vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], uv);
 
 			// Roughness is authored as perceptual roughness; as is convention,
 			// convert to material roughness by squaring the perceptual roughness [2].
@@ -218,7 +295,7 @@ void main()
 			perceptualRoughness = 0.0;
 			specular = vec3(1.0);
 		} else {
-			vec4 physicalDescriptor = texture(textures[material.physicalDescriptorTextureID], inUV);
+			vec4 physicalDescriptor = texture(textures[material.physicalDescriptorTextureID], uv);
 			specular = physicalDescriptor.rgb;
 			perceptualRoughness = 1.0 - physicalDescriptor.a;
 		}
@@ -250,8 +327,7 @@ void main()
 	vec3 specularEnvironmentR0 = specularColor.rgb;
 	vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
 
-	vec3 n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
-	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);    // Vector from surface point to camera
+	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - globalPos);    // Vector from surface point to camera
 	vec3 l = normalize(sceneData.lightDirection.xyz);     // Vector from surface point to light
 	vec3 h = normalize(l+v);                        // Half vector between both l and v
 	vec3 reflection = -normalize(reflect(v, n));
@@ -297,12 +373,12 @@ void main()
 	if (material.occlusionTextureID != NO_TEXTURE) {
 		// Occlusion is stored in the 'g' channel as per:
 		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
-		float ao = texture(textures[material.occlusionTextureID], inUV).g;
+		float ao = texture(textures[material.occlusionTextureID], uv).g;
 		color = mix(color, color * ao, u_OcclusionStrength);
 	}
 
 	if (material.emissiveTextureID != NO_TEXTURE) {
-		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
+		vec3 emissive = texture(textures[material.emissiveTextureID], uv).rgb;
 		color += emissive;
 	}
 
@@ -327,16 +403,16 @@ void main()
 				outColor.rgb = n * 0.5 + 0.5;
 				break;
 			case 3:
-				outColor.rgb = (material.occlusionTextureID == NO_TEXTURE) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], inUV).ggg;
+				outColor.rgb = (material.occlusionTextureID == NO_TEXTURE) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], uv).ggg;
 				break;
 			case 4:
-				outColor.rgb = (material.emissiveTextureID == NO_TEXTURE) ?  vec3(0.0f) : texture(textures[material.emissiveTextureID], inUV).rgb;
+				outColor.rgb = (material.emissiveTextureID == NO_TEXTURE) ?  vec3(0.0f) : texture(textures[material.emissiveTextureID], uv).rgb;
 				break;
 			case 5:
-				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
+				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], uv).ggg;
 				break;
 			case 6:
-				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).aaa;
+				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], uv).aaa;
 				break;
 		}
 		outColor = outColor;
