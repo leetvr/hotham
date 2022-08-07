@@ -1,5 +1,6 @@
 use gltf::Material as MaterialData;
 use nalgebra::{vector, Vector4};
+use serde::Deserialize;
 
 use crate::{
     asset_importer::ImportContext,
@@ -16,6 +17,22 @@ pub static UNLIT_WORKFLOW: u32 = 2;
 /// Material index into the default material
 pub static NO_MATERIAL: usize = 0;
 
+/// Hologram type to indicate to the shader that this material is not a hologram
+pub static NO_HOLOGRAM: u32 = 0;
+
+/// Hologram type to indicate to the shader to ray trace this as a sphere
+pub static HOLOGRAM_SPHERE: u32 = 1;
+
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MaterialExtras {
+    #[serde(default)]
+    pub hologram_type: String,
+
+    #[serde(default)]
+    pub hologram_data: Vector4<f32>,
+}
+
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
 #[repr(C, align(16))]
@@ -29,6 +46,10 @@ pub struct Material {
     pub diffuse_factor: Vector4<f32>,
     /// How specular is this material?
     pub specular_factor: Vector4<f32>,
+    /// Hologram data - see fragment shader
+    pub hologram_data: Vector4<f32>,
+    /// Hologram type - see fragment shader
+    pub hologram_type: u32,
     /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
     pub workflow: u32,
     /// The base color texture.
@@ -122,6 +143,21 @@ impl Material {
             METALLIC_ROUGHNESS_WORKFLOW
         };
 
+        let (hologram_type, hologram_data) = match material.extras().as_deref() {
+            Some(extras) => {
+                let extras: MaterialExtras =
+                    gltf::json::deserialize::from_str(extras.get()).unwrap_or_default();
+                (
+                    match extras.hologram_type.to_lowercase().as_str() {
+                        "sphere" => HOLOGRAM_SPHERE,
+                        _ => NO_HOLOGRAM,
+                    },
+                    extras.hologram_data,
+                )
+            }
+            _ => (NO_HOLOGRAM, Default::default()),
+        };
+
         // Collect the material properties.
         let material = Material {
             base_color_factor,
@@ -138,6 +174,8 @@ impl Material {
             roughness_factor,
             alpha_mask,
             alpha_mask_cutoff,
+            hologram_type,
+            hologram_data,
         };
 
         // Then push it into the materials buffer
@@ -176,6 +214,8 @@ impl Material {
             roughness_factor: 1.0,
             alpha_mask: Default::default(),
             alpha_mask_cutoff: Default::default(),
+            hologram_type: NO_HOLOGRAM,
+            hologram_data: Default::default(),
         }
     }
 }

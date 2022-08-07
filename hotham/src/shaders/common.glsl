@@ -6,6 +6,9 @@
 #define NO_SKIN 4294967295
 #define MAX_JOINTS 64
 
+#define NO_HOLOGRAM 0
+#define HOLOGRAM_SPHERE 1
+
 struct DrawData {
     mat4 globalFromLocal;
     mat4 localFromGlobal;
@@ -18,6 +21,8 @@ struct Material {
     vec4 emissiveFactor;
     vec4 diffuseFactor;
     vec4 specularFactor;
+    vec4 hologramData;
+    uint hologramType;
     uint workflow;
     uint baseColorTextureID;
     uint physicalDescriptorTextureID;
