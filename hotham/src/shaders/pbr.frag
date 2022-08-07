@@ -185,11 +185,6 @@ void main()
 	if (material.hologramType == NO_HOLOGRAM) {
 		globalPos = inGlobalPos;
 		gl_FragDepth = gl_FragCoord.z;
-
-		// vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * vec4(globalPos, 1);
-		// float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
-		// gl_FragDepth = f_ndc_depth;
-
 		uv = inUV;
 		n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
 	} else if (material.hologramType == HOLOGRAM_SPHERE) {
@@ -211,9 +206,6 @@ void main()
 		float discriminant = b * b - 4.0 * a * c;
 
 		if (discriminant < 0.0) {
-			// gl_FragDepth = gl_FragCoord.z;
-			// outColor.rgba = vec4(a, b, c, 1);
-			// return;
 			discard;
 		}
 
