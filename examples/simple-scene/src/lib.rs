@@ -47,6 +47,7 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let mut glb_buffers: Vec<&[u8]> = vec![
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
+        include_bytes!("../../../test_assets/sphere.glb"),
     ];
 
     #[cfg(target_os = "android")]
@@ -60,6 +61,7 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_helmet(&models, &mut world, physics_context);
+    add_sphere(&models, &mut world, physics_context);
     add_hand(&models, Handedness::Left, &mut world, physics_context);
     add_hand(&models, Handedness::Right, &mut world, physics_context);
 
@@ -88,6 +90,30 @@ fn add_helmet(
         .build();
     let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
     world.insert(helmet, components).unwrap();
+}
+
+fn add_sphere(
+    models: &std::collections::HashMap<String, World>,
+    world: &mut World,
+    physics_context: &mut PhysicsContext,
+) {
+    let entity = add_model_to_world("Sphere", models, world, None).expect("Could not find Sphere");
+    let mut local_transform = world.get_mut::<LocalTransform>(entity).unwrap();
+    local_transform.translation.x = 1.0;
+    local_transform.translation.z = -1.5;
+    local_transform.translation.y = 1.4;
+    local_transform.scale = [0.5, 0.5, 0.5].into();
+    let position = local_transform.position();
+    drop(local_transform);
+    let collider = ColliderBuilder::ball(0.25)
+        .active_collision_types(ActiveCollisionTypes::all())
+        .active_events(ActiveEvents::COLLISION_EVENTS)
+        .build();
+    let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
+        .position(position)
+        .build();
+    let components = physics_context.get_rigid_body_and_collider(entity, rigid_body, collider);
+    world.insert(entity, components).unwrap();
 }
 
 fn tick(
