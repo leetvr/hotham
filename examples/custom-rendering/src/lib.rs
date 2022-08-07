@@ -56,6 +56,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let mut glb_buffers: Vec<&[u8]> = vec![
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
+        include_bytes!("../../../test_assets/sphere.glb"),
     ];
 
     #[cfg(target_os = "android")]
@@ -72,6 +73,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_helmet(&models, world, [1., 1.4, -1.].into());
     add_hand(&models, Handedness::Left, world);
     add_hand(&models, Handedness::Right, world);
+    add_sphere(&models, world);
 
     Ok(())
 }
@@ -93,4 +95,19 @@ fn add_helmet(
     let collider = Collider::new(SharedShape::ball(0.35));
 
     world.insert(helmet, (collider, Grabbable {})).unwrap();
+}
+
+fn add_sphere(models: &std::collections::HashMap<String, World>, world: &mut World) {
+    let entity = add_model_to_world("Sphere", models, world, None).expect("Could not find Sphere");
+    {
+        let mut local_transform = world.get::<&mut LocalTransform>(entity).unwrap();
+        local_transform.translation.x = 1.0;
+        local_transform.translation.z = -1.5;
+        local_transform.translation.y = 1.4;
+        local_transform.scale = [0.5, 0.5, 0.5].into();
+    }
+
+    let collider = Collider::new(SharedShape::ball(0.35));
+
+    world.insert(entity, (collider, Grabbable {})).unwrap();
 }
