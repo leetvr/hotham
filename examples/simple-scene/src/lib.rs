@@ -5,7 +5,7 @@ use hotham::{
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
-    resources::{PhysicsContext, RenderContext, XrContext},
+    resources::{InputContext, PhysicsContext, RenderContext},
     schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
@@ -95,9 +95,10 @@ fn tick(
     engine: &mut Engine,
     world: &mut World,
     queries: &mut Queries,
-    state: &mut State,
+    _state: &mut State,
 ) {
     let xr_context = &mut engine.xr_context;
+    let input_context = &engine.input_context;
     let vulkan_context = &engine.vulkan_context;
     let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
@@ -120,8 +121,7 @@ fn tick(
             world,
         );
 
-        debug_system(xr_context, render_context, state);
-
+        debug_system(input_context, render_context);
         skinning_system(&mut queries.skins_query, world, render_context);
     }
 
@@ -137,34 +137,16 @@ fn tick(
 }
 
 #[derive(Clone, Debug, Default)]
-struct State {
-    debug_state: DebugState,
-}
+/// Most Hotham applications will want to keep track of some sort of state.
+/// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
+/// this is something you'd probably want to do!
+struct State {}
 
-#[derive(Clone, Debug, Default)]
-struct DebugState {
-    button_pressed_last_frame: bool,
-}
-
-fn debug_system(xr_context: &mut XrContext, render_context: &mut RenderContext, state: &mut State) {
-    let input = &xr_context.input;
-    let pressed = xr::ActionInput::get(
-        &input.x_button_action,
-        &xr_context.session,
-        xr_context.input.left_hand_subaction_path,
-    )
-    .unwrap()
-    .current_state;
-
-    if state.debug_state.button_pressed_last_frame && pressed {
-        return;
-    }
-
-    if pressed {
+/// This is a simple system used to display a debug view.
+fn debug_system(input_context: &InputContext, render_context: &mut RenderContext) {
+    if input_context.x_button_just_pressed() {
         let debug_data = &mut render_context.scene_data.debug_data;
         debug_data.x = ((debug_data.x as usize + 1) % 6) as f32;
-        println!("debug_data.x is now {}", debug_data.x);
+        println!("[HOTHAM_SIMPLE_SCENE] debug_data.x is now {}", debug_data.x);
     }
-
-    state.debug_state.button_pressed_last_frame = pressed;
 }

@@ -1,7 +1,7 @@
 use crate::{
     resources::{
-        AudioContext, GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext,
-        XrContext, XrContextBuilder,
+        AudioContext, GuiContext, HapticContext, InputContext, PhysicsContext, RenderContext,
+        VulkanContext, XrContext, XrContextBuilder,
     },
     HothamError, HothamResult, VIEW_TYPE,
 };
@@ -96,6 +96,7 @@ impl<'a> EngineBuilder<'a> {
             audio_context: Default::default(),
             gui_context,
             haptic_context: Default::default(),
+            input_context: Default::default(),
         }
     }
 }
@@ -123,6 +124,8 @@ pub struct Engine {
     pub gui_context: GuiContext,
     /// Haptics context
     pub haptic_context: HapticContext,
+    /// Input context
+    pub input_context: InputContext,
 }
 
 /// The result of calling `update()` on Engine.
@@ -161,6 +164,11 @@ impl Engine {
                 let current_state = self.xr_context.poll_xr_event(&mut self.event_data_buffer)?;
                 (previous_state, current_state)
             };
+
+            // If we're in the FOCUSSED state, process input.
+            if current_state == SessionState::FOCUSED {
+                self.input_context.update(&self.xr_context);
+            }
 
             // Handle any state transitions, as required.
             match (previous_state, current_state) {
