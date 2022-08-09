@@ -475,7 +475,7 @@ mod tests {
         // Make sure we got all the Parent -> Child relationships
         {
             let mut transforms_with_parents = world.query::<(&LocalTransform, &Parent)>();
-            assert_eq!(transforms_with_parents.iter().len(), 27);
+            assert_eq!(transforms_with_parents.iter().len(), 26);
             for (_, (_, parent)) in transforms_with_parents.iter() {
                 assert!(world.contains(parent.0));
             }

@@ -299,13 +299,6 @@ impl State {
         orientation.z = rotation.k;
         orientation.w = rotation.w;
 
-        // let left_hand = self.left_hand_space;
-        // let right_hand = self.right_hand_space;
-        // self.spaces.get_mut(&left_hand).unwrap().position.z += z_delta;
-        // self.spaces.get_mut(&left_hand).unwrap().position.x += x_delta;
-        // self.spaces.get_mut(&right_hand).unwrap().position.z += z_delta;
-        // self.spaces.get_mut(&right_hand).unwrap().position.x += x_delta;
-
         self.view_poses[1] = self.view_poses[0];
         Some(())
     }
