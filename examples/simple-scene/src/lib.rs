@@ -146,14 +146,10 @@ struct DebugState {
     button_pressed_last_frame: bool,
 }
 
-#[allow(unused)]
 fn debug_system(xr_context: &mut XrContext, render_context: &mut RenderContext, state: &mut State) {
-    #[cfg(not(target_os = "android"))]
-    return;
-
     let input = &xr_context.input;
     let pressed = xr::ActionInput::get(
-        &input.y_button_action,
+        &input.x_button_action,
         &xr_context.session,
         xr_context.input.left_hand_subaction_path,
     )
