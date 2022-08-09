@@ -706,15 +706,21 @@ pub unsafe extern "system" fn create_action(
 
 pub unsafe extern "system" fn suggest_interaction_profile_bindings(
     _instance: Instance,
-    _suggested_bindings: *const InteractionProfileSuggestedBinding,
+    suggested_bindings: *const InteractionProfileSuggestedBinding,
 ) -> Result {
-    // let suggested_bindings = *suggested_bindings;
-    // let bindings = slice::from_raw_parts(
-    //     (suggested_bindings).suggested_bindings,
-    //     (suggested_bindings).count_suggested_bindings as _,
-    // );
+    let suggested_bindings = *suggested_bindings;
+    let mut state = STATE.lock().unwrap();
 
-    // for binding in bindings {}
+    let bindings = std::slice::from_raw_parts(
+        suggested_bindings.suggested_bindings,
+        suggested_bindings.count_suggested_bindings as _,
+    );
+
+    for binding in bindings {
+        state
+            .action_state
+            .add_binding(binding.binding, binding.action);
+    }
 
     Result::SUCCESS
 }
@@ -731,7 +737,16 @@ pub unsafe extern "system" fn string_to_path(
                 "[HOTHAM_SIMULATOR] Created path {:?} for {}",
                 path_string, s
             );
-            STATE.lock().unwrap().paths.insert(path, s.to_string());
+            STATE
+                .lock()
+                .unwrap()
+                .path_string
+                .insert(path, s.to_string());
+            STATE
+                .lock()
+                .unwrap()
+                .string_path
+                .insert(s.to_string(), path);
             *path_out = path;
             Result::SUCCESS
         }
@@ -758,7 +773,7 @@ pub unsafe extern "system" fn create_action_space(
     let space = Space::from_raw(raw);
 
     match state
-        .paths
+        .path_string
         .get(&(*create_info).subaction_path)
         .map(|s| s.as_str())
     {
@@ -1516,6 +1531,7 @@ pub unsafe extern "system" fn sync_actions(
     let mut state = STATE.lock().unwrap();
     state.update_camera_rotation();
     state.update_camera_position();
+    state.update_action_state();
 
     Result::SUCCESS
 }
@@ -1745,13 +1761,17 @@ pub unsafe extern "system" fn end_session(_session: Session) -> Result {
 
 pub unsafe extern "system" fn get_action_state_boolean(
     _session: Session,
-    _get_info: *const ActionStateGetInfo,
-    state: *mut ActionStateBoolean,
+    get_info: *const ActionStateGetInfo,
+    action_state: *mut ActionStateBoolean,
 ) -> Result {
-    *state = ActionStateBoolean {
+    let state = STATE.lock().unwrap();
+    let action = (*get_info).action;
+    let current_state = state.get_action_state_boolean(action);
+
+    *action_state = ActionStateBoolean {
         ty: StructureType::ACTION_STATE_BOOLEAN,
         next: ptr::null_mut(),
-        current_state: TRUE,
+        current_state,
         changed_since_last_sync: FALSE,
         last_change_time: openxr_sys::Time::from_nanos(0),
         is_active: TRUE,

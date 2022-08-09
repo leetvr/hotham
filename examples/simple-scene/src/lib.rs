@@ -95,7 +95,7 @@ fn tick(
     engine: &mut Engine,
     world: &mut World,
     queries: &mut Queries,
-    state: &mut State,
+    _state: &mut State,
 ) {
     let xr_context = &mut engine.xr_context;
     let input_context = &engine.input_context;
@@ -121,7 +121,7 @@ fn tick(
             world,
         );
 
-        debug_system(input_context, render_context, state);
+        debug_system(input_context, render_context);
         skinning_system(&mut queries.skins_query, world, render_context);
     }
 
@@ -142,16 +142,8 @@ fn tick(
 /// this is something you'd probably want to do!
 struct State {}
 
-#[allow(unused)]
 /// This is a simple system used to display a debug view.
-fn debug_system(
-    input_context: &InputContext,
-    render_context: &mut RenderContext,
-    state: &mut State,
-) {
-    #[cfg(not(target_os = "android"))]
-    return;
-
+fn debug_system(input_context: &InputContext, render_context: &mut RenderContext) {
     if input_context.x_button_just_pressed() {
         let debug_data = &mut render_context.scene_data.debug_data;
         debug_data.x = ((debug_data.x as usize + 1) % 6) as f32;

@@ -10,6 +10,7 @@ pub mod space_state;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub mod state;
 
+mod action_state;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub mod inputs;
 

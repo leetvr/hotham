@@ -123,10 +123,9 @@ impl Input {
         )?;
 
         let x_button_action = action_set.create_action::<bool>("x_button", "X Button", &[])?;
-
         let y_button_action = action_set.create_action::<bool>("y_button", "Y Button", &[])?;
-        let a_button_action = action_set.create_action::<bool>("a_button", "A Button", &[])?;
 
+        let a_button_action = action_set.create_action::<bool>("a_button", "A Button", &[])?;
         let b_button_action = action_set.create_action::<bool>("b_button", "B Button", &[])?;
 
         let thumbstick_x_action = action_set.create_action::<f32>(
