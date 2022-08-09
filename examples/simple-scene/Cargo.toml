@@ -64,3 +64,10 @@ version = 1
 name = "android.hardware.vr.headtracking"
 required = true
 version = 1
+
+# Create your own private keystore to use for your own apps. This is just a dummy!
+# You can use the keytool from the JDK:
+# keytool -genkey -v -keystore my-release-key.keystore -keyalg RSA -keysize 2048 -validity 10000
+[package.metadata.android.signing.release]
+path = "../hotham_examples.keystore"
+keystore_password = "chomsky-vigilant-spa"
