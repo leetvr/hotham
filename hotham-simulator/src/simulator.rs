@@ -1033,7 +1033,8 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
     let close_window = state.close_window.clone();
 
     let (swapchain_tx, swapchain_rx) = channel();
-    let (event_tx, event_rx) = channel();
+    let (mouse_event_tx, mouse_event_rx) = channel();
+    let (keyboard_event_tx, keyboard_event_rx) = channel();
     let window_thread_handle = thread::spawn(move || {
         let mut event_loop: EventLoop<()> = EventLoop::new_any_thread();
         let visible = true;
@@ -1111,6 +1112,9 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
                             *control_flow = ControlFlow::Exit
                         }
                     }
+                    WindowEvent::KeyboardInput { input, .. } => {
+                        keyboard_event_tx.send(input).unwrap()
+                    }
                     WindowEvent::MouseInput {
                         button: MouseButton::Left,
                         state,
@@ -1125,16 +1129,14 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
                     window.request_redraw();
                 }
                 Event::RedrawRequested(_window_id) => {}
-                Event::DeviceEvent { event, .. } => match event {
-                    DeviceEvent::Key(_) => event_tx.send(event).unwrap(),
 
-                    DeviceEvent::MouseMotion { .. } => {
-                        if mouse_pressed {
-                            event_tx.send(event).unwrap()
+                Event::DeviceEvent { event, .. } => {
+                    if mouse_pressed {
+                        if let DeviceEvent::MouseMotion { delta } = event {
+                            mouse_event_tx.send(delta).unwrap();
                         }
                     }
-                    _ => {}
-                },
+                }
                 _ => (),
             }
         });
@@ -1147,7 +1149,8 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
     let swapchain_ext = khr::Swapchain::new(&instance, device);
 
-    state.event_rx = Some(event_rx);
+    state.mouse_event_rx = Some(mouse_event_rx);
+    state.keyboard_event_rx = Some(keyboard_event_rx);
     state.surface = surface;
     state.window_thread_handle = Some(window_thread_handle);
     state.internal_swapchain = swapchain;
@@ -1510,7 +1513,9 @@ pub unsafe extern "system" fn sync_actions(
     _session: Session,
     _sync_info: *const ActionsSyncInfo,
 ) -> Result {
-    STATE.lock().unwrap().update_camera();
+    let mut state = STATE.lock().unwrap();
+    state.update_camera_rotation();
+    state.update_camera_position();
 
     Result::SUCCESS
 }

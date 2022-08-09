@@ -6,7 +6,7 @@ use ash::{
 
 use nalgebra::{Quaternion, Unit, UnitQuaternion, Vector3};
 use openxr_sys::{Path, Posef, SessionState, Space, Vector3f};
-use winit::event::DeviceEvent;
+use winit::event::KeyboardInput;
 
 use std::{
     collections::HashMap,
@@ -60,7 +60,8 @@ pub struct State {
     pub left_hand_space: u64,
     pub right_hand_space: u64,
     pub view_poses: Vec<Posef>,
-    pub event_rx: Option<Receiver<DeviceEvent>>,
+    pub keyboard_event_rx: Option<Receiver<KeyboardInput>>,
+    pub mouse_event_rx: Option<Receiver<(f64, f64)>>,
     pub input_state: Inputs,
     pub last_frame_time: Instant,
     pub camera: Camera,
@@ -112,7 +113,8 @@ impl Default for State {
             spaces: Default::default(),
             left_hand_space: 0,
             right_hand_space: 0,
-            event_rx: None,
+            mouse_event_rx: None,
+            keyboard_event_rx: None,
             input_state: Inputs::default(),
             last_frame_time: Instant::now(),
             view_poses: (0..NUM_VIEWS)
@@ -202,62 +204,30 @@ impl State {
         println!("[HOTHAM_SIMULATOR] All things are now destroyed");
     }
 
-    /// Updates the OpenXR camera Position & Rotation
-    /// Tries to emulate a simple first person floating camera to help navigate the scene
-    pub fn update_camera(&mut self) -> Option<()> {
-        let mut x_rot = 0f32;
-        let mut y_rot = 0f32;
-
+    pub fn update_camera_position(&mut self) -> Option<()> {
         // We need to adjust the speed value so its always the same speed even if the frame rate isn't consistent
         // The delta time is the the current time - last frame time
         let now = Instant::now();
         let delta = now - self.last_frame_time;
         self.last_frame_time = now;
-
         let dt = delta.as_secs_f32();
-        let movement_speed = 2f32 * dt;
-        let mouse_sensitivity = 0.2 * std::f32::consts::TAU / 360f32;
 
-        while let Ok(input_event) = self.event_rx.as_ref()?.try_recv() {
-            match input_event {
-                DeviceEvent::Key(keyboard_input) => self.input_state.process_event(keyboard_input),
-                DeviceEvent::MouseMotion { delta: (x, y) } => {
-                    x_rot -= x as f32;
-                    y_rot -= y as f32;
-                }
-                _ => {}
-            }
+        while let Ok(keyboard_input) = self.keyboard_event_rx.as_ref()?.try_recv() {
+            self.input_state.process_event(keyboard_input)
         }
 
         // Camera position & Rotation
         let pose = &mut self.view_poses[0];
 
-        // Update Rotation
-        let orientation = &mut pose.orientation;
-
-        self.camera.yaw += x_rot * mouse_sensitivity;
-        self.camera.pitch += y_rot * mouse_sensitivity;
-
-        // I think I'm converting these two types incorrectly but it seems to work and I'm too scared to break it lol
-        let rotation: Unit<Quaternion<f32>> =
-            UnitQuaternion::from_euler_angles(self.camera.pitch, self.camera.yaw, 0f32);
-
-        orientation.x = rotation.i;
-        orientation.y = rotation.j;
-        orientation.z = rotation.k;
-        orientation.w = rotation.w;
-
-        // Update Position
-
         let position = &mut pose.position;
-
+        let orientation = &pose.orientation;
         // get the forward vector rotated by the camera rotation quaternion
         let forward = rotate_vector_by_quaternion(Vector3::new(0f32, 0f32, 1f32), *orientation);
         // get the right vector rotated by the camera rotation quaternion
         let right = rotate_vector_by_quaternion(Vector3::new(1f32, 0f32, 0f32), *orientation);
 
         let up = Vector3::new(0f32, 1f32, 0f32);
-
+        let movement_speed = 2f32 * dt;
         for pressed in self.input_state.pressed.iter() {
             match pressed {
                 winit::event::VirtualKeyCode::W => {
@@ -293,6 +263,41 @@ impl State {
                 _ => {}
             }
         }
+
+        self.view_poses[1] = self.view_poses[0];
+        Some(())
+    }
+
+    /// Updates the OpenXR camera Position & Rotation
+    /// Tries to emulate a simple first person floating camera to help navigate the scene
+    pub fn update_camera_rotation(&mut self) -> Option<()> {
+        let mut x_rot = 0f32;
+        let mut y_rot = 0f32;
+
+        while let Ok((x, y)) = self.mouse_event_rx.as_ref()?.try_recv() {
+            x_rot -= x as f32;
+            y_rot -= y as f32;
+        }
+
+        // Camera position & Rotation
+        let pose = &mut self.view_poses[0];
+
+        // Update Rotation
+        let orientation = &mut pose.orientation;
+
+        let mouse_sensitivity = 0.2 * std::f32::consts::TAU / 360f32;
+
+        self.camera.yaw += x_rot * mouse_sensitivity;
+        self.camera.pitch += y_rot * mouse_sensitivity;
+
+        // I think I'm converting these two types incorrectly but it seems to work and I'm too scared to break it lol
+        let rotation: Unit<Quaternion<f32>> =
+            UnitQuaternion::from_euler_angles(self.camera.pitch, self.camera.yaw, 0f32);
+
+        orientation.x = rotation.i;
+        orientation.y = rotation.j;
+        orientation.z = rotation.k;
+        orientation.w = rotation.w;
 
         // let left_hand = self.left_hand_space;
         // let right_hand = self.right_hand_space;
