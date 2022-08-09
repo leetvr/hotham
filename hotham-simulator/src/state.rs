@@ -5,7 +5,7 @@ use ash::{
 };
 
 use nalgebra::{Quaternion, Unit, UnitQuaternion, Vector3};
-use openxr_sys::{Path, Posef, SessionState, Space, Vector3f};
+use openxr_sys::{Action, Bool32, Path, Posef, SessionState, Space, Vector3f};
 use winit::event::KeyboardInput;
 
 use std::{
@@ -20,8 +20,15 @@ use std::{
     time::Instant,
 };
 
-use crate::{inputs::Inputs, simulator::NUM_VIEWS, space_state::SpaceState};
-// use crate::simulator::spa
+use crate::{
+    action_state::ActionState, inputs::Inputs, simulator::NUM_VIEWS, space_state::SpaceState,
+};
+
+static X_INPUT: &'static str = "/user/hand/left/input/x/click";
+static Y_INPUT: &'static str = "/user/hand/left/input/y/click";
+static B_INPUT: &'static str = "/user/hand/right/input/b/click";
+static A_INPUT: &'static str = "/user/hand/right/input/a/click";
+
 pub struct State {
     pub vulkan_entry: Option<AshEntry>,
     pub vulkan_instance: Option<AshInstance>,
@@ -55,7 +62,8 @@ pub struct State {
     pub surface: vk::SurfaceKHR,
     pub window_thread_handle: Option<JoinHandle<()>>,
     pub reference_space: Space,
-    pub paths: HashMap<Path, String>,
+    pub path_string: HashMap<Path, String>,
+    pub string_path: HashMap<String, Path>,
     pub spaces: HashMap<u64, SpaceState>,
     pub left_hand_space: u64,
     pub right_hand_space: u64,
@@ -65,6 +73,7 @@ pub struct State {
     pub input_state: Inputs,
     pub last_frame_time: Instant,
     pub camera: Camera,
+    pub action_state: ActionState,
 }
 
 #[derive(Default)]
@@ -109,7 +118,8 @@ impl Default for State {
             surface: vk::SurfaceKHR::null(),
             window_thread_handle: None,
             reference_space: Space::NULL,
-            paths: Default::default(),
+            path_string: Default::default(),
+            string_path: Default::default(),
             spaces: Default::default(),
             left_hand_space: 0,
             right_hand_space: 0,
@@ -117,6 +127,7 @@ impl Default for State {
             keyboard_event_rx: None,
             input_state: Inputs::default(),
             last_frame_time: Instant::now(),
+            action_state: Default::default(),
             view_poses: (0..NUM_VIEWS)
                 .map(|_| {
                     let mut pose = Posef::IDENTITY;
@@ -301,6 +312,41 @@ impl State {
 
         self.view_poses[1] = self.view_poses[0];
         Some(())
+    }
+
+    /// Update simulated action state
+    pub fn update_action_state(&mut self) {
+        // Reset the state of all the inputs
+        self.action_state.clear();
+
+        // Clone to get around mutate after borrow
+        for pressed in &self.input_state.clone().pressed {
+            match pressed {
+                winit::event::VirtualKeyCode::Key1 => {
+                    self.press(X_INPUT);
+                }
+                winit::event::VirtualKeyCode::Key2 => {
+                    self.press(Y_INPUT);
+                }
+                winit::event::VirtualKeyCode::Key3 => {
+                    self.press(B_INPUT);
+                }
+                winit::event::VirtualKeyCode::Key4 => {
+                    self.press(A_INPUT);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Checks to see whether a specific action has been triggered.
+    pub fn get_action_state_boolean(&self, action: Action) -> Bool32 {
+        self.action_state.get_boolean(action)
+    }
+
+    fn press(&mut self, path_string: &str) {
+        let path = self.string_path.get(path_string).unwrap();
+        self.action_state.set_boolean(path, true);
     }
 }
 
