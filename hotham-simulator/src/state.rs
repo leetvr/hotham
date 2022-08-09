@@ -24,10 +24,10 @@ use crate::{
     action_state::ActionState, inputs::Inputs, simulator::NUM_VIEWS, space_state::SpaceState,
 };
 
-static X_INPUT: &'static str = "/user/hand/left/input/x/click";
-static Y_INPUT: &'static str = "/user/hand/left/input/y/click";
-static B_INPUT: &'static str = "/user/hand/right/input/b/click";
-static A_INPUT: &'static str = "/user/hand/right/input/a/click";
+static X_INPUT: &str = "/user/hand/left/input/x/click";
+static Y_INPUT: &str = "/user/hand/left/input/y/click";
+static B_INPUT: &str = "/user/hand/right/input/b/click";
+static A_INPUT: &str = "/user/hand/right/input/a/click";
 
 pub struct State {
     pub vulkan_entry: Option<AshEntry>,
