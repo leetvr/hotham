@@ -5,7 +5,10 @@ use anyhow::Result;
 
 use super::{
     buffer::Buffer,
-    descriptors::Descriptors,
+    descriptors::{
+        Descriptors, CULL_PARAMS_BINDING, DRAW_DATA_BINDING, PRIMITIVE_CULL_DATA_BINDING,
+        SCENE_DATA_BINDING,
+    },
     resources::{DrawData, PrimitiveCullData},
     scene_data::SceneData,
 };
@@ -88,24 +91,24 @@ impl Frame {
             draw_data_buffer.update_descriptor_set(
                 &vulkan_context.device,
                 descriptors.sets[index],
-                0,
+                DRAW_DATA_BINDING,
             );
             scene_data_buffer.update_descriptor_set(
                 &vulkan_context.device,
                 descriptors.sets[index],
-                3,
+                SCENE_DATA_BINDING,
             );
 
             // Compute
             primitive_cull_data_buffer.update_descriptor_set(
                 &vulkan_context.device,
                 descriptors.compute_sets[index],
-                0,
+                PRIMITIVE_CULL_DATA_BINDING,
             );
             cull_params_buffer.update_descriptor_set(
                 &vulkan_context.device,
                 descriptors.compute_sets[index],
-                1,
+                CULL_PARAMS_BINDING,
             );
 
             // Add some default data to the scene buffer.

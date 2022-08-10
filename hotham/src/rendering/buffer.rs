@@ -131,7 +131,7 @@ impl<T: Sized> Buffer<T> {
         &self,
         device: &ash::Device,
         descriptor_set: vk::DescriptorSet,
-        binding: usize,
+        binding: u32,
     ) {
         let buffer_info = vk::DescriptorBufferInfo::builder()
             .buffer(self.buffer)
@@ -147,7 +147,7 @@ impl<T: Sized> Buffer<T> {
         let write = vk::WriteDescriptorSet::builder()
             .buffer_info(std::slice::from_ref(&buffer_info))
             .dst_set(descriptor_set)
-            .dst_binding(binding as _)
+            .dst_binding(binding)
             .descriptor_type(descriptor_type);
 
         device.update_descriptor_sets(std::slice::from_ref(&write), &[]);
