@@ -30,5 +30,5 @@ impl Default for SceneData {
 
 /// Create a new directional light
 pub fn new_directional_light(x: f32, y: f32, z: f32) -> Vector4<f32> {
-    [x.to_radians(), y.to_radians(), z.to_radians(), 1.].into()
+    [x, y, z, 0.].into()
 }
