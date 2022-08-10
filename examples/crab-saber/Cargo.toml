@@ -68,3 +68,17 @@ version = 1
 name = "android.hardware.vr.headtracking"
 required = true
 version = 1
+
+# !! IMPORTANT !!
+#
+# When creating your own apps, make sure to generate your own keystore, rather than using our example one!
+# You can use `keytool` like so:
+# keytool -genkey -v -keystore my-release-key.keystore -keyalg RSA -keysize 2048 -validity 10000
+#
+# For more information on key signing and why it's so important, check out this article:
+# https://developer.android.com/studio/publish/app-signing
+#
+# !! IMPORTANT !!
+[package.metadata.android.signing.release]
+path = "../hotham_examples.keystore"
+keystore_password = "chomsky-vigilant-spa"
