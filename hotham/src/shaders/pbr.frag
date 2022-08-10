@@ -272,7 +272,9 @@ void main()
 	vec3 color = NdotL * (diffuseContrib + specContrib);
 
 	// Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
-	color += getIBLContribution(pbrInputs, n, reflection) * sceneData.params.x;
+	if (sceneData.params.x != 0) {
+		color += getIBLContribution(pbrInputs, n, reflection) * sceneData.params.x;
+	}
 
 	// Apply optional PBR terms for additional (optional) shading
 	if (material.occlusionTextureID != NO_TEXTURE) {
