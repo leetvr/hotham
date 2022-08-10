@@ -31,7 +31,7 @@ pub fn debug_system(input_context: &InputContext, render_context: &mut RenderCon
         println!("[HOTHAM_DEBUG] params.x is now {}", params.x);
     } else {
         if input_context.b_button_just_pressed() {
-            params.x = (params.x * 10. + 1.).round() % 50. * 0.1 as f32;
+            params.x = (params.x * 10. + 1.).round() % 50. * 0.1;
             println!("[HOTHAM_DEBUG] params.x is now {}", params.x);
         }
         if input_context.a_button_just_pressed() {
