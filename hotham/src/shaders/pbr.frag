@@ -42,15 +42,6 @@ struct MaterialInfo
 	float NdotV;                  // cos angle between normal and view direction
 };
 
-// Encapsulation of lighting information
-struct LightInfo
-{
-	float NdotL;                  // cos angle between normal and light direction
-	float NdotH;                  // cos angle between normal and half vector
-	float LdotH;                  // cos angle between light direction and half vector
-	float VdotH;                  // cos angle between view direction and half vector
-};
-
 const float M_PI = 3.141592653589793;
 const float c_MinRoughness = 0.04;
 
@@ -184,21 +175,12 @@ float convertMetallic(vec3 diffuse, vec3 specular, float maxSpecular) {
 }
 
 vec3 getAnalyticalLight(MaterialInfo materialInfo, vec3 n, vec3 v, vec3 l) {
-	vec3 h = normalize(l+v);                        	  // Half vector between both l and v
-
+	vec3 h = normalize(l+v);  // Half vector between both l and v
 
 	float NdotL = clamp(dot(n, l), 0.001, 1.0);
 	float NdotH = clamp(dot(n, h), 0.0, 1.0);
 	float LdotH = clamp(dot(l, h), 0.0, 1.0);
 	float VdotH = clamp(dot(v, h), 0.0, 1.0);
-
-
-	LightInfo lightInfo = LightInfo(
-		NdotL,
-		NdotH,
-		LdotH,
-		VdotH
-	);
 
 	// Calculate the shading terms for the microfacet specular shading model
 	vec3 F = specularReflection(materialInfo, VdotH);
@@ -210,19 +192,41 @@ vec3 getAnalyticalLight(MaterialInfo materialInfo, vec3 n, vec3 v, vec3 l) {
 	vec3 specContrib = F * G * D / (4.0 * NdotL * materialInfo.NdotV);
 
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-	return NdotL * (diffuseContrib + specContrib);
+	vec3 color = NdotL * (diffuseContrib + specContrib);
+
+	// Debug the PBR output
+	// "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
+	if (sceneData.params.w > 0.0) {
+		int index = int(sceneData.params.w);
+		switch (index) {
+			case 1:
+				color = diffuseContrib;
+				break;
+			case 2:
+				color = F;
+				break;
+			case 3:
+				color = vec3(G);
+				break;
+			case 4:
+				color = vec3(D);
+				break;
+			case 5:
+				color = specContrib;
+				break;
+		}
+	}
+
+	return color;
 }
 
 vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
-	float perceptualRoughness;
-	float metalness;
-	vec3 diffuseColor;
-
 	// Metallic and Roughness material properties are packed together
 	// In glTF, these factors can be specified by fixed scalar values
 	// or from a metallic-roughness map
-	perceptualRoughness = material.roughnessFactor;
-	metalness = material.metallicFactor;
+	float perceptualRoughness = material.roughnessFactor;
+	float metalness = material.metallicFactor;
+
 	if (material.physicalDescriptorTextureID == NO_TEXTURE) {
 		perceptualRoughness = clamp(perceptualRoughness, c_MinRoughness, 1.0);
 		metalness = clamp(metalness, 0.0, 1.0);
@@ -237,7 +241,8 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		metalness = mrSample.a * metalness;
 	}
 
-	diffuseColor = baseColor.rgb * (vec3(1.0) - f0);
+	// Get the diffuse colour
+	vec3 diffuseColor = baseColor.rgb * (vec3(1.0) - f0);
 	diffuseColor *= 1.0 - metalness;
 
 	float alphaRoughness = perceptualRoughness * perceptualRoughness;
@@ -252,8 +257,11 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	vec3 specularEnvironmentR0 = specularColor.rgb;
 	vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
 
+	// Get the normal
 	vec3 n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
-	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);    // Vector from surface point to camera
+
+	// Get the view vector - from surface point to camera
+	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);
 	float NdotV = clamp(abs(dot(n, v)), 0.001, 1.0);
 
 	// TODO: Is this correct?
@@ -272,7 +280,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		NdotV
 	);
 
-    // Walk through each of the lights and add the colour.
+    // Walk through each light and add its color contribution.
 	// 
 	// Start with the directional light.
 	vec3 pointToLight = normalize(sceneData.lightDirection.xyz);     // Vector from surface point to light
@@ -294,29 +302,6 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		color += emissive;
 	}
 
-	// // Debug the PBR output
-	// // "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
-	// if (sceneData.params.w > 0.0) {
-	// 	int index = int(sceneData.params.w);
-	// 	switch (index) {
-	// 		case 1:
-	// 			color = diffuseContrib;
-	// 			break;
-	// 		case 2:
-	// 			color = F;
-	// 			break;
-	// 		case 3:
-	// 			color = vec3(G);
-	// 			break;
-	// 		case 4:
-	// 			color = vec3(D);
-	// 			break;
-	// 		case 5:
-	// 			color = specContrib;
-	// 			break;
-	// 	}
-	// }
-
 	return color;
 }
 
@@ -336,6 +321,7 @@ void main() {
 		baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
 	}
 
+	// Handle transparency
 	if (material.alphaMask == 1.0f) {
 		if (baseColor.a < material.alphaMaskCutoff) {
 			// TODO: Apparently Adreno GPUs don't like discarding.
