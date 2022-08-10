@@ -105,8 +105,8 @@ vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 	vec3 brdf = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rgb;
 
 	// Get diffuse and specular light values
-	vec3 diffuseLight = tonemap(texture(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], n)).rgb;
-	vec3 specularLight = tonemap(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod)).rgb;
+	vec3 diffuseLight = texture(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], n).rgb;
+	vec3 specularLight = textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb;
 
 	// Multiply them by their respective inputs to get their final colors.
 	vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
@@ -287,7 +287,7 @@ void main()
 		color += emissive;
 	}
 
-	outColor = vec4(color, 1.0);
+	outColor = tonemap(vec4(color, 1.0));
 
 	if (material.workflow == PBR_WORKFLOW_UNLIT) {
 		outColor = baseColor;
