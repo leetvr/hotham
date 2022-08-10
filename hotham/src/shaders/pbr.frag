@@ -7,12 +7,20 @@
 const float epsilon = 1e-6;
 #define DEFAULT_EXPOSURE 4.5
 #define DEFAULT_IBL_SCALE 0.4
+#define DEFAULT_CUBE_MIPMAP_LEVELS 10
+#define BRDF_LUT_TEXTURE_ID 0
+#define SAMPLER_IRRADIANCE_TEXTURE_ID 0
+#define ENVIRONMENT_MAP_TEXTURE_ID 1
 
 // Inputs
 layout (location = 0) in vec3 inGlobalPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in uint inMaterialID;
+
+// Textures
+layout(set = 0, binding = 4) uniform sampler2D textures[];
+layout(set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
 // Outputs
 layout(location = 0) out vec4 outColor;
@@ -84,33 +92,28 @@ vec3 getNormal(uint normalTextureID)
 	return normalize(TBN * tangentNormal);
 }
 
-// Add some fake IBL. Texture reads are PHENOMENALLY expensive on mobile so we'll need to come up with a
-// faster solution than reading all the IBL images.
+// Calculation of the lighting contribution from an optional Image Based Light source.
 vec3 getIBLContribution(PBRInfo pbrInputs, vec3 n, vec3 reflection)
 {
-	vec4 irradiance  = vec4(0.5);
-	vec4 ibl_diffuse = irradiance * vec4(pbrInputs.diffuseColor, 1.0);
-	return tonemap(ibl_diffuse).xyz;
+	// Flip the y axis of the reflection vector; otherwise our cubemap will be upside down.
+	// TODO: Fix this by pre-flipping the cubemaps.
+	reflection.y *= -1.;
+	float lod = pbrInputs.perceptualRoughness * float(DEFAULT_CUBE_MIPMAP_LEVELS -1);
+
+	// retrieve a scale and bias to F0. See [1], Figure 3
+	vec2 brdfSamplePoint = clamp(vec2(pbrInputs.NdotV, 1.0 - pbrInputs.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
+	vec3 brdf = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rgb;
+
+	// Get diffuse and specular light values
+	vec3 diffuseLight = tonemap(texture(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], n)).rgb;
+	vec3 specularLight = tonemap(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod)).rgb;
+
+	// Multiply them by their respective inputs to get their final colors.
+	vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
+	vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
+
+	return diffuse + specular;
 }
-
-// TODO: RESTORE
-// Calculation of the lighting contribution from an optional Image Based Light source.
-// Precomputed Environment Maps are required uniform inputs and are computed as outlined in [1].
-// See our README.md on Environment Maps [3] for additional discussion.
-// vec3 getIBLContributionWithTextures(PBRInfo pbrInputs, vec3 n, vec3 reflection)
-// {
-// 	float lod = (pbrInputs.perceptualRoughness * DEFAULT_CUBE_MIPMAP_LEVELS);
-// 	// retrieve a scale and bias to F0. See [1], Figure 3
-// 	vec3 brdf = (texture(textures[BRDF_LUT_TEXTURE_ID], vec2(pbrInputs.NdotV, 1.0 - pbrInputs.perceptualRoughness))).rgb;
-// 	// vec3 diffuseLight = tonemap(texture(samplerIrradiance, n)).rgb;
-// 	// vec3 specularLight = tonemap(textureLod(prefilteredMap, reflection, lod)).rgb;
-
-// 	// vec3 diffuse = diffuseLight * pbrInputs.diffuseColor;
-// 	// vec3 specular = specularLight * (pbrInputs.specularColor * brdf.x + brdf.y);
-
-// 	// return diffuse + specular;
-// 	return vec3(1.);
-// }
 
 // Basic Lambertian diffuse
 // Implementation from Lambert's Photometria https://archive.org/details/lambertsphotome00lambgoog
@@ -210,30 +213,6 @@ void main()
 		}
 	}
 
-	if (material.workflow == PBR_WORKFLOW_SPECULAR_GLOSSINESS) {
-		vec3 specular;
-
-		// Values from specular glossiness workflow are converted to metallic roughness
-		if (material.physicalDescriptorTextureID == NO_TEXTURE) {
-			perceptualRoughness = 0.0;
-			specular = vec3(1.0);
-		} else {
-			vec4 physicalDescriptor = texture(textures[material.physicalDescriptorTextureID], inUV);
-			specular = physicalDescriptor.rgb;
-			perceptualRoughness = 1.0 - physicalDescriptor.a;
-		}
-
-		vec4 diffuse = baseColor;
-		float maxSpecular = max(max(specular.r, specular.g), specular.b);
-
-		// Convert metallic value from specular glossiness inputs
-		metallic = convertMetallic(diffuse.rgb, specular, maxSpecular);
-
-		vec3 baseColorDiffusePart = diffuse.rgb * ((1.0 - maxSpecular) / (1 - c_MinRoughness) / max(1 - metallic, epsilon)) * material.diffuseFactor.rgb;
-		vec3 baseColorSpecularPart = specular - (vec3(c_MinRoughness) * (1 - metallic) * (1 / max(metallic, epsilon))) * material.specularFactor.rgb;
-		baseColor = vec4(mix(baseColorDiffusePart, baseColorSpecularPart, metallic * metallic), diffuse.a);
-	}
-
 	diffuseColor = baseColor.rgb * (vec3(1.0) - f0);
 	diffuseColor *= 1.0 - metallic;
 
@@ -255,7 +234,9 @@ void main()
 	vec3 l = normalize(sceneData.lightDirection.xyz);     // Vector from surface point to light
 	vec3 h = normalize(l+v);                        // Half vector between both l and v
 	vec3 reflection = -normalize(reflect(v, n));
-	reflection.y *= -1.0f;
+
+	// TODO: Is this correct?
+	reflection.y *= -1.;
 
 	float NdotL = clamp(dot(n, l), 0.001, 1.0);
 	float NdotV = clamp(abs(dot(n, v)), 0.001, 1.0);
@@ -286,19 +267,19 @@ void main()
 	// Calculation of analytical lighting contribution
 	vec3 diffuseContrib = (1.0 - F) * diffuse(pbrInputs);
 	vec3 specContrib = F * G * D / (4.0 * NdotL * NdotV);
+
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
 	vec3 color = NdotL * (diffuseContrib + specContrib);
 
-	// Calculate lighting contribution from image based lighting source (IBL)
-	color += getIBLContribution(pbrInputs, n, reflection) * DEFAULT_IBL_SCALE;
+	// Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
+	color += getIBLContribution(pbrInputs, n, reflection) * sceneData.params.x;
 
-	const float u_OcclusionStrength = 1.0f;
 	// Apply optional PBR terms for additional (optional) shading
 	if (material.occlusionTextureID != NO_TEXTURE) {
 		// Occlusion is stored in the 'g' channel as per:
 		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
 		float ao = texture(textures[material.occlusionTextureID], inUV).g;
-		color = mix(color, color * ao, u_OcclusionStrength);
+		color = color * ao;
 	}
 
 	if (material.emissiveTextureID != NO_TEXTURE) {
@@ -306,7 +287,7 @@ void main()
 		color += emissive;
 	}
 
-	outColor = vec4(color, baseColor.a);
+	outColor = vec4(color, 1.0);
 
 	if (material.workflow == PBR_WORKFLOW_UNLIT) {
 		outColor = baseColor;
@@ -317,8 +298,8 @@ void main()
 
 	// Shader inputs debug visualization
 	// "none", "Base Color Texture", "Normal Texture", "Occlusion Texture", "Emissive Texture", "Metallic (?)", "Roughness (?)"
-	if (sceneData.debugData.x > 0.0) {
-		int index = int(sceneData.debugData.x);
+	if (sceneData.params.z > 0.0) {
+		int index = int(sceneData.params.z);
 		switch (index) {
 			case 1:
 				outColor.rgba = baseColor;
@@ -343,8 +324,8 @@ void main()
 	}
 
 	// "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
-	if (sceneData.debugData.y > 0.0) {
-		int index = int(sceneData.debugData.y);
+	if (sceneData.params.w > 0.0) {
+		int index = int(sceneData.params.w);
 		switch (index) {
 			case 1:
 				outColor.rgb = diffuseContrib;

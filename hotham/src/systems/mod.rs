@@ -2,6 +2,7 @@
 pub mod animation;
 pub mod audio;
 pub mod collision;
+pub mod debug;
 pub mod draw_gui;
 pub mod grabbing;
 pub mod hands;

@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::io::{Cursor, Read};
 
 use crate::{
     asset_importer::ImportContext,
@@ -34,6 +34,8 @@ pub enum TextureUsage {
     MetallicRoughness,
     /// Indicates areas that receive less less indirect light from ambient sources
     Occlusion,
+    /// Indicates this texture is used for Image Based Lighting (IBL)
+    IBL,
     /// A non PBR texture
     Other,
 }
@@ -157,32 +159,15 @@ impl Texture {
         ktx2_data: &[u8],
         texture_usage: TextureUsage,
     ) -> Self {
-        let ktx2_reader = ktx2::Reader::new(ktx2_data).unwrap();
-        let header = ktx2_reader.header();
-        if header.supercompression_scheme.is_some() {
-            panic!("[HOTHAM_TEXTURE] ktx2 supercompression is currently unsupported");
-        }
-
-        let extent = vk::Extent2D {
-            width: header.pixel_width,
-            height: header.pixel_height,
-        };
-        let format = get_format_from_ktx2(header.format);
-
-        // We don't really support mipmaps with Hotham yet. So, we assume there is ONLY ONE mipmap level.
-        let image_bytes = ktx2_reader.levels().next().unwrap();
-        println!(
-            "[HOTHAM_TEXTURE] Importing ktx2 texture in {:?} format",
-            format
-        );
+        let ktx2_image = parse_ktx2(ktx2_data);
 
         Texture::new(
             name,
             vulkan_context,
             render_context,
-            image_bytes,
-            &extent,
-            format,
+            &ktx2_image.image_buf,
+            &ktx2_image.extent,
+            ktx2_image.format,
             texture_usage,
         )
     }
@@ -230,6 +215,62 @@ impl Texture {
             format,
             texture_usage,
         )
+    }
+}
+
+// Thin wrapper containing the information we need from a KTX2 file.
+#[derive(Debug, Clone)]
+pub(crate) struct KTX2Image {
+    pub format: vk::Format,
+    pub extent: vk::Extent2D,
+    pub image_buf: Vec<u8>,
+    pub offsets: Vec<vk::DeviceSize>,
+    pub mip_levels: u32,
+}
+
+pub(crate) fn parse_ktx2(ktx2_data: &[u8]) -> KTX2Image {
+    let ktx2_reader = ktx2::Reader::new(ktx2_data).unwrap();
+    let header = ktx2_reader.header();
+    let extent = vk::Extent2D {
+        width: header.pixel_width,
+        height: header.pixel_height,
+    };
+    let mut image_buf = Vec::new();
+    let mut offsets = Vec::new();
+
+    println!(
+        "[HOTHAM_TEXTURE] Importing KTX2 texture in {:?} format.",
+        header.format
+    );
+    for level in ktx2_reader.levels() {
+        let len = match header.supercompression_scheme {
+            // Lifted from Bevy, with Love:
+            // https://github.com/bevyengine/bevy/blob/05e5008624b35f51cd6418acc745236be2cddd28/crates/bevy_render/src/texture/ktx2.rs#L62
+            Some(ktx2::SupercompressionScheme::Zstandard) => {
+                let mut cursor = std::io::Cursor::new(level);
+                let mut decoder = ruzstd::StreamingDecoder::new(&mut cursor).unwrap();
+                decoder.read_to_end(&mut image_buf).unwrap()
+            }
+            None => {
+                image_buf.extend(level);
+                level.len()
+            }
+            s => panic!(
+                "Unable to parse KTX2 file, unsupported supercompression scheme: {:?}",
+                s
+            ),
+        };
+
+        let offset_increment = len as u32 / header.face_count;
+        offsets.push(offset_increment as _);
+    }
+
+    KTX2Image {
+        format: get_format_from_ktx2(header.format),
+        extent,
+        image_buf,
+        offsets,
+        mip_levels: header.level_count,
     }
 }
 
@@ -282,7 +323,7 @@ fn get_format_from_mime_type(mime_type: &str) -> image::ImageFormat {
 }
 
 // This is legal.. with some caveats. But if it's wrong it'll blow up when the texture gets imported anyway
-fn get_format_from_ktx2(format: Option<ktx2::Format>) -> vk::Format {
+pub(crate) fn get_format_from_ktx2(format: Option<ktx2::Format>) -> vk::Format {
     let raw = format.expect("No format specified").0;
     vk::Format::from_raw(raw.get() as _)
 }

@@ -184,7 +184,7 @@ impl RenderContext {
                 .as_slice_mut()[0];
             scene_data.camera_position = self.scene_data.camera_position;
             scene_data.view_projection = self.scene_data.view_projection;
-            scene_data.debug_data = self.scene_data.debug_data;
+            scene_data.params = self.scene_data.params;
         }
     }
 

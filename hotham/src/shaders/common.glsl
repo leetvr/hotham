@@ -48,8 +48,5 @@ layout (set = 0, binding = 3) readonly uniform SceneData {
     mat4 viewProjection[2];
     vec4 cameraPosition[2];
     vec4 lightDirection;
-    vec4 debugData;
+    vec4 params;
 } sceneData;
-
-// Textures
-layout(set = 0, binding = 4) uniform sampler2D textures[];
