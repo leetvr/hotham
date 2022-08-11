@@ -36,25 +36,19 @@ layout(location = 0) out vec4 outColor;
 // of the shading terms, outlined in the Readme.MD Appendix of Sascha's implementation.
 struct MaterialInfo
 {
-	vec3 reflectance0;            // full reflectance color (normal incidence angle)
-	vec3 reflectance90;           // reflectance color at grazing angle
+	vec3 f0;                      // full reflectance color (normal incidence angle)
+	vec3 f90;                     // reflectance color at grazing angle
 	vec3 diffuseColor;            // color contribution from diffuse lighting
 	vec3 specularColor;           // color contribution from specular lighting
-	vec3 reflection;			  // reflection vector 
 	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
 	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
-	float metalness;              // metallic value at the surface
 	float NdotV;                  // cos angle between normal and view direction
 };
-
-const float c_MinRoughness = 0.04;
 
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
 const float PBR_WORKFLOW_SPECULAR_GLOSSINESS = 1.0f;
 const float PBR_WORKFLOW_UNLIT = 2.0f;
 
-// The default index of refraction of 1.5 yields a dielectric normal incidence reflectance of 0.04.
-const vec3 f0 = vec3(0.04);
 // Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th editon on page 325.
 const vec3 f90 = vec3(1.0);
 
@@ -143,20 +137,25 @@ vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, Light light
 	vec3 l = normalize(pointToLight);
 	vec3 h = normalize(l + v);  // Half vector between both l and v
 
+	// TODO: Changing the clamp value to 0 here results in very strange colour values. This is NOT RIGHT.
 	float NdotL = clamp(dot(n, l), 0.001, 1.0);
 	float NdotV = clamp(dot(n, v), 0.0, 1.0);
 	float NdotH = clamp(dot(n, h), 0.0, 1.0);
 	float LdotH = clamp(dot(l, h), 0.0, 1.0);
 	float VdotH = clamp(dot(v, h), 0.0, 1.0);
 
-	vec3 intensity = getLightIntensity(light, l);
+	vec3 color;
 
-	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-	vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(f0, f90, materialInfo.diffuseColor, VdotH);
-	vec3 specContrib = intensity * NdotL * BRDF_specularGGX(f0, f90, materialInfo.alphaRoughness, VdotH, NdotL, NdotV, NdotH);
+	if (NdotL > 0. || NdotV > 0.) {
+		vec3 intensity = getLightIntensity(light, l);
 
-	// Finally, combind the diffuse and specular contributions
-	vec3 color = diffuseContrib + specContrib;
+		// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
+		vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(materialInfo.f0, f90, materialInfo.diffuseColor, VdotH);
+		vec3 specContrib = intensity * NdotL * BRDF_specularGGX(materialInfo.f0, f90, materialInfo.alphaRoughness, VdotH, NdotL, NdotV, NdotH);
+
+		// Finally, combind the diffuse and specular contributions
+		color = diffuseContrib + specContrib;
+	}
 
 	return color;
 }
@@ -170,8 +169,8 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	float metalness = material.metallicFactor;
 
 	if (material.physicalDescriptorTextureID == NO_TEXTURE) {
-		perceptualRoughness = clamp(perceptualRoughness, c_MinRoughness, 1.0);
-		metalness = clamp(metalness, 0.0, 1.0);
+		perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
+		metalness = clamp(metalness, 0., 1.0);
 	} else {
 		// Roughness is stored in the 'g' channel, metallic is stored in the 'a' channel, as per
 		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
@@ -184,20 +183,11 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	}
 
 	// Get the diffuse colour
-	vec3 diffuseColor = baseColor.rgb * (vec3(1.0) - f0);
-	diffuseColor *= 1.0 - metalness;
+	vec3 f0 = mix(vec3(0.4), baseColor.rgb, metalness);
+	vec3 diffuseColor = mix(baseColor.rgb, vec3(0.), metalness);
 
 	float alphaRoughness = perceptualRoughness * perceptualRoughness;
 	vec3 specularColor = mix(f0, baseColor.rgb, metalness);
-
-	// Compute reflectance.
-	float reflectance = max(max(specularColor.r, specularColor.g), specularColor.b);
-
-	// For typical incident reflectance range (between 4% to 100%) set the grazing reflectance to 100% for typical fresnel effect.
-	// For very low reflectance range on highly diffuse objects (below 4%), incrementally reduce grazing reflectance to 0%.
-	float reflectance90 = clamp(reflectance * 25.0, 0.0, 1.0);
-	vec3 specularEnvironmentR0 = specularColor.rgb;
-	vec3 specularEnvironmentR90 = vec3(1.0, 1.0, 1.0) * reflectance90;
 
 	// Get the normal
 	vec3 n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
@@ -211,14 +201,12 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	reflection.y *= -1.;
 
 	MaterialInfo materialInfo = MaterialInfo(
-		specularEnvironmentR0,
-		specularEnvironmentR90,
+		f0,
+		f90,
 		diffuseColor,
 		specularColor,
-		reflection,
 		alphaRoughness,
 		perceptualRoughness,
-		metalness,
 		NdotV
 	);
 
@@ -232,13 +220,25 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		// Occlusion is stored in the 'g' channel as per:
 		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
 		float ao = texture(textures[material.occlusionTextureID], inUV).g;
-		color = color * ao;
+		// color = color * ao;
 	}
 
     // Walk through each light and add its color contribution.
 
-	// pointToLight = sceneData.lightDirection.xyz;     // Vector from surface point to light
-	// color += getLightContribution(materialInfo, n, v, pointToLight);
+	// Now add a spot light;
+	Light pointLight = Light(
+		vec3(0., 0., 0.),  // no direction
+		3.0, // range
+
+		vec3(1., 1., 1.), // color
+		5.0, // intensity
+
+		vec3(-2., 2., 0.), // position
+		0.,
+
+		0.,
+		LightType_Point
+	);
 
 	// Now add a spot light;
 	Light spotLight = Light(
@@ -255,7 +255,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		LightType_Spot
 	);
 
-	color += getLightContribution(materialInfo, n, v, spotLight);
+	color += getLightContribution(materialInfo, n, v, pointLight);
 
 	if (material.emissiveTextureID != NO_TEXTURE) {
 		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
@@ -297,7 +297,7 @@ void main() {
 	}
 
 	// Finally, tonemap the color.
-	outColor = tonemap(outColor);
+	// outColor = tonemap(outColor);
 
 	// Debugging
 	// Shader inputs debug visualization
