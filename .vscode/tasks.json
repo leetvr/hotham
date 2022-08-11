@@ -25,7 +25,7 @@
 			"command": "run",
 			"args": [
 				"--bin",
-				"hotham_simple_scene_example",
+				"hotham_stress_test_desktop",
 				"--release"
 			],
 			"env": {

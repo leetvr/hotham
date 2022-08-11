@@ -57,6 +57,7 @@ impl Primitive {
         let mut positions = Vec::new();
         let mut tex_coords = Vec::new();
         let mut normals = Vec::new();
+        let mut tangents = Vec::new();
         let mut joint_indices = Vec::new();
         let mut joint_weights = Vec::new();
 
@@ -85,6 +86,17 @@ impl Primitive {
         } else {
             for _ in 0..positions.len() {
                 normals.push(vector![0., 0., 0.]);
+            }
+        }
+
+        // Tangents
+        if let Some(iter) = reader.read_tangents() {
+            for v in iter {
+                tangents.push(vector![v[0], v[1], v[2]]);
+            }
+        } else {
+            for _ in 0..positions.len() {
+                tangents.push(vector![0., 0., 0.]);
             }
         }
 
@@ -118,11 +130,17 @@ impl Primitive {
             }
         }
 
-        let vertices: Vec<Vertex> =
-            izip!(positions, normals, tex_coords, joint_indices, joint_weights)
-                .into_iter()
-                .map(Vertex::from_zip)
-                .collect();
+        let vertices: Vec<Vertex> = izip!(
+            positions,
+            normals,
+            tangents,
+            tex_coords,
+            joint_indices,
+            joint_weights
+        )
+        .into_iter()
+        .map(Vertex::from_zip)
+        .collect();
 
         // All the materials in this glTF file will be imported into the material buffer, so all we need
         // to do is grab the index of this material and add it to the running offset. If we don't do this,

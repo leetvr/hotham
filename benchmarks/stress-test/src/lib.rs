@@ -37,7 +37,7 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let test = StressTest::ManyHelmets;
+    let test = StressTest::NormalTangentTest;
     let (world, models) = init(&mut engine, &test);
     let queries = Default::default();
     let timer = Default::default();
@@ -110,6 +110,8 @@ pub enum StressTest {
     CullingStressTest,
     /// Khronos provided scene to test Image Based Lighting
     IBLTest,
+    /// Khronos provided scene to test Normals and Tangents
+    NormalTangentTest,
 }
 
 fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World>) {
@@ -186,6 +188,19 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
 
             #[cfg(not(target_os = "android"))]
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/ibl_test.glb")];
+
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
+            for name in models.keys() {
+                add_model_to_world(name, &models, &mut world, None);
+            }
+            models
+        }
+        StressTest::NormalTangentTest => {
+            let glb_buffers: Vec<&[u8]> = vec![include_bytes!(
+                "../../../test_assets/normal_tangent_test.glb"
+            )];
 
             let models =
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)

@@ -31,9 +31,8 @@ layout(set = 0, binding = 5) uniform samplerCube cubeTextures[];
 // Outputs
 layout(location = 0) out vec4 outColor;
 
-// Encapsulate the various inputs used by the various functions in the shading equation
-// We store values in this struct to simplify the integration of alternative implementations
-// of the shading terms, outlined in the Readme.MD Appendix of Sascha's implementation.
+// Encapsulate BRDF information about this material
+// TODO: This could all be precomputed.
 struct MaterialInfo
 {
 	vec3 f0;                      // full reflectance color (normal incidence angle)
@@ -42,7 +41,6 @@ struct MaterialInfo
 	vec3 specularColor;           // color contribution from specular lighting
 	float alphaRoughness;         // roughness mapped to a more linear change in the roughness (proposed by [2])
 	float perceptualRoughness;    // roughness value, as authored by the model creator (input to shader)
-	float NdotV;                  // cos angle between normal and view direction
 };
 
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
@@ -100,15 +98,12 @@ vec3 getNormal(uint normalTextureID)
 }
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
-vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 reflection)
+vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 reflection, float NdotV)
 {
-	// Flip the y axis of the reflection vector; otherwise our cubemap will be upside down.
-	// TODO: Fix this by pre-flipping the cubemaps.
-	reflection.y *= -1.;
 	float lod = materialInfo.perceptualRoughness * float(DEFAULT_CUBE_MIPMAP_LEVELS -1);
 
 	// retrieve a scale and bias to F0. See [1], Figure 3
-	vec2 brdfSamplePoint = clamp(vec2(materialInfo.NdotV, 1.0 - materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
+	vec2 brdfSamplePoint = clamp(vec2(NdotV, 1.0 - materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
 	vec3 brdf = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rgb;
 
 	// Get diffuse and specular light values
@@ -122,7 +117,7 @@ vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 reflection)
 	return diffuse + specular;
 }
 
-vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, Light light) {
+vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, float NdotV, Light light) {
 	// Get a vector between this point and the light.
 	vec3 pointToLight;
 	if (light.type != LightType_Directional)
@@ -139,7 +134,6 @@ vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, Light light
 
 	// TODO: Changing the clamp value to 0 here results in very strange colour values. This is NOT RIGHT.
 	float NdotL = clamp(dot(n, l), 0.001, 1.0);
-	float NdotV = clamp(dot(n, v), 0.0, 1.0);
 	float NdotH = clamp(dot(n, h), 0.0, 1.0);
 	float LdotH = clamp(dot(l, h), 0.0, 1.0);
 	float VdotH = clamp(dot(v, h), 0.0, 1.0);
@@ -186,6 +180,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	vec3 f0 = mix(vec3(0.4), baseColor.rgb, metalness);
 	vec3 diffuseColor = mix(baseColor.rgb, vec3(0.), metalness);
 
+	// Roughness, specular color
 	float alphaRoughness = perceptualRoughness * perceptualRoughness;
 	vec3 specularColor = mix(f0, baseColor.rgb, metalness);
 
@@ -194,11 +189,11 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 
 	// Get the view vector - from surface point to camera
 	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);
-	float NdotV = clamp(abs(dot(n, v)), 0.001, 1.0);
 
-	// TODO: Is this correct?
+	// Get NdotV
+	float NdotV = clamp(abs(dot(n, v)), 0., 1.0);
+
 	vec3 reflection = -normalize(reflect(v, n));
-	reflection.y *= -1.;
 
 	MaterialInfo materialInfo = MaterialInfo(
 		f0,
@@ -206,13 +201,11 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		diffuseColor,
 		specularColor,
 		alphaRoughness,
-		perceptualRoughness,
-		NdotV
+		perceptualRoughness
 	);
 
 	// Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
-	// vec3 color = getIBLContribution(materialInfo, n, reflection) * sceneData.params.x;
-
+	// vec3 color = getIBLContribution(materialInfo, n, reflection, NdotV) * sceneData.params.x;
 	vec3 color = vec3(0.);
 
 	// Apply optional PBR terms for additional (optional) shading
@@ -233,7 +226,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		vec3(1., 1., 1.), // color
 		5.0, // intensity
 
-		vec3(-2., 2., 0.), // position
+		vec3(0., 0., 0.), // position
 		0.,
 
 		0.,
@@ -255,7 +248,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		LightType_Spot
 	);
 
-	color += getLightContribution(materialInfo, n, v, pointLight);
+	color += getLightContribution(materialInfo, n, v, NdotV, pointLight);
 
 	if (material.emissiveTextureID != NO_TEXTURE) {
 		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
@@ -297,7 +290,7 @@ void main() {
 	}
 
 	// Finally, tonemap the color.
-	// outColor = tonemap(outColor);
+	outColor = tonemap(outColor);
 
 	// Debugging
 	// Shader inputs debug visualization

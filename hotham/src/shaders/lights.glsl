@@ -58,6 +58,7 @@ vec3 getLightIntensity(Light light, vec3 pointToLight)
     {
         rangeAttenuation = getRangeAttenuation(light.range, length(pointToLight));
     }
+
     if (light.type == LightType_Spot)
     {
         spotAttenuation = getSpotAttenuation(pointToLight, light.direction, light.outerConeCos, light.innerConeCos);

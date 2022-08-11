@@ -1,4 +1,3 @@
-//
 // Fresnel
 //
 // http://graphicrants.blogspot.com/2013/08/specular-brdf-reference.html
