@@ -11,26 +11,24 @@ pub struct SceneData {
     pub camera_position: [Vector4<f32>; 2],
     /// Direction of global light
     pub light_direction: Vector4<f32>,
-    /// Debug information - x = debug inputs, y = debug algorithm, z = unused
-    pub debug_data: Vector4<f32>,
+    /// Scene Parameters - x = IBL intensity, y = unused, z = debug render inputs, w = debug render algorithm
+    pub params: Vector4<f32>,
 }
 
 impl Default for SceneData {
     fn default() -> Self {
-        let light_direction = new_directional_light(75_f32.to_radians(), 40_f32.to_radians());
+        // TODO: Pick a reasonable default.
+        let light_direction = new_directional_light(-27., 67., -35.);
         Self {
             view_projection: [Matrix4::identity(), Matrix4::identity()],
             camera_position: [Vector4::zeros(), Vector4::zeros()],
             light_direction,
-            debug_data: Default::default(),
+            params: [1., 0., 0., 0.].into(),
         }
     }
 }
 
 /// Create a new directional light
-pub fn new_directional_light(x: f32, y: f32) -> Vector4<f32> {
-    let x = x.sin() * y.cos();
-    let y = y.sin();
-    let z = x.cos() * y.cos();
-    [x, y, z, 1.].into()
+pub fn new_directional_light(x: f32, y: f32, z: f32) -> Vector4<f32> {
+    [x.to_radians(), y.to_radians(), z.to_radians(), 1.].into()
 }

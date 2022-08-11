@@ -260,7 +260,7 @@ mod tests {
 
         let errors: Vec<_> = params
             .iter()
-            .filter_map(|(name, debug_data_x, debug_data_y)| {
+            .filter_map(|(name, debug_shader_inputs, debug_shader_params)| {
                 render_object_with_debug_data(
                     &vulkan_context,
                     &mut render_context,
@@ -268,8 +268,8 @@ mod tests {
                     resolution,
                     image.clone(),
                     name,
-                    *debug_data_x,
-                    *debug_data_y,
+                    *debug_shader_inputs,
+                    *debug_shader_params,
                 )
                 .err()
             })
@@ -284,16 +284,16 @@ mod tests {
         resolution: vk::Extent2D,
         image: Image,
         name: &str,
-        debug_data_x: f32,
-        debug_data_y: f32,
+        debug_shader_inputs: f32,
+        debug_shader_params: f32,
     ) -> Result<(), String> {
         // Render the scene
         let mut renderdoc = begin_renderdoc();
         render(
             render_context,
             vulkan_context,
-            debug_data_x,
-            debug_data_y,
+            debug_shader_inputs,
+            debug_shader_params,
             world,
         );
         if let Ok(renderdoc) = renderdoc.as_mut() {
@@ -361,8 +361,8 @@ mod tests {
     fn render(
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
-        debug_data_x: f32,
-        debug_data_y: f32,
+        debug_shader_inputs: f32,
+        debug_shader_params: f32,
         world: &mut World,
     ) {
         // SPONZA
@@ -396,8 +396,8 @@ mod tests {
         };
         let views = vec![view.clone(), view];
         render_context.begin_frame(vulkan_context);
-        render_context.scene_data.debug_data.x = debug_data_x;
-        render_context.scene_data.debug_data.y = debug_data_y;
+        render_context.scene_data.params.z = debug_shader_inputs;
+        render_context.scene_data.params.w = debug_shader_params;
         update_global_transform_system(&mut Default::default(), world);
         update_global_transform_with_parent_system(
             &mut Default::default(),

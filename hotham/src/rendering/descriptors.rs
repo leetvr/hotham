@@ -8,10 +8,12 @@ pub const MATERIALS_BINDING: u32 = 1;
 pub const SKINS_BINDING: u32 = 2;
 pub const SCENE_DATA_BINDING: u32 = 3;
 pub const TEXTURE_BINDING: u32 = 4;
-const TEXTURE_BINDING_DESCRIPTOR_COUNT: u32 = 10_000;
+pub const CUBE_TEXTURE_BINDING: u32 = 5;
 
 pub const PRIMITIVE_CULL_DATA_BINDING: u32 = 0;
 pub const CULL_PARAMS_BINDING: u32 = 1;
+
+const TEXTURE_BINDING_DESCRIPTOR_COUNT: u32 = 10_000;
 
 /// A wrapper around all the various bits of descriptor functionality
 #[derive(Clone, Debug)]
@@ -64,6 +66,34 @@ impl Descriptors {
             vk::WriteDescriptorSet::builder()
                 .image_info(std::slice::from_ref(&image_info))
                 .dst_binding(TEXTURE_BINDING)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .dst_array_element(array_index)
+                .dst_set(set)
+                .build()
+        });
+
+        vulkan_context
+            .device
+            .update_descriptor_sets(&texture_writes, &[]);
+    }
+
+    pub unsafe fn write_cube_texture_descriptor(
+        &self,
+        vulkan_context: &VulkanContext,
+        image_view: vk::ImageView,
+        sampler: vk::Sampler,
+        array_index: u32,
+    ) {
+        let image_info = vk::DescriptorImageInfo {
+            sampler,
+            image_view,
+            image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
+        };
+
+        let texture_writes = self.sets.map(|set| {
+            vk::WriteDescriptorSet::builder()
+                .image_info(std::slice::from_ref(&image_info))
+                .dst_binding(CUBE_TEXTURE_BINDING)
                 .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .dst_array_element(array_index)
                 .dst_set(set)
@@ -166,6 +196,14 @@ unsafe fn create_descriptor_layouts(
             descriptor_count: TEXTURE_BINDING_DESCRIPTOR_COUNT,
             ..Default::default()
         },
+        // Cube Textures
+        vk::DescriptorSetLayoutBinding {
+            binding: CUBE_TEXTURE_BINDING,
+            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            stage_flags: vk::ShaderStageFlags::FRAGMENT,
+            descriptor_count: 2,
+            ..Default::default()
+        },
     ];
 
     let compute_bindings = [
@@ -197,6 +235,7 @@ unsafe fn create_descriptor_layouts(
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         flags,
+        vk::DescriptorBindingFlags::empty(),
     ];
     let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
         .binding_flags(&descriptor_flags);

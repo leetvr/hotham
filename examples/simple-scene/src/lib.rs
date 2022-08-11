@@ -5,13 +5,13 @@ use hotham::{
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
-    resources::{InputContext, PhysicsContext, RenderContext},
+    resources::PhysicsContext,
     schedule_functions::physics_step,
     systems::{
-        animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
-        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
-        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
-        Queries,
+        animation_system, collision_system, debug::debug_system, grabbing_system, hands::add_hand,
+        hands_system, rendering::rendering_system, skinning::skinning_system,
+        update_global_transform_system, update_global_transform_with_parent_system,
+        update_local_transform_with_rigid_body_system, Queries,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -141,12 +141,3 @@ fn tick(
 /// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
 /// this is something you'd probably want to do!
 struct State {}
-
-/// This is a simple system used to display a debug view.
-fn debug_system(input_context: &InputContext, render_context: &mut RenderContext) {
-    if input_context.x_button_just_pressed() {
-        let debug_data = &mut render_context.scene_data.debug_data;
-        debug_data.x = ((debug_data.x as usize + 1) % 6) as f32;
-        println!("[HOTHAM_SIMPLE_SCENE] debug_data.x is now {}", debug_data.x);
-    }
-}
