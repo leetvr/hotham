@@ -1,8 +1,13 @@
-// PBR shader based on Sascha Willems' implementation:
+// PBR shader based on a combination of Sascha Willems' implementation:
 // https://github.com/SaschaWillems/Vulkan-glTF-PBR
-// Which in turn was based on https://github.com/KhronosGroup/glTF-WebGL-PBR
+// 
+// and the Khronos glTF-Sample Viewer:
+// https://github.com/KhronosGroup/glTF-WebGL-PBR
+
 #version 460
 #include "common.glsl"
+#include "lights.glsl"
+#include "brdf.glsl"
 
 const float epsilon = 1e-6;
 #define DEFAULT_EXPOSURE 4.5
@@ -42,14 +47,16 @@ struct MaterialInfo
 	float NdotV;                  // cos angle between normal and view direction
 };
 
-const float M_PI = 3.141592653589793;
 const float c_MinRoughness = 0.04;
 
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
 const float PBR_WORKFLOW_SPECULAR_GLOSSINESS = 1.0f;
 const float PBR_WORKFLOW_UNLIT = 2.0f;
 
+// The default index of refraction of 1.5 yields a dielectric normal incidence reflectance of 0.04.
 const vec3 f0 = vec3(0.04);
+// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th editon on page 325.
+const vec3 f90 = vec3(1.0);
 
 vec3 Uncharted2Tonemap(vec3 color)
 {
@@ -111,8 +118,8 @@ vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 reflection)
 	vec3 brdf = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rgb;
 
 	// Get diffuse and specular light values
-	vec3 diffuseLight = tonemap(texture(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], n)).rgb;
-	vec3 specularLight = tonemap(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod)).rgb;
+	vec3 diffuseLight = texture(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], n).rgb;
+	vec3 specularLight = textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb;
 
 	// Multiply them by their respective inputs to get their final colors.
 	vec3 diffuse = diffuseLight * materialInfo.diffuseColor;
@@ -121,106 +128,41 @@ vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 reflection)
 	return diffuse + specular;
 }
 
-// Basic Lambertian diffuse
-// Implementation from Lambert's Photometria https://archive.org/details/lambertsphotome00lambgoog
-// See also [1], Equation 1
-vec3 diffuse(MaterialInfo materialInfo)
-{
-	return materialInfo.diffuseColor / M_PI;
-}
-
-// The following equation models the Fresnel reflectance term of the spec equation (aka F())
-// Implementation of fresnel from [4], Equation 15
-vec3 specularReflection(MaterialInfo materialInfo, float VdotH)
-{
-	return materialInfo.reflectance0 + (materialInfo.reflectance90 - materialInfo.reflectance0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
-}
-
-// This calculates the specular geometric attenuation (aka G()),
-// where rougher material will reflect less light back to the viewer.
-// This implementation is based on [1] Equation 4, and we adopt their modifications to
-// alphaRoughness as input as originally proposed in [2].
-float geometricOcclusion(MaterialInfo materialInfo, float NdotL)
-{
-	float NdotV = materialInfo.NdotV;
-	float r = materialInfo.alphaRoughness;
-
-	float attenuationL = 2.0 * NdotL / (NdotL + sqrt(r * r + (1.0 - r * r) * (NdotL * NdotL)));
-	float attenuationV = 2.0 * NdotV / (NdotV + sqrt(r * r + (1.0 - r * r) * (NdotV * NdotV)));
-	return attenuationL * attenuationV;
-}
-
-// The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
-// Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
-// Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
-float microfacetDistribution(MaterialInfo materialInfo, float NdotH)
-{
-	float roughnessSq = materialInfo.alphaRoughness * materialInfo.alphaRoughness;
-	float f = (NdotH * roughnessSq - NdotH) * NdotH + 1.0;
-	return roughnessSq / (M_PI * f * f);
-}
-
-// Gets metallic factor from specular glossiness workflow inputs
-float convertMetallic(vec3 diffuse, vec3 specular, float maxSpecular) {
-	float perceivedDiffuse = sqrt(0.299 * diffuse.r * diffuse.r + 0.587 * diffuse.g * diffuse.g + 0.114 * diffuse.b * diffuse.b);
-	float perceivedSpecular = sqrt(0.299 * specular.r * specular.r + 0.587 * specular.g * specular.g + 0.114 * specular.b * specular.b);
-	if (perceivedSpecular < c_MinRoughness) {
-		return 0.0;
+vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, Light light) {
+	// Get a vector between this point and the light.
+	vec3 pointToLight;
+	if (light.type != LightType_Directional)
+	{
+		pointToLight = light.position - inGlobalPos;
 	}
-	float a = c_MinRoughness;
-	float b = perceivedDiffuse * (1.0 - maxSpecular) / (1.0 - c_MinRoughness) + perceivedSpecular - 2.0 * c_MinRoughness;
-	float c = c_MinRoughness - perceivedSpecular;
-	float D = max(b * b - 4.0 * a * c, 0.0);
-	return clamp((-b + sqrt(D)) / (2.0 * a), 0.0, 1.0);
-}
+	else
+	{
+		pointToLight = -light.direction;
+	}
 
-vec3 getAnalyticalLight(MaterialInfo materialInfo, vec3 n, vec3 v, vec3 l) {
-	vec3 h = normalize(l+v);  // Half vector between both l and v
+	vec3 l = normalize(pointToLight);
+	vec3 h = normalize(l + v);  // Half vector between both l and v
 
 	float NdotL = clamp(dot(n, l), 0.001, 1.0);
+	float NdotV = clamp(dot(n, v), 0.0, 1.0);
 	float NdotH = clamp(dot(n, h), 0.0, 1.0);
 	float LdotH = clamp(dot(l, h), 0.0, 1.0);
 	float VdotH = clamp(dot(v, h), 0.0, 1.0);
 
-	// Calculate the shading terms for the microfacet specular shading model
-	vec3 F = specularReflection(materialInfo, VdotH);
-	float G = geometricOcclusion(materialInfo, NdotL);
-	float D = microfacetDistribution(materialInfo, NdotH);
-
-	// Calculation of analytical lighting contribution
-	vec3 diffuseContrib = (1.0 - F) * diffuse(materialInfo);
-	vec3 specContrib = F * G * D / (4.0 * NdotL * materialInfo.NdotV);
+	vec3 intensity = getLightIntensity(light, l);
 
 	// Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-	vec3 color = NdotL * (diffuseContrib + specContrib);
+	vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(f0, f90, materialInfo.diffuseColor, VdotH);
+	vec3 specContrib = intensity * NdotL * BRDF_specularGGX(f0, f90, materialInfo.alphaRoughness, VdotH, NdotL, NdotV, NdotH);
 
-	// Debug the PBR output
-	// "none", "Diff (l,n)", "F (l,h)", "G (l,v,h)", "D (h)", "Specular"
-	if (sceneData.params.w > 0.0) {
-		int index = int(sceneData.params.w);
-		switch (index) {
-			case 1:
-				color = diffuseContrib;
-				break;
-			case 2:
-				color = F;
-				break;
-			case 3:
-				color = vec3(G);
-				break;
-			case 4:
-				color = vec3(D);
-				break;
-			case 5:
-				color = specContrib;
-				break;
-		}
-	}
+	// Finally, combind the diffuse and specular contributions
+	vec3 color = diffuseContrib + specContrib;
 
 	return color;
 }
 
 vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
+
 	// Metallic and Roughness material properties are packed together
 	// In glTF, these factors can be specified by fixed scalar values
 	// or from a metallic-roughness map
@@ -280,14 +222,10 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		NdotV
 	);
 
-    // Walk through each light and add its color contribution.
-	// 
-	// Start with the directional light.
-	vec3 pointToLight = normalize(sceneData.lightDirection.xyz);     // Vector from surface point to light
-	vec3 color = getAnalyticalLight(materialInfo, n, v, pointToLight);
-
 	// Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
-	color += getIBLContribution(materialInfo, n, reflection) * sceneData.params.x;
+	// vec3 color = getIBLContribution(materialInfo, n, reflection) * sceneData.params.x;
+
+	vec3 color = vec3(0.);
 
 	// Apply optional PBR terms for additional (optional) shading
 	if (material.occlusionTextureID != NO_TEXTURE) {
@@ -296,6 +234,28 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		float ao = texture(textures[material.occlusionTextureID], inUV).g;
 		color = color * ao;
 	}
+
+    // Walk through each light and add its color contribution.
+
+	// pointToLight = sceneData.lightDirection.xyz;     // Vector from surface point to light
+	// color += getLightContribution(materialInfo, n, v, pointToLight);
+
+	// Now add a spot light;
+	Light spotLight = Light(
+		vec3(0., 0., -1.), // direction, transformed along negative Z
+		10.0, // range
+
+		vec3(1., 1., 1.), // color
+		5.0, // intensity
+
+		vec3(0., 2., 0.), // position
+		cos(0.), // innerConeCos
+
+		cos(0.7853982), // outerConeCos
+		LightType_Spot
+	);
+
+	color += getLightContribution(materialInfo, n, v, spotLight);
 
 	if (material.emissiveTextureID != NO_TEXTURE) {
 		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
@@ -334,8 +294,10 @@ void main() {
 		outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor);
 	} else if (material.workflow == PBR_WORKFLOW_UNLIT) {
 		outColor = baseColor;
-		outColor.a = 1;
 	}
+
+	// Finally, tonemap the color.
+	outColor = tonemap(outColor);
 
 	// Debugging
 	// Shader inputs debug visualization
