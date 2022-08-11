@@ -36,7 +36,7 @@ void main() {
 		vec3 bitangentW = cross(normalW, tangentW) * inTangent.w;
 		outTBN = mat3(tangentW, bitangentW, normalW);
 	} else {
-		// Mesh is skinned
+		// Mesh is skinnedh
 		mat4[MAX_JOINTS] jointMatrices = skinsBuffer.jointMatrices[d.skinID];
 		mat4 skinMatrix =
 			inWeight.x * jointMatrices[int(inJoint.x)] +
@@ -45,7 +45,15 @@ void main() {
 			inWeight.w * jointMatrices[int(inJoint.w)];
 
 		outGlobalPos = d.globalFromLocal * skinMatrix * vec4(inPos, 1.0);
-		outNormal = normalize(mat3(d.inverseTranspose) * mat3(skinMatrix) * inNormal);
+
+		mat3 m3_skinMatrix = mat3(skinMatrix);
+		vec3 normal = normalize(m3_skinMatrix * inNormal);
+		vec3 tangent = normalize(m3_skinMatrix * inTangent.xyz);
+
+		vec3 normalW = normalize(vec3(d.inverseTranspose * vec4(normal, 0.0)));
+		vec3 tangentW = normalize(vec3(d.globalFromLocal * vec4(tangent, 0.0)));
+		vec3 bitangentW = cross(normalW, tangentW) * inTangent.w;
+		outTBN = mat3(tangentW, bitangentW, normalW);
 	}
 
 	outUV = inUV;

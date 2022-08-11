@@ -23,6 +23,7 @@ layout (location = 0) in vec3 inGlobalPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec2 inUV;
 layout (location = 3) flat in uint inMaterialID;
+layout (location = 4) in mat3 inTBN;
 
 // Textures
 layout(set = 0, binding = 4) uniform sampler2D textures[];
@@ -77,25 +78,45 @@ vec4 tonemap(vec4 color)
 //
 // This has some potential correctness issues, in addition to being somewhat expensive. The solution
 // is to switch to mikktspace tangents: https://github.com/leetvr/hotham/issues/324 
+// vec3 getNormal(uint normalTextureID)
+// {
+// 	// We swizzle our normals to save on texture reads: https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-normal-maps
+// 	vec3 ntex;
+// 	ntex.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
+// 	ntex.z = sqrt(1 - dot(ntex.xy, ntex.xy));
+
+// 	vec3 q1 = dFdx(inGlobalPos);
+// 	vec3 q2 = dFdy(inGlobalPos);
+// 	vec2 st1 = dFdx(inUV);
+// 	vec2 st2 = dFdy(inUV);
+
+// 	vec3 N = normalize(inNormal);
+// 	vec3 T = normalize(q1 * st2.t - q2 * st1.t);
+// 	vec3 B = -normalize(cross(N, T));
+// 	mat3 TBN = mat3(T, B, N);
+
+// 	return normalize(TBN * tangentNormal);
+// }
+
+// Get normal, tangent and bitangent vectors.
 vec3 getNormal(uint normalTextureID)
 {
-	// We swizzle our normals to save on texture reads: https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-normal-maps
-	vec3 tangentNormal;
-	tangentNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
-	tangentNormal.z = sqrt(1 - dot(tangentNormal.xy, tangentNormal.xy));
+    vec3 n, t, b, ng;
 
-	vec3 q1 = dFdx(inGlobalPos);
-	vec3 q2 = dFdy(inGlobalPos);
-	vec2 st1 = dFdx(inUV);
-	vec2 st2 = dFdy(inUV);
+    // Trivial TBN computation, present as vertex attribute.
+    // Normalize eigenvectors as matrix is linearly interpolated.
+    t = normalize(inTBN[0]);
+    b = normalize(inTBN[1]);
+    ng = normalize(inTBN[2]);
 
-	vec3 N = normalize(inNormal);
-	vec3 T = normalize(q1 * st2.t - q2 * st1.t);
-	vec3 B = -normalize(cross(N, T));
-	mat3 TBN = mat3(T, B, N);
+	vec3 ntex;
+	ntex.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
+	ntex.z = sqrt(1 - dot(ntex.xy, ntex.xy));
+	ntex = normalize(ntex);
 
-	return normalize(TBN * tangentNormal);
+    return normalize(mat3(t, b, ng) * ntex);
 }
+
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
 vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 reflection, float NdotV)
@@ -184,11 +205,11 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	float alphaRoughness = perceptualRoughness * perceptualRoughness;
 	vec3 specularColor = mix(f0, baseColor.rgb, metalness);
 
-	// Get the normal
-	vec3 n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
-
 	// Get the view vector - from surface point to camera
 	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);
+
+	// Get the normal
+	vec3 n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
 
 	// Get NdotV
 	float NdotV = clamp(abs(dot(n, v)), 0., 1.0);
