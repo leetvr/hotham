@@ -10,7 +10,7 @@ pub struct Vertex {
     /// Normal in model space
     pub normal: Vector3<f32>,
     /// Tangent
-    pub tangent: Vector3<f32>,
+    pub tangent: Vector4<f32>,
     /// First set of texture coordinates
     pub texture_coords: Vector2<f32>,
     /// Joint indices (for skinning)
@@ -24,7 +24,7 @@ impl Vertex {
     pub fn new(
         position: Vector3<f32>,
         normal: Vector3<f32>,
-        tangent: Vector3<f32>,
+        tangent: Vector4<f32>,
         texture_coords: Vector2<f32>,
         joint_indices: Vector4<f32>,
         joint_weights: Vector4<f32>,
@@ -46,7 +46,7 @@ impl Vertex {
         t: (
             Vector3<f32>,
             Vector3<f32>,
-            Vector3<f32>,
+            Vector4<f32>,
             Vector2<f32>,
             Vector4<f32>,
             Vector4<f32>,
@@ -76,7 +76,7 @@ impl Vertex {
         let tangent = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(2)
-            .format(vk::Format::R32G32B32_SFLOAT)
+            .format(vk::Format::R32G32B32A32_SFLOAT)
             .offset(memoffset::offset_of!(Vertex, tangent) as _)
             .build();
 
@@ -104,6 +104,7 @@ impl Vertex {
         vec![
             position,
             normal,
+            tangent,
             texture_coords,
             joint_indices,
             joint_weights,

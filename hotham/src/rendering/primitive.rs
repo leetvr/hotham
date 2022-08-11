@@ -92,11 +92,7 @@ impl Primitive {
         // Tangents
         if let Some(iter) = reader.read_tangents() {
             for v in iter {
-                tangents.push(vector![v[0], v[1], v[2]]);
-            }
-        } else {
-            for _ in 0..positions.len() {
-                tangents.push(vector![0., 0., 0.]);
+                tangents.push(vector![v[0], v[1], v[2], v[3]]);
             }
         }
 
@@ -128,6 +124,10 @@ impl Primitive {
             for _ in 0..positions.len() {
                 joint_weights.push(vector![0., 0., 0., 0.]);
             }
+        }
+
+        if tangents.is_empty() {
+            todo!("Need to generate tangents!");
         }
 
         let vertices: Vec<Vertex> = izip!(

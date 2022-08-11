@@ -199,7 +199,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
         }
         StressTest::NormalTangentTest => {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!(
-                "../../../test_assets/normal_tangent_test.glb"
+                "../../../test_assets/normal_tangent_mirror_test.glb"
             )];
 
             let models =
