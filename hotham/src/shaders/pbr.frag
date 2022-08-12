@@ -235,7 +235,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		// Occlusion is stored in the 'g' channel as per:
 		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
 		float ao = texture(textures[material.occlusionTextureID], inUV).g;
-		// color = color * ao;
+		color = color * ao;
 	}
 
     // Walk through each light and add its color contribution.
