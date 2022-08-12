@@ -156,7 +156,7 @@ vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, float NdotV
 	return color;
 }
 
-vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
+vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor, vec3 p, vec3 n, vec2 uv) {
 
 	// Metallic and Roughness material properties are packed together
 	// In glTF, these factors can be specified by fixed scalar values
@@ -170,7 +170,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	} else {
 		// Roughness is stored in the 'g' channel, metallic is stored in the 'a' channel, as per
 		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
-		vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], inUV);
+		vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], uv);
 
 		// Roughness is authored as perceptual roughness; as is convention,
 		// convert to material roughness by squaring the perceptual roughness [2].
@@ -187,10 +187,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	vec3 specularColor = mix(f0, baseColor.rgb, metalness);
 
 	// Get the view vector - from surface point to camera
-	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);
-
-	// Get the normal
-	vec3 n = (material.normalTextureID == NOT_PRESENT) ? normalize(inNormal) : getNormal(material.normalTextureID);
+	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - p);
 
 	// Get NdotV
 	float NdotV = clamp(abs(dot(n, v)), 0., 1.0);
@@ -219,7 +216,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	if (material.occlusionTextureID != NOT_PRESENT) {
 		// Occlusion is stored in the 'g' channel as per:
 		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
-		float ao = texture(textures[material.occlusionTextureID], inUV).g;
+		float ao = texture(textures[material.occlusionTextureID], uv).g;
 		color = color * ao;
 	}
 
@@ -241,7 +238,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 
 	// Add emission, if present
 	if (material.emissiveTextureID != NOT_PRESENT) {
-		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
+		vec3 emissive = texture(textures[material.emissiveTextureID], uv).rgb;
 		color += emissive;
 	}
 
@@ -274,7 +271,10 @@ void main() {
 
 	// Choose the correct workflow for this material
 	if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-		outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor);
+		// Get the normal
+		vec3 n = (material.normalTextureID == NOT_PRESENT) ? normalize(inNormal) : getNormal(material.normalTextureID);
+
+		outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor, inGlobalPos, n, inUV);
 	} else if (material.workflow == PBR_WORKFLOW_UNLIT) {
 		outColor = baseColor;
 	}
