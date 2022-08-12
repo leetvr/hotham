@@ -256,20 +256,20 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 
 	// Now add a spot light;
 	Light spotLight = Light(
-		vec3(0., 0., -1.), // direction, transformed along negative Z
+		vec3(0.5, 0., -1.), // direction, transformed along negative Z
 		10.0, // range
 
 		vec3(1., 1., 1.), // color
 		5.0, // intensity
 
-		vec3(0., 2., 0.), // position
+		vec3(-2., 2., 2.), // position
 		cos(0.), // innerConeCos
 
 		cos(0.7853982), // outerConeCos
 		LightType_Spot
 	);
 
-	color += getLightContribution(materialInfo, n, v, NdotV, pointLight);
+	color += getLightContribution(materialInfo, n, v, NdotV, spotLight);
 
 	if (material.emissiveTextureID != NO_TEXTURE) {
 		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
