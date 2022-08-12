@@ -202,7 +202,10 @@ mod tests {
 
     use crate::{
         asset_importer,
-        rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
+        rendering::{
+            image::Image, legacy_buffer::Buffer, scene_data::DEFAULT_IBL_INTENSITY,
+            swapchain::SwapchainInfo,
+        },
         resources::RenderContext,
         systems::{update_global_transform_system, update_global_transform_with_parent_system},
         util::get_from_device_memory,
@@ -249,18 +252,15 @@ mod tests {
                 .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
         let params = vec![
-            ("Full", 0.0, 0.0),
-            ("Normals", 2.0, 0.0),
-            ("Diffuse", 0.0, 1.0),
-            ("F", 0.0, 2.0),
-            ("G", 0.0, 3.0),
-            ("D", 0.0, 4.0),
-            ("Specular", 0.0, 5.0),
+            ("Full", 0.0, DEFAULT_IBL_INTENSITY),
+            ("Diffuse", 1.0, DEFAULT_IBL_INTENSITY),
+            ("Normals", 2.0, DEFAULT_IBL_INTENSITY),
+            ("No_IBL", 0.0, 0.0),
         ];
 
         let errors: Vec<_> = params
             .iter()
-            .filter_map(|(name, debug_shader_inputs, debug_shader_params)| {
+            .filter_map(|(name, debug_shader_inputs, debug_ibl_intensity)| {
                 render_object_with_debug_data(
                     &vulkan_context,
                     &mut render_context,
@@ -269,7 +269,7 @@ mod tests {
                     image.clone(),
                     name,
                     *debug_shader_inputs,
-                    *debug_shader_params,
+                    *debug_ibl_intensity,
                 )
                 .err()
             })
@@ -285,7 +285,7 @@ mod tests {
         image: Image,
         name: &str,
         debug_shader_inputs: f32,
-        debug_shader_params: f32,
+        debug_ibl_intensity: f32,
     ) -> Result<(), String> {
         // Render the scene
         let mut renderdoc = begin_renderdoc();
@@ -293,7 +293,7 @@ mod tests {
             render_context,
             vulkan_context,
             debug_shader_inputs,
-            debug_shader_params,
+            debug_ibl_intensity,
             world,
         );
         if let Ok(renderdoc) = renderdoc.as_mut() {
@@ -362,7 +362,7 @@ mod tests {
         render_context: &mut RenderContext,
         vulkan_context: &VulkanContext,
         debug_shader_inputs: f32,
-        debug_shader_params: f32,
+        debug_ibl_intensity: f32,
         world: &mut World,
     ) {
         // SPONZA
@@ -397,7 +397,7 @@ mod tests {
         let views = vec![view.clone(), view];
         render_context.begin_frame(vulkan_context);
         render_context.scene_data.params.z = debug_shader_inputs;
-        render_context.scene_data.params.w = debug_shader_params;
+        render_context.scene_data.params.x = debug_ibl_intensity;
         update_global_transform_system(&mut Default::default(), world);
         update_global_transform_with_parent_system(
             &mut Default::default(),
