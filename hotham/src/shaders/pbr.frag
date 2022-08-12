@@ -120,12 +120,12 @@ vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 reflection, floa
 	return diffuse + specular;
 }
 
-vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, float NdotV, Light light) {
+vec3 getLightContribution(MaterialInfo materialInfo, vec3 p, vec3 n, vec3 v, float NdotV, Light light) {
 	// Get a vector between this point and the light.
 	vec3 pointToLight;
 	if (light.type != LightType_Directional)
 	{
-		pointToLight = light.position - inGlobalPos;
+		pointToLight = light.position - p;
 	}
 	else
 	{
@@ -224,16 +224,16 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor, vec3 p, vec
 	// Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
 	// Since these values are uniform, they shouldn't have too high of a penalty.
 	if (sceneData.lights[0].type != NOT_PRESENT) {
-		color += getLightContribution(materialInfo, n, v, NdotV, sceneData.lights[0]);
+		color += getLightContribution(materialInfo, p, n, v, NdotV, sceneData.lights[0]);
 	}
 	if (sceneData.lights[1].type != NOT_PRESENT) {
-		color += getLightContribution(materialInfo, n, v, NdotV, sceneData.lights[1]);
+		color += getLightContribution(materialInfo, p, n, v, NdotV, sceneData.lights[1]);
 	}
 	if (sceneData.lights[2].type != NOT_PRESENT) {
-		color += getLightContribution(materialInfo, n, v, NdotV, sceneData.lights[2]);
+		color += getLightContribution(materialInfo, p, n, v, NdotV, sceneData.lights[2]);
 	}
 	if (sceneData.lights[3].type != NOT_PRESENT) {
-		color += getLightContribution(materialInfo, n, v, NdotV, sceneData.lights[3]);
+		color += getLightContribution(materialInfo, p, n, v, NdotV, sceneData.lights[3]);
 	}
 
 	// Add emission, if present
