@@ -62,7 +62,7 @@ impl Light {
             direction,
             range,
             color: [1., 1., 1.].into(),
-            intensity: intensity,
+            intensity,
             position,
             inner_cone_cos: inner_cone_angle.cos(),
             outer_cone_cos: outer_cone_angle.cos(),
