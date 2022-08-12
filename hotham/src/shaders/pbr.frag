@@ -33,7 +33,7 @@ layout(set = 0, binding = 5) uniform samplerCube cubeTextures[];
 layout(location = 0) out vec4 outColor;
 
 // Encapsulate BRDF information about this material
-// TODO: This could all be precomputed.
+// TODO: This could all be precomputed!
 struct MaterialInfo
 {
 	vec3 f0;                      // full reflectance color (normal incidence angle)
@@ -70,34 +70,6 @@ vec4 tonemap(vec4 color)
 	return vec4(outcol, 1.0);
 }
 
-// Find the normal for this fragment, pulling either from a predefined normal map
-// or from the interpolated mesh normal and tangent attributes.
-//
-// TODO: We currently use "Normal Mapping Without Precomputed Tangents" as outlined in
-// http://www.thetenthplanet.de/archives/1180
-//
-// This has some potential correctness issues, in addition to being somewhat expensive. The solution
-// is to switch to mikktspace tangents: https://github.com/leetvr/hotham/issues/324 
-// vec3 getNormal(uint normalTextureID)
-// {
-// 	// We swizzle our normals to save on texture reads: https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-normal-maps
-// 	vec3 ntex;
-// 	ntex.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
-// 	ntex.z = sqrt(1 - dot(ntex.xy, ntex.xy));
-
-// 	vec3 q1 = dFdx(inGlobalPos);
-// 	vec3 q2 = dFdy(inGlobalPos);
-// 	vec2 st1 = dFdx(inUV);
-// 	vec2 st2 = dFdy(inUV);
-
-// 	vec3 N = normalize(inNormal);
-// 	vec3 T = normalize(q1 * st2.t - q2 * st1.t);
-// 	vec3 B = -normalize(cross(N, T));
-// 	mat3 TBN = mat3(T, B, N);
-
-// 	return normalize(TBN * tangentNormal);
-// }
-
 // Get normal, tangent and bitangent vectors.
 vec3 getNormal(uint normalTextureID)
 {
@@ -117,23 +89,34 @@ vec3 getNormal(uint normalTextureID)
     return normalize(mat3(t, b, ng) * ntex);
 }
 
-
 // Calculation of the lighting contribution from an optional Image Based Light source.
 vec3 getIBLContribution(MaterialInfo materialInfo, vec3 n, vec3 reflection, float NdotV)
 {
+	vec3 F0 = materialInfo.f0;
 	float lod = materialInfo.perceptualRoughness * float(DEFAULT_CUBE_MIPMAP_LEVELS -1);
 
-	// retrieve a scale and bias to F0. See [1], Figure 3
-	vec2 brdfSamplePoint = clamp(vec2(NdotV, 1.0 - materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-	vec3 brdf = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rgb;
+	vec2 brdfSamplePoint = clamp(vec2(NdotV, materialInfo.perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
+	vec2 f_ab = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rg;
 
-	// Get diffuse and specular light values
-	vec3 diffuseLight = texture(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], n).rgb;
 	vec3 specularLight = textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb;
+	vec3 diffuseLight = textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).rgb;
 
-	// Multiply them by their respective inputs to get their final colors.
-	vec3 diffuse = diffuseLight * materialInfo.diffuseColor;
-	vec3 specular = specularLight * (materialInfo.specularColor * brdf.x + brdf.y);
+
+    // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
+    // Roughness dependent fresnel, from Fdez-Aguera
+    vec3 Fr = max(vec3(1.0 - materialInfo.perceptualRoughness), F0) - F0;
+    vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
+    vec3 FssEss = k_S * f_ab.x + f_ab.y;
+
+    vec3 specular = specularLight * FssEss;
+
+    // Multiple scattering, from Fdez-Aguera
+    float Ems = (1.0 - (f_ab.x + f_ab.y));
+    vec3 F_avg = F0 + (1.0 - F0) / 21.0;
+    vec3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
+    vec3 k_D = materialInfo.diffuseColor * (1.0 - FssEss + FmsEms); // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
+
+	vec3 diffuse = (FmsEms + k_D) * diffuseLight;
 
 	return diffuse + specular;
 }
@@ -153,8 +136,7 @@ vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, float NdotV
 	vec3 l = normalize(pointToLight);
 	vec3 h = normalize(l + v);  // Half vector between both l and v
 
-	// TODO: Changing the clamp value to 0 here results in very strange colour values. This is NOT RIGHT.
-	float NdotL = clamp(dot(n, l), 0.001, 1.0);
+	float NdotL = clamp(dot(n, l), 0.0, 1.0);
 	float NdotH = clamp(dot(n, h), 0.0, 1.0);
 	float LdotH = clamp(dot(l, h), 0.0, 1.0);
 	float VdotH = clamp(dot(v, h), 0.0, 1.0);
@@ -183,7 +165,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	float perceptualRoughness = material.roughnessFactor;
 	float metalness = material.metallicFactor;
 
-	if (material.physicalDescriptorTextureID == NO_TEXTURE) {
+	if (material.physicalDescriptorTextureID == NOT_PRESENT) {
 		perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
 		metalness = clamp(metalness, 0., 1.0);
 	} else {
@@ -209,13 +191,14 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);
 
 	// Get the normal
-	vec3 n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
+	vec3 n = (material.normalTextureID == NOT_PRESENT) ? normalize(inNormal) : getNormal(material.normalTextureID);
 
 	// Get NdotV
 	float NdotV = clamp(abs(dot(n, v)), 0., 1.0);
 
 	vec3 reflection = -normalize(reflect(v, n));
 
+	// Collect all the material info.
 	MaterialInfo materialInfo = MaterialInfo(
 		f0,
 		f90,
@@ -226,52 +209,39 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 	);
 
 	// Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
-	// vec3 color = getIBLContribution(materialInfo, n, reflection, NdotV) * sceneData.params.x;
-	vec3 color = vec3(0.);
+	vec3 color;
+	if (sceneData.params.x > 0.) {
+		color = getIBLContribution(materialInfo, n, reflection, NdotV) * sceneData.params.x;
+	} else {
+		color = vec3(0.);
+	}
 
-	// Apply optional PBR terms for additional (optional) shading
-	if (material.occlusionTextureID != NO_TEXTURE) {
+	// Apply ambient occlusion, if present.
+	if (material.occlusionTextureID != NOT_PRESENT) {
 		// Occlusion is stored in the 'g' channel as per:
 		// https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
 		float ao = texture(textures[material.occlusionTextureID], inUV).g;
-		// color = color * ao;
+		color = color * ao;
 	}
 
     // Walk through each light and add its color contribution.
+	// Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
+	// Since these values are uniform, they shouldn't have too high of a penalty.
+	if (sceneData.lights[0].type != NOT_PRESENT) {
+		color += getLightContribution(materialInfo, n, v, NdotV, sceneData.lights[0]);
+	}
+	if (sceneData.lights[1].type != NOT_PRESENT) {
+		color += getLightContribution(materialInfo, n, v, NdotV, sceneData.lights[1]);
+	}
+	if (sceneData.lights[2].type != NOT_PRESENT) {
+		color += getLightContribution(materialInfo, n, v, NdotV, sceneData.lights[2]);
+	}
+	if (sceneData.lights[3].type != NOT_PRESENT) {
+		color += getLightContribution(materialInfo, n, v, NdotV, sceneData.lights[3]);
+	}
 
-	// Now add a spot light;
-	Light pointLight = Light(
-		vec3(0., 0., 0.),  // no direction
-		3.0, // range
-
-		vec3(1., 1., 1.), // color
-		5.0, // intensity
-
-		vec3(0., 0., 0.), // position
-		0.,
-
-		0.,
-		LightType_Point
-	);
-
-	// Now add a spot light;
-	Light spotLight = Light(
-		vec3(0.5, 0., -1.), // direction, transformed along negative Z
-		10.0, // range
-
-		vec3(1., 1., 1.), // color
-		5.0, // intensity
-
-		vec3(-2., 2., 2.), // position
-		cos(0.), // innerConeCos
-
-		cos(0.7853982), // outerConeCos
-		LightType_Spot
-	);
-
-	color += getLightContribution(materialInfo, n, v, NdotV, spotLight);
-
-	if (material.emissiveTextureID != NO_TEXTURE) {
+	// Add emission, if present
+	if (material.emissiveTextureID != NOT_PRESENT) {
 		vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
 		color += emissive;
 	}
@@ -289,7 +259,7 @@ void main() {
 	// Determine the base color
 	vec4 baseColor;
 
-	if (material.baseColorTextureID == NO_TEXTURE) {
+	if (material.baseColorTextureID == NOT_PRESENT) {
 		baseColor = material.baseColorFactor;
 	} else {
 		baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
@@ -323,20 +293,20 @@ void main() {
 				outColor.rgba = baseColor;
 				break;
 			case 2:
-				vec3 n = (material.normalTextureID == NO_TEXTURE) ? normalize(inNormal) : getNormal(material.normalTextureID);
+				vec3 n = (material.normalTextureID == NOT_PRESENT) ? normalize(inNormal) : getNormal(material.normalTextureID);
 				outColor.rgb = n * 0.5 + 0.5;
 				break;
 			case 3:
-				outColor.rgb = (material.occlusionTextureID == NO_TEXTURE) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], inUV).ggg;
+				outColor.rgb = (material.occlusionTextureID == NOT_PRESENT) ? vec3(0.0f) : texture(textures[material.occlusionTextureID], inUV).ggg;
 				break;
 			case 4:
-				outColor.rgb = (material.emissiveTextureID == NO_TEXTURE) ?  vec3(0.0f) : texture(textures[material.emissiveTextureID], inUV).rgb;
+				outColor.rgb = (material.emissiveTextureID == NOT_PRESENT) ?  vec3(0.0f) : texture(textures[material.emissiveTextureID], inUV).rgb;
 				break;
 			case 5:
-				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
+				outColor.rgb = (material.physicalDescriptorTextureID == NOT_PRESENT) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
 				break;
 			case 6:
-				outColor.rgb = (material.physicalDescriptorTextureID == NO_TEXTURE) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).aaa;
+				outColor.rgb = (material.physicalDescriptorTextureID == NOT_PRESENT) ? vec3(0.0) : texture(textures[material.physicalDescriptorTextureID], inUV).aaa;
 				break;
 		}
 		outColor = outColor;

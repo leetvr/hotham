@@ -40,5 +40,7 @@ pub mod resources;
 /// Data to instruct the renderer how a primitive should look
 pub mod material;
 
+/// Lights and related functionality
+pub mod light;
 /// Wrapper around geometry data.
 pub mod mesh_data;

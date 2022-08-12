@@ -11,6 +11,7 @@ use hotham::{
     hecs::{With, World},
     nalgebra::{UnitQuaternion, Vector3},
     rendering::{
+        light::Light,
         material::Material,
         mesh_data::MeshData,
         primitive::{calculate_bounding_sphere, Primitive},
@@ -208,6 +209,22 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             for name in models.keys() {
                 add_model_to_world(name, &models, &mut world, None);
             }
+
+            let scene_data = &mut render_context.scene_data;
+
+            // Disable IBL
+            scene_data.params.x = 0.;
+
+            // Add a spotlight pointing at the scene
+            scene_data.lights[0] = Light::new_spotlight(
+                [0.5, 0., -1.].into(),
+                10.,
+                5.,
+                [-2., 2., 2.].into(),
+                0.,
+                0.7853892,
+            );
+
             models
         }
     };

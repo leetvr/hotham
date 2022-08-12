@@ -25,7 +25,7 @@ out gl_PerVertex {
 void main() {
 	DrawData d = drawDataBuffer.data[gl_InstanceIndex];
 
-	if (d.skinID == NO_SKIN) {
+	if (d.skinID == NOT_PRESENT) {
 		// Mesh has no skin
 		outGlobalPos = d.globalFromLocal * vec4(inPos, 1.0);
 		vec3 normal = normalize(inNormal);
@@ -36,7 +36,7 @@ void main() {
 		vec3 bitangentW = cross(normalW, tangentW) * inTangent.w;
 		outTBN = mat3(tangentW, bitangentW, normalW);
 	} else {
-		// Mesh is skinnedh
+		// Mesh is skinned
 		mat4[MAX_JOINTS] jointMatrices = skinsBuffer.jointMatrices[d.skinID];
 		mat4 skinMatrix =
 			inWeight.x * jointMatrices[int(inJoint.x)] +

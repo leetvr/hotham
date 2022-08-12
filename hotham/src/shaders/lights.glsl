@@ -1,31 +1,9 @@
-// Light related data structures and functionality, mostly borrowed from:
+// Light related functionality, mostly borrowed from:
 // https://github.com/KhronosGroup/glTF-Sample-Viewer/blob/master/source/Renderer/shaders/punctual.glsl
 
-// Representation of a light in a scene, based on the KHR_lights_punctual extension:
-// https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_lights_punctual
-struct Light {
-    vec3 direction;
-    float range;
-
-    vec3 color;
-    float intensity;
-
-    vec3 position;
-    float innerConeCos;
-
-    float outerConeCos;
-    int type;
-};
-
-const int LightType_Directional = 0;
-const int LightType_Point = 1;
-const int LightType_Spot = 2;
-
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#range-property
-float getRangeAttenuation(float range, float distance)
-{
-    if (range <= 0.0)
-    {
+float getRangeAttenuation(float range, float distance) {
+    if (range <= 0.0) {
         // negative range means unlimited
         return 1.0 / pow(distance, 2.0);
     }
@@ -34,13 +12,10 @@ float getRangeAttenuation(float range, float distance)
 
 
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#inner-and-outer-cone-angles
-float getSpotAttenuation(vec3 pointToLight, vec3 spotDirection, float outerConeCos, float innerConeCos)
-{
+float getSpotAttenuation(vec3 pointToLight, vec3 spotDirection, float outerConeCos, float innerConeCos) {
     float actualCos = dot(normalize(spotDirection), normalize(-pointToLight));
-    if (actualCos > outerConeCos)
-    {
-        if (actualCos < innerConeCos)
-        {
+    if (actualCos > outerConeCos) {
+        if (actualCos < innerConeCos) {
             return smoothstep(outerConeCos, innerConeCos, actualCos);
         }
         return 1.0;
@@ -49,18 +24,15 @@ float getSpotAttenuation(vec3 pointToLight, vec3 spotDirection, float outerConeC
 }
 
 
-vec3 getLightIntensity(Light light, vec3 pointToLight)
-{
+vec3 getLightIntensity(Light light, vec3 pointToLight)         {
     float rangeAttenuation = 1.0;
     float spotAttenuation = 1.0;
 
-    if (light.type != LightType_Directional)
-    {
+    if (light.type != LightType_Directional) {
         rangeAttenuation = getRangeAttenuation(light.range, length(pointToLight));
     }
 
-    if (light.type == LightType_Spot)
-    {
+    if (light.type == LightType_Spot) {
         spotAttenuation = getSpotAttenuation(pointToLight, light.direction, light.outerConeCos, light.innerConeCos);
     }
 
