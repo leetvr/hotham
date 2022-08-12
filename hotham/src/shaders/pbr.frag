@@ -1,6 +1,6 @@
 // PBR shader based on a combination of Sascha Willems' implementation:
 // https://github.com/SaschaWillems/Vulkan-glTF-PBR
-// 
+//
 // and the Khronos glTF-Sample Viewer:
 // https://github.com/KhronosGroup/glTF-WebGL-PBR
 
@@ -84,7 +84,6 @@ vec3 getNormal(uint normalTextureID)
 	vec3 ntex;
 	ntex.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
 	ntex.z = sqrt(1 - dot(ntex.xy, ntex.xy));
-	ntex = normalize(ntex);
 
     return normalize(mat3(t, b, ng) * ntex);
 }
