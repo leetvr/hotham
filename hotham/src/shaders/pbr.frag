@@ -98,7 +98,6 @@ vec3 getNormal(uint normalTextureID)
 		vec3 ntex;
 		ntex.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
 		ntex.z = sqrt(1 - dot(ntex.xy, ntex.xy));
-		ntex = normalize(ntex);
 		return normalize(mat3(t, b, ng) * ntex);
 	} else {
 		return ng;
