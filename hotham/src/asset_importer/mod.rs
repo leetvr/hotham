@@ -86,9 +86,7 @@ fn get_lights_from_gltf_data(document: &Document) -> Result<Vec<Light>> {
     let mut lights = Vec::new();
     for node in document
         .default_scene()
-        .ok_or(anyhow::format_err!(
-            "glTF file does not have a default scene!"
-        ))?
+        .ok_or_else(|| anyhow::format_err!("glTF file does not have a default scene!"))?
         .nodes()
     {
         if let Some(light) = node.light() {

@@ -107,7 +107,7 @@ impl Light {
         let color = light.color().into();
         let range = light.range().unwrap_or(-1.);
         let along_negative_z = [0., 0., -1.].into();
-        let direction = rotation.transform_vector(&along_negative_z).into();
+        let direction = rotation.transform_vector(&along_negative_z);
         let position = translation.into();
 
         match light.kind() {
