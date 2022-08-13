@@ -237,7 +237,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 		// color = color * ao;
 	}
 
-    // Walk through each light and add its color contribution.
+	// Walk through each light and add its color contribution.
 	// Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
 	// Since these values are uniform, they shouldn't have too high of a penalty.
 	if (sceneData.lights[0].type != NOT_PRESENT) {
