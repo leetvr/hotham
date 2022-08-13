@@ -1,4 +1,4 @@
-use nalgebra::Vector3;
+use nalgebra::{UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
 /// A directional light.
@@ -54,6 +54,7 @@ impl Light {
         direction: Vector3<f32>,
         range: f32,
         intensity: f32,
+        color: Vector3<f32>,
         position: Vector3<f32>,
         inner_cone_angle: f32,
         outer_cone_angle: f32,
@@ -61,12 +62,73 @@ impl Light {
         Self {
             direction,
             range,
-            color: [1., 1., 1.].into(),
+            color,
             intensity,
             position,
             inner_cone_cos: inner_cone_angle.cos(),
             outer_cone_cos: outer_cone_angle.cos(),
             light_type: LIGHT_TYPE_SPOT,
+        }
+    }
+
+    /// Create a new directional light
+    pub fn new_directional(direction: Vector3<f32>, intensity: f32, color: Vector3<f32>) -> Self {
+        Self {
+            direction,
+            color,
+            intensity,
+            light_type: LIGHT_TYPE_DIRECTIONAL,
+            ..Default::default()
+        }
+    }
+
+    /// Create a new point light
+    pub fn new_point(
+        position: Vector3<f32>,
+        range: f32,
+        intensity: f32,
+        color: Vector3<f32>,
+    ) -> Self {
+        Self {
+            position,
+            range,
+            color,
+            intensity,
+            light_type: LIGHT_TYPE_POINT,
+            ..Default::default()
+        }
+    }
+
+    pub(crate) fn from_gltf(light: &gltf::khr_lights_punctual::Light, node: &gltf::Node) -> Self {
+        // TODO: Technically scale could apply here as well.
+        let (translation, rotation, _) = node.transform().decomposed();
+        let rotation = UnitQuaternion::new_unchecked(rotation.into());
+        let intensity = light.intensity();
+        let color = light.color().into();
+        let range = light.range().unwrap_or(-1.);
+        let along_negative_z = [0., 0., -1.].into();
+        let direction = rotation.transform_vector(&along_negative_z).into();
+        let position = translation.into();
+
+        match light.kind() {
+            gltf::khr_lights_punctual::Kind::Directional => {
+                Light::new_directional(direction, intensity, color)
+            }
+            gltf::khr_lights_punctual::Kind::Point => {
+                Light::new_point(position, range, intensity, color)
+            }
+            gltf::khr_lights_punctual::Kind::Spot {
+                inner_cone_angle,
+                outer_cone_angle,
+            } => Light::new_spotlight(
+                direction,
+                range,
+                intensity,
+                color,
+                position,
+                inner_cone_angle,
+                outer_cone_angle,
+            ),
         }
     }
 }

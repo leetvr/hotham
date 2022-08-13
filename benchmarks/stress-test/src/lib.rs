@@ -220,6 +220,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 [0.5, 0., -1.].into(),
                 10.,
                 5.,
+                [1., 1., 1.].into(),
                 [-2., 2., 2.].into(),
                 0.,
                 0.7853892,
