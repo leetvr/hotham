@@ -145,7 +145,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
         create_info.pp_enabled_extension_names,
         create_info.enabled_extension_count as usize,
     );
-    for ext in &(*xr_extensions) {
+    for ext in xr_extensions {
         enabled_extensions.push(CStr::from_ptr(*ext));
     }
 

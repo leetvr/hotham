@@ -27,7 +27,7 @@ pub struct AudioContext {
 }
 
 /// A music track
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
 pub struct MusicTrack {
     index: Index,
 }
