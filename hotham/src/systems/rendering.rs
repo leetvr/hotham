@@ -238,25 +238,12 @@ mod tests {
         let mut render_context =
             RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
 
-        // Get a model from GLTF
-        // let gltf_data: Vec<(&[u8], &[u8])> = vec![(
-        //     include_bytes!("../../../test_assets/Sponza.gltf"),
-        //     include_bytes!("../../../test_assets/Sponza.bin"),
-        // )];
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
         let mut models =
             asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
                 .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
-        let params = vec![
-            ("Full", 0.0, 0.0),
-            ("Normals", 2.0, 0.0),
-            ("Diffuse", 0.0, 1.0),
-            ("F", 0.0, 2.0),
-            ("G", 0.0, 3.0),
-            ("D", 0.0, 4.0),
-            ("Specular", 0.0, 5.0),
-        ];
+        let params = vec![("Full", 0.0, 0.0), ("Normals", 2.0, 0.0)];
 
         let errors: Vec<_> = params
             .iter()
@@ -365,15 +352,6 @@ mod tests {
         debug_shader_params: f32,
         world: &mut World,
     ) {
-        // SPONZA
-        // let rotation: mint::Quaternion<f32> =
-        //     UnitQuaternion::from_euler_angles(0., 90_f32.to_radians(), 0.).into();
-        // let position = Vector3f {
-        //     x: 0.0,
-        //     y: 1.4,
-        //     z: 0.0,
-        // };
-
         // HELMET
         let rotation: mint::Quaternion<f32> =
             UnitQuaternion::from_euler_angles(0., 45_f32.to_radians(), 0.).into();
