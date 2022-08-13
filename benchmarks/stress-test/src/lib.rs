@@ -27,7 +27,7 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
-use systems::setup_cubes;
+use systems::setup_grid_of_models;
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -38,7 +38,7 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let test = StressTest::ManyHelmets;
+    let test = StressTest::ManySpheres;
     let (world, models) = init(&mut engine, &test);
     let queries = Default::default();
     let timer = Default::default();
@@ -101,6 +101,8 @@ impl Timer {
 pub enum StressTest {
     /// Generate one cube per second
     ManyCubes,
+    /// Generate one sphere per second
+    ManySpheres,
     /// Display an additional model each second
     ManyHelmets,
     /// Create a dynamic mesh and increase the number of vertices each second
@@ -128,9 +130,17 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                     .unwrap();
 
             let resolution = 34; // 42,875 cubes
+            setup_grid_of_models(&mut world, resolution, &models, "Cube");
+            models
+        }
+        StressTest::ManySpheres => {
+            let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/sphere.glb")];
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
 
-            setup_cubes(&mut world, resolution, &models);
-
+            let resolution = 34; // 42,875 spheres
+            setup_grid_of_models(&mut world, resolution, &models, "Sphere");
             models
         }
         StressTest::CullingStressTest => {

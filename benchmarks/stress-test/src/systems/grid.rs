@@ -5,7 +5,7 @@ use hotham::{
     nalgebra::Vector3,
 };
 
-pub fn setup_cubes(world: &mut World, resolution: usize, models: &Models) {
+pub fn setup_grid_of_models(world: &mut World, resolution: usize, models: &Models, name: &str) {
     let step = 2. / resolution as f32;
     let scale_factor = 3.;
     let scale = Vector3::repeat(step / scale_factor);
@@ -15,7 +15,7 @@ pub fn setup_cubes(world: &mut World, resolution: usize, models: &Models) {
     for floor in 0..resolution {
         for row in 0..resolution {
             for column in 0..resolution {
-                let c = add_model_to_world("Cube", models, world, None).unwrap();
+                let c = add_model_to_world(name, models, world, None).unwrap();
                 let mut t = world.get_mut::<LocalTransform>(c).unwrap();
                 t.scale = scale;
                 t.translation.y = floor as f32 / scale_factor;
