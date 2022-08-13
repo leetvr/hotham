@@ -202,10 +202,7 @@ mod tests {
 
     use crate::{
         asset_importer,
-        rendering::{
-            image::Image, legacy_buffer::Buffer, scene_data::DEFAULT_IBL_INTENSITY,
-            swapchain::SwapchainInfo,
-        },
+        rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
         resources::RenderContext,
         systems::{update_global_transform_system, update_global_transform_with_parent_system},
         util::get_from_device_memory,
@@ -252,9 +249,9 @@ mod tests {
                 .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
         let params = vec![
-            ("Full", 0.0, DEFAULT_IBL_INTENSITY),
-            ("Diffuse", 1.0, DEFAULT_IBL_INTENSITY),
-            ("Normals", 2.0, DEFAULT_IBL_INTENSITY),
+            ("Full", 0.0, scene_data::DEFAULT_IBL_INTENSITY),
+            ("Diffuse", 1.0, scene_data::DEFAULT_IBL_INTENSITY),
+            ("Normals", 2.0, scene_data::DEFAULT_IBL_INTENSITY),
             ("No_IBL", 0.0, 0.0),
         ];
 
