@@ -25,6 +25,7 @@ layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
 
 // Outputs
 layout (location = 0) out vec4 outColor;
+layout (depth_less) out float gl_FragDepth;
 
 void findIntersection(in DrawData d, out vec4 hitPoint, out vec3 normal) {
     float a = dot(inRayDir, inSurfaceQTimesRayDir);
