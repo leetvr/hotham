@@ -202,7 +202,8 @@ fn load_ibl_textures(
 pub struct DrawData {
     /// The transform of the parent mesh
     pub global_from_local: Matrix4<f32>,
-    /// The inverse transpose of the transform of the parent mesh
+    /// The inverse of the transform of the parent mesh
+    /// Transform normals by treating by multiplying with the matrix on the right hand side
     pub local_from_global: Matrix4<f32>,
     /// The ID of the material to use.
     pub material_id: u32,
