@@ -1,3 +1,7 @@
 {
-    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools"
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
+    "[glsl]": {
+        "editor.formatOnSave": false
+    },
+    "webgl-glsl-editor.format.placeSpaceAfterKeywords": true
 }

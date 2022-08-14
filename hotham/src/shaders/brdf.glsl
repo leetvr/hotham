@@ -10,8 +10,7 @@
 
 const float M_PI = 3.141592653589793;
 
-vec3 F_Schlick(vec3 f0, vec3 f90, float VdotH)
-{
+vec3 F_Schlick(vec3 f0, vec3 f90, float VdotH) {
     return f0 + (f90 - f0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
 }
 
@@ -20,21 +19,18 @@ vec3 F_Schlick(vec3 f0, vec3 f90, float VdotH)
 // see Eric Heitz. 2014. Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs. Journal of Computer Graphics Techniques, 3
 // see Real-Time Rendering. Page 331 to 336.
 // see https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
-float V_GGX(float NdotL, float NdotV, float alphaRoughness)
-{
+float V_GGX(float NdotL, float NdotV, float alphaRoughness) {
     float alphaRoughnessSq = alphaRoughness * alphaRoughness;
 
     float GGXV = NdotL * sqrt(NdotV * NdotV * (1.0 - alphaRoughnessSq) + alphaRoughnessSq);
     float GGXL = NdotV * sqrt(NdotL * NdotL * (1.0 - alphaRoughnessSq) + alphaRoughnessSq);
 
     float GGX = GGXV + GGXL;
-    if (GGX > 0.0)
-    {
+    if (GGX > 0.0) {
         return 0.5 / GGX;
     }
     return 0.0;
 }
-
 
 // The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
 // Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
@@ -45,13 +41,11 @@ float D_GGX(float NdotH, float alphaRoughness) {
     return alphaRoughnessSq / (M_PI * f * f);
 }
 
-
 //https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
 vec3 BRDF_lambertian(vec3 f0, vec3 f90, vec3 diffuseColor, float VdotH) {
     // see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
     return (1.0 - F_Schlick(f0, f90, VdotH)) * (diffuseColor / M_PI);
 }
-
 
 //  https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
 vec3 BRDF_specularGGX(vec3 f0, vec3 f90, float alphaRoughness, float VdotH, float NdotL, float NdotV, float NdotH) {
