@@ -1,28 +1,16 @@
-use std::{collections::HashMap, convert::TryInto};
+use std::convert::TryInto;
 
 use crate::{
     components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Visible},
-    rendering::{
-        primitive::Primitive,
-        resources::{DrawData, PrimitiveCullData},
-    },
-    resources::RenderContext,
+    rendering::resources::{DrawData, PrimitiveCullData},
     resources::VulkanContext,
+    resources::{
+        render_context::{Instance, InstancedPrimitive},
+        RenderContext,
+    },
 };
 use hecs::{PreparedQuery, With, World};
-use nalgebra::{Matrix4, Vector4};
 use openxr as xr;
-
-struct Instance {
-    global_from_local: Matrix4<f32>,
-    bounding_sphere: Vector4<f32>,
-    skin_id: u32,
-}
-
-struct InstancedPrimitive {
-    primitive: Primitive,
-    instances: Vec<Instance>,
-}
 
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
@@ -30,8 +18,39 @@ struct InstancedPrimitive {
 /// Requirements:
 /// - BEFORE: ensure you have called render_context.begin_frame
 /// - AFTER: ensure you have called render_context.end_frame
+///
+/// Advanced users may instead call [`begin`], [`draw_world`], and [`end`] manually.
 #[allow(clippy::type_complexity)]
 pub fn rendering_system(
+    query: &mut PreparedQuery<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>,
+    world: &mut World,
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+    views: &[xr::View],
+    swapchain_image_index: usize,
+) {
+    unsafe {
+        begin(
+            query,
+            world,
+            vulkan_context,
+            render_context,
+            views,
+            swapchain_image_index,
+        );
+        draw_world(vulkan_context, render_context);
+        end(vulkan_context, render_context);
+    }
+}
+
+/// Prepare to draw the world
+///
+/// Begins the render pass used to draw the world, but records no drawing commands.
+///
+/// # Safety
+///
+/// Must be called at the start of the process or after [`end`]
+pub unsafe fn begin(
     query: &mut PreparedQuery<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
@@ -44,7 +63,6 @@ pub fn rendering_system(
     //
     // We use primitive.index_buffer_offset as our primitive ID as it is guaranteed to be unique between
     // primitives.
-    let mut primitive_map: HashMap<u32, InstancedPrimitive> = Default::default();
     let meshes = &render_context.resources.mesh_data;
 
     for (_, (mesh, global_transform, skin)) in query.query_mut(world) {
@@ -53,7 +71,8 @@ pub fn rendering_system(
         for primitive in &mesh.primitives {
             let key = primitive.index_buffer_offset;
 
-            primitive_map
+            render_context
+                .primitive_map
                 .entry(key)
                 .or_insert(InstancedPrimitive {
                     primitive: primitive.clone(),
@@ -67,7 +86,6 @@ pub fn rendering_system(
                 });
         }
     }
-    let primitive_map = primitive_map;
 
     // Next organize this data into a layout that's easily consumed by the compute shader.
     // ORDER IS IMPORTANT HERE! The final buffer should look something like:
@@ -85,17 +103,15 @@ pub fn rendering_system(
     let cull_data = &mut frame.primitive_cull_data_buffer;
     cull_data.clear();
 
-    for instanced_primitive in primitive_map.values() {
+    for instanced_primitive in render_context.primitive_map.values() {
         let primitive = &instanced_primitive.primitive;
         for (i, instance) in instanced_primitive.instances.iter().enumerate() {
-            unsafe {
-                cull_data.push(&PrimitiveCullData {
-                    index_instance: i.try_into().unwrap(),
-                    index_offset: primitive.index_buffer_offset,
-                    bounding_sphere: instance.bounding_sphere,
-                    visible: false,
-                });
-            }
+            cull_data.push(&PrimitiveCullData {
+                index_instance: i.try_into().unwrap(),
+                index_offset: primitive.index_buffer_offset,
+                bounding_sphere: instance.bounding_sphere,
+                visible: false,
+            });
         }
     }
 
@@ -107,83 +123,109 @@ pub fn rendering_system(
 
     // Begin the render pass, bind descriptor sets.
     render_context.begin_pbr_render_pass(vulkan_context, swapchain_image_index);
+}
 
+/// Draw the world
+///
+/// Records commands to draw all visible meshes
+///
+/// # Safety
+///
+/// Must be between [`begin`] and [`end`]
+pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
     // Parse through the cull buffer and record commands. This is a bit complex.
-    unsafe {
-        let device = &vulkan_context.device;
-        let frame = &mut render_context.frames[render_context.frame_index];
-        let command_buffer = frame.command_buffer;
-        let draw_data_buffer = &mut frame.draw_data_buffer;
-        draw_data_buffer.clear();
+    let device = &vulkan_context.device;
+    let frame = &mut render_context.frames[render_context.frame_index];
+    let command_buffer = frame.command_buffer;
+    let draw_data_buffer = &mut frame.draw_data_buffer;
+    draw_data_buffer.clear();
 
-        let mut instance_offset = 0;
-        let mut current_primitive_id = u32::MAX;
-        let mut instance_count = 0;
-        let cull_data = frame.primitive_cull_data_buffer.as_slice();
+    let mut instance_offset = 0;
+    let mut current_primitive_id = u32::MAX;
+    let mut instance_count = 0;
+    let cull_data = frame.primitive_cull_data_buffer.as_slice();
 
-        for cull_result in cull_data {
-            // If we haven't yet set our primitive ID, set it now.
-            if current_primitive_id == u32::MAX {
-                current_primitive_id = cull_result.index_offset;
-            }
-
-            // We're finished with this primitive. Record the command and increase our offset.
-            if cull_result.index_offset != current_primitive_id {
-                let primitive = &primitive_map.get(&current_primitive_id).unwrap().primitive;
-
-                // Don't record commands for primitives which have no instances, eg. have been culled.
-                if instance_count > 0 {
-                    device.cmd_draw_indexed(
-                        command_buffer,
-                        primitive.indices_count,
-                        instance_count,
-                        primitive.index_buffer_offset,
-                        primitive.vertex_buffer_offset as _,
-                        instance_offset,
-                    );
-                }
-
-                current_primitive_id = cull_result.index_offset;
-                instance_offset += instance_count;
-                instance_count = 0;
-            }
-
-            // If this primitive is visible, increase the instance count and record its draw data.
-            if cull_result.visible {
-                let instanced_primitive = primitive_map.get(&current_primitive_id).unwrap();
-                let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
-                let draw_data = DrawData {
-                    global_from_local: instance.global_from_local,
-                    inverse_transpose: instance
-                        .global_from_local
-                        .try_inverse()
-                        .unwrap()
-                        .transpose(),
-                    material_id: instanced_primitive.primitive.material_id,
-                    skin_id: instance.skin_id,
-                };
-                draw_data_buffer.push(&draw_data);
-                instance_count += 1;
-            }
+    for cull_result in cull_data {
+        // If we haven't yet set our primitive ID, set it now.
+        if current_primitive_id == u32::MAX {
+            current_primitive_id = cull_result.index_offset;
         }
 
-        // Finally, record the last primitive. This is counterintuitive at first glance, but the loop above only
-        // records a command when the primitive has changed. If we don't do this, the last primitive will never
-        // be drawn.
-        if instance_count > 0 {
-            let primitive = &primitive_map.get(&current_primitive_id).unwrap().primitive;
-            device.cmd_draw_indexed(
-                command_buffer,
-                primitive.indices_count,
-                instance_count,
-                primitive.index_buffer_offset,
-                primitive.vertex_buffer_offset as _,
-                instance_offset,
-            );
+        // We're finished with this primitive. Record the command and increase our offset.
+        if cull_result.index_offset != current_primitive_id {
+            let primitive = &render_context
+                .primitive_map
+                .get(&current_primitive_id)
+                .unwrap()
+                .primitive;
+
+            // Don't record commands for primitives which have no instances, eg. have been culled.
+            if instance_count > 0 {
+                device.cmd_draw_indexed(
+                    command_buffer,
+                    primitive.indices_count,
+                    instance_count,
+                    primitive.index_buffer_offset,
+                    primitive.vertex_buffer_offset as _,
+                    instance_offset,
+                );
+            }
+
+            current_primitive_id = cull_result.index_offset;
+            instance_offset += instance_count;
+            instance_count = 0;
+        }
+
+        // If this primitive is visible, increase the instance count and record its draw data.
+        if cull_result.visible {
+            let instanced_primitive = render_context
+                .primitive_map
+                .get(&current_primitive_id)
+                .unwrap();
+            let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
+            let draw_data = DrawData {
+                global_from_local: instance.global_from_local,
+                inverse_transpose: instance
+                    .global_from_local
+                    .try_inverse()
+                    .unwrap()
+                    .transpose(),
+                material_id: instanced_primitive.primitive.material_id,
+                skin_id: instance.skin_id,
+            };
+            draw_data_buffer.push(&draw_data);
+            instance_count += 1;
         }
     }
 
+    // Finally, record the last primitive. This is counterintuitive at first glance, but the loop above only
+    // records a command when the primitive has changed. If we don't do this, the last primitive will never
+    // be drawn.
+    if instance_count > 0 {
+        let primitive = &render_context
+            .primitive_map
+            .get(&current_primitive_id)
+            .unwrap()
+            .primitive;
+        device.cmd_draw_indexed(
+            command_buffer,
+            primitive.indices_count,
+            instance_count,
+            primitive.index_buffer_offset,
+            primitive.vertex_buffer_offset as _,
+            instance_offset,
+        );
+    }
+}
+
+/// Finish drawing
+///
+/// # Safety
+///
+/// Must be called after `begin`
+pub fn end(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
     // OK. We're all done!
+    render_context.primitive_map.clear();
     render_context.end_pbr_render_pass(vulkan_context);
 }
 

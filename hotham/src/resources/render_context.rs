@@ -1,4 +1,4 @@
-use std::{ffi::CStr, mem::size_of, slice::from_ref as slice_from_ref};
+use std::{collections::HashMap, ffi::CStr, mem::size_of, slice::from_ref as slice_from_ref};
 
 pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
@@ -22,6 +22,7 @@ use crate::{
         descriptors::Descriptors,
         frame::Frame,
         image::Image,
+        primitive::Primitive,
         resources::Resources,
         scene_data::SceneData,
         swapchain::{Swapchain, SwapchainInfo},
@@ -32,7 +33,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::vk::{self, Handle};
-use nalgebra::{Matrix4, RowVector4};
+use nalgebra::{Matrix4, RowVector4, Vector4};
 use openxr as xr;
 use vk_shader_macros::include_glsl;
 
@@ -57,6 +58,9 @@ pub struct RenderContext {
     pub(crate) frames: [Frame; PIPELINE_DEPTH],
     pub(crate) swapchain: Swapchain,
     pub(crate) descriptors: Descriptors,
+
+    // Populated only between rendering::begin and rendering::end
+    pub(crate) primitive_map: HashMap<u32, InstancedPrimitive>,
 }
 
 impl RenderContext {
@@ -68,6 +72,11 @@ impl RenderContext {
         // Build swapchain
         let swapchain = SwapchainInfo::from_openxr_swapchain(xr_swapchain, swapchain_resolution)?;
         Self::new_from_swapchain_info(vulkan_context, &swapchain)
+    }
+
+    /// Command buffer of the current frame
+    pub fn cmd(&self) -> vk::CommandBuffer {
+        self.frames[self.frame_index].command_buffer
     }
 
     pub(crate) fn new_from_swapchain_info(
@@ -119,6 +128,8 @@ impl RenderContext {
             scene_data,
             descriptors,
             resources,
+
+            primitive_map: HashMap::default(),
         })
     }
 
@@ -413,6 +424,17 @@ impl RenderContext {
 
         Ok(texture_index)
     }
+}
+
+pub(crate) struct InstancedPrimitive {
+    pub(crate) primitive: Primitive,
+    pub(crate) instances: Vec<Instance>,
+}
+
+pub(crate) struct Instance {
+    pub(crate) global_from_local: Matrix4<f32>,
+    pub(crate) bounding_sphere: Vector4<f32>,
+    pub(crate) skin_id: u32,
 }
 
 pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
