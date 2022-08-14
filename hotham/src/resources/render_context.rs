@@ -416,7 +416,7 @@ impl RenderContext {
 }
 
 pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(std::mem::transmute(p), size_of::<T>()) }
+    unsafe { std::slice::from_raw_parts(p as *const T as *const u8, size_of::<T>()) }
 }
 
 #[derive(Debug, Copy, Clone)]
