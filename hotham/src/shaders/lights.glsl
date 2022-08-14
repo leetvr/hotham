@@ -10,7 +10,6 @@ float getRangeAttenuation(float range, float distance) {
     return max(min(1.0 - pow(distance / range, 4.0), 1.0), 0.0) / pow(distance, 2.0);
 }
 
-
 // https://github.com/KhronosGroup/glTF/blob/master/extensions/2.0/Khronos/KHR_lights_punctual/README.md#inner-and-outer-cone-angles
 float getSpotAttenuation(vec3 pointToLight, vec3 spotDirection, float outerConeCos, float innerConeCos) {
     float actualCos = dot(normalize(spotDirection), normalize(-pointToLight));
@@ -23,8 +22,7 @@ float getSpotAttenuation(vec3 pointToLight, vec3 spotDirection, float outerConeC
     return 0.0;
 }
 
-
-vec3 getLightIntensity(Light light, vec3 pointToLight)         {
+vec3 getLightIntensity(Light light, vec3 pointToLight) {
     float rangeAttenuation = 1.0;
     float spotAttenuation = 1.0;
 
