@@ -39,26 +39,30 @@ void findIntersection(in DrawData d, out vec4 hitPoint, out vec3 normal) {
     }
 
     // Pick closest solution, but still in front of us
-    float t0 = (-b - sqrt(discriminant)) / (2.0 * a);
-    float t1 = (-b + sqrt(discriminant)) / (2.0 * a);
+    vec2 t = vec2(
+        (-b - sqrt(discriminant)) / (2.0 * a),
+        (-b + sqrt(discriminant)) / (2.0 * a));
+    t = vec2(min(t.x, t.y), max(t.x, t.y));
 
-    if (t1 < 0.0) {
+    if (t.y < 0.0) {
         discard;
     }
 
-    if (t0 >= 0.0) {
-        hitPoint = inRayOrigin + inRayDir * t0;
-        normal = normalize((d.surfaceQ * hitPoint).xyz);
+    if (t.x >= 0.0) {
+        hitPoint = inRayOrigin + inRayDir * t.x;
+        normal = (d.surfaceQ * hitPoint).xyz;
+        normal = normalize(-dot(inRayDir.xyz, normal) * normal);
         float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
-        if (dot(inRayDir.xyz, normal) <= 0.0 && boundsValue <= 0.0) {
+        if (boundsValue <= 0.0) {
             return;
         }
     }
-    // t1 >= 0
-    hitPoint = inRayOrigin + inRayDir * t1;
-    normal = normalize((d.surfaceQ * hitPoint).xyz);
+    // t.y >= 0
+    hitPoint = inRayOrigin + inRayDir * t.y;
+    normal = (d.surfaceQ * hitPoint).xyz;
+    normal = normalize(-dot(inRayDir.xyz, normal) * normal);
     float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
-    if (dot(inRayDir.xyz, normal) <= 0.0 && boundsValue <= 0.0) {
+    if (boundsValue <= 0.0) {
         return;
     }
     discard;
