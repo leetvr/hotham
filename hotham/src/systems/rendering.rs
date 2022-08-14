@@ -186,11 +186,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
             let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
             let draw_data = DrawData {
                 global_from_local: instance.global_from_local,
-                inverse_transpose: instance
-                    .global_from_local
-                    .try_inverse()
-                    .unwrap()
-                    .transpose(),
+                local_from_global: instance.global_from_local.try_inverse().unwrap(),
                 material_id: instanced_primitive.primitive.material_id,
                 skin_id: instance.skin_id,
             };

@@ -29,7 +29,7 @@ void main() {
 		vec3 normal = normalize(inNormal);
 		vec3 tangent = normalize(inTangent.xyz);
 
-		vec3 globalNormal = normalize(mat3(d.inverseTranspose) * normal);
+		vec3 globalNormal = normalize(normal * mat3(d.localFromGlobal));
 		vec3 globalTangent = normalize(mat3(d.globalFromLocal) * tangent);
 		vec3 globalBiTangent = cross(globalNormal, globalTangent) * inTangent.w;
 		outTBN = mat3(globalTangent, globalBiTangent, globalNormal);
@@ -48,7 +48,7 @@ void main() {
 		vec3 normal = normalize(m3_skinMatrix * inNormal);
 		vec3 tangent = normalize(m3_skinMatrix * inTangent.xyz);
 
-		vec3 globalNormal = normalize(mat3(d.inverseTranspose) * normal);
+		vec3 globalNormal = normalize(normal * mat3(d.localFromGlobal));
 		vec3 globalTangent = normalize(mat3(d.globalFromLocal) * tangent);
 		vec3 globalBiTangent = cross(globalNormal, globalTangent) * inTangent.w;
 		outTBN = mat3(globalTangent, globalBiTangent, globalNormal);

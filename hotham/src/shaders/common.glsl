@@ -7,7 +7,7 @@
 
 struct DrawData {
     mat4 globalFromLocal;
-    mat4 inverseTranspose;
+    mat4 localFromGlobal;
     uint materialID;
     uint skinID;
 };
