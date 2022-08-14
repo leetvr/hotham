@@ -13,10 +13,11 @@ layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 #include "pbr.glsl"
 
 // Inputs
-layout (location = 0) in vec3 inGlobalPos;
-layout (location = 1) in vec2 inUV;
-layout (location = 2) flat in uint inMaterialID;
-layout (location = 3) in mat3 inTBN;
+layout (location = 0) in vec4 inRayOrigin;
+layout (location = 1) in vec4 inRayDir;
+layout (location = 2) in vec4 inSurfaceQTimesRayOrigin;
+layout (location = 3) in vec4 inSurfaceQTimesRayDir;
+layout (location = 4) in flat uint inInstanceIndex;
 
 layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
     Material materials[];
@@ -25,32 +26,64 @@ layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
 // Outputs
 layout (location = 0) out vec4 outColor;
 
-// Get normal, tangent and bitangent vectors.
-vec3 getNormal(uint normalTextureID) {
-    vec3 n, t, b, ng;
+void findIntersection(in DrawData d, out vec4 hitPoint, out vec3 normal) {
+    float a = dot(inRayDir, inSurfaceQTimesRayDir);
+    float b = dot(inRayOrigin, inSurfaceQTimesRayDir) + dot(inRayDir, inSurfaceQTimesRayOrigin);
+    float c = dot(inRayOrigin, inSurfaceQTimesRayOrigin);
 
-    // Trivial TBN computation, present as vertex attribute.
-    // Normalize eigenvectors as matrix is linearly interpolated.
-    t = normalize(inTBN[0]);
-    b = normalize(inTBN[1]);
-    ng = normalize(inTBN[2]);
-
-    if (normalTextureID != NOT_PRESENT) {
-        vec3 ntex;
-        ntex.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
-        ntex.z = sqrt(1 - dot(ntex.xy, ntex.xy));
-        return normalize(mat3(t, b, ng) * ntex);
-    } else {
-        return ng;
+    // Discriminant from quadratic formula
+    // b^2 - 4ac
+    float discriminant = b * b - 4.0 * a * c;
+    if (discriminant < 0.0) {
+        discard;
     }
+
+    // Pick closest solution, but still in front of us
+    float t0 = (-b - sqrt(discriminant)) / (2.0 * a);
+    float t1 = (-b + sqrt(discriminant)) / (2.0 * a);
+
+    if (t1 < 0.0) {
+        discard;
+    }
+
+    if (t0 >= 0.0) {
+        hitPoint = inRayOrigin + inRayDir * t0;
+        normal = normalize((d.surfaceQ * hitPoint).xyz);
+        float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
+        if (dot(inRayDir.xyz, normal) <= 0.0 && boundsValue <= 0.0) {
+            return;
+        }
+    }
+    // t1 >= 0
+    hitPoint = inRayOrigin + inRayDir * t1;
+    normal = normalize((d.surfaceQ * hitPoint).xyz);
+    float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
+    if (dot(inRayDir.xyz, normal) <= 0.0 && boundsValue <= 0.0) {
+        return;
+    }
+    discard;
 }
 
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
     outColor = ERROR_MAGENTA;
 
+    // Retrieve draw data
+    DrawData d = drawDataBuffer.data[inInstanceIndex];
+
+    // Find ray-quadric intersection, if any
+    vec4 hitPoint;
+    vec3 normal;
+    findIntersection(d, hitPoint, normal);
+    vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * hitPoint;
+    float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
+    gl_FragDepth = f_ndc_depth;
+
+    vec4 uv4 = d.uvFromGlobal * hitPoint;
+    vec2 uv = uv4.xy / uv4.w;
+
     // Retrieve the material from the buffer.
-    Material material = materialBuffer.materials[inMaterialID];
+    Material material = materialBuffer.materials[d.materialID];
 
     // Determine the base color
     vec4 baseColor;
@@ -58,7 +91,7 @@ void main() {
     if (material.baseColorTextureID == NOT_PRESENT) {
         baseColor = material.baseColorFactor;
     } else {
-        baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
+        baseColor = texture(textures[material.baseColorTextureID], uv) * material.baseColorFactor;
     }
 
     // Handle transparency
@@ -71,9 +104,7 @@ void main() {
 
     // Choose the correct workflow for this material
     if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        // Get the normal
-        vec3 n = getNormal(material.normalTextureID);
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor, inGlobalPos, n, inUV);
+        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor, hitPoint.xyz, normal, uv);
     } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
         outColor = baseColor;
     }
@@ -91,20 +122,19 @@ void main() {
                 outColor.rgba = baseColor;
                 break;
             case 2:
-                vec3 n = getNormal(material.normalTextureID);
-                outColor.rgb = n * 0.5 + 0.5;
+                outColor.rgb = normal * 0.5 + 0.5;
                 break;
             case 3:
-                outColor.rgb = (material.occlusionTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.occlusionTextureID], inUV).ggg;
+                outColor.rgb = (material.occlusionTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.occlusionTextureID], uv).ggg;
                 break;
             case 4:
-                outColor.rgb = (material.emissiveTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.emissiveTextureID], inUV).rgb;
+                outColor.rgb = (material.emissiveTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.emissiveTextureID], uv).rgb;
                 break;
             case 5:
-                outColor.rgb = (material.physicalDescriptorTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
+                outColor.rgb = (material.physicalDescriptorTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.physicalDescriptorTextureID], uv).ggg;
                 break;
             case 6:
-                outColor.rgb = (material.physicalDescriptorTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.physicalDescriptorTextureID], inUV).aaa;
+                outColor.rgb = (material.physicalDescriptorTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.physicalDescriptorTextureID], uv).aaa;
                 break;
         }
         outColor = outColor;

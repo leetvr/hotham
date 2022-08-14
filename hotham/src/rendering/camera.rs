@@ -36,7 +36,7 @@ impl Camera {
     /// Get the camera's position
     pub fn position(&self) -> Vector4<f32> {
         let p = self.position.translation.vector;
-        vector![p[0], p[1], p[2], 0.]
+        vector![p[0], p[1], p[2], 1.]
     }
 
     /// Build the camera's view matrix

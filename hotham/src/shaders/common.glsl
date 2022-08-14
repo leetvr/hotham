@@ -7,9 +7,10 @@
 
 struct DrawData {
     mat4 globalFromLocal;
-    mat4 localFromGlobal;
+    mat4 surfaceQ;
+    mat4 boundsQ;
+    mat4 uvFromGlobal;
     uint materialID;
-    uint skinID;
 };
 
 // Representation of a light in a scene, based on the KHR_lights_punctual extension:

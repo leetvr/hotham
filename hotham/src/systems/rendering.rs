@@ -10,7 +10,7 @@ use crate::{
     resources::VulkanContext,
 };
 use hecs::{PreparedQuery, With, World};
-use nalgebra::{Matrix4, Vector4};
+use nalgebra::{vector, Matrix4, Vector4};
 use openxr as xr;
 
 struct Instance {
@@ -152,11 +152,20 @@ pub fn rendering_system(
             if cull_result.visible {
                 let instanced_primitive = primitive_map.get(&current_primitive_id).unwrap();
                 let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
+                let local_from_global = instance.global_from_local.try_inverse().unwrap();
+                let surface_q_in_local = Matrix4::from_diagonal(&vector![1.0, 1.0, 1.0, -0.25]);
+                let mut bounds_q_in_local = Matrix4::zeros();
+                let mut c = bounds_q_in_local.column_mut(3);
+                c += vector![1.0, 0.0, 0.0, -0.2];
+                let uv_from_local = Matrix4::identity();
                 let draw_data = DrawData {
                     global_from_local: instance.global_from_local,
-                    local_from_global: instance.global_from_local.try_inverse().unwrap(),
+                    surface_q: local_from_global.transpose()
+                        * surface_q_in_local
+                        * local_from_global,
+                    bounds_q: local_from_global.transpose() * bounds_q_in_local * local_from_global,
+                    uv_from_global: instance.global_from_local * uv_from_local,
                     material_id: instanced_primitive.primitive.material_id,
-                    skin_id: instance.skin_id,
                 };
                 draw_data_buffer.push(&draw_data);
                 instance_count += 1;

@@ -202,13 +202,14 @@ fn load_ibl_textures(
 pub struct DrawData {
     /// The transform of the parent mesh
     pub global_from_local: Matrix4<f32>,
-    /// The inverse of the transform of the parent mesh
-    /// Transform normals by treating by multiplying with the matrix on the right hand side
-    pub local_from_global: Matrix4<f32>,
+    /// The quadric matrix that describes the quadric equation for the surface, x^t * Q * x = 0
+    pub surface_q: Matrix4<f32>,
+    /// The quadric matrix that describes the surface bounds, x^t * Q * x < 0
+    pub bounds_q: Matrix4<f32>,
+    /// The projective matrix that takes global coords into UV space.
+    pub uv_from_global: Matrix4<f32>,
     /// The ID of the material to use.
     pub material_id: u32,
-    /// An optional skin to use.
-    pub skin_id: u32,
 }
 
 /// Information for the culling shader on how to cull this primitive.

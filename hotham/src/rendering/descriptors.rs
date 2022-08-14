@@ -160,7 +160,7 @@ unsafe fn create_descriptor_layouts(
         vk::DescriptorSetLayoutBinding {
             binding: DRAW_DATA_BINDING,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-            stage_flags: vk::ShaderStageFlags::VERTEX,
+            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1,
             ..Default::default()
         },
