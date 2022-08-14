@@ -185,6 +185,7 @@ impl RenderContext {
             scene_data.camera_position = self.scene_data.camera_position;
             scene_data.view_projection = self.scene_data.view_projection;
             scene_data.params = self.scene_data.params;
+            scene_data.lights = self.scene_data.lights;
         }
     }
 

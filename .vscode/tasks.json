@@ -25,6 +25,26 @@
 			"command": "run",
 			"args": [
 				"--bin",
+				"hotham_stress_test_desktop",
+				"--release"
+			],
+			"env": {
+				"RUST_BACKTRACE": "1"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "Run Hotham stress test on the simulator",
+			"group": {
+				"kind": "test",
+				"isDefault": false
+			}
+		},
+		{
+			"type": "cargo",
+			"command": "run",
+			"args": [
+				"--bin",
 				"hotham_simple_scene_example",
 				"--release"
 			],

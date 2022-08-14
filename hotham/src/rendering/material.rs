@@ -8,10 +8,8 @@ use crate::{
 
 /// Tells the fragment shader to use the PBR Metallic Roughness workflow
 pub static METALLIC_ROUGHNESS_WORKFLOW: u32 = 0;
-/// Tells the fragment shader to use the PBR Specular Glossy workflow
-pub static SPECULAR_GLOSSINESS_WORKFLOW: u32 = 1;
 /// Tells the fragment shader to use the unlit workflow
-pub static UNLIT_WORKFLOW: u32 = 2;
+pub static UNLIT_WORKFLOW: u32 = 1;
 
 /// Material index into the default material
 pub static NO_MATERIAL: usize = 0;
@@ -25,10 +23,6 @@ pub struct Material {
     pub base_color_factor: Vector4<f32>,
     /// The color and intensity of the light being emitted by the material
     pub emissive_factor: Vector4<f32>,
-    /// How diffuse is this material?
-    pub diffuse_factor: Vector4<f32>,
-    /// How specular is this material?
-    pub specular_factor: Vector4<f32>,
     /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
     pub workflow: u32,
     /// The base color texture.
@@ -61,7 +55,6 @@ impl Material {
     /// Load a material from a glTF document
     pub(crate) fn load(material: MaterialData, import_context: &mut ImportContext) {
         let pbr_metallic_roughness = material.pbr_metallic_roughness();
-        let pbr_specular_glossiness = material.pbr_specular_glossiness();
 
         // Base Color
         let base_color_texture_info = pbr_metallic_roughness.base_color_texture();
@@ -96,14 +89,6 @@ impl Material {
 
         // Factors
         let emissive_factor = vector![0., 0., 0., 0.];
-        let diffuse_factor = pbr_specular_glossiness
-            .as_ref()
-            .map(|p| Vector4::from(p.diffuse_factor()))
-            .unwrap_or_else(Vector4::zeros);
-        let specular_factor = pbr_specular_glossiness
-            .as_ref()
-            .map(|p| arr_to_vec4(p.specular_factor()))
-            .unwrap_or_else(Vector4::zeros);
         let metallic_factor = pbr_metallic_roughness.metallic_factor();
         let roughness_factor = pbr_metallic_roughness.roughness_factor();
 
@@ -116,8 +101,8 @@ impl Material {
         };
 
         // Workflow
-        let workflow = if pbr_specular_glossiness.is_some() {
-            SPECULAR_GLOSSINESS_WORKFLOW
+        let workflow = if material.unlit() {
+            UNLIT_WORKFLOW
         } else {
             METALLIC_ROUGHNESS_WORKFLOW
         };
@@ -126,8 +111,6 @@ impl Material {
         let material = Material {
             base_color_factor,
             emissive_factor,
-            diffuse_factor,
-            specular_factor,
             workflow,
             base_color_texture_set,
             physical_descriptor_texture_id: metallic_roughness_texture_set,
@@ -164,8 +147,6 @@ impl Material {
         Self {
             base_color_factor: [1., 1., 1., 1.].into(),
             emissive_factor: Default::default(),
-            diffuse_factor: Default::default(),
-            specular_factor: Default::default(),
             workflow: METALLIC_ROUGHNESS_WORKFLOW,
             base_color_texture_set: NO_TEXTURE,
             physical_descriptor_texture_id: NO_TEXTURE,
@@ -178,8 +159,4 @@ impl Material {
             alpha_mask_cutoff: Default::default(),
         }
     }
-}
-
-fn arr_to_vec4(vec3: [f32; 3]) -> Vector4<f32> {
-    vector![vec3[0], vec3[1], vec3[2], 0.]
 }

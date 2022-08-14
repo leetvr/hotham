@@ -1,9 +1,12 @@
+/// Representation of a glTF Scene
+pub mod scene;
+
 use crate::{
     components::{
         animation_controller::AnimationController, GlobalTransform, Info, LocalTransform, Mesh,
         Parent, Root, Skin, Visible,
     },
-    rendering::material::Material,
+    rendering::{light::Light, material::Material},
     resources::{RenderContext, VulkanContext},
 };
 use anyhow::Result;
@@ -11,6 +14,8 @@ use anyhow::Result;
 use gltf::Document;
 use hecs::{Entity, World};
 use std::{borrow::Cow, collections::HashMap};
+
+use self::scene::Scene;
 
 /// Convenience type for models
 pub type Models = HashMap<String, World>;
@@ -52,6 +57,45 @@ impl<'a> ImportContext<'a> {
     }
 }
 
+/// Load glTF scene from a GLB file
+pub fn load_scene_from_glb(
+    glb_buffer: &[u8],
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+) -> Result<Scene> {
+    // Global models map, shared between imports.
+    let mut models = HashMap::new();
+
+    let mut import_context = ImportContext::new(vulkan_context, render_context, glb_buffer);
+    load_models_from_gltf_data(&mut import_context).unwrap();
+
+    // Take all the models we imported and add them to the global map
+    for (k, v) in import_context.models.drain() {
+        models.insert(k, v);
+    }
+
+    let lights = get_lights_from_gltf_data(&import_context.document)?;
+    dbg!(&lights);
+
+    Ok(Scene { models, lights })
+}
+
+// TODO: At the moment we only support lights in the top level scene object. glTF lets us do fancier things like
+//       have lights be part of the node heirarchy, which we should definitely support, but we're not there yet.
+fn get_lights_from_gltf_data(document: &Document) -> Result<Vec<Light>> {
+    let mut lights = Vec::new();
+    for node in document
+        .default_scene()
+        .ok_or_else(|| anyhow::format_err!("glTF file does not have a default scene!"))?
+        .nodes()
+    {
+        if let Some(light) = node.light() {
+            lights.push(Light::from_gltf(&light, &node));
+        }
+    }
+
+    Ok(lights)
+}
 /// Load glTF models from an array of GLB files.
 pub fn load_models_from_glb(
     glb_buffers: &[&[u8]],
