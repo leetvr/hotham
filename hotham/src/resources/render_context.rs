@@ -43,6 +43,7 @@ static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulka
 
 // TODO: Is this a good idea?
 pub const PIPELINE_DEPTH: usize = 2;
+pub const SAMPLES: vk::SampleCountFlags = vk::SampleCountFlags::TYPE_4;
 
 pub struct RenderContext {
     pub frame_index: usize,
@@ -77,6 +78,10 @@ impl RenderContext {
     /// Command buffer of the current frame
     pub fn cmd(&self) -> vk::CommandBuffer {
         self.frames[self.frame_index].command_buffer
+    }
+
+    pub fn render_area(&self) -> vk::Rect2D {
+        self.swapchain.render_area
     }
 
     pub(crate) fn new_from_swapchain_info(
