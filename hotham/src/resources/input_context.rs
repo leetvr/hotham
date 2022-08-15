@@ -42,8 +42,8 @@ pub struct LeftInputContext {
     linear_velocity: Vector3<f32>,
     angular_velocity: Vector3<f32>,
     // pose input
-    grip_pose_local: Isometry3<f32>,
-    aim_pose_local: Isometry3<f32>,
+    stage_from_grip: Isometry3<f32>,
+    stage_from_aim: Isometry3<f32>,
 }
 
 impl LeftInputContext {
@@ -161,11 +161,11 @@ impl LeftInputContext {
     pub fn angular_velocity(&self) -> Vector3<f32> {
         self.angular_velocity
     }
-    pub fn grip_pose_local(&self) -> Isometry3<f32> {
-        self.grip_pose_local
+    pub fn stage_from_grip(&self) -> Isometry3<f32> {
+        self.stage_from_grip
     }
-    pub fn aim_pose_local(&self) -> Isometry3<f32> {
-        self.aim_pose_local
+    pub fn stage_from_aim(&self) -> Isometry3<f32> {
+        self.stage_from_aim
     }
 }
 
@@ -204,8 +204,8 @@ pub struct RightInputContext {
     linear_velocity: Vector3<f32>,
     angular_velocity: Vector3<f32>,
     // pose input
-    grip_pose_local: Isometry3<f32>,
-    aim_pose_local: Isometry3<f32>,
+    stage_from_grip: Isometry3<f32>,
+    stage_from_aim: Isometry3<f32>,
 }
 
 impl RightInputContext {
@@ -314,11 +314,11 @@ impl RightInputContext {
     pub fn angular_velocity(&self) -> Vector3<f32> {
         self.angular_velocity
     }
-    pub fn grip_pose_local(&self) -> Isometry3<f32> {
-        self.grip_pose_local
+    pub fn stage_from_grip(&self) -> Isometry3<f32> {
+        self.stage_from_grip
     }
-    pub fn aim_pose_local(&self) -> Isometry3<f32> {
-        self.aim_pose_local
+    pub fn stage_from_aim(&self) -> Isometry3<f32> {
+        self.stage_from_aim
     }
 }
 
@@ -410,12 +410,12 @@ impl InputContext {
             xr::ActionInput::get(&input.squeeze_action, session, left_subaction_path)
                 .unwrap()
                 .current_state;
-        self.left.grip_button = self.left.grip_analog > 0.0;
+        self.left.grip_button = self.left.grip_analog > 0.1;
         self.left.trigger_analog =
             xr::ActionInput::get(&input.trigger_action, session, left_subaction_path)
                 .unwrap()
                 .current_state;
-        self.left.trigger_button = self.left.trigger_analog > 0.0;
+        self.left.trigger_button = self.left.trigger_analog > 0.1;
         self.left.thumbstick_xy.x =
             xr::ActionInput::get(&input.thumbstick_x_action, session, left_subaction_path)
                 .unwrap()
@@ -430,7 +430,7 @@ impl InputContext {
             .relate(&xr_context.stage_space, time)
             .unwrap();
         if is_space_valid(location) {
-            self.left.grip_pose_local = posef_to_isometry(location.pose);
+            self.left.stage_from_grip = posef_to_isometry(location.pose);
             self.left.linear_velocity = mint::Vector3::from(velocity.linear_velocity).into();
             self.left.angular_velocity = mint::Vector3::from(velocity.angular_velocity).into();
         }
@@ -439,7 +439,7 @@ impl InputContext {
             .locate(&xr_context.stage_space, time)
             .unwrap();
         if is_space_valid(location) {
-            self.left.aim_pose_local = posef_to_isometry(location.pose);
+            self.left.stage_from_aim = posef_to_isometry(location.pose);
         }
 
         self.right.a_button =
@@ -484,12 +484,12 @@ impl InputContext {
             xr::ActionInput::get(&input.squeeze_action, session, right_subaction_path)
                 .unwrap()
                 .current_state;
-        self.right.grip_button = self.right.grip_analog > 0.0;
+        self.right.grip_button = self.right.grip_analog > 0.1;
         self.right.trigger_analog =
             xr::ActionInput::get(&input.trigger_action, session, right_subaction_path)
                 .unwrap()
                 .current_state;
-        self.right.trigger_button = self.right.trigger_analog > 0.0;
+        self.right.trigger_button = self.right.trigger_analog > 0.1;
         self.right.thumbstick_xy.x =
             xr::ActionInput::get(&input.thumbstick_x_action, session, right_subaction_path)
                 .unwrap()
@@ -504,7 +504,7 @@ impl InputContext {
             .relate(&xr_context.stage_space, time)
             .unwrap();
         if is_space_valid(location) {
-            self.right.grip_pose_local = posef_to_isometry(location.pose);
+            self.right.stage_from_grip = posef_to_isometry(location.pose);
             self.right.linear_velocity = mint::Vector3::from(velocity.linear_velocity).into();
             self.right.angular_velocity = mint::Vector3::from(velocity.angular_velocity).into();
         }
@@ -513,7 +513,7 @@ impl InputContext {
             .locate(&xr_context.stage_space, time)
             .unwrap();
         if is_space_valid(location) {
-            self.right.aim_pose_local = posef_to_isometry(location.pose);
+            self.right.stage_from_aim = posef_to_isometry(location.pose);
         }
     }
 }

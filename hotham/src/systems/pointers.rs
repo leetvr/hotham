@@ -40,11 +40,11 @@ pub fn pointers_system(
         // Get our the space and path of the pointer.
         let (mut pose, trigger_value) = match pointer.handedness {
             Handedness::Left => (
-                input_context.left.grip_pose_local(),
+                input_context.left.stage_from_grip(),
                 input_context.left.trigger_analog(),
             ),
             Handedness::Right => (
-                input_context.right.grip_pose_local(),
+                input_context.right.stage_from_grip(),
                 input_context.right.trigger_analog(),
             ),
         };

@@ -28,8 +28,8 @@ pub fn sabers_system(
     for (_, (color, rigid_body)) in query.query_mut(world) {
         // Get our the space and path of the hand.
         let mut pose = match color {
-            Color::Red => input_context.left.grip_pose_local(),
-            Color::Blue => input_context.right.grip_pose_local(),
+            Color::Red => input_context.left.stage_from_grip(),
+            Color::Blue => input_context.right.stage_from_grip(),
         };
 
         // apply transform
