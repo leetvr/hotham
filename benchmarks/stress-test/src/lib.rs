@@ -255,7 +255,12 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
     let physics_context = &mut engine.physics_context;
 
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        hands_system(&mut queries.hands_query, world, input_context, physics_context);
+        hands_system(
+            &mut queries.hands_query,
+            world,
+            input_context,
+            physics_context,
+        );
         grabbing_system(&mut queries.grabbing_query, world, physics_context);
         physics_step(physics_context);
         collision_system(&mut queries.collision_query, world, physics_context);
