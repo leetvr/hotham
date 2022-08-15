@@ -50,6 +50,7 @@ pub fn rendering_system(
 /// # Safety
 ///
 /// Must be called at the start of the process or after [`end`]
+#[allow(clippy::type_complexity)]
 pub unsafe fn begin(
     query: &mut PreparedQuery<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>,
     world: &mut World,
