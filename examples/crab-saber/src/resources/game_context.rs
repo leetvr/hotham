@@ -254,7 +254,7 @@ pub fn pre_spawn_cube(
         .unwrap();
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GameState {
     Init,
     MainMenu,
@@ -262,7 +262,7 @@ pub enum GameState {
     GameOver,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Song {
     pub track: MusicTrack,
     pub beat_length: Duration,

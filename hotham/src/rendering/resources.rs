@@ -6,8 +6,13 @@ use vulkan_context::VulkanContext;
 use crate::resources::vulkan_context;
 
 use super::{
-    buffer::Buffer, descriptors::Descriptors, image::Image, material::Material,
-    mesh_data::MeshData, vertex::Vertex,
+    buffer::Buffer,
+    descriptors::{Descriptors, MATERIALS_BINDING, SKINS_BINDING},
+    image::Image,
+    material::Material,
+    mesh_data::MeshData,
+    texture::{parse_ktx2, DEFAULT_COMPONENT_MAPPING},
+    vertex::Vertex,
 };
 
 static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
@@ -64,7 +69,7 @@ impl Resources {
             MATERIAL_BUFFER_SIZE,
         );
         for set in descriptors.sets {
-            materials_buffer.update_descriptor_set(&vulkan_context.device, set, 1);
+            materials_buffer.update_descriptor_set(&vulkan_context.device, set, MATERIALS_BINDING);
         }
 
         // RESERVE index 0 for the default material, available as the material::NO_MATERIAL constant.
@@ -77,7 +82,7 @@ impl Resources {
         );
 
         for set in descriptors.sets {
-            skins_buffer.update_descriptor_set(&vulkan_context.device, set, 2);
+            skins_buffer.update_descriptor_set(&vulkan_context.device, set, SKINS_BINDING);
         }
 
         let texture_sampler = vulkan_context
@@ -88,13 +93,15 @@ impl Resources {
             .create_texture_sampler(vk::SamplerAddressMode::CLAMP_TO_EDGE)
             .unwrap();
 
+        load_ibl_textures(vulkan_context, descriptors, cube_sampler);
+
         Self {
             vertex_buffer,
             index_buffer,
             materials_buffer,
             skins_buffer,
             mesh_data: Default::default(),
-            texture_count: 0,
+            texture_count: 1, // IMPORTANT! Because we stashed the BRDF Lut texture in here, make sure we increment the count accordingly
             texture_sampler,
             cube_sampler,
         }
@@ -106,18 +113,86 @@ impl Resources {
         descriptors: &Descriptors,
         image: &Image,
     ) -> u32 {
-        // TODO: Create separate samplers.
-        let sampler = if image.format == vk::Format::R16G16_SFLOAT || image.layer_count == 6 {
-            self.cube_sampler
-        } else {
-            self.texture_sampler
-        };
+        // There doesn't seem any reason to add support for dynamic cube maps yet as there isn't any user facing way of loading them.
+        let sampler = self.texture_sampler;
 
         let index = self.texture_count;
         descriptors.write_texture_descriptor(vulkan_context, image.view, sampler, index);
         self.texture_count += 1;
 
         index
+    }
+}
+
+// Upload the textures required for Image Based Lighting. A bit of silliness is required here.
+// Our normal methods of creating textures are somewhat limited here as we don't have access to RenderContext.
+// A better way to handle this would be to make Texture a little more flexible, but we can get to that.
+fn load_ibl_textures(
+    vulkan_context: &VulkanContext,
+    descriptors: &Descriptors,
+    cube_texture_sampler: vk::Sampler,
+) {
+    // First, load in the LUT file.
+    let brdf_lut_file = include_bytes!("../../data/brdf_lut.ktx2");
+    let ktx2_image = parse_ktx2(brdf_lut_file);
+
+    let image = vulkan_context
+        .create_image_with_component_mapping(
+            ktx2_image.format,
+            &ktx2_image.extent,
+            vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+            1,
+            1,
+            DEFAULT_COMPONENT_MAPPING,
+        )
+        .unwrap();
+
+    vulkan_context.upload_image(&ktx2_image.image_buf, 1, vec![0], &image);
+    let texture_sampler = vulkan_context
+        .create_texture_sampler(vk::SamplerAddressMode::CLAMP_TO_EDGE)
+        .unwrap();
+
+    unsafe {
+        descriptors.write_texture_descriptor(vulkan_context, image.view, texture_sampler, 0);
+    }
+
+    // OK. Next we've got to load in the cubemaps.
+    let cubemaps = [
+        include_bytes!("../../data/environment_map_diffuse.ktx2").to_vec(),
+        include_bytes!("../../data/environment_map_specular.ktx2").to_vec(),
+    ];
+
+    for (index, image) in cubemaps.iter().enumerate() {
+        let ktx2_image = parse_ktx2(image);
+        let mip_levels = ktx2_image.mip_levels;
+
+        // Right. Now we've got to do the array/mip count dance.
+        let image = vulkan_context
+            .create_image_with_component_mapping(
+                ktx2_image.format,
+                &ktx2_image.extent,
+                vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
+                6,
+                mip_levels,
+                DEFAULT_COMPONENT_MAPPING,
+            )
+            .unwrap();
+
+        vulkan_context.upload_image(
+            &ktx2_image.image_buf,
+            mip_levels,
+            ktx2_image.offsets,
+            &image,
+        );
+
+        unsafe {
+            descriptors.write_cube_texture_descriptor(
+                vulkan_context,
+                image.view,
+                cube_texture_sampler,
+                index as _,
+            );
+        }
     }
 }
 

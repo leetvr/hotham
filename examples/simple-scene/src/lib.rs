@@ -5,7 +5,7 @@ use hotham::{
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
-    resources::{InputContext, PhysicsContext, RenderContext},
+    resources::{InputContext, PhysicsContext},
     schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
@@ -95,7 +95,7 @@ fn tick(
     engine: &mut Engine,
     world: &mut World,
     queries: &mut Queries,
-    state: &mut State,
+    _state: &mut State,
 ) {
     let xr_context = &mut engine.xr_context;
     let input_context = &engine.input_context;
@@ -104,7 +104,12 @@ fn tick(
     let physics_context = &mut engine.physics_context;
 
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        hands_system(&mut queries.hands_query, world, input_context, physics_context);
+        hands_system(
+            &mut queries.hands_query,
+            world,
+            input_context,
+            physics_context,
+        );
         grabbing_system(&mut queries.grabbing_query, world, physics_context);
         physics_step(physics_context);
         collision_system(&mut queries.collision_query, world, physics_context);
@@ -121,7 +126,7 @@ fn tick(
             world,
         );
 
-        debug_system(input_context, render_context, state);
+        input_test(input_context);
         skinning_system(&mut queries.skins_query, world, render_context);
     }
 
@@ -142,22 +147,8 @@ fn tick(
 /// this is something you'd probably want to do!
 struct State {}
 
-#[allow(unused)]
-/// This is a simple system used to display a debug view.
-fn debug_system(
-    input_context: &InputContext,
-    render_context: &mut RenderContext,
-    state: &mut State,
-) {
-    #[cfg(not(target_os = "android"))]
-    return;
-
-    if input_context.left.x_button_just_pressed() {
-        let debug_data = &mut render_context.scene_data.debug_data;
-        debug_data.x = ((debug_data.x as usize + 1) % 6) as f32;
-        println!("[HOTHAM_SIMPLE_SCENE] debug_data.x is now {}", debug_data.x);
-    }
-
+/// System to display controller input debugging information
+fn input_test(input_context: &InputContext) {
     if input_context.left.x_button_just_pressed() {
         println!("[HOTHAM_SIMPLE_SCENE] Left hand X button pressed");
     }
@@ -183,7 +174,7 @@ fn debug_system(
         println!("[HOTHAM_SIMPLE_SCENE] Left hand trigger released");
     }
     if input_context.left.trigger_analog() > 0.0 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Left hand trigger analog is {}", input_context.left.trigger_analog());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand trigger analog is {}", input_context.left.trigger_analog());
     }
     if input_context.left.grip_button_just_pressed() {
         println!("[HOTHAM_SIMPLE_SCENE] Left hand grip pressed");
@@ -192,7 +183,7 @@ fn debug_system(
         println!("[HOTHAM_SIMPLE_SCENE] Left hand grip released");
     }
     if input_context.left.grip_analog() > 0.0 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Left hand grip analog is {}", input_context.left.grip_analog());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand grip analog is {}", input_context.left.grip_analog());
     }
     if input_context.left.thumbstick_click_just_pressed() {
         println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick pressed");
@@ -231,15 +222,15 @@ fn debug_system(
         println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick touch released");
     }
     if input_context.left.thumbstick_xy().magnitude() > 0.0 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick xy is {:?}", input_context.left.thumbstick_xy());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick xy is {:?}", input_context.left.thumbstick_xy());
     }
     if input_context.left.linear_velocity().magnitude() > 0.1 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Left hand linear velocity is {:?}", input_context.left.linear_velocity());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand linear velocity is {:?}", input_context.left.linear_velocity());
     }
     if input_context.left.angular_velocity().magnitude() > 0.1 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Left hand angular velocity is {:?}", input_context.left.angular_velocity());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand angular velocity is {:?}", input_context.left.angular_velocity());
     }
-    
+
     if input_context.right.a_button_just_pressed() {
         println!("[HOTHAM_SIMPLE_SCENE] Right hand A button pressed");
     }
@@ -259,7 +250,7 @@ fn debug_system(
         println!("[HOTHAM_SIMPLE_SCENE] Right hand trigger released");
     }
     if input_context.right.trigger_analog() > 0.0 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Right hand trigger analog is {}", input_context.right.trigger_analog());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand trigger analog is {}", input_context.right.trigger_analog());
     }
     if input_context.right.grip_button_just_pressed() {
         println!("[HOTHAM_SIMPLE_SCENE] Right hand grip pressed");
@@ -268,7 +259,7 @@ fn debug_system(
         println!("[HOTHAM_SIMPLE_SCENE] Right hand grip released");
     }
     if input_context.right.grip_analog() > 0.0 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Right hand grip analog is {}", input_context.right.grip_analog());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand grip analog is {}", input_context.right.grip_analog());
     }
     if input_context.right.thumbstick_click_just_pressed() {
         println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick click pressed");
@@ -307,12 +298,12 @@ fn debug_system(
         println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick touch released");
     }
     if input_context.right.thumbstick_xy().magnitude() > 0.0 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick xy is {:?}", input_context.right.thumbstick_xy());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick xy is {:?}", input_context.right.thumbstick_xy());
     }
     if input_context.right.linear_velocity().magnitude() > 0.1 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Right hand linear velocity is {:?}", input_context.right.linear_velocity());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand linear velocity is {:?}", input_context.right.linear_velocity());
     }
     if input_context.right.angular_velocity().magnitude() > 0.1 {
-    //    println!("[HOTHAM_SIMPLE_SCENE] Right hand angular velocity is {:?}", input_context.right.angular_velocity());
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand angular velocity is {:?}", input_context.right.angular_velocity());
     }
 }

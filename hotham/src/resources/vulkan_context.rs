@@ -597,6 +597,11 @@ impl VulkanContext {
         &self,
         address_mode: vk::SamplerAddressMode,
     ) -> Result<vk::Sampler> {
+        let border_color = if address_mode == vk::SamplerAddressMode::CLAMP_TO_EDGE {
+            vk::BorderColor::FLOAT_OPAQUE_WHITE
+        } else {
+            vk::BorderColor::FLOAT_TRANSPARENT_BLACK
+        };
         let create_info = vk::SamplerCreateInfo::builder()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
@@ -605,7 +610,7 @@ impl VulkanContext {
             .address_mode_w(address_mode)
             .anisotropy_enable(false)
             .max_anisotropy(1.0)
-            .border_color(vk::BorderColor::FLOAT_TRANSPARENT_BLACK)
+            .border_color(border_color)
             .unnormalized_coordinates(false)
             .compare_enable(false)
             .compare_op(vk::CompareOp::NEVER)
@@ -627,17 +632,18 @@ impl VulkanContext {
         src_buffer: vk::Buffer,
         dst_image: &Image,
         layer_count: u32,
-        mip_count: u32,
         offsets: Vec<vk::DeviceSize>,
     ) {
         let command_buffer = self.begin_single_time_commands();
 
         let mut regions = Vec::new();
-        for layer in 0..layer_count {
-            for mip_level in 0..mip_count {
+
+        let mut offset = 0;
+        for (mip_level, offset_increment) in offsets.iter().enumerate() {
+            for layer in 0..layer_count {
                 let image_subresource = vk::ImageSubresourceLayers::builder()
                     .aspect_mask(vk::ImageAspectFlags::COLOR)
-                    .mip_level(mip_level)
+                    .mip_level(mip_level as _)
                     .base_array_layer(layer)
                     .layer_count(1);
 
@@ -646,16 +652,16 @@ impl VulkanContext {
                     height: dst_image.extent.height >> mip_level,
                     depth: 1,
                 };
-                let offset_index = (layer * mip_count) + mip_level;
 
                 let region = vk::BufferImageCopy::builder()
-                    .buffer_offset(offsets[offset_index as usize])
+                    .buffer_offset(offset)
                     .buffer_row_length(0)
                     .buffer_image_height(0)
                     .image_subresource(*image_subresource)
                     .image_extent(image_extent)
                     .build();
                 regions.push(region);
+                offset += offset_increment;
             }
         }
 
@@ -774,13 +780,7 @@ impl VulkanContext {
         );
 
         println!("[HOTHAM_VULKAN] Copying buffer to image..");
-        self.copy_buffer_to_image(
-            staging_buffer,
-            texture_image,
-            layer_count,
-            mip_count,
-            offsets,
-        );
+        self.copy_buffer_to_image(staging_buffer, texture_image, layer_count, offsets);
 
         // Now transition the image
         println!("[HOTHAM_VULKAN] ..done! Transitioning image layout..");

@@ -26,7 +26,7 @@ impl Clone for SoundEmitter {
 }
 
 /// State of a sound
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SoundState {
     /// The sound has stopped permanently
     Stopped,
