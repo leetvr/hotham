@@ -5,13 +5,13 @@ use hotham::{
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
-    resources::PhysicsContext,
+    resources::{InputContext, PhysicsContext},
     schedule_functions::physics_step,
     systems::{
-        animation_system, collision_system, debug::debug_system, grabbing_system, hands::add_hand,
-        hands_system, rendering::rendering_system, skinning::skinning_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
-        update_local_transform_with_rigid_body_system, Queries,
+        animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
+        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
+        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
+        Queries,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -104,7 +104,12 @@ fn tick(
     let physics_context = &mut engine.physics_context;
 
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        hands_system(&mut queries.hands_query, world, xr_context, physics_context);
+        hands_system(
+            &mut queries.hands_query,
+            world,
+            input_context,
+            physics_context,
+        );
         grabbing_system(&mut queries.grabbing_query, world, physics_context);
         physics_step(physics_context);
         collision_system(&mut queries.collision_query, world, physics_context);
@@ -121,7 +126,7 @@ fn tick(
             world,
         );
 
-        debug_system(input_context, render_context);
+        input_test(input_context);
         skinning_system(&mut queries.skins_query, world, render_context);
     }
 
@@ -141,3 +146,164 @@ fn tick(
 /// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
 /// this is something you'd probably want to do!
 struct State {}
+
+/// System to display controller input debugging information
+fn input_test(input_context: &InputContext) {
+    if input_context.left.x_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand X button pressed");
+    }
+    if input_context.left.x_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand X button released");
+    }
+    if input_context.left.y_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand Y button pressed");
+    }
+    if input_context.left.y_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand Y button released");
+    }
+    if input_context.left.menu_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand menu button pressed");
+    }
+    if input_context.left.menu_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand menu button released");
+    }
+    if input_context.left.trigger_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand trigger pressed");
+    }
+    if input_context.left.trigger_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand trigger released");
+    }
+    if input_context.left.trigger_analog() > 0.0 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand trigger analog is {}", input_context.left.trigger_analog());
+    }
+    if input_context.left.grip_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand grip pressed");
+    }
+    if input_context.left.grip_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand grip released");
+    }
+    if input_context.left.grip_analog() > 0.0 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand grip analog is {}", input_context.left.grip_analog());
+    }
+    if input_context.left.thumbstick_click_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick pressed");
+    }
+    if input_context.left.thumbstick_click_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick released");
+    }
+    if input_context.left.x_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand X touch pressed");
+    }
+    if input_context.left.x_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand X touch released");
+    }
+    if input_context.left.y_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand Y touch pressed");
+    }
+    if input_context.left.y_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand Y touch released");
+    }
+    if input_context.left.trigger_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand trigger touch pressed");
+    }
+    if input_context.left.trigger_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand trigger touch released");
+    }
+    if input_context.left.thumbrest_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbrest touch pressed");
+    }
+    if input_context.left.thumbrest_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbrest touch released");
+    }
+    if input_context.left.thumbstick_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick touch pressed");
+    }
+    if input_context.left.thumbstick_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick touch released");
+    }
+    if input_context.left.thumbstick_xy().magnitude() > 0.0 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand thumbstick xy is {:?}", input_context.left.thumbstick_xy());
+    }
+    if input_context.left.linear_velocity().magnitude() > 0.1 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand linear velocity is {:?}", input_context.left.linear_velocity());
+    }
+    if input_context.left.angular_velocity().magnitude() > 0.1 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Left hand angular velocity is {:?}", input_context.left.angular_velocity());
+    }
+
+    if input_context.right.a_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand A button pressed");
+    }
+    if input_context.right.a_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand A button released");
+    }
+    if input_context.right.b_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand B button pressed");
+    }
+    if input_context.right.b_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand B button released");
+    }
+    if input_context.right.trigger_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand trigger pressed");
+    }
+    if input_context.right.trigger_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand trigger released");
+    }
+    if input_context.right.trigger_analog() > 0.0 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand trigger analog is {}", input_context.right.trigger_analog());
+    }
+    if input_context.right.grip_button_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand grip pressed");
+    }
+    if input_context.right.grip_button_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand grip released");
+    }
+    if input_context.right.grip_analog() > 0.0 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand grip analog is {}", input_context.right.grip_analog());
+    }
+    if input_context.right.thumbstick_click_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick click pressed");
+    }
+    if input_context.right.thumbstick_click_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick click released");
+    }
+    if input_context.right.a_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand A touch pressed");
+    }
+    if input_context.right.a_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand A touch released");
+    }
+    if input_context.right.b_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand B touch pressed");
+    }
+    if input_context.right.b_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand B touch released");
+    }
+    if input_context.right.trigger_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand trigger touch pressed");
+    }
+    if input_context.right.trigger_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand trigger touch released");
+    }
+    if input_context.right.thumbrest_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbrest touch pressed");
+    }
+    if input_context.right.thumbrest_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbrest touch released");
+    }
+    if input_context.right.thumbstick_touch_just_pressed() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick touch pressed");
+    }
+    if input_context.right.thumbstick_touch_just_released() {
+        println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick touch released");
+    }
+    if input_context.right.thumbstick_xy().magnitude() > 0.0 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand thumbstick xy is {:?}", input_context.right.thumbstick_xy());
+    }
+    if input_context.right.linear_velocity().magnitude() > 0.1 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand linear velocity is {:?}", input_context.right.linear_velocity());
+    }
+    if input_context.right.angular_velocity().magnitude() > 0.1 {
+        //    println!("[HOTHAM_SIMPLE_SCENE] Right hand angular velocity is {:?}", input_context.right.angular_velocity());
+    }
+}

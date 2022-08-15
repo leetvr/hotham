@@ -58,6 +58,7 @@ fn tick(
     game_context: &mut GameContext,
 ) {
     let xr_context = &mut engine.xr_context;
+    let input_context = &mut engine.input_context;
     let vulkan_context = &engine.vulkan_context;
     let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
@@ -73,13 +74,13 @@ fn tick(
         sabers_system(
             &mut crab_saber_queries.sabers_query,
             world,
-            xr_context,
+            input_context,
             physics_context,
         );
         pointers_system(
             &mut hotham_queries.pointers_query,
             world,
-            xr_context,
+            input_context,
             physics_context,
         );
 
