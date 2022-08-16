@@ -6,17 +6,17 @@
 #include "lights.glsl"
 #include "brdf.glsl"
 
-// Textures
-layout (set = 0, binding = 4) uniform sampler2D textures[];
-layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
-
-#include "pbr.glsl"
-
 // Inputs
 layout (location = 0) in vec3 inGlobalPos;
 layout (location = 1) in vec2 inUV;
 layout (location = 2) flat in uint inMaterialID;
 layout (location = 3) in mat3 inTBN;
+
+// Textures
+layout (set = 0, binding = 4) uniform sampler2D textures[];
+layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
+
+#include "pbr.glsl"
 
 layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
     Material materials[];
@@ -24,26 +24,6 @@ layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
 
 // Outputs
 layout (location = 0) out vec4 outColor;
-
-// Get normal, tangent and bitangent vectors.
-vec3 getNormal(uint normalTextureID) {
-    vec3 n, t, b, ng;
-
-    // Trivial TBN computation, present as vertex attribute.
-    // Normalize eigenvectors as matrix is linearly interpolated.
-    t = normalize(inTBN[0]);
-    b = normalize(inTBN[1]);
-    ng = normalize(inTBN[2]);
-
-    if (normalTextureID != NOT_PRESENT) {
-        vec3 ntex;
-        ntex.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
-        ntex.z = sqrt(1 - dot(ntex.xy, ntex.xy));
-        return normalize(mat3(t, b, ng) * ntex);
-    } else {
-        return ng;
-    }
-}
 
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
@@ -71,9 +51,7 @@ void main() {
 
     // Choose the correct workflow for this material
     if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        // Get the normal
-        vec3 n = getNormal(material.normalTextureID);
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor, inGlobalPos, n, inUV);
+        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor);
     } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
         outColor = baseColor;
     }
