@@ -17,44 +17,44 @@ layout (location = 2) flat out uint outMaterialID;
 layout (location = 3) out mat3 outTBN;
 
 out gl_PerVertex {
-	vec4 gl_Position;
+    vec4 gl_Position;
 };
 
 void main() {
-	DrawData d = drawDataBuffer.data[gl_InstanceIndex];
+    DrawData d = drawDataBuffer.data[gl_InstanceIndex];
 
-	if (d.skinID == NOT_PRESENT) {
-		// Mesh has no skin
-		outGlobalPos = d.globalFromLocal * vec4(inPos, 1.0);
-		vec3 normal = normalize(inNormal);
-		vec3 tangent = normalize(inTangent.xyz);
+    if (d.skinID == NOT_PRESENT) {
+        // Mesh has no skin
+        outGlobalPos = d.globalFromLocal * vec4(inPos, 1.0);
+        vec3 normal = normalize(inNormal);
+        vec3 tangent = normalize(inTangent.xyz);
 
-		vec3 globalNormal = normalize(mat3(d.inverseTranspose) * normal);
-		vec3 globalTangent = normalize(mat3(d.globalFromLocal) * tangent);
-		vec3 globalBiTangent = cross(globalNormal, globalTangent) * inTangent.w;
-		outTBN = mat3(globalTangent, globalBiTangent, globalNormal);
-	} else {
-		// Mesh is skinned
-		mat4[MAX_JOINTS] jointMatrices = skinsBuffer.jointMatrices[d.skinID];
-		mat4 skinMatrix =
-			inWeight.x * jointMatrices[int(inJoint.x)] +
-			inWeight.y * jointMatrices[int(inJoint.y)] +
-			inWeight.z * jointMatrices[int(inJoint.z)] +
-			inWeight.w * jointMatrices[int(inJoint.w)];
+        vec3 globalNormal = normalize(normal * mat3(d.localFromGlobal));
+        vec3 globalTangent = normalize(mat3(d.globalFromLocal) * tangent);
+        vec3 globalBiTangent = cross(globalNormal, globalTangent) * inTangent.w;
+        outTBN = mat3(globalTangent, globalBiTangent, globalNormal);
+    } else {
+        // Mesh is skinned
+        mat4[MAX_JOINTS] jointMatrices = skinsBuffer.jointMatrices[d.skinID];
+        mat4 skinMatrix =
+            inWeight.x * jointMatrices[int(inJoint.x)] +
+            inWeight.y * jointMatrices[int(inJoint.y)] +
+            inWeight.z * jointMatrices[int(inJoint.z)] +
+            inWeight.w * jointMatrices[int(inJoint.w)];
 
-		outGlobalPos = d.globalFromLocal * skinMatrix * vec4(inPos, 1.0);
+        outGlobalPos = d.globalFromLocal * skinMatrix * vec4(inPos, 1.0);
 
-		mat3 m3_skinMatrix = mat3(skinMatrix);
-		vec3 normal = normalize(m3_skinMatrix * inNormal);
-		vec3 tangent = normalize(m3_skinMatrix * inTangent.xyz);
+        mat3 m3_skinMatrix = mat3(skinMatrix);
+        vec3 normal = normalize(m3_skinMatrix * inNormal);
+        vec3 tangent = normalize(m3_skinMatrix * inTangent.xyz);
 
-		vec3 globalNormal = normalize(mat3(d.inverseTranspose) * normal);
-		vec3 globalTangent = normalize(mat3(d.globalFromLocal) * tangent);
-		vec3 globalBiTangent = cross(globalNormal, globalTangent) * inTangent.w;
-		outTBN = mat3(globalTangent, globalBiTangent, globalNormal);
-	}
+        vec3 globalNormal = normalize(normal * mat3(d.localFromGlobal));
+        vec3 globalTangent = normalize(mat3(d.globalFromLocal) * tangent);
+        vec3 globalBiTangent = cross(globalNormal, globalTangent) * inTangent.w;
+        outTBN = mat3(globalTangent, globalBiTangent, globalNormal);
+    }
 
-	outUV = inUV;
-	outMaterialID = d.materialID;
-	gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGlobalPos;
+    outUV = inUV;
+    outMaterialID = d.materialID;
+    gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGlobalPos;
 }

@@ -7,7 +7,7 @@
 
 struct DrawData {
     mat4 globalFromLocal;
-    mat4 inverseTranspose;
+    mat4 localFromGlobal;
     uint materialID;
     uint skinID;
 };
@@ -32,11 +32,11 @@ const uint LightType_Directional = 0;
 const uint LightType_Point = 1;
 const uint LightType_Spot = 2;
 
-layout(std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
+layout (std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
     DrawData data[];
 } drawDataBuffer;
 
-layout(std430, set = 0, binding = 2) readonly buffer SkinsBuffer {
+layout (std430, set = 0, binding = 2) readonly buffer SkinsBuffer {
     mat4 jointMatrices[100][64]; // dynamically sized array of 64 element long arrays of mat4.
 } skinsBuffer;
 
