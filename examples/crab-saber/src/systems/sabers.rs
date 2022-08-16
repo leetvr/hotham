@@ -5,8 +5,7 @@ use hotham::{
     components::RigidBody,
     hecs::{Entity, PreparedQuery, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    resources::{PhysicsContext, XrContext},
-    util::{is_space_valid, posef_to_isometry},
+    resources::{InputContext, PhysicsContext},
 };
 
 use crate::components::{Color, Saber};
@@ -23,25 +22,15 @@ const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 pub fn sabers_system(
     query: &mut PreparedQuery<With<Saber, (&Color, &RigidBody)>>,
     world: &mut World,
-    xr_context: &XrContext,
+    input_context: &InputContext,
     physics_context: &mut PhysicsContext,
 ) {
-    let input = &xr_context.input;
     for (_, (color, rigid_body)) in query.query_mut(world) {
         // Get our the space and path of the hand.
-        let time = xr_context.frame_state.predicted_display_time;
-        let (space, _) = match color {
-            Color::Red => (&input.left_hand_space, input.left_hand_subaction_path),
-            Color::Blue => (&input.right_hand_space, input.right_hand_subaction_path),
+        let mut pose = match color {
+            Color::Red => input_context.left.stage_from_grip(),
+            Color::Blue => input_context.right.stage_from_grip(),
         };
-
-        // Locate the hand in the space.
-        let space = space.locate(&xr_context.stage_space, time).unwrap();
-        if !is_space_valid(&space) {
-            return;
-        }
-
-        let pose = space.pose;
 
         // apply transform
         let rigid_body = physics_context
@@ -49,10 +38,9 @@ pub fn sabers_system(
             .get_mut(rigid_body.handle)
             .unwrap();
 
-        let mut position = posef_to_isometry(pose);
-        apply_grip_offset(&mut position);
+        apply_grip_offset(&mut pose);
 
-        rigid_body.set_next_kinematic_position(position);
+        rigid_body.set_next_kinematic_position(pose);
     }
 }
 
@@ -111,6 +99,7 @@ mod tests {
         let mut world = World::new();
         let path = std::path::Path::new("../../openxr_loader.dll");
         let (xr_context, _) = XrContext::new_from_path(path).unwrap();
+        let mut input_context = InputContext::default();
         let mut physics_context = PhysicsContext::default();
         let saber = world.spawn((
             Color::Red,
@@ -123,10 +112,11 @@ mod tests {
         let mut saber_query = Default::default();
         let mut rigid_body_transforms_query = Default::default();
 
+        input_context.update(&xr_context);
         sabers_system(
             &mut saber_query,
             &mut world,
-            &xr_context,
+            &input_context,
             &mut physics_context,
         );
         physics_context.update();

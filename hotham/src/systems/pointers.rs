@@ -25,8 +25,7 @@ use crate::{
     components::{
         hand::Handedness, panel::PanelInput, Info, LocalTransform, Panel, Pointer, Visible,
     },
-    resources::{PhysicsContext, XrContext},
-    util::{is_space_valid, posef_to_isometry},
+    resources::{InputContext, PhysicsContext},
 };
 
 /// Pointers system
@@ -34,38 +33,29 @@ use crate::{
 pub fn pointers_system(
     query: &mut PreparedQuery<With<Visible, (&mut Pointer, &mut LocalTransform)>>,
     world: &mut World,
-    xr_context: &XrContext,
+    input_context: &InputContext,
     physics_context: &mut PhysicsContext,
 ) {
-    let input = &xr_context.input;
     for (_, (pointer, local_transform)) in query.query(world).iter() {
         // Get our the space and path of the pointer.
-        let time = xr_context.frame_state.predicted_display_time;
-        let (space, path) = match pointer.handedness {
-            Handedness::Left => (&input.left_hand_space, input.left_hand_subaction_path),
-            Handedness::Right => (&input.right_hand_space, input.right_hand_subaction_path),
+        let (mut pose, trigger_value) = match pointer.handedness {
+            Handedness::Left => (
+                input_context.left.stage_from_grip(),
+                input_context.left.trigger_analog(),
+            ),
+            Handedness::Right => (
+                input_context.right.stage_from_grip(),
+                input_context.right.trigger_analog(),
+            ),
         };
 
-        // Locate the pointer in the space.
-        let space = space.locate(&xr_context.stage_space, time).unwrap();
-        if !is_space_valid(&space) {
-            return;
-        }
-
-        let pose = space.pose;
-
         // apply transform
-        let mut position = posef_to_isometry(pose);
-        apply_grip_offset(&mut position);
+        apply_grip_offset(&mut pose);
 
-        local_transform.translation = position.translation.vector;
-        local_transform.rotation = position.rotation;
+        local_transform.translation = pose.translation.vector;
+        local_transform.rotation = pose.rotation;
 
         // get trigger value
-        let trigger_value =
-            openxr::ActionInput::get(&input.trigger_action, &xr_context.session, path)
-                .unwrap()
-                .current_state;
         pointer.trigger_value = trigger_value;
 
         let ray_direction = local_transform
@@ -169,6 +159,7 @@ fn ray_to_panel_space(
 mod tests {
     use super::*;
 
+    use crate::resources::XrContext;
     use approx::assert_relative_eq;
     use ash::vk;
 
@@ -185,10 +176,13 @@ mod tests {
         use nalgebra::vector;
         use rapier3d::prelude::ColliderBuilder;
 
-        let (mut xr_context, vulkan_context) = XrContext::testing();
+        let (xr_context, vulkan_context) = XrContext::testing();
         let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
         let mut physics_context = PhysicsContext::default();
+        let mut input_context = InputContext::default();
         let mut world = World::default();
+
+        input_context.update(&xr_context);
 
         let panel = Panel::create(
             &vulkan_context,
@@ -246,7 +240,7 @@ mod tests {
             LocalTransform::default(),
         ));
 
-        tick(&mut physics_context, &mut world, &mut xr_context);
+        tick(&mut physics_context, &mut world, &input_context);
 
         let local_transform = world.get_mut::<LocalTransform>(pointer_entity).unwrap();
 
@@ -268,10 +262,15 @@ mod tests {
     fn tick(
         physics_context: &mut PhysicsContext,
         world: &mut hecs::World,
-        xr_context: &mut XrContext,
+        input_context: &InputContext,
     ) -> () {
         physics_context.update();
-        pointers_system(&mut Default::default(), world, xr_context, physics_context)
+        pointers_system(
+            &mut Default::default(),
+            world,
+            input_context,
+            physics_context,
+        )
     }
 
     #[test]
