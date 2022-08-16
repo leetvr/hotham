@@ -31,6 +31,9 @@ pub mod texture;
 /// Vertex representation
 pub mod vertex;
 
+/// Vertex representations for holograms
+pub mod hologram_vertex;
+
 /// A wrapper for all Descriptor related functionality
 pub(crate) mod descriptors;
 

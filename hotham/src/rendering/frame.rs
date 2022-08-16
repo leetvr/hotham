@@ -7,7 +7,7 @@ use super::{
     buffer::Buffer,
     descriptors::{
         Descriptors, CULL_PARAMS_BINDING, DRAW_DATA_BINDING, PRIMITIVE_CULL_DATA_BINDING,
-        SCENE_DATA_BINDING,
+        QUADRIC_DATA_BINDING, SCENE_DATA_BINDING,
     },
     resources::{DrawData, PrimitiveCullData},
     scene_data::SceneData,
@@ -97,6 +97,11 @@ impl Frame {
                 &vulkan_context.device,
                 descriptors.sets[index],
                 SCENE_DATA_BINDING,
+            );
+            draw_data_buffer.update_descriptor_set(
+                &vulkan_context.device,
+                descriptors.sets[index],
+                QUADRIC_DATA_BINDING,
             );
 
             // Compute

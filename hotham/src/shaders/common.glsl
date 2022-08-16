@@ -12,6 +12,14 @@ struct DrawData {
     uint skinID;
 };
 
+struct QuadricData {
+    mat4 globalFromLocal;
+    mat4 surfaceQ;
+    mat4 boundsQ;
+    mat4 uvFromGlobal;
+    uint materialID;
+};
+
 // Representation of a light in a scene, based on the KHR_lights_punctual extension:
 // https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_lights_punctual
 struct Light {
@@ -31,14 +39,6 @@ struct Light {
 const uint LightType_Directional = 0;
 const uint LightType_Point = 1;
 const uint LightType_Spot = 2;
-
-layout (std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
-    DrawData data[];
-} drawDataBuffer;
-
-layout (std430, set = 0, binding = 2) readonly buffer SkinsBuffer {
-    mat4 jointMatrices[100][64]; // dynamically sized array of 64 element long arrays of mat4.
-} skinsBuffer;
 
 layout (set = 0, binding = 3) readonly uniform SceneData {
     mat4 viewProjection[2];
