@@ -6,17 +6,17 @@
 #include "lights.glsl"
 #include "brdf.glsl"
 
-// Inputs
-layout (location = 0) in vec3 inGosPos;
-layout (location = 1) in vec2 inUV;
-layout (location = 2) flat in uint inMaterialID;
-layout (location = 3) in vec3 inNormal;
-
 // Textures
 layout (set = 0, binding = 4) uniform sampler2D textures[];
 layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
 #include "pbr.glsl"
+
+// Inputs
+layout (location = 0) in vec3 inGosPos;
+layout (location = 1) in vec2 inUV;
+layout (location = 2) flat in uint inMaterialID;
+layout (location = 3) in vec3 inNormal;
 
 layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
     Material materials[];
@@ -24,6 +24,34 @@ layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
 
 // Outputs
 layout (location = 0) out vec4 outColor;
+
+// Get normal, tangent and bitangent vectors.
+vec3 getNormal(uint normalTextureID) {
+    vec3 N = normalize(inNormal);
+    if (normalTextureID == NOT_PRESENT) {
+        return N;
+    }
+
+    vec3 textureNormal;
+    textureNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
+    textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
+
+    // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
+    // See http://www.thetenthplanet.de/archives/1180 for an explanation of how this works
+    // and a little bit about why it is better than using precomputed tangents.
+    // Note however that we are using a slightly different formulation with coordinates in
+    // globally oriented stage space instead of view space and we rely on the UV map not being too distorted.
+    vec3 dGosPosDx = dFdx(inGosPos);
+    vec3 dGosPosDy = dFdy(inGosPos);
+    vec2 dUvDx = dFdx(inUV);
+    vec2 dUvDy = dFdy(inUV);
+
+    vec3 T = normalize(dGosPosDx * dUvDy.t - dGosPosDy * dUvDx.t);
+    vec3 B = normalize(cross(N, T));
+    mat3 TBN = mat3(T, B, N);
+
+    return normalize(TBN * textureNormal);
+}
 
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
@@ -51,7 +79,9 @@ void main() {
 
     // Choose the correct workflow for this material
     if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor);
+        // Get the normal
+        vec3 n = getNormal(material.normalTextureID);
+        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor, inGosPos, n, inUV);
     } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
         outColor = baseColor;
     }
