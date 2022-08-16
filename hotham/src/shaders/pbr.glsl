@@ -124,7 +124,7 @@ vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, float NdotV
     vec3 color;
 
     if (NdotL > 0. || NdotV > 0.) {
-        vec3 intensity = getLightIntensity(light, l);
+        vec3 intensity = getLightIntensity(light, pointToLight);
 
         // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
         vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(materialInfo.f0, f90, materialInfo.diffuseColor, VdotH);
