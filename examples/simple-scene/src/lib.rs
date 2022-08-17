@@ -8,10 +8,10 @@ use hotham::{
     resources::PhysicsContext,
     schedule_functions::physics_step,
     systems::{
-        animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
-        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
-        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
-        Queries,
+        animation_system, collision_system, debug::debug_system, grabbing_system, hands::add_hand,
+        hands_system, rendering::rendering_system, skinning::skinning_system,
+        update_global_transform_system, update_global_transform_with_parent_system,
+        update_local_transform_with_rigid_body_system, Queries,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -125,6 +125,8 @@ fn tick(
             &mut queries.roots_query,
             world,
         );
+
+        debug_system(input_context, render_context);
         skinning_system(&mut queries.skins_query, world, render_context);
     }
 
