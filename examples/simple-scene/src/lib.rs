@@ -1,6 +1,6 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, LocalTransform},
+    components::{hand::Handedness, Hologram, LocalTransform},
     hecs::World,
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
@@ -114,6 +114,7 @@ fn add_sphere(
         .build();
     let components = physics_context.get_rigid_body_and_collider(entity, rigid_body, collider);
     world.insert(entity, components).unwrap();
+    world.insert_one(entity, Hologram {});
 }
 
 fn tick(
