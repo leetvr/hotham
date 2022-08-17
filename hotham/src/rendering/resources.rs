@@ -227,6 +227,17 @@ pub struct QuadricData {
     pub material_id: u32,
 }
 
+/// Shader index is used for selecting the correct pipeline to render with
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum ShaderIndex {
+    /// Normal PBR flat triangles.
+    #[default]
+    Triangle = 0,
+    /// Holographic material with a quadric surface.
+    Quadric = 1,
+}
+
 /// Information for the culling shader on how to cull this primitive.
 #[derive(Debug, Default, Clone)]
 #[repr(C, align(16))]
@@ -234,5 +245,6 @@ pub(crate) struct PrimitiveCullData {
     pub bounding_sphere: Vector4<f32>,
     pub index_instance: u32,
     pub index_offset: u32,
+    pub index_shader: ShaderIndex,
     pub visible: bool,
 }

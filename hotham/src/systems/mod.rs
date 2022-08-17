@@ -29,8 +29,8 @@ pub use update_global_transform_with_parent::update_global_transform_with_parent
 pub use update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system;
 
 use crate::components::{
-    AnimationController, Collider, GlobalTransform, Hand, Info, Joint, LocalTransform, Mesh, Panel,
-    Parent, Pointer, RigidBody, Skin, SoundEmitter, UIPanel, Visible,
+    AnimationController, Collider, GlobalTransform, Hand, Hologram, Info, Joint, LocalTransform,
+    Mesh, Panel, Parent, Pointer, RigidBody, Skin, SoundEmitter, UIPanel, Visible,
 };
 use hecs::{PreparedQuery, With, Without};
 
@@ -47,8 +47,17 @@ pub struct Queries<'a> {
     pub skins_query: PreparedQuery<(&'a Skin, &'a GlobalTransform)>,
     pub parent_query: PreparedQuery<&'a Parent>,
     #[allow(clippy::type_complexity)]
-    pub rendering_query:
-        PreparedQuery<With<Visible, (&'a Mesh, &'a GlobalTransform, Option<&'a Skin>)>>,
+    pub rendering_query: PreparedQuery<
+        With<
+            Visible,
+            (
+                &'a Mesh,
+                &'a GlobalTransform,
+                Option<&'a Skin>,
+                Option<&'a Hologram>,
+            ),
+        >,
+    >,
     pub roots_query: PreparedQuery<Without<Parent, &'a GlobalTransform>>,
     pub update_rigid_body_transforms_query: PreparedQuery<(&'a RigidBody, &'a mut LocalTransform)>,
     pub update_global_transform_query: PreparedQuery<(&'a LocalTransform, &'a mut GlobalTransform)>,
