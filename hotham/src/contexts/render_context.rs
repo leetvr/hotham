@@ -64,7 +64,8 @@ pub struct RenderContext {
     pub(crate) descriptors: Descriptors,
 
     // Populated only between rendering::begin and rendering::end
-    pub(crate) primitive_map: HashMap<u32, InstancedPrimitive>,
+    pub(crate) triangles_primitive_map: HashMap<u32, InstancedPrimitive>,
+    pub(crate) quadrics_primitive_map: HashMap<u32, InstancedPrimitive>,
 }
 
 impl RenderContext {
@@ -137,7 +138,9 @@ impl RenderContext {
             scene_data,
             descriptors,
             resources,
-            primitive_map: HashMap::default(),
+
+            triangles_primitive_map: HashMap::default(),
+            quadrics_primitive_map: HashMap::default(),
         })
     }
 

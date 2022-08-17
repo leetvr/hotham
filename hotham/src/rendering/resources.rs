@@ -1,7 +1,6 @@
 use ash::vk;
 use glam::{Mat4, Vec4};
 use id_arena::Arena;
-use rapier3d::na;
 use vulkan_context::VulkanContext;
 
 use crate::contexts::vulkan_context;
@@ -217,15 +216,26 @@ pub struct DrawData {
 #[repr(C, align(16))]
 pub struct QuadricData {
     /// The transform of the parent mesh
-    pub global_from_local: na::Matrix4<f32>,
+    pub gos_from_local: Mat4,
     /// The quadric surface to render, x'Qx = 0
-    pub surface_q: na::Matrix4<f32>,
+    pub surface_q: Mat4,
     /// The quadric bounds to limit the surface, x'Qx ≤ 0
-    pub bounds_q: na::Matrix4<f32>,
-    /// Projects positions in global space into uv space for texturing
-    pub uv_from_global: na::Matrix4<f32>,
+    pub bounds_q: Mat4,
+    /// Projects positions in globally oriented stage space into uv space for texturing
+    pub uv_from_gos: Mat4,
     /// The ID of the material to use.
     pub material_id: u32,
+}
+
+/// Shader index is used for selecting the correct pipeline to render with
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum ShaderIndex {
+    /// Normal PBR flat triangles.
+    #[default]
+    Triangle = 0,
+    /// Holographic material with a quadric surface.
+    Quadric = 1,
 }
 
 /// Information for the culling shader on how to cull this primitive.
@@ -235,5 +245,6 @@ pub(crate) struct PrimitiveCullData {
     pub bounding_sphere: Vec4,
     pub index_instance: u32,
     pub index_offset: u32,
+    pub index_shader: ShaderIndex,
     pub visible: bool,
 }

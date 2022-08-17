@@ -13,6 +13,7 @@ struct PrimitiveCullData {
     vec4 boundingSphere;
     uint indexInstance;
     uint indexOffset;
+    uint indexShader;
     bool visible;
 };
 
