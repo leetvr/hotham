@@ -114,7 +114,7 @@ fn add_sphere(
         .build();
     let components = physics_context.get_rigid_body_and_collider(entity, rigid_body, collider);
     world.insert(entity, components).unwrap();
-    world.insert_one(entity, Hologram {});
+    world.insert_one(entity, Hologram {}).unwrap();
 }
 
 fn tick(
