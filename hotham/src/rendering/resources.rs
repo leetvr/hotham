@@ -1,6 +1,7 @@
 use ash::vk;
 use glam::{Mat4, Vec4};
 use id_arena::Arena;
+use rapier3d::na;
 use vulkan_context::VulkanContext;
 
 use crate::contexts::vulkan_context;
@@ -216,13 +217,13 @@ pub struct DrawData {
 #[repr(C, align(16))]
 pub struct QuadricData {
     /// The transform of the parent mesh
-    pub global_from_local: Matrix4<f32>,
+    pub global_from_local: na::Matrix4<f32>,
     /// The quadric surface to render, x'Qx = 0
-    pub surface_q: Matrix4<f32>,
+    pub surface_q: na::Matrix4<f32>,
     /// The quadric bounds to limit the surface, x'Qx ≤ 0
-    pub bounds_q: Matrix4<f32>,
+    pub bounds_q: na::Matrix4<f32>,
     /// Projects positions in global space into uv space for texturing
-    pub uv_from_global: Matrix4<f32>,
+    pub uv_from_global: na::Matrix4<f32>,
     /// The ID of the material to use.
     pub material_id: u32,
 }

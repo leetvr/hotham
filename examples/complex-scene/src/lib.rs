@@ -2,7 +2,7 @@ pub mod navigation;
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, LocalTransform},
+    components::{hand::Handedness, Hologram, LocalTransform},
     contexts::PhysicsContext,
     glam,
     hecs::World,
@@ -142,5 +142,7 @@ fn add_sphere(
         .position(position)
         .build();
     let components = physics_context.create_rigid_body_and_collider(entity, rigid_body, collider);
-    world.insert(entity, components).unwrap();
+    world
+        .insert(entity, (components.0, components.1, Hologram {}))
+        .unwrap();
 }
