@@ -21,7 +21,6 @@ use crate::{
         camera::Camera,
         descriptors::Descriptors,
         frame::Frame,
-        hologram_vertex::HologramVertex,
         image::Image,
         primitive::Primitive,
         resources::Resources,
@@ -625,31 +624,18 @@ fn create_pipelines(
 
     let quadric_stages = [quadric_vertex_stage, quadric_fragment_stage];
 
-    // Triangle vertex input state
-    let triangle_vertex_binding_description = vk::VertexInputBindingDescription::builder()
+    // Vertex input state
+    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
         .binding(0)
         .stride(size_of::<Vertex>() as _)
         .input_rate(vk::VertexInputRate::VERTEX)
         .build();
-    let triangle_vertex_binding_descriptions = [triangle_vertex_binding_description];
-    let triangle_vertex_attribute_descriptions = Vertex::attribute_descriptions();
+    let vertex_binding_descriptions = [vertex_binding_description];
+    let vertex_attribute_descriptions = Vertex::attribute_descriptions();
 
-    let triangle_vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
-        .vertex_attribute_descriptions(&triangle_vertex_attribute_descriptions)
-        .vertex_binding_descriptions(&triangle_vertex_binding_descriptions);
-
-    // Quadric vertex input state
-    let quadric_vertex_binding_description = vk::VertexInputBindingDescription::builder()
-        .binding(0)
-        .stride(size_of::<HologramVertex>() as _)
-        .input_rate(vk::VertexInputRate::VERTEX)
-        .build();
-    let quadric_vertex_binding_descriptions = [quadric_vertex_binding_description];
-    let quadric_vertex_attribute_descriptions = Vertex::attribute_descriptions();
-
-    let quadric_vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
-        .vertex_attribute_descriptions(&quadric_vertex_attribute_descriptions)
-        .vertex_binding_descriptions(&quadric_vertex_binding_descriptions);
+    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
+        .vertex_attribute_descriptions(&vertex_attribute_descriptions)
+        .vertex_binding_descriptions(&vertex_binding_descriptions);
 
     // Input assembly state
     let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::builder()
@@ -719,7 +705,7 @@ fn create_pipelines(
 
     let triangle_create_info = vk::GraphicsPipelineCreateInfo::builder()
         .stages(&triangle_stages)
-        .vertex_input_state(&triangle_vertex_input_state)
+        .vertex_input_state(&vertex_input_state)
         .input_assembly_state(&input_assembly_state)
         .viewport_state(&viewport_state)
         .rasterization_state(&rasterization_state)
@@ -733,7 +719,7 @@ fn create_pipelines(
 
     let quadric_create_info = vk::GraphicsPipelineCreateInfo::builder()
         .stages(&quadric_stages)
-        .vertex_input_state(&quadric_vertex_input_state)
+        .vertex_input_state(&vertex_input_state)
         .input_assembly_state(&input_assembly_state)
         .viewport_state(&viewport_state)
         .rasterization_state(&rasterization_state)
