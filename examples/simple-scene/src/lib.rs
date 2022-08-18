@@ -2,7 +2,7 @@ use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, Hologram, LocalTransform},
     hecs::World,
-    nalgebra::{self, vector, Matrix4},
+    nalgebra::{self, vector, Matrix4, UnitQuaternion, Vector3},
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
@@ -62,7 +62,34 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_helmet(&models, &mut world, physics_context);
-    add_sphere(&models, &mut world, physics_context);
+    add_quadric(
+        &models,
+        &mut world,
+        physics_context,
+        &LocalTransform {
+            translation: Vector3::new(1.0, 1.4, -1.5),
+            rotation: UnitQuaternion::identity(),
+            scale: Vector3::new(0.5, 0.5, 0.5),
+        },
+        &Matrix4::from_diagonal(&vector![1.0, 1.0, 1.0, -1.0]),
+        &Matrix4::from_diagonal(&vector![0.0, 0.0, 0.0, 0.0]),
+        &Matrix4::<f32>::identity(),
+        0.5,
+    );
+    add_quadric(
+        &models,
+        &mut world,
+        physics_context,
+        &LocalTransform {
+            translation: Vector3::new(-1.0, 1.4, -1.5),
+            rotation: UnitQuaternion::identity(),
+            scale: Vector3::new(0.5, 0.5, 0.5),
+        },
+        &Matrix4::from_diagonal(&vector![1.0, 1.0, 0.0, -1.0]),
+        &Matrix4::from_diagonal(&vector![0.0, 0.0, 1.0, -1.0]),
+        &Matrix4::<f32>::identity(),
+        0.5,
+    );
     add_hand(&models, Handedness::Left, &mut world, physics_context);
     add_hand(&models, Handedness::Right, &mut world, physics_context);
 
@@ -93,20 +120,20 @@ fn add_helmet(
     world.insert(helmet, components).unwrap();
 }
 
-fn add_sphere(
+fn add_quadric(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
     physics_context: &mut PhysicsContext,
+    local_transform: &LocalTransform,
+    surface_q_in_local: &Matrix4<f32>,
+    bounds_q_in_local: &Matrix4<f32>,
+    uv_from_local: &Matrix4<f32>,
+    ball_radius: f32,
 ) {
     let entity = add_model_to_world("Sphere", models, world, None).expect("Could not find Sphere");
-    let mut local_transform = world.get_mut::<LocalTransform>(entity).unwrap();
-    local_transform.translation.x = 1.0;
-    local_transform.translation.z = -1.5;
-    local_transform.translation.y = 1.4;
-    local_transform.scale = [0.5, 0.5, 0.5].into();
+    *world.get_mut::<LocalTransform>(entity).unwrap() = *local_transform;
     let position = local_transform.position();
-    drop(local_transform);
-    let collider = ColliderBuilder::ball(0.25)
+    let collider = ColliderBuilder::ball(ball_radius)
         .active_collision_types(ActiveCollisionTypes::all())
         .active_events(ActiveEvents::COLLISION_EVENTS)
         .build();
@@ -119,9 +146,9 @@ fn add_sphere(
         .insert_one(
             entity,
             Hologram {
-                surface_q_in_local: Matrix4::from_diagonal(&vector![1.0, 1.0, 1.0, -1.0]),
-                bounds_q_in_local: Matrix4::from_diagonal(&vector![0.0, 0.0, 0.0, 0.0]),
-                uv_from_local: Matrix4::<f32>::identity(),
+                surface_q_in_local: surface_q_in_local.clone(),
+                bounds_q_in_local: bounds_q_in_local.clone(),
+                uv_from_local: uv_from_local.clone(),
             },
         )
         .unwrap();
