@@ -52,19 +52,21 @@ void findIntersection(in QuadricData d, out vec4 hitPoint, out vec3 normal) {
 
     if (t.x >= 0.0) {
         hitPoint = inRayOrigin + inRayDir * t.x;
-        normal = (d.surfaceQ * hitPoint).xyz;
-        normal = normalize(-dot(inRayDir.xyz, normal) * normal);
         float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
         if (boundsValue <= 0.0) {
+            normal = (d.surfaceQ * hitPoint).xyz;
+            // Flip the normal so that it faces the viewer
+            normal = normalize(-dot(inRayDir.xyz, normal) * normal);
             return;
         }
     }
     // t.y >= 0
     hitPoint = inRayOrigin + inRayDir * t.y;
-    normal = (d.surfaceQ * hitPoint).xyz;
-    normal = normalize(-dot(inRayDir.xyz, normal) * normal);
     float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
     if (boundsValue <= 0.0) {
+        normal = (d.surfaceQ * hitPoint).xyz;
+        // Flip the normal so that it faces the viewer
+        normal = normalize(-dot(inRayDir.xyz, normal) * normal);
         return;
     }
     discard;
