@@ -119,8 +119,8 @@ fn add_sphere(
         .insert_one(
             entity,
             Hologram {
-                surface_q_in_local: Matrix4::from_diagonal(&vector![1.0, 0.0, 1.0, -0.25]),
-                bounds_q_in_local: Matrix4::from_diagonal(&vector![0.0, 1.0, 0.0, -0.5]),
+                surface_q_in_local: Matrix4::from_diagonal(&vector![1.0, 1.0, 1.0, -1.0]),
+                bounds_q_in_local: Matrix4::from_diagonal(&vector![0.0, 0.0, 0.0, 0.0]),
                 uv_from_local: Matrix4::<f32>::identity(),
             },
         )
