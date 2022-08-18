@@ -65,7 +65,7 @@ pub struct RenderContext {
 
     // Populated only between rendering::begin and rendering::end
     pub(crate) triangles_primitive_map: HashMap<u32, InstancedPrimitive>,
-    pub(crate) quadrics_primitive_map: HashMap<u32, InstancedPrimitive>,
+    pub(crate) quadrics_primitive_map: HashMap<u32, InstancedQuadricPrimitive>,
 }
 
 impl RenderContext {
@@ -470,10 +470,23 @@ pub(crate) struct InstancedPrimitive {
     pub(crate) instances: Vec<Instance>,
 }
 
+pub(crate) struct InstancedQuadricPrimitive {
+    pub(crate) primitive: Primitive,
+    pub(crate) instances: Vec<QuadricInstance>,
+}
+
 pub(crate) struct Instance {
     pub(crate) gos_from_local: Affine3A,
     pub(crate) bounding_sphere: Vec4,
     pub(crate) skin_id: u32,
+}
+
+pub(crate) struct QuadricInstance {
+    pub(crate) gos_from_local: Affine3A,
+    pub(crate) bounding_sphere: Vec4,
+    pub(crate) surface_q_in_local: Mat4,
+    pub(crate) bounds_q_in_local: Mat4,
+    pub(crate) uv_from_local: Mat4,
 }
 
 pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {

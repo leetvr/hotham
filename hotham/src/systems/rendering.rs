@@ -1,9 +1,12 @@
 use crate::{
     components::{skin::NO_SKIN, stage, GlobalTransform, Hologram, Mesh, Skin, Visible},
-    contexts::VulkanContext,
     contexts::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
+    },
+    contexts::{
+        render_context::{InstancedQuadricPrimitive, QuadricInstance},
+        VulkanContext,
     },
     rendering::resources::{DrawData, PrimitiveCullData, QuadricData, ShaderIndex},
     Engine,
@@ -96,21 +99,37 @@ pub unsafe fn begin(
             // Create a transform from this primitive's local space into gos space.
             let gos_from_local = gos_from_global * global_transform.0;
 
-            let map = match hologram {
-                Some(_) => &mut render_context.quadrics_primitive_map,
-                None => &mut render_context.triangles_primitive_map,
+            if let Some(hologram) = hologram {
+                render_context
+                    .quadrics_primitive_map
+                    .entry(key)
+                    .or_insert(InstancedQuadricPrimitive {
+                        primitive: primitive.clone(),
+                        instances: Default::default(),
+                    })
+                    .instances
+                    .push(QuadricInstance {
+                        gos_from_local,
+                        bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
+                        surface_q_in_local: hologram.surface_q_in_local,
+                        bounds_q_in_local: hologram.bounds_q_in_local,
+                        uv_from_local: hologram.uv_from_local,
+                    });
+            } else {
+                render_context
+                    .triangles_primitive_map
+                    .entry(key)
+                    .or_insert(InstancedPrimitive {
+                        primitive: primitive.clone(),
+                        instances: Default::default(),
+                    })
+                    .instances
+                    .push(Instance {
+                        gos_from_local,
+                        bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
+                        skin_id,
+                    });
             };
-            map.entry(key)
-                .or_insert(InstancedPrimitive {
-                    primitive: primitive.clone(),
-                    instances: Default::default(),
-                })
-                .instances
-                .push(Instance {
-                    gos_from_local,
-                    bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
-                    skin_id,
-                });
         }
     }
 
@@ -204,19 +223,38 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
         {
             // Don't record commands for primitives which have no instances, eg. have been culled.
             if instance_count > 0 {
-                let map = match current_shader {
-                    ShaderIndex::Triangle => &render_context.triangles_primitive_map,
-                    ShaderIndex::Quadric => &render_context.quadrics_primitive_map,
+                match current_shader {
+                    ShaderIndex::Triangle => {
+                        let primitive = &render_context
+                            .triangles_primitive_map
+                            .get(&current_primitive_id)
+                            .unwrap()
+                            .primitive;
+                        device.cmd_draw_indexed(
+                            command_buffer,
+                            primitive.indices_count,
+                            instance_count,
+                            primitive.index_buffer_offset,
+                            primitive.vertex_buffer_offset as _,
+                            instance_offset,
+                        );
+                    }
+                    ShaderIndex::Quadric => {
+                        let primitive = &render_context
+                            .quadrics_primitive_map
+                            .get(&current_primitive_id)
+                            .unwrap()
+                            .primitive;
+                        device.cmd_draw_indexed(
+                            command_buffer,
+                            primitive.indices_count,
+                            instance_count,
+                            primitive.index_buffer_offset,
+                            primitive.vertex_buffer_offset as _,
+                            instance_offset,
+                        );
+                    }
                 };
-                let primitive = &map.get(&current_primitive_id).unwrap().primitive;
-                device.cmd_draw_indexed(
-                    command_buffer,
-                    primitive.indices_count,
-                    instance_count,
-                    primitive.index_buffer_offset,
-                    primitive.vertex_buffer_offset as _,
-                    instance_offset,
-                );
             }
 
             current_primitive_id = cull_result.index_offset;
@@ -242,7 +280,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
         if cull_result.visible {
             match current_shader {
                 ShaderIndex::Triangle => {
-                    let instanced_primitive = &render_context
+                    let instanced_primitive = render_context
                         .triangles_primitive_map
                         .get(&cull_result.index_offset)
                         .unwrap();
@@ -258,22 +296,23 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                     instance_count += 1;
                 }
                 ShaderIndex::Quadric => {
-                    let instanced_primitive = &render_context
+                    let instanced_primitive = render_context
                         .quadrics_primitive_map
                         .get(&cull_result.index_offset)
                         .unwrap();
                     let instance =
                         &instanced_primitive.instances[cull_result.index_instance as usize];
                     let local_from_gos: Mat4 = instance.gos_from_local.inverse().into();
-                    let surface_q_in_local = Mat4::from_diagonal([1.0, 0.0, 1.0, -0.25].into());
-                    let bounds_q_in_local = Mat4::from_diagonal([0.0, 1.0, 0.0, -0.5].into());
-                    let uv_from_local = Mat4::IDENTITY;
                     let quadric_data = QuadricData {
                         gos_from_local: instance.gos_from_local.into(),
                         material_id: instanced_primitive.primitive.material_id,
-                        surface_q: local_from_gos.transpose() * surface_q_in_local * local_from_gos,
-                        bounds_q: local_from_gos.transpose() * bounds_q_in_local * local_from_gos,
-                        uv_from_gos: uv_from_local * local_from_gos,
+                        surface_q: local_from_gos.transpose()
+                            * instance.surface_q_in_local
+                            * local_from_gos,
+                        bounds_q: local_from_gos.transpose()
+                            * instance.bounds_q_in_local
+                            * local_from_gos,
+                        uv_from_gos: instance.uv_from_local * local_from_gos,
                     };
                     quadrics_data_buffer.push(&quadric_data);
                     instance_count += 1;
@@ -286,19 +325,38 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
     // records a command when the primitive has changed. If we don't do this, the last primitive will never
     // be drawn.
     if instance_count > 0 {
-        let map = match current_shader {
-            ShaderIndex::Triangle => &render_context.triangles_primitive_map,
-            ShaderIndex::Quadric => &render_context.quadrics_primitive_map,
+        match current_shader {
+            ShaderIndex::Triangle => {
+                let primitive = &render_context
+                    .triangles_primitive_map
+                    .get(&current_primitive_id)
+                    .unwrap()
+                    .primitive;
+                device.cmd_draw_indexed(
+                    command_buffer,
+                    primitive.indices_count,
+                    instance_count,
+                    primitive.index_buffer_offset,
+                    primitive.vertex_buffer_offset as _,
+                    instance_offset,
+                );
+            }
+            ShaderIndex::Quadric => {
+                let primitive = &render_context
+                    .quadrics_primitive_map
+                    .get(&current_primitive_id)
+                    .unwrap()
+                    .primitive;
+                device.cmd_draw_indexed(
+                    command_buffer,
+                    primitive.indices_count,
+                    instance_count,
+                    primitive.index_buffer_offset,
+                    primitive.vertex_buffer_offset as _,
+                    instance_offset,
+                );
+            }
         };
-        let primitive = &map.get(&current_primitive_id).unwrap().primitive;
-        device.cmd_draw_indexed(
-            command_buffer,
-            primitive.indices_count,
-            instance_count,
-            primitive.index_buffer_offset,
-            primitive.vertex_buffer_offset as _,
-            instance_offset,
-        );
     }
 }
 

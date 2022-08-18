@@ -4,7 +4,7 @@ use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, Hologram, LocalTransform},
     contexts::PhysicsContext,
-    glam,
+    glam::{self, Mat4},
     hecs::World,
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
@@ -142,7 +142,12 @@ fn add_sphere(
         .position(position)
         .build();
     let components = physics_context.create_rigid_body_and_collider(entity, rigid_body, collider);
+    let hologram = Hologram {
+        surface_q_in_local: Mat4::from_diagonal([1.0, 0.0, 1.0, -0.25].into()),
+        bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -0.5].into()),
+        uv_from_local: Mat4::IDENTITY,
+    };
     world
-        .insert(entity, (components.0, components.1, Hologram {}))
+        .insert(entity, (components.0, components.1, hologram))
         .unwrap();
 }
