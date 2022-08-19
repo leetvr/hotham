@@ -35,42 +35,40 @@ void main() {
     // Retrieve draw data
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
-    gl_SampleMask[0] = 0;
-    vec4 hitPoint = vec4(0.0, 0.0, 0.0, 0.0);
-    for (int sampleId = 0; sampleId < 4; ++sampleId) {
-        vec4 sampleRayOrigin = interpolateAtSample(inRayOrigin, sampleId);
-        vec4 sampleRayDir = interpolateAtSample(inRayDir, sampleId);
-        vec4 sampleSurfaceQTimesRayOrigin = interpolateAtSample(inSurfaceQTimesRayOrigin, sampleId);
-        vec4 sampleSurfaceQTimesRayDir = interpolateAtSample(inSurfaceQTimesRayDir, sampleId);
-
-        // Find ray-quadric intersection, if any
-        float a = dot(sampleRayDir, sampleSurfaceQTimesRayDir);
-        float b = dot(sampleRayOrigin, sampleSurfaceQTimesRayDir) + dot(sampleRayDir, sampleSurfaceQTimesRayOrigin);
-        float c = dot(sampleRayOrigin, sampleSurfaceQTimesRayOrigin);
-        // Discriminant from quadratic formula
-        // b^2 - 4ac
-        float discriminant = b * b - 4.0 * a * c;
-        if (discriminant < 0.0) {
-            continue;
-        }
-
-        // Pick the solution that is facing us
-        float t = (b + sqrt(discriminant)) * -0.5 / a;
-
-        if (t < 0.0) {
-            continue;
-        }
-
-        vec4 sampleHitPoint = sampleRayOrigin + sampleRayDir * t.x;
-        float boundsValue = dot(sampleHitPoint, d.boundsQ * sampleHitPoint);
-        if (boundsValue <= 0.0) {
-            gl_SampleMask[0] |= (1 << sampleId);
-            hitPoint += sampleHitPoint;
-        }
+    // Find ray-quadric intersection, if any
+    float a = dot(inRayDir, inSurfaceQTimesRayDir);
+    float b = dot(inRayOrigin, inSurfaceQTimesRayDir) + dot(inRayDir, inSurfaceQTimesRayOrigin);
+    float c = dot(inRayOrigin, inSurfaceQTimesRayOrigin);
+    // Discriminant from quadratic formula
+    // b^2 - 4ac
+    float discriminant = b * b - 4.0 * a * c;
+    gl_SampleMask[0] =
+        int(step(0.0, discriminant + dFdx(discriminant) * 0.25 + dFdy(discriminant) * 0.25)) * 1 +
+        int(step(0.0, discriminant - dFdx(discriminant) * 0.25 + dFdy(discriminant) * 0.25)) * 2 +
+        int(step(0.0, discriminant + dFdx(discriminant) * 0.25 - dFdy(discriminant) * 0.25)) * 4 +
+        int(step(0.0, discriminant - dFdx(discriminant) * 0.25 - dFdy(discriminant) * 0.25)) * 8;
+    if (discriminant < 0.0) {
+        discriminant = 0.0;
     }
 
-    // Discarding is postponed until all samples have been tested.
-    if (hitPoint.w == 0.0) {
+    // Pick the solution that is facing us
+    float t = (b + sqrt(discriminant)) * -0.5 / a;
+
+    if (t < 0.0) {
+        t = 0.0;
+        gl_SampleMask[0] = 0;
+    }
+
+    vec4 hitPoint = inRayOrigin + inRayDir * t.x;
+    float boundsValue = 0.0001 - dot(hitPoint, d.boundsQ * hitPoint);
+    gl_SampleMask[0] &=
+        int(step(0.0, boundsValue + dFdx(boundsValue) * 0.25 + dFdy(boundsValue) * 0.25)) * 1 +
+        int(step(0.0, boundsValue - dFdx(boundsValue) * 0.25 + dFdy(boundsValue) * 0.25)) * 2 +
+        int(step(0.0, boundsValue + dFdx(boundsValue) * 0.25 - dFdy(boundsValue) * 0.25)) * 4 +
+        int(step(0.0, boundsValue - dFdx(boundsValue) * 0.25 - dFdy(boundsValue) * 0.25)) * 8;
+
+    // Discarding is postponed until here to make sure the derivatives above are valid.
+    if (gl_SampleMask[0] == 0) {
         discard;
     }
 
