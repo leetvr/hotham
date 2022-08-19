@@ -35,9 +35,8 @@ void main() {
     // Retrieve draw data
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
-    float coverage = 0.0;
+    gl_SampleMask[0] = 0;
     vec4 hitPoint = vec4(0.0, 0.0, 0.0, 0.0);
-
     for (int sampleId = 0; sampleId < 4; ++sampleId) {
         vec4 sampleRayOrigin = interpolateAtSample(inRayOrigin, sampleId);
         vec4 sampleRayDir = interpolateAtSample(inRayDir, sampleId);
@@ -65,13 +64,13 @@ void main() {
         vec4 sampleHitPoint = sampleRayOrigin + sampleRayDir * t.x;
         float boundsValue = dot(sampleHitPoint, d.boundsQ * sampleHitPoint);
         if (boundsValue <= 0.0) {
-            coverage += 0.25;
+            gl_SampleMask[0] |= (1 << sampleId);
             hitPoint += sampleHitPoint;
         }
     }
 
     // Discarding is postponed until all samples have been tested.
-    if (coverage == 0.0) {
+    if (hitPoint.w == 0.0) {
         discard;
     }
 
@@ -118,7 +117,6 @@ void main() {
 
     // Finally, tonemap the color.
     outColor.rgb = tonemap(outColor.rgb);
-    outColor.a = coverage;
 
     // Debugging
     // Shader inputs debug visualization

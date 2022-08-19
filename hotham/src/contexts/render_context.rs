@@ -677,7 +677,6 @@ fn create_pipelines(
 
     // Multisample state
     let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
-        .alpha_to_coverage_enable(true)
         .rasterization_samples(vk::SampleCountFlags::TYPE_4);
 
     // Depth stencil state
