@@ -28,11 +28,10 @@ layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
 layout (location = 0) out vec4 outColor;
 layout (depth_less) out float gl_FragDepth;
 
-void findIntersection(in QuadricData d, out vec4 hitPoint, out vec3 normal) {
+vec4 findIntersection(in QuadricData d) {
     float a = dot(inRayDir, inSurfaceQTimesRayDir);
     float b = dot(inRayOrigin, inSurfaceQTimesRayDir) + dot(inRayDir, inSurfaceQTimesRayOrigin);
     float c = dot(inRayOrigin, inSurfaceQTimesRayOrigin);
-
     // Discriminant from quadratic formula
     // b^2 - 4ac
     float discriminant = b * b - 4.0 * a * c;
@@ -41,33 +40,29 @@ void findIntersection(in QuadricData d, out vec4 hitPoint, out vec3 normal) {
     }
 
     // Pick closest solution, but still in front of us
-    vec2 t = vec2(
-        (-b - sqrt(discriminant)) / (2.0 * a),
-        (-b + sqrt(discriminant)) / (2.0 * a));
+    discriminant = sqrt(discriminant);
+    a = 0.5 / a;
+    vec2 t = (vec2(-discriminant, discriminant)-b) * a;
     t = vec2(min(t.x, t.y), max(t.x, t.y));
 
     if (t.y < 0.0) {
         discard;
     }
 
+    vec4 hitPoint;
+    float boundsValue;
     if (t.x >= 0.0) {
         hitPoint = inRayOrigin + inRayDir * t.x;
-        float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
+        boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
         if (boundsValue <= 0.0) {
-            normal = (d.surfaceQ * hitPoint).xyz;
-            // Flip the normal so that it faces the viewer
-            normal = normalize(-dot(inRayDir.xyz, normal) * normal);
-            return;
+            return hitPoint;
         }
     }
     // t.y >= 0
     hitPoint = inRayOrigin + inRayDir * t.y;
-    float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
+    boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
     if (boundsValue <= 0.0) {
-        normal = (d.surfaceQ * hitPoint).xyz;
-        // Flip the normal so that it faces the viewer
-        normal = normalize(-dot(inRayDir.xyz, normal) * normal);
-        return;
+        return hitPoint;
     }
     discard;
 }
@@ -80,12 +75,14 @@ void main() {
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
     // Find ray-quadric intersection, if any
-    vec4 hitPoint;
-    vec3 normal;
-    findIntersection(d, hitPoint, normal);
+    vec4 hitPoint = findIntersection(d);
     vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * hitPoint;
     float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
     gl_FragDepth = f_ndc_depth;
+
+    vec3 normal = (d.surfaceQ * hitPoint).xyz;
+    // Flip the normal so that it faces the viewer
+    normal = normalize(-dot(inRayDir.xyz, normal) * normal);
 
     vec4 uv4 = d.uvFromGlobal * hitPoint;
     vec2 uv = uv4.xy / uv4.w;
