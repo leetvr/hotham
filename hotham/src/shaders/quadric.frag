@@ -39,32 +39,19 @@ vec4 findIntersection(in QuadricData d) {
         discard;
     }
 
-    // Pick closest solution, but still in front of us
-    discriminant = sqrt(discriminant);
-    a = 0.5 / a;
-    vec2 t = (vec2(-discriminant, discriminant)-b) * a;
-    t = vec2(min(t.x, t.y), max(t.x, t.y));
+    // Pick the solution that is facing us
+    float t = (b + sqrt(discriminant)) * -0.5 / a;
 
-    if (t.y < 0.0) {
+    if (t < 0.0) {
         discard;
     }
 
-    vec4 hitPoint;
-    float boundsValue;
-    if (t.x >= 0.0) {
-        hitPoint = inRayOrigin + inRayDir * t.x;
-        boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
-        if (boundsValue <= 0.0) {
-            return hitPoint;
-        }
+    vec4 hitPoint = inRayOrigin + inRayDir * t.x;
+    float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
+    if (boundsValue > 0.0) {
+        discard;
     }
-    // t.y >= 0
-    hitPoint = inRayOrigin + inRayDir * t.y;
-    boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
-    if (boundsValue <= 0.0) {
-        return hitPoint;
-    }
-    discard;
+    return hitPoint;
 }
 
 void main() {
