@@ -35,6 +35,12 @@ void main() {
     // Retrieve draw data
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
+    // These values are from https://registry.khronos.org/vulkan/specs/1.2-extensions/html/chap27.html#primrast-samplelocations
+    vec2 offsetSample0 = vec2(0.375 - 0.5, 0.125 - 0.5);
+    vec2 offsetSample1 = vec2(0.875 - 0.5, 0.375 - 0.5);
+    vec2 offsetSample2 = vec2(0.125 - 0.5, 0.625 - 0.5);
+    vec2 offsetSample3 = vec2(0.625 - 0.5, 0.875 - 0.5);
+
     // Find ray-quadric intersection, if any
     float a = dot(inRayDir, inSurfaceQTimesRayDir);
     float b = dot(inRayOrigin, inSurfaceQTimesRayDir) + dot(inRayDir, inSurfaceQTimesRayOrigin);
@@ -42,11 +48,12 @@ void main() {
     // Discriminant from quadratic formula
     // b^2 - 4ac
     float discriminant = b * b - 4.0 * a * c;
+    vec2 gradientOfDiscriminant = vec2(dFdx(discriminant), dFdy(discriminant));
     gl_SampleMask[0] =
-        int(step(0.0, discriminant + dFdx(discriminant) * 0.25 + dFdy(discriminant) * 0.25)) * 1 +
-        int(step(0.0, discriminant - dFdx(discriminant) * 0.25 + dFdy(discriminant) * 0.25)) * 2 +
-        int(step(0.0, discriminant + dFdx(discriminant) * 0.25 - dFdy(discriminant) * 0.25)) * 4 +
-        int(step(0.0, discriminant - dFdx(discriminant) * 0.25 - dFdy(discriminant) * 0.25)) * 8;
+        int(step(0.0, discriminant + dot(offsetSample0, gradientOfDiscriminant))) * 1 +
+        int(step(0.0, discriminant + dot(offsetSample1, gradientOfDiscriminant))) * 2 +
+        int(step(0.0, discriminant + dot(offsetSample2, gradientOfDiscriminant))) * 4 +
+        int(step(0.0, discriminant + dot(offsetSample3, gradientOfDiscriminant))) * 8;
     if (discriminant < 0.0) {
         discriminant = 0.0;
     }
@@ -61,11 +68,12 @@ void main() {
 
     vec4 hitPoint = inRayOrigin + inRayDir * t.x;
     float boundsValue = 0.0001 - dot(hitPoint, d.boundsQ * hitPoint);
+    vec2 gradientOfBoundsValue = vec2(dFdx(boundsValue), dFdy(boundsValue));
     gl_SampleMask[0] &=
-        int(step(0.0, boundsValue + dFdx(boundsValue) * 0.25 + dFdy(boundsValue) * 0.25)) * 1 +
-        int(step(0.0, boundsValue - dFdx(boundsValue) * 0.25 + dFdy(boundsValue) * 0.25)) * 2 +
-        int(step(0.0, boundsValue + dFdx(boundsValue) * 0.25 - dFdy(boundsValue) * 0.25)) * 4 +
-        int(step(0.0, boundsValue - dFdx(boundsValue) * 0.25 - dFdy(boundsValue) * 0.25)) * 8;
+        int(step(0.0, boundsValue + dot(offsetSample0, gradientOfBoundsValue))) * 1 +
+        int(step(0.0, boundsValue + dot(offsetSample1, gradientOfBoundsValue))) * 2 +
+        int(step(0.0, boundsValue + dot(offsetSample2, gradientOfBoundsValue))) * 4 +
+        int(step(0.0, boundsValue + dot(offsetSample3, gradientOfBoundsValue))) * 8;
 
     // Discarding is postponed until here to make sure the derivatives above are valid.
     if (gl_SampleMask[0] == 0) {
