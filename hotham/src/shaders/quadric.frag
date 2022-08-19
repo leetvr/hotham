@@ -28,32 +28,6 @@ layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
 layout (location = 0) out vec4 outColor;
 layout (depth_less) out float gl_FragDepth;
 
-vec4 findIntersection(in QuadricData d) {
-    float a = dot(inRayDir, inSurfaceQTimesRayDir);
-    float b = dot(inRayOrigin, inSurfaceQTimesRayDir) + dot(inRayDir, inSurfaceQTimesRayOrigin);
-    float c = dot(inRayOrigin, inSurfaceQTimesRayOrigin);
-    // Discriminant from quadratic formula
-    // b^2 - 4ac
-    float discriminant = b * b - 4.0 * a * c;
-    if (discriminant < 0.0) {
-        discard;
-    }
-
-    // Pick the solution that is facing us
-    float t = (b + sqrt(discriminant)) * -0.5 / a;
-
-    if (t < 0.0) {
-        discard;
-    }
-
-    vec4 hitPoint = inRayOrigin + inRayDir * t.x;
-    float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
-    if (boundsValue > 0.0) {
-        discard;
-    }
-    return hitPoint;
-}
-
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
     outColor = ERROR_MAGENTA;
@@ -61,15 +35,49 @@ void main() {
     // Retrieve draw data
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
+    float coverage = 1.0;
     // Find ray-quadric intersection, if any
-    vec4 hitPoint = findIntersection(d);
+    float a = dot(inRayDir, inSurfaceQTimesRayDir);
+    float b = dot(inRayOrigin, inSurfaceQTimesRayDir) + dot(inRayDir, inSurfaceQTimesRayOrigin);
+    float c = dot(inRayOrigin, inSurfaceQTimesRayOrigin);
+    // Discriminant from quadratic formula
+    // b^2 - 4ac
+    float discriminant = b * b - 4.0 * a * c;
+    coverage = (4.0 +
+        sign(discriminant + dFdx(discriminant) * 0.25 + dFdy(discriminant) * 0.25) +
+        sign(discriminant - dFdx(discriminant) * 0.25 + dFdy(discriminant) * 0.25) +
+        sign(discriminant + dFdx(discriminant) * 0.25 - dFdy(discriminant) * 0.25) +
+        sign(discriminant + dFdx(discriminant) * 0.25 - dFdy(discriminant) * 0.25)) / 8.0;
+    if (discriminant < 0.0) {
+        discriminant = 0.0;
+    }
+
+    // Pick the solution that is facing us
+    float t = (b + sqrt(discriminant)) * -0.5 / a;
+
+    if (t < 0.0) {
+        t = 0.0;
+        coverage = 0.0;
+    }
+
+    vec4 hitPoint = inRayOrigin + inRayDir * t.x;
+    float boundsValue = 0.0001 - dot(hitPoint, d.boundsQ * hitPoint);
+    coverage *= (4.0 +
+        sign(boundsValue + dFdx(boundsValue) * 0.25 + dFdy(boundsValue) * 0.25) +
+        sign(boundsValue - dFdx(boundsValue) * 0.25 + dFdy(boundsValue) * 0.25) +
+        sign(boundsValue + dFdx(boundsValue) * 0.25 - dFdy(boundsValue) * 0.25) +
+        sign(boundsValue + dFdx(boundsValue) * 0.25 - dFdy(boundsValue) * 0.25)) / 8.0;
+
+    // Discarding is postponed until here to make sure the derivatives above are valid.
+    if (coverage <= 0.0) {
+        discard;
+    }
     vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * hitPoint;
     float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
     gl_FragDepth = f_ndc_depth;
 
-    vec3 normal = (d.surfaceQ * hitPoint).xyz;
-    // Flip the normal so that it faces the viewer
-    normal = normalize(-dot(inRayDir.xyz, normal) * normal);
+    // Compute normal from gradient of surface quadric
+    vec3 normal = normalize((d.surfaceQ * hitPoint).xyz);
 
     vec4 uv4 = d.uvFromGlobal * hitPoint;
     vec2 uv = uv4.xy / uv4.w;
@@ -103,6 +111,7 @@ void main() {
 
     // Finally, tonemap the color.
     outColor.rgb = tonemap(outColor.rgb);
+    outColor.a = coverage;
 
     // Debugging
     // Shader inputs debug visualization
