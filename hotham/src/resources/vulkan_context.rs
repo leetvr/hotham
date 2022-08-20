@@ -640,29 +640,27 @@ impl VulkanContext {
 
         let mut offset = 0;
         for (mip_level, offset_increment) in offsets.iter().enumerate() {
-            for layer in 0..layer_count {
-                let image_subresource = vk::ImageSubresourceLayers::builder()
-                    .aspect_mask(vk::ImageAspectFlags::COLOR)
-                    .mip_level(mip_level as _)
-                    .base_array_layer(layer)
-                    .layer_count(1);
+            let image_subresource = vk::ImageSubresourceLayers::builder()
+                .aspect_mask(vk::ImageAspectFlags::COLOR)
+                .mip_level(mip_level as _)
+                .base_array_layer(0)
+                .layer_count(layer_count);
 
-                let image_extent = vk::Extent3D {
-                    width: dst_image.extent.width >> mip_level,
-                    height: dst_image.extent.height >> mip_level,
-                    depth: 1,
-                };
+            let image_extent = vk::Extent3D {
+                width: dst_image.extent.width >> mip_level,
+                height: dst_image.extent.height >> mip_level,
+                depth: 1,
+            };
 
-                let region = vk::BufferImageCopy::builder()
-                    .buffer_offset(offset)
-                    .buffer_row_length(0)
-                    .buffer_image_height(0)
-                    .image_subresource(*image_subresource)
-                    .image_extent(image_extent)
-                    .build();
-                regions.push(region);
-                offset += offset_increment;
-            }
+            let region = vk::BufferImageCopy::builder()
+                .buffer_offset(offset)
+                .buffer_row_length(0)
+                .buffer_image_height(0)
+                .image_subresource(*image_subresource)
+                .image_extent(image_extent)
+                .build();
+            regions.push(region);
+            offset += offset_increment * u64::from(layer_count);
         }
 
         let dst_image_layout = vk::ImageLayout::TRANSFER_DST_OPTIMAL;
