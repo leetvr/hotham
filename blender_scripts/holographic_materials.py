@@ -84,12 +84,24 @@ if np.any(s < 1.0e-10):
     u, s, vh = np.linalg.svd(V.T @ (BtB + BtB_prior) @ V, hermitian=True)
 c = vh.T @ np.diag(1 / s) @ u.T @ V.T @ BtN
 q = V @ c
+Q = (
+    np.array(
+        [
+            [2 * q[0], q[3], q[4], q[6]],
+            [q[3], 2 * q[1], q[5], q[7]],
+            [q[4], q[5], 2 * q[2], q[8]],
+            [q[6], q[7], q[8], 2 * q[9]],
+        ]
+    )
+    / 2
+)
 
 print("eigenvalues: ", eigenvalues)
 print("k: ", np.count_nonzero(eigenvalues < 1.0e-10))
-print("V: ", V)
-print("c: ", c)
-print("q: ", q)
+print("V:\n", V)
+print("cᵀ: ", c.T)
+print("q:\n", q)
+print("Q:\n", Q)
 
 
 # bm.free()  # free and prevent further access
