@@ -80,7 +80,8 @@ if np.any(s < 1.0e-10):
     print(
         "INFO: Normals do not constrain the solution fully, adding prior for regularization."
     )
-    u, s, vh = np.linalg.svd(V.T @ (BtB + np.identity(10) * 1.0e-5) @ V, hermitian=True)
+    BtB_prior = np.diag([1, 1, 1, 10, 10, 10, 0, 0, 0, 0]) * 1.0e-6
+    u, s, vh = np.linalg.svd(V.T @ (BtB + BtB_prior) @ V, hermitian=True)
 c = vh.T @ np.diag(1 / s) @ u.T @ V.T @ BtN
 q = V @ c
 
