@@ -45,12 +45,14 @@ pub static NO_TEXTURE: u32 = std::u32::MAX;
 
 impl Texture {
     /// Creates a new texture
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &str,
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,
         image_buf: &[u8],
         extent: &vk::Extent2D,
+        array_layers: u32,
         format: vk::Format,
         texture_usage: TextureUsage,
     ) -> Self {
@@ -61,14 +63,21 @@ impl Texture {
                 format,
                 extent,
                 vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
-                1,
+                array_layers,
                 1,
                 component_mapping,
             )
             .unwrap();
 
         let index = render_context
-            .create_texture_image(name, vulkan_context, image_buf, 1, vec![0], &image)
+            .create_texture_image(
+                name,
+                vulkan_context,
+                image_buf,
+                1,
+                vec![image_buf.len() as u64 / array_layers as u64],
+                &image,
+            )
             .unwrap();
 
         Texture {
@@ -152,6 +161,8 @@ impl Texture {
     ///
     /// This is the preferred way of using textures in Hotham. By compressing the image in a GPU friendly way we can drastically reduce the amount of
     /// bandwidth used to sample from it.
+    ///
+    /// Cube arrays are unimplemented.
     pub fn from_ktx2(
         name: &str,
         vulkan_context: &VulkanContext,
@@ -167,6 +178,7 @@ impl Texture {
             render_context,
             &ktx2_image.image_buf,
             &ktx2_image.extent,
+            ktx2_image.array_layers.max(1) * ktx2_image.faces,
             ktx2_image.format,
             texture_usage,
         )
@@ -212,6 +224,7 @@ impl Texture {
             render_context,
             &image.into_raw(),
             &extent,
+            1,
             format,
             texture_usage,
         )
@@ -226,6 +239,8 @@ pub(crate) struct KTX2Image {
     pub image_buf: Vec<u8>,
     pub offsets: Vec<vk::DeviceSize>,
     pub mip_levels: u32,
+    pub array_layers: u32,
+    pub faces: u32,
 }
 
 pub(crate) fn parse_ktx2(ktx2_data: &[u8]) -> KTX2Image {
@@ -271,6 +286,8 @@ pub(crate) fn parse_ktx2(ktx2_data: &[u8]) -> KTX2Image {
         image_buf,
         offsets,
         mip_levels: header.level_count,
+        array_layers: header.layer_count,
+        faces: header.face_count,
     }
 }
 
