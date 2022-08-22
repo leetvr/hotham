@@ -6,6 +6,8 @@ import math
 import bmesh
 import numpy as np
 
+np.set_printoptions(suppress=True)
+
 # Get the active mesh
 me = bpy.context.object.data
 
@@ -42,9 +44,9 @@ bm = bmesh.from_edit_mesh(me)
 # ∇f(p) = (Qᵀ+Q)·p
 # Q is symmetric => ∇f(p) = 2·Q·p
 
-AtA = np.zeros((10, 10))
-BtB = np.zeros((10, 10))
-BtN = np.zeros((10, 1))
+AtA = np.zeros((10, 10), dtype=np.float64)
+BtB = np.zeros((10, 10), dtype=np.float64)
+BtN = np.zeros((10, 1), dtype=np.float64)
 for v in bm.verts:
     if v.select:
         x, y, z = (v.co.x, v.co.y, v.co.z)
@@ -67,10 +69,10 @@ for v in bm.verts:
 # The eigenvectors are arranged as columns
 eigenvalues, eigenvectors = np.linalg.eigh(AtA)
 
-# Measure size of nullspace
+# Measure dimensionality of nullspace
 k = np.count_nonzero(eigenvalues < 1.0e-10)
 if k == 0:
-    print("WARNING: This shape does not look like a quadric, the fit will be bad!")
+    print("WARNING: This shape does not look like a quadric, the fit may be bad!")
     k = 1
 V = eigenvectors[:, :k]
 
@@ -96,12 +98,38 @@ Q = (
     / 2
 )
 
+# Measure how good the fit is
+deviations = np.zeros((len(bm.verts), 1), dtype=np.float64)
+for i, v in enumerate(bm.verts):
+    if v.select:
+        x, y, z = (v.co.x, v.co.y, v.co.z)
+        a_row = np.array(
+            [
+                [x * x, y * y, z * z, x * y, x * z, y * z, x, y, z, 1],
+            ]
+        )
+        b_rows = np.array(
+            [
+                [2 * x, 0, 0, y, z, 0, 1, 0, 0, 0],
+                [0, 2 * y, 0, x, 0, z, 0, 1, 0, 0],
+                [0, 0, 2 * z, 0, x, y, 0, 0, 1, 0],
+            ]
+        )
+        f = a_row @ q
+        df = b_rows @ q
+        deviations[i] = f / np.sqrt(df.T @ df)
+
 print("eigenvalues: ", eigenvalues)
 print("k: ", np.count_nonzero(eigenvalues < 1.0e-10))
 print("V:\n", V)
 print("cᵀ: ", c.T)
 print("q:\n", q)
 print("Q:\n", Q)
+print("min(deviations): {:f}".format(np.min(deviations)))
+print("max(deviations): {:f}".format(np.max(deviations)))
+print("mean(deviations): {:f}".format(np.mean(deviations)))
+print("mean(abs(deviations)): {:f}".format(np.mean(np.abs(deviations))))
+print("median(abs(deviations)): {:f}".format(np.median(np.abs(deviations))))
 
 
 # bm.free()  # free and prevent further access
