@@ -15,7 +15,7 @@ use super::{
     vertex::Vertex,
 };
 
-static VERTEX_BUFFER_SIZE: usize = 1_000_000; // TODO
+static VERTEX_BUFFER_SIZE: usize = 2_000_000; // TODO
 static MATERIAL_BUFFER_SIZE: usize = 10_000; // TODO
 static SKINS_BUFFER_SIZE: usize = 100; // TODO
 
