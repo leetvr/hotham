@@ -45,6 +45,7 @@ pub static NO_TEXTURE: u32 = std::u32::MAX;
 
 impl Texture {
     /// Creates a new texture
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         name: &str,
         vulkan_context: &VulkanContext,
