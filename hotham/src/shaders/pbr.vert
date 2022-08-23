@@ -35,12 +35,11 @@ void main() {
         outTBN = mat3(globalTangent, globalBiTangent, globalNormal);
     } else {
         // Mesh is skinned
-        mat4[MAX_JOINTS] jointMatrices = skinsBuffer.jointMatrices[d.skinID];
         mat4 skinMatrix =
-            inWeight.x * jointMatrices[int(inJoint.x)] +
-            inWeight.y * jointMatrices[int(inJoint.y)] +
-            inWeight.z * jointMatrices[int(inJoint.z)] +
-            inWeight.w * jointMatrices[int(inJoint.w)];
+            inWeight.x * skinsBuffer.jointMatrices[d.skinID][int(inJoint.x)] +
+            inWeight.y * skinsBuffer.jointMatrices[d.skinID][int(inJoint.y)] +
+            inWeight.z * skinsBuffer.jointMatrices[d.skinID][int(inJoint.z)] +
+            inWeight.w * skinsBuffer.jointMatrices[d.skinID][int(inJoint.w)];
 
         outGlobalPos = d.globalFromLocal * skinMatrix * vec4(inPos, 1.0);
 
