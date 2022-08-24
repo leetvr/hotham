@@ -13,10 +13,10 @@ pub struct Vertex {
     pub tangent: Vector4<f32>,
     /// First set of texture coordinates
     pub texture_coords: Vector2<f32>,
-    /// Joint indices (for skinning)
-    pub joint_indices: Vector4<f32>,
-    /// Joint weights (for skinning)
-    pub joint_weights: Vector4<f32>,
+    /// Joint indices (for skinning), one byte per index.
+    pub joint_indices: u32,
+    /// Joint weights (for skinning), one byte per weight.
+    pub joint_weights: u32,
 }
 
 impl Vertex {
@@ -26,8 +26,8 @@ impl Vertex {
         normal: Vector3<f32>,
         tangent: Vector4<f32>,
         texture_coords: Vector2<f32>,
-        joint_indices: Vector4<f32>,
-        joint_weights: Vector4<f32>,
+        joint_indices: u32,
+        joint_weights: u32,
     ) -> Self {
         Self {
             position,
@@ -48,11 +48,26 @@ impl Vertex {
             Vector3<f32>,
             Vector4<f32>,
             Vector2<f32>,
-            Vector4<f32>,
+            Vector4<u8>,
             Vector4<f32>,
         ),
     ) -> Self {
-        Vertex::new(t.0, t.1, t.2, t.3, t.4, t.5)
+        let max_weight = t.5.max().max(f32::EPSILON);
+        let weight_normalization = 255.0 / max_weight;
+        Vertex::new(
+            t.0,
+            t.1,
+            t.2,
+            t.3,
+            (t.4[0] as u32)
+                + (t.4[1] as u32) * 256
+                + (t.4[2] as u32) * 256 * 256
+                + (t.4[3] as u32) * 256 * 256 * 256,
+            ((t.5[0] * weight_normalization).round() as u32)
+                + ((t.5[1] * weight_normalization).round() as u32) * 256
+                + ((t.5[2] * weight_normalization).round() as u32) * 256 * 256
+                + ((t.5[3] * weight_normalization).round() as u32) * 256 * 256 * 256,
+        )
     }
 }
 

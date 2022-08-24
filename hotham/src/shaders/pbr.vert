@@ -8,8 +8,8 @@ layout (location = 0) in vec3 inPos;
 layout (location = 1) in vec3 inNormal;
 layout (location = 2) in vec4 inTangent;
 layout (location = 3) in vec2 inUV;
-layout (location = 4) in vec4 inJoint;
-layout (location = 5) in vec4 inWeight;
+layout (location = 4) in uint inJoint;
+layout (location = 5) in uint inWeight;
 
 layout (location = 0) out vec4 outGlobalPos;
 layout (location = 1) out vec2 outUV;
@@ -36,10 +36,10 @@ void main() {
     } else {
         // Mesh is skinned
         mat4 skinMatrix =
-            inWeight.x * skinsBuffer.jointMatrices[d.skinID][int(inJoint.x)] +
-            inWeight.y * skinsBuffer.jointMatrices[d.skinID][int(inJoint.y)] +
-            inWeight.z * skinsBuffer.jointMatrices[d.skinID][int(inJoint.z)] +
-            inWeight.w * skinsBuffer.jointMatrices[d.skinID][int(inJoint.w)];
+            ((inWeight) & 255)       * skinsBuffer.jointMatrices[d.skinID][(inJoint) & 255] +
+            ((inWeight >> 8) & 255)  * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 8) & 255] +
+            ((inWeight >> 16) & 255) * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 16) & 255] +
+            ((inWeight >> 24) & 255) * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 24) & 255];
 
         outGlobalPos = d.globalFromLocal * skinMatrix * vec4(inPos, 1.0);
 
