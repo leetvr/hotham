@@ -56,25 +56,25 @@ vec3 tonemap(vec3 color) {
 
 // Get normal, tangent and bitangent vectors.
 vec3 getNormal(uint normalTextureID) {
-	vec3 N = normalize(inNormal);
+    vec3 N = normalize(inNormal);
     if (normalTextureID == NOT_PRESENT) {
         return N;
     }
 
-	vec3 textureNormal;
-	textureNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
-	textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
+    vec3 textureNormal;
+    textureNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
+    textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
 
-	vec3 dGlobalPosDx = dFdx(inGlobalPos);
-	vec3 dGlobalPosDy = dFdy(inGlobalPos);
-	vec2 dUvDx = dFdx(inUV);
-	vec2 dUvDy = dFdy(inUV);
+    vec3 dGlobalPosDx = dFdx(inGlobalPos);
+    vec3 dGlobalPosDy = dFdy(inGlobalPos);
+    vec2 dUvDx = dFdx(inUV);
+    vec2 dUvDy = dFdy(inUV);
 
-	vec3 T = normalize(dGlobalPosDx * dUvDy.t - dGlobalPosDy * dUvDx.t);
-	vec3 B = normalize(cross(N, T));
-	mat3 TBN = mat3(T, B, N);
+    vec3 T = normalize(dGlobalPosDx * dUvDy.t - dGlobalPosDy * dUvDx.t);
+    vec3 B = normalize(cross(N, T));
+    mat3 TBN = mat3(T, B, N);
 
-	return normalize(TBN * textureNormal);
+    return normalize(TBN * textureNormal);
 }
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
@@ -173,7 +173,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     // Get the view vector - from surface point to camera
     vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);
 
-	// Get the normal
+    // Get the normal
     vec3 n = getNormal(material.normalTextureID);
 
     // Get NdotV
