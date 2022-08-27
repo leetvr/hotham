@@ -52,6 +52,7 @@ impl Vertex {
             Vector4<f32>,
         ),
     ) -> Self {
+        // Normalize weights to 0 <= w <= 255 while avoiding division with zero.
         let max_weight = t.5.max().max(f32::EPSILON);
         let weight_normalization = 255.0 / max_weight;
         Vertex::new(
@@ -59,10 +60,12 @@ impl Vertex {
             t.1,
             t.2,
             t.3,
+            // Pack indices into one u32 with one byte per index.
             (t.4[0] as u32)
                 + (t.4[1] as u32) * 256
                 + (t.4[2] as u32) * 256 * 256
                 + (t.4[3] as u32) * 256 * 256 * 256,
+            // Pack weights into one u32 with one byte per weight.
             ((t.5[0] * weight_normalization).round() as u32)
                 + ((t.5[1] * weight_normalization).round() as u32) * 256
                 + ((t.5[2] * weight_normalization).round() as u32) * 256 * 256

@@ -35,6 +35,8 @@ void main() {
         outTBN = mat3(globalTangent, globalBiTangent, globalNormal);
     } else {
         // Mesh is skinned
+        // Shift and mask to unpack the individual indices and weights.
+        // There is no need to divide with the sum of weights because we are using homogenous coordinates.
         mat4 skinMatrix =
             ((inWeight) & 255)       * skinsBuffer.jointMatrices[d.skinID][(inJoint) & 255] +
             ((inWeight >> 8) & 255)  * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 8) & 255] +
