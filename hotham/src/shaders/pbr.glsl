@@ -34,7 +34,7 @@ struct MaterialInfo {
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
 const float PBR_WORKFLOW_UNLIT = 1.0;
 
-// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th editon on page 325.
+// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th edition on page 325.
 const vec3 f90 = vec3(1.0);
 
 // Fast approximation of ACES tonemap
