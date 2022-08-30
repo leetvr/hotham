@@ -170,7 +170,11 @@ impl RenderContext {
         )
     }
 
-    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) {
+    pub(crate) fn update_scene_data(
+        &mut self,
+        views: &[xr::View],
+        stage_from_global: &Matrix4<f32>,
+    ) {
         self.views = views.to_owned();
 
         // View (camera)
@@ -202,6 +206,12 @@ impl RenderContext {
             scene_data.view_projection = self.scene_data.view_projection;
             scene_data.params = self.scene_data.params;
             scene_data.lights = self.scene_data.lights;
+            for mut light in scene_data.lights {
+                light.position = stage_from_global
+                    .transform_point(&light.position.into())
+                    .coords;
+                light.direction = stage_from_global.transform_vector(&light.direction);
+            }
         }
     }
 
