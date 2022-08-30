@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 
 use crate::{
-    components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Visible},
+    components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Stage, Visible},
     rendering::resources::{DrawData, PrimitiveCullData},
     resources::VulkanContext,
     resources::{
@@ -10,6 +10,7 @@ use crate::{
     },
 };
 use hecs::{PreparedQuery, With, World};
+use nalgebra::Matrix4;
 use openxr as xr;
 
 /// Rendering system
@@ -66,6 +67,15 @@ pub unsafe fn begin(
     // primitives.
     let meshes = &render_context.resources.mesh_data;
 
+    // Get the stage transform
+    let global_from_stage = world
+        .query_mut::<With<Stage, &GlobalTransform>>()
+        .into_iter()
+        .next()
+        .map(|(_, global_transform)| global_transform.0)
+        .unwrap_or_else(Matrix4::<_>::identity);
+    let stage_from_global = global_from_stage.try_inverse().unwrap();
+
     for (_, (mesh, global_transform, skin)) in query.query_mut(world) {
         let mesh = meshes.get(mesh.handle).unwrap();
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
@@ -81,8 +91,9 @@ pub unsafe fn begin(
                 })
                 .instances
                 .push(Instance {
-                    global_from_local: global_transform.0,
-                    bounding_sphere: primitive.get_bounding_sphere(global_transform),
+                    stage_from_local: stage_from_global * global_transform.0,
+                    bounding_sphere: stage_from_global
+                        * primitive.get_bounding_sphere(global_transform),
                     skin_id,
                 });
         }
@@ -185,8 +196,8 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                 .unwrap();
             let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
             let draw_data = DrawData {
-                global_from_local: instance.global_from_local,
-                local_from_global: instance.global_from_local.try_inverse().unwrap(),
+                stage_from_local: instance.stage_from_local,
+                local_from_stage: instance.stage_from_local.try_inverse().unwrap(),
                 material_id: instanced_primitive.primitive.material_id,
                 skin_id: instance.skin_id,
             };

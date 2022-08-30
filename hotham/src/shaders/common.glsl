@@ -6,8 +6,8 @@
 #define MAX_JOINTS 64
 
 struct DrawData {
-    mat4 globalFromLocal;
-    mat4 localFromGlobal;
+    mat4 stageFromLocal;
+    mat4 localFromStage;
     uint materialID;
     uint skinID;
 };

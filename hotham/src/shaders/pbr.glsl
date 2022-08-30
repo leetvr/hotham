@@ -68,14 +68,14 @@ vec3 getNormal(uint normalTextureID) {
     // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
     // See http://www.thetenthplanet.de/archives/1180 for an explanation of how this works
     // and a little bit about why it is better than using precomputed tangents.
-    // Note however that we are using a slightly different formulation with global coordinates
-    // instead of view coordinates and we rely on the UV map not being too distorted.
-    vec3 dGlobalPosDx = dFdx(inGlobalPos);
-    vec3 dGlobalPosDy = dFdy(inGlobalPos);
+    // Note however that we are using a slightly different formulation with coordinates in stage space
+    // instead of view space and we rely on the UV map not being too distorted.
+    vec3 dStagePosDx = dFdx(inStagePos);
+    vec3 dStagePosDy = dFdy(inStagePos);
     vec2 dUvDx = dFdx(inUV);
     vec2 dUvDy = dFdy(inUV);
 
-    vec3 T = normalize(dGlobalPosDx * dUvDy.t - dGlobalPosDy * dUvDx.t);
+    vec3 T = normalize(dStagePosDx * dUvDy.t - dStagePosDy * dUvDx.t);
     vec3 B = normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
 
@@ -116,7 +116,7 @@ vec3 getLightContribution(MaterialInfo materialInfo, vec3 n, vec3 v, float NdotV
     // Get a vector between this point and the light.
     vec3 pointToLight;
     if (light.type != LightType_Directional) {
-        pointToLight = light.position - inGlobalPos;
+        pointToLight = light.position - inStagePos;
     } else {
         pointToLight = -light.direction;
     }
@@ -176,7 +176,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     vec3 specularColor = mix(f0, baseColor.rgb, metalness);
 
     // Get the view vector - from surface point to camera
-    vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);
+    vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inStagePos);
 
     // Get the normal
     vec3 n = getNormal(material.normalTextureID);

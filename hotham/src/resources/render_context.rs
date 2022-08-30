@@ -437,7 +437,7 @@ pub(crate) struct InstancedPrimitive {
 }
 
 pub(crate) struct Instance {
-    pub(crate) global_from_local: Matrix4<f32>,
+    pub(crate) stage_from_local: Matrix4<f32>,
     pub(crate) bounding_sphere: Vector4<f32>,
     pub(crate) skin_id: u32,
 }
