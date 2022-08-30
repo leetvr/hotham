@@ -4,9 +4,8 @@ use crate::{
     rendering::{material::NO_MATERIAL, vertex::Vertex},
     resources::render_context,
 };
-use bevy_mikktspace::Geometry;
 use itertools::izip;
-use nalgebra::{vector, Point3, Vector2, Vector3, Vector4};
+use nalgebra::{vector, Point3, Vector3, Vector4};
 use render_context::RenderContext;
 
 /// Geometry for a mesh
@@ -58,12 +57,8 @@ impl Primitive {
         let mut positions = Vec::new();
         let mut tex_coords = Vec::new();
         let mut normals = Vec::new();
-        let mut tangents = Vec::new();
         let mut joint_indices = Vec::new();
         let mut joint_weights = Vec::new();
-
-        // Indicates whether the source geometry has tangent information
-        let mut has_tangents = false;
 
         let reader = primitive_data.reader(|_| Some(&import_context.buffer));
 
@@ -90,18 +85,6 @@ impl Primitive {
         } else {
             for _ in 0..positions.len() {
                 normals.push(vector![0., 0., 0.]);
-            }
-        }
-
-        // Tangents
-        if let Some(iter) = reader.read_tangents() {
-            for v in iter {
-                tangents.push(vector![v[0], v[1], v[2], v[3]]);
-            }
-            has_tangents = true;
-        } else {
-            for _ in 0..positions.len() {
-                tangents.push(Default::default());
             }
         }
 
@@ -135,24 +118,11 @@ impl Primitive {
             }
         }
 
-        if !has_tangents {
-            let mut helper =
-                MikktspaceHelper::new(&indices, &positions, &normals, &tex_coords, &mut tangents);
-            let success = bevy_mikktspace::generate_tangents(&mut helper);
-            assert!(success, "Error generating tangents!");
-        }
-
-        let vertices: Vec<Vertex> = izip!(
-            positions,
-            normals,
-            tangents,
-            tex_coords,
-            joint_indices,
-            joint_weights
-        )
-        .into_iter()
-        .map(Vertex::from_zip)
-        .collect();
+        let vertices: Vec<Vertex> =
+            izip!(positions, normals, tex_coords, joint_indices, joint_weights)
+                .into_iter()
+                .map(Vertex::from_zip)
+                .collect();
 
         // All the materials in this glTF file will be imported into the material buffer, so all we need
         // to do is grab the index of this material and add it to the running offset. If we don't do this,
@@ -248,68 +218,4 @@ fn next_up(n: f32) -> f32 {
         bits - 1
     };
     f32::from_bits(next_bits)
-}
-
-// Broadly lifted from Bevy:
-// https://github.com/bevyengine/bevy/blob/4847f7e3adc835053a8907dd578c342b4bd395e2/crates/bevy_render/src/mesh/mesh/mod.rs
-struct MikktspaceHelper<'a> {
-    indices: &'a Vec<u32>,
-    positions: &'a Vec<Vector3<f32>>,
-    normals: &'a Vec<Vector3<f32>>,
-    uvs: &'a Vec<Vector2<f32>>,
-    tangents: &'a mut Vec<Vector4<f32>>,
-}
-
-impl<'a> MikktspaceHelper<'a> {
-    fn new(
-        indices: &'a Vec<u32>,
-        positions: &'a Vec<Vector3<f32>>,
-        normals: &'a Vec<Vector3<f32>>,
-        uvs: &'a Vec<Vector2<f32>>,
-        tangents: &'a mut Vec<Vector4<f32>>,
-    ) -> Self {
-        Self {
-            indices,
-            positions,
-            normals,
-            uvs,
-            tangents,
-        }
-    }
-
-    fn index(&self, face: usize, vert: usize) -> usize {
-        let index_index = face * 3 + vert;
-        self.indices[index_index] as usize
-    }
-}
-
-impl Geometry for MikktspaceHelper<'_> {
-    fn num_faces(&self) -> usize {
-        self.indices.len() / 3
-    }
-
-    fn num_vertices_of_face(&self, _: usize) -> usize {
-        3
-    }
-
-    fn position(&self, face: usize, vert: usize) -> [f32; 3] {
-        self.positions[self.index(face, vert)].into()
-    }
-
-    fn normal(&self, face: usize, vert: usize) -> [f32; 3] {
-        self.normals[self.index(face, vert)].into()
-    }
-
-    fn tex_coord(&self, face: usize, vert: usize) -> [f32; 2] {
-        self.uvs[self.index(face, vert)].into()
-    }
-
-    fn set_tangent_encoded(&mut self, mut tangent: [f32; 4], face: usize, vert: usize) {
-        let index = self.index(face, vert);
-
-        // !! IMPORTANT !! Flip the handedness of the generated tangent. See:
-        // https://github.com/KhronosGroup/glTF-Sample-Models/issues/174#issuecomment-779532934
-        tangent[3] *= -1.;
-        self.tangents[index] = tangent.into();
-    }
 }

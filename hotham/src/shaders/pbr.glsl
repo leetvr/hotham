@@ -34,7 +34,7 @@ struct MaterialInfo {
 const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
 const float PBR_WORKFLOW_UNLIT = 1.0;
 
-// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th editon on page 325.
+// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th edition on page 325.
 const vec3 f90 = vec3(1.0);
 
 // Fast approximation of ACES tonemap
@@ -56,22 +56,30 @@ vec3 tonemap(vec3 color) {
 
 // Get normal, tangent and bitangent vectors.
 vec3 getNormal(uint normalTextureID) {
-    vec3 n, t, b, ng;
-
-    // Trivial TBN computation, present as vertex attribute.
-    // Normalize eigenvectors as matrix is linearly interpolated.
-    t = normalize(inTBN[0]);
-    b = normalize(inTBN[1]);
-    ng = normalize(inTBN[2]);
-
-    if (normalTextureID != NOT_PRESENT) {
-        vec3 ntex;
-        ntex.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
-        ntex.z = sqrt(1 - dot(ntex.xy, ntex.xy));
-        return normalize(mat3(t, b, ng) * ntex);
-    } else {
-        return ng;
+    vec3 N = normalize(inNormal);
+    if (normalTextureID == NOT_PRESENT) {
+        return N;
     }
+
+    vec3 textureNormal;
+    textureNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
+    textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
+
+    // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
+    // See http://www.thetenthplanet.de/archives/1180 for an explanation of how this works
+    // and a little bit about why it is better than using precomputed tangents.
+    // Note however that we are using a slightly different formulation with global coordinates
+    // instead of view coordinates and we rely on the UV map not being too distorted.
+    vec3 dGlobalPosDx = dFdx(inGlobalPos);
+    vec3 dGlobalPosDy = dFdy(inGlobalPos);
+    vec2 dUvDx = dFdx(inUV);
+    vec2 dUvDy = dFdy(inUV);
+
+    vec3 T = normalize(dGlobalPosDx * dUvDy.t - dGlobalPosDy * dUvDx.t);
+    vec3 B = normalize(cross(N, T));
+    mat3 TBN = mat3(T, B, N);
+
+    return normalize(TBN * textureNormal);
 }
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
@@ -170,7 +178,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     // Get the view vector - from surface point to camera
     vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGlobalPos);
 
-	// Get the normal
+    // Get the normal
     vec3 n = getNormal(material.normalTextureID);
 
     // Get NdotV
