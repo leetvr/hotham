@@ -10,7 +10,7 @@ use rapier3d::{
     prelude::{InteractionGroups, QueryFilter, Ray},
 };
 
-const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
+const POSITION_OFFSET: Translation3<f32> = Translation3::new(0., -0.08, 0.);
 
 /* Original Precision
     -0.5581498959847122,
@@ -18,12 +18,17 @@ const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
     0.03413791007514528,
     -0.05061153302400824,
 */
-const ROTATION_OFFSET: Quaternion<f32> =
-    Quaternion::new(-0.558_149_8, 0.827_491_2, 0.034_137_9, -0.050_611_5);
+const ROTATION_OFFSET: UnitQuaternion<f32> = UnitQuaternion::new_unchecked(Quaternion::<f32>::new(
+    -0.558_149_9,
+    0.827_491_2,
+    0.034_137_91,
+    -0.050_611_533,
+));
 
 use crate::{
     components::{
-        hand::Handedness, panel::PanelInput, Info, LocalTransform, Panel, Pointer, Visible,
+        hand::Handedness, panel::PanelInput, Info, LocalTransform, Panel, Pointer, RigidBody,
+        Stage, Visible,
     },
     resources::{InputContext, PhysicsContext},
 };
@@ -36,9 +41,20 @@ pub fn pointers_system(
     input_context: &InputContext,
     physics_context: &mut PhysicsContext,
 ) {
+    // Get the isometry of the stage
+    let global_from_stage = world
+        .query_mut::<With<Stage, &RigidBody>>()
+        .into_iter()
+        .next()
+        .map_or(Default::default(), |(_, rigid_body)| {
+            *physics_context.rigid_bodies[rigid_body.handle].position()
+        });
+
+    let grip_from_local = ROTATION_OFFSET * POSITION_OFFSET;
+
     for (_, (pointer, local_transform)) in query.query(world).iter() {
         // Get our the space and path of the pointer.
-        let (mut pose, trigger_value) = match pointer.handedness {
+        let (stage_from_grip, trigger_value) = match pointer.handedness {
             Handedness::Left => (
                 input_context.left.stage_from_grip(),
                 input_context.left.trigger_analog(),
@@ -49,13 +65,13 @@ pub fn pointers_system(
             ),
         };
 
-        // apply transform
-        apply_grip_offset(&mut pose);
+        // Compose transform
+        let global_from_local = global_from_stage * stage_from_grip * grip_from_local;
 
-        local_transform.translation = pose.translation.vector;
-        local_transform.rotation = pose.rotation;
+        local_transform.translation = global_from_local.translation.vector;
+        local_transform.rotation = global_from_local.rotation;
 
-        // get trigger value
+        // Get trigger value
         pointer.trigger_value = trigger_value;
 
         let ray_direction = local_transform
@@ -103,14 +119,6 @@ pub fn pointers_system(
             }
         }
     }
-}
-
-pub(crate) fn apply_grip_offset(position: &mut Isometry3<f32>) {
-    let updated_rotation = position.rotation.quaternion() * ROTATION_OFFSET;
-    let updated_translation = position.translation.vector
-        - vector!(POSITION_OFFSET[0], POSITION_OFFSET[1], POSITION_OFFSET[2]);
-    position.rotation = UnitQuaternion::from_quaternion(updated_rotation);
-    position.translation = Translation3::from(updated_translation);
 }
 
 fn get_cursor_location_for_panel(
@@ -254,7 +262,7 @@ mod tests {
         let panel = world.get_mut::<Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 150.);
-        assert_relative_eq!(input.cursor_location.y, 88.473129);
+        assert_relative_eq!(input.cursor_location.y, 88.473_13);
         assert_eq!(input.trigger_value, 0.);
     }
 
@@ -263,7 +271,7 @@ mod tests {
         physics_context: &mut PhysicsContext,
         world: &mut hecs::World,
         input_context: &InputContext,
-    ) -> () {
+    ) {
         physics_context.update();
         pointers_system(
             &mut Default::default(),

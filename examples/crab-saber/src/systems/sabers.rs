@@ -1,4 +1,5 @@
-use hotham::nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
+use hotham::components::Stage;
+use hotham::nalgebra::{Quaternion, Translation3, UnitQuaternion};
 use hotham::rapier3d::prelude::RigidBodyType;
 use hotham::{
     asset_importer::{add_model_to_world, Models},
@@ -10,9 +11,13 @@ use hotham::{
 
 use crate::components::{Color, Saber};
 
-const POSITION_OFFSET: [f32; 3] = [0., 0.071173, -0.066082];
-const ROTATION_OFFSET: Quaternion<f32> =
-    Quaternion::new(-0.558_149_8, 0.827_491_2, 0.034_137_9, -0.050_611_5);
+const POSITION_OFFSET: Translation3<f32> = Translation3::new(0., -0.08, 0.);
+const ROTATION_OFFSET: UnitQuaternion<f32> = UnitQuaternion::new_unchecked(Quaternion::<f32>::new(
+    -0.558_149_9,
+    0.827_491_2,
+    0.034_137_91,
+    -0.050_611_533,
+));
 
 const SABER_HEIGHT: f32 = 0.8;
 const SABER_HALF_HEIGHT: f32 = SABER_HEIGHT / 2.;
@@ -25,22 +30,32 @@ pub fn sabers_system(
     input_context: &InputContext,
     physics_context: &mut PhysicsContext,
 ) {
+    // Get the isometry of the stage
+    let global_from_stage = world
+        .query_mut::<With<Stage, &RigidBody>>()
+        .into_iter()
+        .next()
+        .map_or(Default::default(), |(_, rigid_body)| {
+            *physics_context.rigid_bodies[rigid_body.handle].position()
+        });
+
+    let grip_from_saber = ROTATION_OFFSET * POSITION_OFFSET;
+
     for (_, (color, rigid_body)) in query.query_mut(world) {
         // Get our the space and path of the hand.
-        let mut pose = match color {
+        let stage_from_grip = match color {
             Color::Red => input_context.left.stage_from_grip(),
             Color::Blue => input_context.right.stage_from_grip(),
         };
 
-        // apply transform
+        // Apply transform
         let rigid_body = physics_context
             .rigid_bodies
             .get_mut(rigid_body.handle)
             .unwrap();
 
-        apply_grip_offset(&mut pose);
-
-        rigid_body.set_next_kinematic_position(pose);
+        rigid_body
+            .set_next_kinematic_position(global_from_stage * stage_from_grip * grip_from_saber);
     }
 }
 
@@ -73,14 +88,6 @@ fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, sa
     // Add the components to the entity.
     let components = physics_context.get_rigid_body_and_collider(saber, rigid_body, collider);
     world.insert(saber, components).unwrap();
-}
-
-pub fn apply_grip_offset(position: &mut Isometry3<f32>) {
-    let updated_rotation = position.rotation.quaternion() * ROTATION_OFFSET;
-    let updated_translation = position.translation.vector
-        - Vector3::new(POSITION_OFFSET[0], POSITION_OFFSET[1], POSITION_OFFSET[2]);
-    position.rotation = UnitQuaternion::from_quaternion(updated_rotation);
-    position.translation = Translation3::from(updated_translation);
 }
 
 #[cfg(test)]
@@ -131,26 +138,5 @@ mod tests {
             local_transform.translation,
             [-0.2, 1.328827, -0.433918].into()
         );
-    }
-
-    #[test]
-    fn test_add_offset() {
-        #[allow(clippy::approx_constant)]
-        let q1 = UnitQuaternion::from_quaternion(Quaternion::new(
-            4.329_780_3e-17,
-            0.707_106_77,
-            4.329_780_3e-17,
-            0.707_106_77,
-        ));
-        let t = Translation3::new(0.2, 1.4, 2.);
-        let mut position = Isometry3::from_parts(t, q1);
-        apply_grip_offset(&mut position);
-
-        let expected_rotation =
-            Quaternion::new(-0.549_336_9, -0.418_810_73, 0.620_912_43, -0.370_532_42);
-        let expected_translation = Translation3::new(0.2, 1.328827, 2.066082);
-
-        approx::assert_relative_eq!(position.rotation.quaternion(), &expected_rotation);
-        approx::assert_relative_eq!(position.translation, &expected_translation);
     }
 }
