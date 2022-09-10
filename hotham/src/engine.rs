@@ -147,6 +147,8 @@ impl Engine {
 
     /// IMPORTANT: Call this function each tick to update the engine's running state with OpenXR and the underlying OS
     pub fn update(&mut self) -> HothamResult<TickData> {
+        puffin::GlobalProfiler::lock().new_frame();
+        puffin::profile_function!();
         loop {
             #[cfg(target_os = "android")]
             process_android_events(&mut self.resumed, &self.should_quit);
@@ -216,6 +218,7 @@ impl Engine {
 
     /// Call this after update
     pub fn finish(&mut self) -> xr::Result<()> {
+        puffin::profile_function!();
         let vulkan_context = &self.vulkan_context;
         let render_context = &mut self.render_context;
 
@@ -223,6 +226,27 @@ impl Engine {
             render_context.end_frame(vulkan_context);
         }
         self.xr_context.end_frame()
+    }
+
+    /// Optionally, call this to start profiling with puffin
+    pub fn start_puffin_server(&mut self) {
+        puffin::set_scopes_on(true); // Tell puffin to collect data
+
+        match puffin_http::Server::new("0.0.0.0:8585") {
+            Ok(puffin_server) => {
+                eprintln!(
+                    "Run:  cargo install puffin_viewer && puffin_viewer --url 127.0.0.1:8585"
+                );
+
+                // We can store the server if we want, but in this case we just want
+                // it to keep running. Dropping it closes the server, so let's not drop it!
+                #[allow(clippy::mem_forget)]
+                std::mem::forget(puffin_server);
+            }
+            Err(err) => {
+                eprintln!("Failed to start puffin server: {}", err);
+            }
+        };
     }
 }
 

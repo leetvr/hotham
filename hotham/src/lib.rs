@@ -19,6 +19,7 @@ pub use engine::{Engine, EngineBuilder, TickData};
 pub use hecs;
 pub use hotham_error::HothamError;
 pub use nalgebra;
+pub use puffin;
 pub use rapier3d;
 
 /// Components are data that are used to update the simulation and interact with the external world

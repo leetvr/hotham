@@ -29,6 +29,8 @@ mint = "0.5.6"
 nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.31.0"}
 oddio = "0.5"
 openxr = {features = ["loaded", "mint"], version = "0.16"}
+puffin = "0.13"
+puffin_http = "0.10"
 rapier3d = "0.14.0"
 ruzstd = "0.3"
 serde = {version = "1.0", features = ["derive"]}
