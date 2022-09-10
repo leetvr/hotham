@@ -16,6 +16,7 @@ pub fn hands_system(
     input_context: &InputContext,
     physics_context: &mut PhysicsContext,
 ) {
+    puffin::profile_function!();
     // Get the isometry of the stage
     let global_from_stage = world
         .query_mut::<With<Stage, &RigidBody>>()

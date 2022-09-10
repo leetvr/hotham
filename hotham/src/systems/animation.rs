@@ -4,6 +4,7 @@ use hecs::{PreparedQuery, World};
 /// Animation system
 /// Walks through each AnimationController and applies the appropriate animation to its targets.
 pub fn animation_system(query: &mut PreparedQuery<&AnimationController>, world: &mut World) {
+    puffin::profile_function!();
     for (_, controller) in query.query(world).iter() {
         let blend_from = controller.blend_from;
         let blend_to = controller.blend_to;

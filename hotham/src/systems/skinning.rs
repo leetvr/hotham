@@ -13,6 +13,7 @@ pub fn skinning_system(
     world: &mut World,
     render_context: &mut RenderContext,
 ) {
+    puffin::profile_function!();
     for (_, (skin, global_transform)) in skins_query.query(world).iter() {
         let buffer = unsafe { render_context.resources.skins_buffer.as_slice_mut() };
         let joint_matrices = &mut buffer[skin.id as usize];

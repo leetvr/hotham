@@ -29,6 +29,7 @@ pub fn rendering_system(
     views: &[xr::View],
     swapchain_image_index: usize,
 ) {
+    puffin::profile_function!();
     unsafe {
         begin(
             query,
@@ -59,6 +60,7 @@ pub unsafe fn begin(
     views: &[xr::View],
     swapchain_image_index: usize,
 ) {
+    puffin::profile_function!();
     // First, we need to walk through each entity that contains a mesh, collect its primitives
     // and create a list of instances, indexed by primitive ID.
     //
@@ -134,6 +136,7 @@ pub unsafe fn begin(
 ///
 /// Must be between [`begin`] and [`end`]
 pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
+    puffin::profile_function!();
     // Parse through the cull buffer and record commands. This is a bit complex.
     let device = &vulkan_context.device;
     let frame = &mut render_context.frames[render_context.frame_index];
@@ -221,6 +224,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
 ///
 /// Must be called after `begin`
 pub fn end(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
+    puffin::profile_function!();
     // OK. We're all done!
     render_context.primitive_map.clear();
     render_context.end_pbr_render_pass(vulkan_context);

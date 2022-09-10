@@ -9,6 +9,7 @@ pub fn collision_system(
     world: &World,
     physics_context: &mut PhysicsContext,
 ) {
+    puffin::profile_function!();
     for (_, collider) in query.query(world).iter() {
         // Clear out any collisions from previous frames.
         collider.collisions_this_frame.clear();

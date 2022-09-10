@@ -2,6 +2,7 @@ use crate::resources::{InputContext, RenderContext};
 
 /// A simple system used to assist with debugging the fragment shader.
 pub fn debug_system(input_context: &InputContext, render_context: &mut RenderContext) {
+    puffin::profile_function!();
     if input_context.left.x_button_just_pressed() {
         let params = &mut render_context.scene_data.params;
         params.w = 0.;

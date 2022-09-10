@@ -13,6 +13,7 @@ pub fn grabbing_system(
     world: &mut World,
     physics_context: &mut PhysicsContext,
 ) {
+    puffin::profile_function!();
     for (_, (hand, collider)) in query.query(world).iter() {
         // Check to see if we are currently gripping
         if hand.grip_value >= 1.0 {

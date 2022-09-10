@@ -13,6 +13,7 @@ pub fn update_global_transform_with_parent_system(
     roots_query: &mut PreparedQuery<Without<Parent, &GlobalTransform>>,
     world: &mut World,
 ) {
+    puffin::profile_function!();
     // Build hierarchy
     let mut hierarchy: HashMap<Entity, Vec<Entity>> = HashMap::new();
     for (entity, parent) in parent_query.query_mut(world) {

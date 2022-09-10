@@ -171,6 +171,7 @@ impl RenderContext {
     }
 
     pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) {
+        puffin::profile_function!();
         self.views = views.to_owned();
 
         // View (camera)
@@ -207,6 +208,7 @@ impl RenderContext {
 
     /// Start rendering a frame
     pub(crate) fn begin_frame(&self, vulkan_context: &VulkanContext) {
+        puffin::profile_function!();
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[self.frame_index];
@@ -227,6 +229,7 @@ impl RenderContext {
     }
 
     pub(crate) fn cull_objects(&mut self, vulkan_context: &VulkanContext) {
+        puffin::profile_function!();
         let device = &vulkan_context.device;
         let frame_index = self.frame_index;
         let frame = &mut self.frames[self.frame_index];
@@ -309,6 +312,7 @@ impl RenderContext {
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,
     ) {
+        puffin::profile_function!();
         // Get the values we need to start a renderpass
         let device = &vulkan_context.device;
         let frame = &self.frames[self.frame_index];
@@ -357,6 +361,7 @@ impl RenderContext {
     }
 
     pub(crate) fn end_pbr_render_pass(&mut self, vulkan_context: &VulkanContext) {
+        puffin::profile_function!();
         let device = &vulkan_context.device;
         let frame = &self.frames[self.frame_index];
         let command_buffer = frame.command_buffer;
@@ -367,6 +372,7 @@ impl RenderContext {
 
     /// Finish rendering a frame
     pub(crate) fn end_frame(&mut self, vulkan_context: &VulkanContext) {
+        puffin::profile_function!();
         // Get the values we need to end the renderpass
         let device = &vulkan_context.device;
         let frame = &self.frames[self.frame_index];
@@ -389,6 +395,7 @@ impl RenderContext {
     }
 
     pub(crate) fn wait(&self, device: &ash::Device, frame: &Frame) {
+        puffin::profile_function!();
         let fence = frame.fence;
 
         unsafe {
@@ -406,6 +413,7 @@ impl RenderContext {
         offsets: Vec<vk::DeviceSize>,
         texture_image: &Image,
     ) -> Result<u32> {
+        puffin::profile_function!();
         vulkan_context.set_debug_name(
             vk::ObjectType::IMAGE,
             texture_image.handle.as_raw(),

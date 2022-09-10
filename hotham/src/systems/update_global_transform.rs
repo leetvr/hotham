@@ -9,6 +9,7 @@ pub fn update_global_transform_system(
     query: &mut PreparedQuery<(&LocalTransform, &mut GlobalTransform)>,
     world: &mut World,
 ) {
+    puffin::profile_function!();
     for (_, (local_transform, global_transform)) in query.query_mut(world) {
         global_transform.0 = Matrix4::new_translation(&local_transform.translation)
             * Matrix4::from(local_transform.rotation)

@@ -144,6 +144,7 @@ impl XrContext {
         &mut self,
         event_buffer: &mut EventDataBuffer,
     ) -> Result<SessionState> {
+        puffin::profile_function!();
         match self.instance.poll_event(event_buffer)? {
             Some(xr::Event::SessionStateChanged(session_changed)) => {
                 let new_state = session_changed.state();
@@ -161,23 +162,37 @@ impl XrContext {
     }
 
     pub(crate) fn begin_frame(&mut self) -> HothamResult<usize> {
-        self.frame_state = self.frame_waiter.wait()?;
+        puffin::profile_function!();
+        self.frame_state = {
+            puffin::profile_scope!("frame_waiter.wait");
+            self.frame_waiter.wait()?
+        };
         self.frame_stream.begin()?;
 
         if !self.frame_state.should_render {
             return Err(HothamError::NotRendering);
         }
 
-        let image_index = self.swapchain.acquire_image()? as _;
-        self.swapchain.wait_image(openxr::Duration::INFINITE)?;
+        let image_index = {
+            puffin::profile_scope!("swapchain.acquire_image");
+            self.swapchain.acquire_image()? as _
+        };
+        {
+            puffin::profile_scope!("swapchain.wait_image");
+            self.swapchain.wait_image(openxr::Duration::INFINITE)?;
+        };
 
-        let active_action_set = xr::ActiveActionSet::new(&self.input.action_set);
-        self.session.sync_actions(&[active_action_set])?;
+        {
+            puffin::profile_scope!("sync_actions");
+            let active_action_set = xr::ActiveActionSet::new(&self.input.action_set);
+            self.session.sync_actions(&[active_action_set])?;
+        };
 
         Ok(image_index)
     }
 
     pub fn update_views(&'_ mut self) -> &[xr::View] {
+        puffin::profile_function!();
         let (view_state_flags, views) = self
             .session
             .locate_views(
@@ -196,6 +211,7 @@ impl XrContext {
     }
 
     pub fn end_frame(&mut self) -> std::result::Result<(), openxr::sys::Result> {
+        puffin::profile_function!();
         // If we aren't in the rendering state, just submit empty views.
         if !self.frame_state.should_render {
             self.frame_stream

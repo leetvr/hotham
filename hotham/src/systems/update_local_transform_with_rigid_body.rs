@@ -12,6 +12,7 @@ pub fn update_local_transform_with_rigid_body_system(
     world: &mut World,
     physics_context: &PhysicsContext,
 ) {
+    puffin::profile_function!();
     for (_, (rigid_body, local_transform)) in query.query_mut(world) {
         let rigid_body = &physics_context.rigid_bodies[rigid_body.handle];
         let position = rigid_body.position();
