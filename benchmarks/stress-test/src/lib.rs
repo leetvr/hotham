@@ -43,6 +43,8 @@ pub fn real_main() -> HothamResult<()> {
     let queries = Default::default();
     let timer = Default::default();
 
+    engine.start_puffin_server();
+
     let mut tick_props = TickProps {
         engine,
         world,
