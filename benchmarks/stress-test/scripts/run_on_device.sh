@@ -4,7 +4,7 @@ set -eux
 adb shell am force-stop rust.hotham_stress_test
 
 scriptdir=$(dirname -- "$(realpath -- "$0")")
-cd $scriptdir
+cd $scriptdir/..
 
 cargo apk run --release
 
