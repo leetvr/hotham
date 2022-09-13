@@ -1,16 +1,16 @@
 use std::convert::TryInto;
 
 use crate::{
-    components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Stage, Visible},
+    components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Visible},
     rendering::resources::{DrawData, PrimitiveCullData},
     resources::VulkanContext,
     resources::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
     },
+    systems::stage,
 };
 use hecs::{PreparedQuery, With, World};
-use nalgebra::Matrix4;
 use openxr as xr;
 
 /// Rendering system
@@ -68,12 +68,7 @@ pub unsafe fn begin(
     let meshes = &render_context.resources.mesh_data;
 
     // Get the stage transform
-    let global_from_stage = world
-        .query_mut::<With<Stage, &GlobalTransform>>()
-        .into_iter()
-        .next()
-        .map(|(_, global_transform)| global_transform.0)
-        .unwrap_or_else(Matrix4::<_>::identity);
+    let global_from_stage = stage::get_global_from_stage(world);
     let stage_from_global = global_from_stage.try_inverse().unwrap();
 
     for (_, (mesh, global_transform, skin)) in query.query_mut(world) {

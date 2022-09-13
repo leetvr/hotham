@@ -207,9 +207,7 @@ impl RenderContext {
             scene_data.params = self.scene_data.params;
             scene_data.lights = self.scene_data.lights;
             for mut light in scene_data.lights {
-                light.position = stage_from_global
-                    .transform_point(&light.position.into())
-                    .coords;
+                light.position = stage_from_global.transform_vector(&light.position);
                 light.direction = stage_from_global.transform_vector(&light.direction);
             }
         }
