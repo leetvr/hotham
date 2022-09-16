@@ -22,15 +22,15 @@ use openxr_sys::{
     ActionStateBoolean, ActionStateFloat, ActionStateGetInfo, ActionStatePose, ActionsSyncInfo,
     Duration, EnvironmentBlendMode, EventDataBuffer, EventDataSessionStateChanged, Fovf,
     FrameBeginInfo, FrameEndInfo, FrameState, FrameWaitInfo, GraphicsRequirementsVulkanKHR,
-    Instance, InstanceCreateInfo, InstanceProperties, InteractionProfileSuggestedBinding, Path,
-    Posef, Quaternionf, ReferenceSpaceCreateInfo, ReferenceSpaceType, Result, Session,
-    SessionActionSetsAttachInfo, SessionBeginInfo, SessionCreateInfo, SessionState, Space,
-    SpaceLocation, SpaceLocationFlags, StructureType, Swapchain, SwapchainCreateInfo,
-    SwapchainImageAcquireInfo, SwapchainImageBaseHeader, SwapchainImageReleaseInfo,
-    SwapchainImageVulkanKHR, SwapchainImageWaitInfo, SystemGetInfo, SystemId, SystemProperties,
-    Time, Vector3f, Version, View, ViewConfigurationType, ViewConfigurationView, ViewLocateInfo,
-    ViewState, ViewStateFlags, VulkanDeviceCreateInfoKHR, VulkanGraphicsDeviceGetInfoKHR,
-    VulkanInstanceCreateInfoKHR, FALSE, TRUE,
+    HapticActionInfo, HapticBaseHeader, Instance, InstanceCreateInfo, InstanceProperties,
+    InteractionProfileSuggestedBinding, Path, Posef, Quaternionf, ReferenceSpaceCreateInfo,
+    ReferenceSpaceType, Result, Session, SessionActionSetsAttachInfo, SessionBeginInfo,
+    SessionCreateInfo, SessionState, Space, SpaceLocation, SpaceLocationFlags, StructureType,
+    Swapchain, SwapchainCreateInfo, SwapchainImageAcquireInfo, SwapchainImageBaseHeader,
+    SwapchainImageReleaseInfo, SwapchainImageVulkanKHR, SwapchainImageWaitInfo, SystemGetInfo,
+    SystemId, SystemProperties, Time, Vector3f, Version, View, ViewConfigurationType,
+    ViewConfigurationView, ViewLocateInfo, ViewState, ViewStateFlags, VulkanDeviceCreateInfoKHR,
+    VulkanGraphicsDeviceGetInfoKHR, VulkanInstanceCreateInfoKHR, FALSE, TRUE,
 };
 use rand::random;
 use std::{
@@ -1776,6 +1776,16 @@ pub unsafe extern "system" fn get_action_state_boolean(
         last_change_time: openxr_sys::Time::from_nanos(0),
         is_active: TRUE,
     };
+    Result::SUCCESS
+}
+
+pub unsafe extern "system" fn apply_haptic_feedback(
+    _session: Session,
+    _haptic_action_info: *const HapticActionInfo,
+    _haptic_feedback: *const HapticBaseHeader,
+) -> Result {
+    /* explicit no-op, could possibly be extended with controller support in future if winit ever
+     * provides such APIs */
     Result::SUCCESS
 }
 
