@@ -19,13 +19,13 @@ rand = "0.8.0"
 approx = "0.5"
 
 [target.'cfg(target_os = "android")'.dependencies]
-ndk-glue = "0.6"
+ndk-glue = "0.7"
 
 [package.metadata.android]
 apk_label = "Crab Saber"
 fullscreen = true
 runtime_libs = "../common_lib"
-target_sdk_version = 26
+target_sdk_version = 29
 
 [[package.metadata.android.uses_permission]]
 name = "android.permission.INTERNET"
