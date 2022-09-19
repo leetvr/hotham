@@ -314,7 +314,6 @@ mod tests {
             &mut world,
             &physics_context,
         );
-        update_global_transform_system(&mut Default::default(), &mut world);
 
         // Set views
         let rotation: mint::Quaternion<f32> =
