@@ -236,17 +236,23 @@ mod tests {
     use ash::vk;
     use ash::vk::Handle;
     use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
-    use nalgebra::UnitQuaternion;
+    use nalgebra::{Translation3, UnitQuaternion, Vector3};
     use openxr::{Fovf, Quaternionf, Vector3f};
+    use rapier3d::prelude::Isometry;
+    use update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system;
 
     use crate::{
         asset_importer,
+        components::RigidBody,
         rendering::{
             image::Image, legacy_buffer::Buffer, light::Light, scene_data, swapchain::SwapchainInfo,
         },
-        resources::RenderContext,
-        systems::{update_global_transform_system, update_global_transform_with_parent_system},
-        util::get_from_device_memory,
+        resources::{PhysicsContext, RenderContext},
+        systems::{
+            add_stage, update_global_transform_system, update_global_transform_with_parent_system,
+            update_local_transform_with_rigid_body,
+        },
+        util::{get_from_device_memory, isometry_to_posef, posef_to_isometry},
         COLOR_FORMAT,
     };
 
@@ -278,12 +284,28 @@ mod tests {
 
         let mut render_context =
             RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
+        let mut physics_context = PhysicsContext::default();
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
         let mut models =
             asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
                 .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
+
+        // Add stage transform
+        let global_from_stage = Isometry::from_parts(
+            Translation3::new(0.1, 0.2, 0.3),
+            UnitQuaternion::from_scaled_axis(Vector3::y() * (std::f32::consts::TAU * 0.1)),
+        );
+        let stage_entity = add_stage(&mut world, &mut physics_context);
+        physics_context.rigid_bodies[world.get_mut::<RigidBody>(stage_entity).unwrap().handle]
+            .set_position(global_from_stage, true);
+        update_local_transform_with_rigid_body_system(
+            &mut Default::default(),
+            &mut world,
+            &physics_context,
+        );
+        update_global_transform_system(&mut Default::default(), &mut world);
 
         // Set views
         let rotation: mint::Quaternion<f32> =
@@ -305,7 +327,13 @@ mod tests {
                 angle_right: 45.0_f32.to_radians(),
             },
         };
-        let views = vec![view.clone(), view];
+        let mut views = vec![view.clone(), view];
+
+        // Compensate stage transform by adjusting the views
+        for view in &mut views {
+            view.pose =
+                isometry_to_posef(global_from_stage.inverse() * posef_to_isometry(view.pose));
+        }
 
         let params = vec![
             (
