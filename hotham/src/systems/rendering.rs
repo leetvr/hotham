@@ -8,8 +8,10 @@ use crate::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
     },
+    systems::stage,
 };
 use hecs::{PreparedQuery, With, World};
+use nalgebra::Isometry3;
 use openxr as xr;
 
 /// Rendering system
@@ -66,6 +68,12 @@ pub unsafe fn begin(
     // primitives.
     let meshes = &render_context.resources.mesh_data;
 
+    // Create transformations to globally oriented stage space
+    let global_from_stage = stage::get_global_from_stage(world);
+    let gos_from_global: Isometry3<f32> = global_from_stage.translation.inverse().into();
+    let gos_from_stage: Isometry3<f32> = gos_from_global * global_from_stage;
+    let matrix_gos_from_global = gos_from_global.to_homogeneous();
+
     for (_, (mesh, global_transform, skin)) in query.query_mut(world) {
         let mesh = meshes.get(mesh.handle).unwrap();
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
@@ -81,8 +89,9 @@ pub unsafe fn begin(
                 })
                 .instances
                 .push(Instance {
-                    global_from_local: global_transform.0,
-                    bounding_sphere: primitive.get_bounding_sphere(global_transform),
+                    gos_from_local: matrix_gos_from_global * global_transform.0,
+                    bounding_sphere: matrix_gos_from_global
+                        * primitive.get_bounding_sphere(global_transform),
                     skin_id,
                 });
         }
@@ -117,7 +126,7 @@ pub unsafe fn begin(
     }
 
     // This is the VERY LATEST we can possibly update our views, as the compute shader will need them.
-    render_context.update_scene_data(views);
+    render_context.update_scene_data(views, &gos_from_global, &gos_from_stage);
 
     // Execute the culling shader on the GPU.
     render_context.cull_objects(vulkan_context);
@@ -185,8 +194,8 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                 .unwrap();
             let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
             let draw_data = DrawData {
-                global_from_local: instance.global_from_local,
-                local_from_global: instance.global_from_local.try_inverse().unwrap(),
+                gos_from_local: instance.gos_from_local,
+                local_from_gos: instance.gos_from_local.try_inverse().unwrap(),
                 material_id: instanced_primitive.primitive.material_id,
                 skin_id: instance.skin_id,
             };
