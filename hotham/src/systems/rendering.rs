@@ -241,7 +241,9 @@ mod tests {
 
     use crate::{
         asset_importer,
-        rendering::{image::Image, legacy_buffer::Buffer, scene_data, swapchain::SwapchainInfo},
+        rendering::{
+            image::Image, legacy_buffer::Buffer, light::Light, scene_data, swapchain::SwapchainInfo,
+        },
         resources::RenderContext,
         systems::{update_global_transform_system, update_global_transform_with_parent_system},
         util::get_from_device_memory,
@@ -282,16 +284,68 @@ mod tests {
             asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
                 .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
+
+        // Set views
+        let rotation: mint::Quaternion<f32> =
+            UnitQuaternion::from_euler_angles(0., 45_f32.to_radians(), 0.).into();
+        let position = Vector3f {
+            x: 1.4,
+            y: 0.0,
+            z: 1.4,
+        };
+        let view = openxr::View {
+            pose: openxr::Posef {
+                orientation: Quaternionf::from(rotation),
+                position,
+            },
+            fov: Fovf {
+                angle_up: 45.0_f32.to_radians(),
+                angle_down: -45.0_f32.to_radians(),
+                angle_left: -45.0_f32.to_radians(),
+                angle_right: 45.0_f32.to_radians(),
+            },
+        };
+        let views = vec![view.clone(), view];
+
         let params = vec![
-            ("Full", 0.0, scene_data::DEFAULT_IBL_INTENSITY),
-            ("Diffuse", 1.0, scene_data::DEFAULT_IBL_INTENSITY),
-            ("Normals", 2.0, scene_data::DEFAULT_IBL_INTENSITY),
-            ("No_IBL", 0.0, 0.0),
+            (
+                "Full",
+                0.0,
+                scene_data::DEFAULT_IBL_INTENSITY,
+                Light::none(),
+            ),
+            (
+                "Diffuse",
+                1.0,
+                scene_data::DEFAULT_IBL_INTENSITY,
+                Light::none(),
+            ),
+            (
+                "Normals",
+                2.0,
+                scene_data::DEFAULT_IBL_INTENSITY,
+                Light::none(),
+            ),
+            ("No_IBL", 0.0, 0.0, Light::none()),
+            (
+                "Spotlight",
+                0.0,
+                0.0,
+                Light::new_spotlight(
+                    [-1., -0.1, 0.2].into(),
+                    10.,
+                    5.,
+                    [1., 1., 1.].into(),
+                    [2., 0.2, -0.4].into(),
+                    0.,
+                    0.3,
+                ),
+            ),
         ];
 
         let errors: Vec<_> = params
             .iter()
-            .filter_map(|(name, debug_shader_inputs, debug_ibl_intensity)| {
+            .filter_map(|(name, debug_shader_inputs, debug_ibl_intensity, light)| {
                 render_object_with_debug_data(
                     &vulkan_context,
                     &mut render_context,
@@ -301,6 +355,8 @@ mod tests {
                     name,
                     *debug_shader_inputs,
                     *debug_ibl_intensity,
+                    light,
+                    &views,
                 )
                 .err()
             })
@@ -317,6 +373,8 @@ mod tests {
         name: &str,
         debug_shader_inputs: f32,
         debug_ibl_intensity: f32,
+        light: &Light,
+        views: &Vec<openxr::View>,
     ) -> Result<(), String> {
         // Render the scene
         let mut renderdoc = begin_renderdoc();
@@ -326,6 +384,8 @@ mod tests {
             debug_shader_inputs,
             debug_ibl_intensity,
             world,
+            light,
+            views,
         );
         if let Ok(renderdoc) = renderdoc.as_mut() {
             end_renderdoc(renderdoc);
@@ -395,31 +455,13 @@ mod tests {
         debug_shader_inputs: f32,
         debug_ibl_intensity: f32,
         world: &mut World,
+        light: &Light,
+        views: &Vec<openxr::View>,
     ) {
-        // HELMET
-        let rotation: mint::Quaternion<f32> =
-            UnitQuaternion::from_euler_angles(0., 45_f32.to_radians(), 0.).into();
-        let position = Vector3f {
-            x: 1.4,
-            y: 0.0,
-            z: 1.4,
-        };
-        let view = openxr::View {
-            pose: openxr::Posef {
-                orientation: Quaternionf::from(rotation),
-                position,
-            },
-            fov: Fovf {
-                angle_up: 45.0_f32.to_radians(),
-                angle_down: -45.0_f32.to_radians(),
-                angle_left: -45.0_f32.to_radians(),
-                angle_right: 45.0_f32.to_radians(),
-            },
-        };
-        let views = vec![view.clone(), view];
         render_context.begin_frame(vulkan_context);
         render_context.scene_data.params.z = debug_shader_inputs;
         render_context.scene_data.params.x = debug_ibl_intensity;
+        render_context.scene_data.lights[0] = light.clone();
         update_global_transform_system(&mut Default::default(), world);
         update_global_transform_with_parent_system(
             &mut Default::default(),
@@ -431,7 +473,7 @@ mod tests {
             world,
             vulkan_context,
             render_context,
-            &views,
+            views,
             0,
         );
         render_context.end_frame(vulkan_context);

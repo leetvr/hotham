@@ -31,10 +31,10 @@ pub struct Light {
 
     /// The position of the light
     pub position: Vector3<f32>,
-    /// Cosine of the angle, in radians, from centre of spotlight where falloff begins.
+    /// Cosine of the angle, in radians, from center of spotlight where falloff begins.
     pub inner_cone_cos: f32,
 
-    /// Cosine of the angle, in radians, from centre of spotlight where falloff ends.
+    /// Cosine of the angle, in radians, from center of spotlight where falloff ends.
     pub outer_cone_cos: f32,
     /// The type of the light. LIGHT_TYPE_NONE indicates to the fragment shader that this light is empty.
     pub light_type: u32,
