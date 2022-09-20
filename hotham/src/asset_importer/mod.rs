@@ -84,11 +84,7 @@ pub fn load_scene_from_glb(
 //       have lights be part of the node hierarchy, which we should definitely support, but we're not there yet.
 fn get_lights_from_gltf_data(document: &Document) -> Result<Vec<Light>> {
     let mut lights = Vec::new();
-    for node in document
-        .default_scene()
-        .ok_or_else(|| anyhow::format_err!("glTF file does not have a default scene!"))?
-        .nodes()
-    {
+    for node in document.nodes() {
         if let Some(light) = node.light() {
             lights.push(Light::from_gltf(&light, &node));
         }
@@ -134,7 +130,7 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     // We need *some* entity to stash the AnimationController onto.
     // For now, just use the first root entity.
     let mut animation_controller_entity = None;
-    for node in document.scenes().next().unwrap().nodes() {
+    for node in document.nodes() {
         let mut world = World::default();
 
         let root = load_node(&node, import_context, &mut world, true);
@@ -156,7 +152,7 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     // Note that this has to be done after every single node has been imported, as skins and animations can reference any other node.
 
     // Skins are attached to nodes, so we need to go back through the node tree.
-    for node in document.scenes().next().unwrap().nodes() {
+    for node in document.nodes() {
         load_skins(node, import_context);
     }
 
