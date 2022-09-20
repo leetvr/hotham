@@ -151,6 +151,8 @@ pub unsafe extern "C" fn get_instance_proc_addr(
         *function = transmute::<pfn::GetActionStateFloat, _>(get_action_state_float);
     } else if name == b"xrGetActionStateBoolean" {
         *function = transmute::<pfn::GetActionStateBoolean, _>(get_action_state_boolean);
+    } else if name == b"xrApplyHapticFeedback" {
+        *function = transmute::<pfn::ApplyHapticFeedback, _>(apply_haptic_feedback);
     } else if name == b"xrEndSession" {
         *function = transmute::<pfn::EndSession, _>(end_session);
     } else {
