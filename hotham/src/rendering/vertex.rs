@@ -95,14 +95,14 @@ impl Vertex {
         let joint_indices = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(3)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R32_UINT)
             .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
             .build();
 
         let joint_weights = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(4)
-            .format(vk::Format::R32G32B32A32_SFLOAT)
+            .format(vk::Format::R32_UINT)
             .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
             .build();
 
