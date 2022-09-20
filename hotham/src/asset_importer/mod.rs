@@ -81,7 +81,7 @@ pub fn load_scene_from_glb(
 }
 
 // TODO: At the moment we only support lights in the top level scene object. glTF lets us do fancier things like
-//       have lights be part of the node heirarchy, which we should definitely support, but we're not there yet.
+//       have lights be part of the node hierarchy, which we should definitely support, but we're not there yet.
 fn get_lights_from_gltf_data(document: &Document) -> Result<Vec<Light>> {
     let mut lights = Vec::new();
     for node in document
