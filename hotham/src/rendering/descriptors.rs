@@ -111,11 +111,6 @@ unsafe fn allocate_descriptor_sets(
     pool: vk::DescriptorPool,
     layout: vk::DescriptorSetLayout,
 ) -> [vk::DescriptorSet; PIPELINE_DEPTH] {
-    let mut descriptor_counts = vk::DescriptorSetVariableDescriptorCountAllocateInfo::builder()
-        .descriptor_counts(&[
-            TEXTURE_BINDING_DESCRIPTOR_COUNT,
-            TEXTURE_BINDING_DESCRIPTOR_COUNT,
-        ]);
     let layouts = [layout; PIPELINE_DEPTH];
 
     vulkan_context
@@ -123,8 +118,7 @@ unsafe fn allocate_descriptor_sets(
         .allocate_descriptor_sets(
             &vk::DescriptorSetAllocateInfo::builder()
                 .descriptor_pool(pool)
-                .set_layouts(&layouts)
-                .push_next(&mut descriptor_counts),
+                .set_layouts(&layouts),
         )
         .unwrap()
         .as_slice()
@@ -225,9 +219,8 @@ unsafe fn create_descriptor_layouts(
         },
     ];
 
-    let flags = vk::DescriptorBindingFlags::PARTIALLY_BOUND
-        | vk::DescriptorBindingFlags::VARIABLE_DESCRIPTOR_COUNT
-        | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
+    let flags =
+        vk::DescriptorBindingFlags::PARTIALLY_BOUND | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
 
     let descriptor_flags = [
         vk::DescriptorBindingFlags::empty(),
