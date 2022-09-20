@@ -197,7 +197,10 @@ impl RenderContext {
             Frustum::from(fov_right).projection(near) * view_matrices[1],
         ];
 
-        self.scene_data.camera_position = [self.cameras[0].position(), self.cameras[1].position()];
+        self.scene_data.camera_position = [
+            self.cameras[0].position_in_gos(),
+            self.cameras[1].position_in_gos(),
+        ];
 
         unsafe {
             let scene_data = &mut self.frames[self.frame_index]
