@@ -10,7 +10,7 @@ layout (location = 2) in vec2 inUV;
 layout (location = 3) in uint inJoint;
 layout (location = 4) in uint inWeight;
 
-layout (location = 0) out vec4 outGlobalPos;
+layout (location = 0) out vec4 outGosPos;
 layout (location = 1) out vec2 outUV;
 layout (location = 2) flat out uint outMaterialID;
 layout (location = 3) out vec3 outNormal;
@@ -24,8 +24,8 @@ void main() {
 
     if (d.skinID == NOT_PRESENT) {
         // Mesh has no skin
-        outGlobalPos = d.globalFromLocal * vec4(inPos, 1.0);
-        outNormal = normalize(inNormal * mat3(d.localFromGlobal));
+        outGosPos = d.gosFromLocal * vec4(inPos, 1.0);
+        outNormal = normalize(inNormal * mat3(d.localFromGos));
     } else {
         // Mesh is skinned
         // Shift and mask to unpack the individual indices and weights.
@@ -36,11 +36,11 @@ void main() {
             ((inWeight >> 16) & 255) * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 16) & 255] +
             ((inWeight >> 24) & 255) * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 24) & 255];
 
-        outGlobalPos = d.globalFromLocal * skinMatrix * vec4(inPos, 1.0);
-        outNormal = normalize(mat3(skinMatrix) * inNormal * mat3(d.localFromGlobal));
+        outGosPos = d.gosFromLocal * skinMatrix * vec4(inPos, 1.0);
+        outNormal = normalize(mat3(skinMatrix) * inNormal * mat3(d.localFromGos));
     }
 
     outUV = inUV;
     outMaterialID = d.materialID;
-    gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGlobalPos;
+    gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGosPos;
 }
