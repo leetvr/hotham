@@ -39,6 +39,7 @@ mod tests {
 
     use crate::{
         components::{Info, Skin},
+        resources::PhysicsContext,
         util::get_world_with_hands,
     };
 
@@ -49,7 +50,9 @@ mod tests {
     #[test]
     pub fn test_hand_skinning() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut world = get_world_with_hands(&vulkan_context, &mut render_context);
+        let mut physics_context = PhysicsContext::default();
+        let mut world =
+            get_world_with_hands(&vulkan_context, &mut render_context, &mut physics_context);
         skinning_system(&mut Default::default(), &mut world, &mut render_context);
 
         assert!(verify_matrices(&world, &render_context));

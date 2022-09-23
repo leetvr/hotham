@@ -57,8 +57,12 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     #[cfg(not(target_os = "android"))]
     glb_buffers.push(include_bytes!("../../../test_assets/damaged_helmet.glb"));
 
-    let models =
-        asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    let models = asset_importer::load_models_from_glb(
+        &glb_buffers,
+        vulkan_context,
+        render_context,
+        physics_context,
+    )?;
     add_helmet(&models, &mut world, physics_context);
     add_hand(&models, Handedness::Left, &mut world, physics_context);
     add_hand(&models, Handedness::Right, &mut world, physics_context);
@@ -71,7 +75,7 @@ fn add_helmet(
     world: &mut World,
     physics_context: &mut PhysicsContext,
 ) {
-    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
+    let helmet = add_model_to_world("Damaged Helmet", models, world, physics_context, None)
         .expect("Could not find Damaged Helmet");
     let mut local_transform = world.get_mut::<LocalTransform>(helmet).unwrap();
     local_transform.translation.z = -1.;

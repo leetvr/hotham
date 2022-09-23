@@ -36,7 +36,7 @@ use hecs::World;
 #[cfg(test)]
 use crate::{
     asset_importer::{add_model_to_world, load_models_from_glb},
-    resources::{RenderContext, VulkanContext},
+    resources::{PhysicsContext, RenderContext, VulkanContext},
 };
 
 /// Convenience function to get a world with hands
@@ -44,6 +44,7 @@ use crate::{
 pub fn get_world_with_hands(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
+    physics_context: &mut PhysicsContext,
 ) -> World {
     use crate::components::{LocalTransform, Skin};
 
@@ -51,18 +52,21 @@ pub fn get_world_with_hands(
         include_bytes!("../../test_assets/left_hand.glb"),
         include_bytes!("../../test_assets/right_hand.glb"),
     ];
-    let models = load_models_from_glb(&data, vulkan_context, render_context).unwrap();
+    let models =
+        load_models_from_glb(&data, vulkan_context, render_context, physics_context).unwrap();
 
     let mut world = World::new();
 
     // Add two hands
-    let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
+    let left_hand =
+        add_model_to_world("Left Hand", &models, &mut world, physics_context, None).unwrap();
     {
         let mut local_transform = world.get_mut::<LocalTransform>(left_hand).unwrap();
         local_transform.translation = [-0.2, 1.4, 0.0].into();
     }
 
-    let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
+    let right_hand =
+        add_model_to_world("Right Hand", &models, &mut world, physics_context, None).unwrap();
     {
         let mut local_transform = world.get_mut::<LocalTransform>(right_hand).unwrap();
         local_transform.translation = [0.2, 1.4, 0.0].into();

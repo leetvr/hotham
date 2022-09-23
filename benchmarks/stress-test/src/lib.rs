@@ -17,7 +17,7 @@ use hotham::{
         primitive::{calculate_bounding_sphere, Primitive},
         vertex::Vertex,
     },
-    resources::RenderContext,
+    resources::{PhysicsContext, RenderContext},
     schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, debug::debug_system, grabbing_system, hands_system,
@@ -118,18 +118,23 @@ pub enum StressTest {
 fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World>) {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
+    let physics_context = &mut engine.physics_context;
     let mut world = World::default();
 
     let models = match test {
         StressTest::ManyCubes => {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/cube.glb")];
-            let models =
-                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
-                    .unwrap();
+            let models = asset_importer::load_models_from_glb(
+                &glb_buffers,
+                vulkan_context,
+                render_context,
+                physics_context,
+            )
+            .unwrap();
 
             let resolution = 34; // 42,875 cubes
 
-            setup_cubes(&mut world, resolution, &models);
+            setup_cubes(&mut world, resolution, &models, physics_context);
 
             models
         }
@@ -137,11 +142,22 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!(
                 "../../../test_assets/culling_stress_test.glb"
             )];
-            let models =
-                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
-                    .unwrap();
+            let models = asset_importer::load_models_from_glb(
+                &glb_buffers,
+                vulkan_context,
+                render_context,
+                physics_context,
+            )
+            .unwrap();
 
-            add_model_to_world("Asteroid and Debris", &models, &mut world, None).unwrap();
+            add_model_to_world(
+                "Asteroid and Debris",
+                &models,
+                &mut world,
+                physics_context,
+                None,
+            )
+            .unwrap();
             models
         }
         StressTest::ManyHelmets => {
@@ -152,13 +168,23 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             #[cfg(not(target_os = "android"))]
             let glb_buffers: Vec<&[u8]> =
                 vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-            let models =
-                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
-                    .unwrap();
+            let models = asset_importer::load_models_from_glb(
+                &glb_buffers,
+                vulkan_context,
+                render_context,
+                physics_context,
+            )
+            .unwrap();
 
             for _ in 0..20 {
-                let e = add_model_to_world("Damaged Helmet", &models, &mut world, None)
-                    .expect("Could not find cube?");
+                let e = add_model_to_world(
+                    "Damaged Helmet",
+                    &models,
+                    &mut world,
+                    physics_context,
+                    None,
+                )
+                .expect("Could not find cube?");
                 let mut t = world.get_mut::<LocalTransform>(e).unwrap();
                 t.rotation = UnitQuaternion::from_axis_angle(
                     &Vector3::x_axis(),
@@ -174,11 +200,15 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
         StressTest::Sponza => {
             let file = std::fs::read("test_assets/sponza.glb").unwrap();
             let glb_buffers: Vec<&[u8]> = vec![&file];
-            let models =
-                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
-                    .unwrap();
+            let models = asset_importer::load_models_from_glb(
+                &glb_buffers,
+                vulkan_context,
+                render_context,
+                physics_context,
+            )
+            .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, &mut world, None);
+                add_model_to_world(name, &models, &mut world, physics_context, None);
             }
             models
         }
@@ -190,11 +220,15 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             #[cfg(not(target_os = "android"))]
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/ibl_test.glb")];
 
-            let models =
-                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
-                    .unwrap();
+            let models = asset_importer::load_models_from_glb(
+                &glb_buffers,
+                vulkan_context,
+                render_context,
+                physics_context,
+            )
+            .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, &mut world, None);
+                add_model_to_world(name, &models, &mut world, physics_context, None);
             }
             models
         }
@@ -203,11 +237,15 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 "../../../test_assets/normal_tangent_test.glb"
             )];
 
-            let models =
-                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
-                    .unwrap();
+            let models = asset_importer::load_models_from_glb(
+                &glb_buffers,
+                vulkan_context,
+                render_context,
+                physics_context,
+            )
+            .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, &mut world, None);
+                add_model_to_world(name, &models, &mut world, physics_context, None);
             }
 
             let scene_data = &mut render_context.scene_data;
@@ -272,7 +310,9 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
 
         match &tick_props.test {
             // StressTest::ManyCubes => rotate_models(world, timer.total_time().as_secs_f32()),
-            StressTest::ManyHelmets => model_system(world, models, timer, "Damaged Helmet"),
+            StressTest::ManyHelmets => {
+                model_system(world, models, timer, "Damaged Helmet", physics_context)
+            }
             StressTest::ManyVertices => subdivide_mesh_system(world, render_context, timer),
             _ => {}
         }
@@ -320,9 +360,11 @@ fn model_system(
     models: &HashMap<String, World>,
     timer: &mut Timer,
     model_name: &str,
+    physics_context: &mut PhysicsContext,
 ) {
     if timer.tick() {
-        add_model_to_world(model_name, models, world, None).expect("Could not find object?");
+        add_model_to_world(model_name, models, world, physics_context, None)
+            .expect("Could not find object?");
         rearrange_models(world);
     }
 
