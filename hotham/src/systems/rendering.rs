@@ -245,9 +245,8 @@ mod tests {
     use ash::vk;
     use ash::vk::Handle;
     use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
-    use nalgebra::{Translation3, UnitQuaternion, Vector3};
+    use nalgebra::{Isometry3, Translation3, UnitQuaternion, Vector3};
     use openxr::{Fovf, Quaternionf, Vector3f};
-    use rapier3d::prelude::Isometry;
     use update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system;
 
     use crate::{
@@ -268,6 +267,7 @@ mod tests {
     #[test]
     pub fn test_rendering_pbr() {
         let vulkan_context = VulkanContext::testing().unwrap();
+        let mut physics_context = PhysicsContext::default();
         let resolution = vk::Extent2D {
             height: 800,
             width: 800,
@@ -293,16 +293,19 @@ mod tests {
 
         let mut render_context =
             RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
-        let mut physics_context = PhysicsContext::default();
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-        let mut models =
-            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
-                .unwrap();
+        let mut models = asset_importer::load_models_from_glb(
+            &gltf_data,
+            &vulkan_context,
+            &mut render_context,
+            &mut physics_context,
+        )
+        .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform
-        let global_from_stage = Isometry::from_parts(
+        let global_from_stage = Isometry3::from_parts(
             Translation3::new(0.1, 0.2, 0.3),
             UnitQuaternion::from_scaled_axis(Vector3::y() * (std::f32::consts::TAU * 0.1)),
         );

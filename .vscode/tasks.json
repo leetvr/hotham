@@ -22,6 +22,29 @@
 		},
 		{
 			"type": "cargo",
+			"command": "test",
+			"args": [
+				"-p",
+				"hotham",
+				"--lib",
+				"--",
+				"asset_importer::tests::test_load_model_with_colliders",
+				"--nocapture",
+			],
+			"env": {
+				"RUST_BACKTRACE": "1"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "Run individual Hotham test",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"type": "cargo",
 			"command": "run",
 			"args": [
 				"--bin",
@@ -57,7 +80,7 @@
 			"label": "Run Hotham simple scene on the simulator",
 			"group": {
 				"kind": "test",
-				"isDefault": true
+				"isDefault": false
 			}
 		}
 	]
