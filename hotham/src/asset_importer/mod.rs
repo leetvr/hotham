@@ -362,7 +362,7 @@ fn find_wall_collider_for_node<'a>(
 
     // Iterate through each node to try and find the matching node, then fetch its mesh.
     import_context.document.nodes().find_map(|n| {
-        if n.name()? != &wall_pattern {
+        if n.name()? == wall_pattern {
             return None;
         }
 
