@@ -130,7 +130,7 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     // We need *some* entity to stash the AnimationController onto.
     // For now, just use the first root entity.
     let mut animation_controller_entity = None;
-    for node in document.nodes() {
+    for node in document.scenes().next().unwrap().nodes() {
         let mut world = World::default();
 
         let root = load_node(&node, import_context, &mut world, true);
