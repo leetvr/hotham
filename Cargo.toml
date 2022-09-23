@@ -8,11 +8,10 @@ opt-level = 3
 [profile.dev.package.parry3d]
 opt-level = 3
 
-# Make performance critical packages compile with optimizations
 [profile.dev.package.nalgebra]
 opt-level = 3
 
-[profile.dev.package."base64"]
+[profile.dev.package.base64]
 opt-level = 3
 
 [profile.dev.package.gltf]
