@@ -33,7 +33,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::vk::{self, Handle};
-use nalgebra::{Matrix4, RowVector4, Vector4};
+use nalgebra::{Isometry3, Matrix4, RowVector4, Vector4};
 use openxr as xr;
 use vk_shader_macros::include_glsl;
 
@@ -170,7 +170,12 @@ impl RenderContext {
         )
     }
 
-    pub(crate) fn update_scene_data(&mut self, views: &[xr::View]) {
+    pub(crate) fn update_scene_data(
+        &mut self,
+        views: &[xr::View],
+        gos_from_global: &Isometry3<f32>,
+        gos_from_stage: &Isometry3<f32>,
+    ) {
         self.views = views.to_owned();
 
         // View (camera)
@@ -178,7 +183,7 @@ impl RenderContext {
             .cameras
             .iter_mut()
             .enumerate()
-            .map(|(n, c)| c.update(&views[n]))
+            .map(|(n, c)| c.update(&views[n], gos_from_stage))
             .collect::<Vec<_>>();
 
         // Projection
@@ -192,7 +197,10 @@ impl RenderContext {
             Frustum::from(fov_right).projection(near) * view_matrices[1],
         ];
 
-        self.scene_data.camera_position = [self.cameras[0].position(), self.cameras[1].position()];
+        self.scene_data.camera_position = [
+            self.cameras[0].position_in_gos(),
+            self.cameras[1].position_in_gos(),
+        ];
 
         unsafe {
             let scene_data = &mut self.frames[self.frame_index]
@@ -202,6 +210,10 @@ impl RenderContext {
             scene_data.view_projection = self.scene_data.view_projection;
             scene_data.params = self.scene_data.params;
             scene_data.lights = self.scene_data.lights;
+            for light in &mut scene_data.lights {
+                light.position = gos_from_global.transform_point(&light.position);
+                light.direction = gos_from_global.transform_vector(&light.direction);
+            }
         }
     }
 
@@ -437,7 +449,7 @@ pub(crate) struct InstancedPrimitive {
 }
 
 pub(crate) struct Instance {
-    pub(crate) global_from_local: Matrix4<f32>,
+    pub(crate) gos_from_local: Matrix4<f32>,
     pub(crate) bounding_sphere: Vector4<f32>,
     pub(crate) skin_id: u32,
 }

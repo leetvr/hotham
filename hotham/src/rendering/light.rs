@@ -1,4 +1,4 @@
-use nalgebra::{UnitQuaternion, Vector3};
+use nalgebra::{Point3, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
 /// A directional light.
@@ -30,7 +30,7 @@ pub struct Light {
     pub intensity: f32,
 
     /// The position of the light
-    pub position: Vector3<f32>,
+    pub position: Point3<f32>,
     /// Cosine of the angle, in radians, from center of spotlight where falloff begins.
     pub inner_cone_cos: f32,
 
@@ -55,7 +55,7 @@ impl Light {
         range: f32,
         intensity: f32,
         color: Vector3<f32>,
-        position: Vector3<f32>,
+        position: Point3<f32>,
         inner_cone_angle: f32,
         outer_cone_angle: f32,
     ) -> Self {
@@ -84,7 +84,7 @@ impl Light {
 
     /// Create a new point light
     pub fn new_point(
-        position: Vector3<f32>,
+        position: Point3<f32>,
         range: f32,
         intensity: f32,
         color: Vector3<f32>,
