@@ -8,8 +8,10 @@ use crate::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
     },
+    systems::stage,
 };
 use hecs::{PreparedQuery, With, World};
+use nalgebra::Isometry3;
 use openxr as xr;
 
 /// Rendering system
@@ -66,6 +68,12 @@ pub unsafe fn begin(
     // primitives.
     let meshes = &render_context.resources.mesh_data;
 
+    // Create transformations to globally oriented stage space
+    let global_from_stage = stage::get_global_from_stage(world);
+    let gos_from_global: Isometry3<f32> = global_from_stage.translation.inverse().into();
+    let gos_from_stage: Isometry3<f32> = gos_from_global * global_from_stage;
+    let matrix_gos_from_global = gos_from_global.to_homogeneous();
+
     for (_, (mesh, global_transform, skin)) in query.query_mut(world) {
         let mesh = meshes.get(mesh.handle).unwrap();
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
@@ -81,8 +89,9 @@ pub unsafe fn begin(
                 })
                 .instances
                 .push(Instance {
-                    global_from_local: global_transform.0,
-                    bounding_sphere: primitive.get_bounding_sphere(global_transform),
+                    gos_from_local: matrix_gos_from_global * global_transform.0,
+                    bounding_sphere: matrix_gos_from_global
+                        * primitive.get_bounding_sphere(global_transform),
                     skin_id,
                 });
         }
@@ -117,7 +126,7 @@ pub unsafe fn begin(
     }
 
     // This is the VERY LATEST we can possibly update our views, as the compute shader will need them.
-    render_context.update_scene_data(views);
+    render_context.update_scene_data(views, &gos_from_global, &gos_from_stage);
 
     // Execute the culling shader on the GPU.
     render_context.cull_objects(vulkan_context);
@@ -185,8 +194,8 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                 .unwrap();
             let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
             let draw_data = DrawData {
-                global_from_local: instance.global_from_local,
-                local_from_global: instance.global_from_local.try_inverse().unwrap(),
+                gos_from_local: instance.gos_from_local,
+                local_from_gos: instance.gos_from_local.try_inverse().unwrap(),
                 material_id: instanced_primitive.primitive.material_id,
                 skin_id: instance.skin_id,
             };
@@ -236,23 +245,29 @@ mod tests {
     use ash::vk;
     use ash::vk::Handle;
     use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
-    use nalgebra::UnitQuaternion;
+    use nalgebra::{Isometry3, Translation3, UnitQuaternion, Vector3};
     use openxr::{Fovf, Quaternionf, Vector3f};
+    use update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system;
 
     use crate::{
         asset_importer,
+        components::RigidBody,
         rendering::{
             image::Image, legacy_buffer::Buffer, light::Light, scene_data, swapchain::SwapchainInfo,
         },
-        resources::RenderContext,
-        systems::{update_global_transform_system, update_global_transform_with_parent_system},
-        util::get_from_device_memory,
+        resources::{PhysicsContext, RenderContext},
+        systems::{
+            add_stage, update_global_transform_system, update_global_transform_with_parent_system,
+            update_local_transform_with_rigid_body,
+        },
+        util::{get_from_device_memory, isometry_to_posef, posef_to_isometry},
         COLOR_FORMAT,
     };
 
     #[test]
     pub fn test_rendering_pbr() {
         let vulkan_context = VulkanContext::testing().unwrap();
+        let mut physics_context = PhysicsContext::default();
         let resolution = vk::Extent2D {
             height: 800,
             width: 800,
@@ -280,10 +295,28 @@ mod tests {
             RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-        let mut models =
-            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
-                .unwrap();
+        let mut models = asset_importer::load_models_from_glb(
+            &gltf_data,
+            &vulkan_context,
+            &mut render_context,
+            &mut physics_context,
+        )
+        .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
+
+        // Add stage transform
+        let global_from_stage = Isometry3::from_parts(
+            Translation3::new(0.1, 0.2, 0.3),
+            UnitQuaternion::from_scaled_axis(Vector3::y() * (std::f32::consts::TAU * 0.1)),
+        );
+        let stage_entity = add_stage(&mut world, &mut physics_context);
+        physics_context.rigid_bodies[world.get_mut::<RigidBody>(stage_entity).unwrap().handle]
+            .set_position(global_from_stage, true);
+        update_local_transform_with_rigid_body_system(
+            &mut Default::default(),
+            &mut world,
+            &physics_context,
+        );
 
         // Set views
         let rotation: mint::Quaternion<f32> =
@@ -305,7 +338,13 @@ mod tests {
                 angle_right: 45.0_f32.to_radians(),
             },
         };
-        let views = vec![view.clone(), view];
+        let mut views = vec![view.clone(), view];
+
+        // Compensate stage transform by adjusting the views
+        for view in &mut views {
+            view.pose =
+                isometry_to_posef(global_from_stage.inverse() * posef_to_isometry(view.pose));
+        }
 
         let params = vec![
             (
