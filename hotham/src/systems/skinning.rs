@@ -52,7 +52,10 @@ mod tests {
     #[test]
     pub fn test_hand_skinning() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut world = get_world_with_hands(&vulkan_context, &mut render_context);
+        let mut physics_context = Default::default();
+        let mut world =
+            get_world_with_hands(&vulkan_context, &mut render_context, &mut physics_context);
+
         skinning_system_inner(&mut world, &mut render_context);
 
         assert!(verify_matrices(&world, &render_context));

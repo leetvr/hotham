@@ -59,7 +59,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, _state: &mut State) {
 
 fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let render_context = &mut engine.render_context;
-
     let vulkan_context = &mut engine.vulkan_context;
     let physics_context = &mut engine.physics_context;
     let world = &mut engine.world;
@@ -77,8 +76,12 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     #[cfg(not(target_os = "android"))]
     glb_buffers.push(include_bytes!("../../../test_assets/damaged_helmet.glb"));
 
-    let models =
-        asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    let models = asset_importer::load_models_from_glb(
+        &glb_buffers,
+        vulkan_context,
+        render_context,
+        physics_context,
+    )?;
     add_helmet(&models, world, physics_context);
     add_hand(&models, Handedness::Left, world, physics_context);
     add_hand(&models, Handedness::Right, world, physics_context);
@@ -91,7 +94,7 @@ fn add_helmet(
     world: &mut World,
     physics_context: &mut PhysicsContext,
 ) {
-    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
+    let helmet = add_model_to_world("Damaged Helmet", models, world, physics_context, None)
         .expect("Could not find Damaged Helmet");
     let mut local_transform = world.get_mut::<LocalTransform>(helmet).unwrap();
     local_transform.translation.z = -1.;

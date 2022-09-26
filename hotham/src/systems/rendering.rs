@@ -284,6 +284,7 @@ mod tests {
     #[test]
     pub fn test_rendering_pbr() {
         let vulkan_context = VulkanContext::testing().unwrap();
+
         let resolution = vk::Extent2D {
             height: 800,
             width: 800,
@@ -306,15 +307,18 @@ mod tests {
             images: vec![image.handle],
             resolution,
         };
-
         let mut render_context =
             RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
         let mut physics_context = PhysicsContext::default();
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-        let mut models =
-            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
-                .unwrap();
+        let mut models = asset_importer::load_models_from_glb(
+            &gltf_data,
+            &vulkan_context,
+            &mut render_context,
+            &mut physics_context,
+        )
+        .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform

@@ -85,7 +85,7 @@ pub fn add_hand(
         Handedness::Left => "Left Hand",
         Handedness::Right => "Right Hand",
     };
-    let hand = add_model_to_world(model_name, models, world, None).unwrap();
+    let hand = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
     {
         // Add a hand component
         world
