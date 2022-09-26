@@ -1,10 +1,10 @@
 use crate::{
     asset_importer::add_model_to_world,
     components::{hand::Handedness, AnimationController, Hand, RigidBody, Stage},
-    resources::{physics_context, InputContext, PhysicsContext},
+    resources::{InputContext, PhysicsContext},
     Engine,
 };
-use hecs::{PreparedQuery, With, World};
+use hecs::{With, World};
 use rapier3d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
 };
@@ -129,12 +129,8 @@ mod tests {
     };
 
     use crate::{
-        components::LocalTransform,
-        resources::XrContext,
-        systems::{
-            update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
-            update_local_transform_with_rigid_body_system,
-        },
+        components::LocalTransform, resources::XrContext,
+        systems::update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
     };
 
     #[test]

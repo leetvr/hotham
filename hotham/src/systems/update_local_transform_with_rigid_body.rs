@@ -1,4 +1,4 @@
-use hecs::{PreparedQuery, World};
+use hecs::World;
 use nalgebra::UnitQuaternion;
 
 use crate::{
@@ -58,24 +58,18 @@ mod tests {
         let handle = physics_context.rigid_bodies.insert(rigid_body);
         world.insert_one(entity, RigidBody { handle }).unwrap();
 
-        let mut query = PreparedQuery::<(&RigidBody, &mut LocalTransform)>::default();
-
         // Run the schedule 4 times. Why 4 times? I can't remember.
-        tick(&mut physics_context, &mut query, &mut world);
-        tick(&mut physics_context, &mut query, &mut world);
-        tick(&mut physics_context, &mut query, &mut world);
-        tick(&mut physics_context, &mut query, &mut world);
+        tick(&mut physics_context, &mut world);
+        tick(&mut physics_context, &mut world);
+        tick(&mut physics_context, &mut world);
+        tick(&mut physics_context, &mut world);
 
         let local_transform = world.get::<LocalTransform>(entity).unwrap();
         assert_relative_eq!(local_transform.translation, vector![1.0, 2.0, 3.0]);
         assert_relative_eq!(local_transform.rotation, rotation);
     }
 
-    fn tick(
-        physics_context: &mut PhysicsContext,
-        query: &mut PreparedQuery<(&RigidBody, &mut LocalTransform)>,
-        world: &mut World,
-    ) {
+    fn tick(physics_context: &mut PhysicsContext, world: &mut World) {
         physics_context.update();
         update_local_transform_with_rigid_body_system_inner(world, physics_context);
     }

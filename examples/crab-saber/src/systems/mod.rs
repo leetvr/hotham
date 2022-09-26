@@ -2,7 +2,7 @@ pub mod game;
 pub mod sabers;
 use hotham::{
     components::{Collider, RigidBody, Visible},
-    hecs::{PreparedQuery, With, Without},
+    hecs::{PreparedQuery, With},
 };
 pub use sabers::sabers_system;
 
@@ -14,5 +14,4 @@ pub struct CrabSaberQueries<'a> {
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
     pub live_cubes_query:
         PreparedQuery<With<Visible, With<Cube, (&'a Color, &'a RigidBody, &'a Collider)>>>,
-    pub dead_cubes_query: PreparedQuery<Without<Visible, With<Cube, &'a Color>>>,
 }

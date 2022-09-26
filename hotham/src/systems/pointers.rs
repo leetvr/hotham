@@ -1,6 +1,6 @@
 use ash::vk;
 use egui::Pos2;
-use hecs::{PreparedQuery, With, World};
+use hecs::{With, World};
 use nalgebra::{
     point, vector, Isometry3, Orthographic3, Point3, Quaternion, Translation3, UnitQuaternion,
     Vector2,

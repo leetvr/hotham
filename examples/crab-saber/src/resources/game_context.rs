@@ -54,11 +54,12 @@ impl Debug for GameContext {
 }
 
 impl GameContext {
-    pub fn new(engine: &mut Engine, world: &mut World) -> Self {
+    pub fn new(engine: &mut Engine) -> Self {
         let render_context = &mut engine.render_context;
         let vulkan_context = &engine.vulkan_context;
         let physics_context = &mut engine.physics_context;
         let gui_context = &engine.gui_context;
+        let world = &mut engine.world;
 
         let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
         let models =

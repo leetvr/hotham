@@ -23,7 +23,6 @@ use hotham::{
         animation_system, collision_system, debug::debug_system, grabbing_system, hands_system,
         rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
         update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
-        Queries,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -39,15 +38,12 @@ pub fn main() {
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
     let test = StressTest::ManyHelmets;
-    let (world, models) = init(&mut engine, &test);
-    let queries = Default::default();
+    let models = init(&mut engine, &test);
     let timer = Default::default();
 
     let mut tick_props = TickProps {
         engine,
-        world,
         models,
-        queries,
         timer,
         test,
     };
@@ -115,10 +111,10 @@ pub enum StressTest {
     NormalTangentTest,
 }
 
-fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World>) {
+fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
-    let mut world = World::default();
+    let world = &mut engine.world;
 
     let models = match test {
         StressTest::ManyCubes => {
@@ -129,7 +125,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
 
             let resolution = 34; // 42,875 cubes
 
-            setup_cubes(&mut world, resolution, &models);
+            setup_cubes(world, resolution, &models);
 
             models
         }
@@ -141,7 +137,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
 
-            add_model_to_world("Asteroid and Debris", &models, &mut world, None).unwrap();
+            add_model_to_world("Asteroid and Debris", &models, world, None).unwrap();
             models
         }
         StressTest::ManyHelmets => {
@@ -157,7 +153,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                     .unwrap();
 
             for _ in 0..20 {
-                let e = add_model_to_world("Damaged Helmet", &models, &mut world, None)
+                let e = add_model_to_world("Damaged Helmet", &models, world, None)
                     .expect("Could not find cube?");
                 let mut t = world.get_mut::<LocalTransform>(e).unwrap();
                 t.rotation = UnitQuaternion::from_axis_angle(
@@ -168,7 +164,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
             models
         }
         StressTest::ManyVertices => {
-            create_mesh(render_context, &mut world);
+            create_mesh(render_context, world);
             Default::default()
         }
         StressTest::Sponza => {
@@ -178,7 +174,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, &mut world, None);
+                add_model_to_world(name, &models, world, None);
             }
             models
         }
@@ -194,7 +190,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, &mut world, None);
+                add_model_to_world(name, &models, world, None);
             }
             models
         }
@@ -207,7 +203,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
                 asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                     .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, &mut world, None);
+                add_model_to_world(name, &models, world, None);
             }
 
             let scene_data = &mut render_context.scene_data;
@@ -230,57 +226,51 @@ fn init(engine: &mut Engine, test: &StressTest) -> (World, HashMap<String, World
         }
     };
 
-    (world, models)
+    models
 }
 
-struct TickProps<'a> {
+struct TickProps {
     engine: Engine,
-    world: World,
     models: HashMap<String, World>,
-    queries: Queries<'a>,
     timer: Timer,
     test: StressTest,
 }
 
 fn tick(tick_props: &mut TickProps, tick_data: TickData) {
     let engine = &mut tick_props.engine;
-    let world = &mut tick_props.world;
-    let queries = &mut tick_props.queries;
     let timer = &mut tick_props.timer;
     let models = &tick_props.models;
 
-    let xr_context = &mut engine.xr_context;
-    let render_context = &mut engine.render_context;
-    let physics_context = &mut engine.physics_context;
-
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        // hands_system(engine);
-        // grabbing_system(engine);
-        physics_step(physics_context);
-        // collision_system(engine);
-        // update_local_transform_with_rigid_body_system(engine);
+        hands_system(engine);
+        grabbing_system(engine);
+        physics_step(&mut engine.physics_context);
+        collision_system(engine);
+        update_local_transform_with_rigid_body_system(engine);
 
         match &tick_props.test {
             // StressTest::ManyCubes => rotate_models(world, timer.total_time().as_secs_f32()),
-            StressTest::ManyHelmets => model_system(world, models, timer, "Damaged Helmet"),
-            StressTest::ManyVertices => subdivide_mesh_system(world, render_context, timer),
+            StressTest::ManyHelmets => model_system(engine, models, timer, "Damaged Helmet"),
+            StressTest::ManyVertices => subdivide_mesh_system(engine, timer),
             _ => {}
         }
 
-        // debug_system(engine);
+        debug_system(engine);
 
-        // animation_system(engine);
-        // update_global_transform_system(engine);
-        // update_global_transform_with_parent_system(engine);
-        // skinning_system(engine);
+        animation_system(engine);
+        update_global_transform_system(engine);
+        update_global_transform_with_parent_system(engine);
+        skinning_system(engine);
     }
 
     // Rendering!
-    let views = xr_context.update_views();
-    // rendering_system(engine, views, tick_data.swapchain_image_index);
+    rendering_system(engine, tick_data.swapchain_image_index);
 }
 
-fn subdivide_mesh_system(world: &mut World, render_context: &mut RenderContext, timer: &mut Timer) {
+fn subdivide_mesh_system(engine: &mut Engine, timer: &mut Timer) {
+    let world = &mut engine.world;
+    let render_context = &mut engine.render_context;
+
     if !timer.tick() {
         return;
     }
@@ -294,11 +284,12 @@ fn subdivide_mesh_system(world: &mut World, render_context: &mut RenderContext, 
 }
 
 fn model_system(
-    world: &mut World,
+    engine: &mut Engine,
     models: &HashMap<String, World>,
     timer: &mut Timer,
     model_name: &str,
 ) {
+    let world = &mut engine.world;
     if timer.tick() {
         add_model_to_world(model_name, models, world, None).expect("Could not find object?");
         rearrange_models(world);

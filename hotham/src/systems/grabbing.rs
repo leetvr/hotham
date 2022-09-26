@@ -1,9 +1,9 @@
-use hecs::{PreparedQuery, World};
+use hecs::World;
 use rapier3d::prelude::RigidBodyType;
 
 use crate::{
     components::{Collider, Grabbable, Hand, RigidBody},
-    resources::{physics_context, PhysicsContext},
+    resources::PhysicsContext,
     Engine,
 };
 
@@ -64,12 +64,9 @@ mod tests {
     use rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder};
 
     use crate::{
-        components::{hand::Handedness, Info, LocalTransform},
+        components::{hand::Handedness, Info},
         resources::PhysicsContext,
-        systems::{
-            update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
-            update_local_transform_with_rigid_body_system,
-        },
+        systems::update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
     };
 
     #[test]
@@ -110,16 +107,14 @@ mod tests {
 
         let hand_entity = world.spawn((hand, collider));
 
-        let mut rigid_body_query = Default::default();
-
-        tick(&mut world, &mut physics_context, &mut rigid_body_query);
+        tick(&mut world, &mut physics_context);
 
         let mut hand = world.get_mut::<Hand>(hand_entity).unwrap();
         assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
         hand.grip_value = 0.0;
         drop(hand);
 
-        tick(&mut world, &mut physics_context, &mut rigid_body_query);
+        tick(&mut world, &mut physics_context);
 
         let mut hand = world.get_mut::<Hand>(hand_entity).unwrap();
         assert!(hand.grabbed_entity.is_none());
@@ -129,17 +124,13 @@ mod tests {
         drop(hand);
         world.remove::<(Grabbable,)>(grabbed_entity).unwrap();
 
-        tick(&mut world, &mut physics_context, &mut rigid_body_query);
+        tick(&mut world, &mut physics_context);
 
         let hand = world.get::<Hand>(hand_entity).unwrap();
         assert!(hand.grabbed_entity.is_none());
     }
 
-    fn tick(
-        world: &mut World,
-        physics_context: &mut PhysicsContext,
-        rigid_body_query: &mut PreparedQuery<(&RigidBody, &mut LocalTransform)>,
-    ) {
+    fn tick(world: &mut World, physics_context: &mut PhysicsContext) {
         grabbing_system_inner(world, physics_context);
         physics_context.update();
         update_local_transform_with_rigid_body_system_inner(world, physics_context);

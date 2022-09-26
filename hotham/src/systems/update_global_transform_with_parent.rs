@@ -57,10 +57,7 @@ mod tests {
 
     use crate::{
         components::{Info, LocalTransform},
-        systems::{
-            update_global_transform::update_global_transform_system_inner,
-            update_global_transform_system,
-        },
+        systems::update_global_transform::update_global_transform_system_inner,
     };
 
     use super::*;

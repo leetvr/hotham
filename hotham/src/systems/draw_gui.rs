@@ -3,7 +3,7 @@ use crate::{
     resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
     Engine,
 };
-use hecs::{PreparedQuery, World};
+use hecs::World;
 static GUI_HAPTIC_AMPLITUDE: f32 = 0.5;
 
 /// GUI system
@@ -85,11 +85,9 @@ mod tests {
         rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
         resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
-            rendering::rendering_system_inner, rendering_system,
+            rendering::rendering_system_inner,
             update_global_transform::update_global_transform_system_inner,
-            update_global_transform_system,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
-            update_global_transform_with_parent_system,
         },
         util::get_from_device_memory,
         COLOR_FORMAT,

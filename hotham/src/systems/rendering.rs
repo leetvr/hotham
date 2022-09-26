@@ -23,11 +23,14 @@ use openxr as xr;
 /// - AFTER: ensure you have called render_context.end_frame
 ///
 /// Advanced users may instead call [`begin`], [`draw_world`], and [`end`] manually.
-#[allow(clippy::type_complexity)]
-pub fn rendering_system(engine: &mut Engine, views: &[xr::View], swapchain_image_index: usize) {
+pub fn rendering_system(engine: &mut Engine, swapchain_image_index: usize) {
     let world = &mut engine.world;
     let vulkan_context = &mut engine.vulkan_context;
     let render_context = &mut engine.render_context;
+
+    // Update views just before rendering.
+    let views = engine.xr_context.update_views();
+
     rendering_system_inner(
         world,
         vulkan_context,
@@ -261,7 +264,6 @@ mod tests {
     use nalgebra::{Translation3, UnitQuaternion, Vector3};
     use openxr::{Fovf, Quaternionf, Vector3f};
     use rapier3d::prelude::Isometry;
-    use update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system;
 
     use crate::{
         asset_importer,
@@ -271,13 +273,9 @@ mod tests {
         },
         resources::{PhysicsContext, RenderContext},
         systems::{
-            add_stage,
-            update_global_transform::update_global_transform_system_inner,
-            update_global_transform_system,
+            add_stage, update_global_transform::update_global_transform_system_inner,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
-            update_local_transform_with_rigid_body::{
-                self, update_local_transform_with_rigid_body_system_inner,
-            },
+            update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
         },
         util::{get_from_device_memory, isometry_to_posef, posef_to_isometry},
         COLOR_FORMAT,
