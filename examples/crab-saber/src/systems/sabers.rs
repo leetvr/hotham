@@ -29,7 +29,7 @@ const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 pub fn sabers_system(engine: &mut Engine) {
     sabers_system_inner(
         &mut engine.world,
-        &mut engine.input_context,
+        &engine.input_context,
         &mut engine.physics_context,
     )
 }

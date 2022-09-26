@@ -116,7 +116,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
     let vulkan_context = &mut engine.vulkan_context;
     let world = &mut engine.world;
 
-    let models = match test {
+    match test {
         StressTest::ManyCubes => {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/cube.glb")];
             let models =
@@ -224,9 +224,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
 
             models
         }
-    };
-
-    models
+    }
 }
 
 struct TickProps {
