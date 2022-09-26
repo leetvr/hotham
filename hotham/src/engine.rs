@@ -1,5 +1,5 @@
 use crate::{
-    resources::{
+    contexts::{
         AudioContext, GuiContext, HapticContext, InputContext, PhysicsContext, RenderContext,
         VulkanContext, XrContext, XrContextBuilder,
     },
@@ -86,6 +86,7 @@ impl<'a> EngineBuilder<'a> {
         let gui_context = GuiContext::new(&vulkan_context);
 
         Engine {
+            world: Default::default(),
             should_quit,
             resumed,
             event_data_buffer: Default::default(),
@@ -110,6 +111,8 @@ pub struct Engine {
     resumed: bool,
     event_data_buffer: EventDataBuffer,
 
+    /// World
+    pub world: hecs::World,
     /// OpenXR context
     pub xr_context: XrContext,
     /// Vulkan context

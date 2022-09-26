@@ -4,7 +4,7 @@ use anyhow::Result;
 use ash::vk;
 use std::marker::PhantomData;
 
-use crate::resources::VulkanContext;
+use crate::contexts::VulkanContext;
 
 /// A thin wrapper around `vk::Buffer`
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]

@@ -10,8 +10,8 @@ use crate::rendering::mesh_data::MeshData;
 use crate::rendering::primitive::Primitive;
 use crate::rendering::vertex::Vertex;
 use crate::{
+    contexts::{RenderContext, VulkanContext},
     rendering::texture::Texture,
-    resources::{RenderContext, VulkanContext},
 };
 
 pub struct Panel {

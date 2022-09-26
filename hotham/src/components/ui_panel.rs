@@ -11,11 +11,11 @@ use rapier3d::prelude::{ColliderBuilder, InteractionGroups};
 const BUFFER_SIZE: usize = 1024;
 
 use crate::components::Panel;
+use crate::contexts::gui_context::SCALE_FACTOR;
+use crate::contexts::physics_context::PANEL_COLLISION_GROUP;
+use crate::contexts::{GuiContext, PhysicsContext};
+use crate::contexts::{RenderContext, VulkanContext};
 use crate::rendering::legacy_buffer::Buffer;
-use crate::resources::gui_context::SCALE_FACTOR;
-use crate::resources::physics_context::PANEL_COLLISION_GROUP;
-use crate::resources::{GuiContext, PhysicsContext};
-use crate::resources::{RenderContext, VulkanContext};
 
 use super::{Collider, GlobalTransform, LocalTransform, Visible};
 

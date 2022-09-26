@@ -10,14 +10,14 @@ use hotham::{
         hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, Pointer, RigidBody,
         SoundEmitter, Visible,
     },
+    contexts::{
+        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
+        PhysicsContext,
+    },
     hecs::{Entity, World},
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
         RigidBodyType,
-    },
-    resources::{
-        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
-        PhysicsContext,
     },
     vk, Engine,
 };
@@ -54,23 +54,20 @@ impl Debug for GameContext {
 }
 
 impl GameContext {
-    pub fn new(engine: &mut Engine, world: &mut World) -> Self {
+    pub fn new(engine: &mut Engine) -> Self {
         let render_context = &mut engine.render_context;
         let vulkan_context = &engine.vulkan_context;
         let physics_context = &mut engine.physics_context;
         let gui_context = &engine.gui_context;
+        let world = &mut engine.world;
 
-        let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
-        let models = asset_importer::load_models_from_glb(
-            &glb_buffers,
-            vulkan_context,
-            render_context,
-            physics_context,
-        )
-        .expect("Unable to load models!");
+        let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../assets/crab_saber.glb")];
+        let models =
+            asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                .expect("Unable to load models!");
 
         // Add the environment models
-        add_environment(&models, world, physics_context);
+        add_environment(&models, world);
 
         // Add sabers
         let sabers = [Color::Blue, Color::Red]
@@ -82,7 +79,7 @@ impl GameContext {
         }
 
         // Add a pointer to let the player interact with the UI
-        let pointer = add_pointer(&models, world, physics_context);
+        let pointer = add_pointer(&models, world);
 
         // Add a "backstop" collider to detect when a cube was missed
         let backstop = add_backstop(world, physics_context);
@@ -137,11 +134,65 @@ impl GameContext {
             sound_effects: Default::default(),
         }
     }
+
+    pub fn add_songs(&mut self, audio_context: &mut AudioContext) {
+        let main_menu_mp3 = include_bytes!("../assets/TrackTribe - Cloud Echo.mp3").to_vec();
+        self.songs.insert(
+            "Main Menu".to_string(),
+            Song {
+                beat_length: Duration::new(0, 0),
+                track: audio_context.add_music_track(main_menu_mp3),
+            },
+        );
+
+        let game_over_mp3 = include_bytes!("../assets/Chasms - Dark Matter.mp3").to_vec();
+        self.songs.insert(
+            "Game Over".to_string(),
+            Song {
+                beat_length: Duration::new(0, 0),
+                track: audio_context.add_music_track(game_over_mp3),
+            },
+        );
+
+        let right_here_beside_you =
+            include_bytes!("../assets/Spence - Right Here Beside You.mp3").to_vec();
+        self.songs.insert(
+            "Spence - Right Here Beside You".to_string(),
+            Song {
+                beat_length: Duration::from_millis(60_000 / 129),
+                track: audio_context.add_music_track(right_here_beside_you),
+            },
+        );
+
+        let tell_me_that_i_cant =
+            include_bytes!("../assets/NEFFEX - Tell Me That I Can't.mp3").to_vec();
+        self.songs.insert(
+            "NEFFEX - Tell Me That I Can't".to_string(),
+            Song {
+                beat_length: Duration::from_millis(60_000 / 70),
+                track: audio_context.add_music_track(tell_me_that_i_cant),
+            },
+        );
+    }
+
+    pub fn add_sound_effects(&mut self, audio_context: &mut AudioContext) {
+        let hit_mp3 = include_bytes!("../assets/Hit.mp3").to_vec();
+        self.sound_effects.insert(
+            "Hit".to_string(),
+            audio_context.create_sound_emitter(hit_mp3),
+        );
+
+        let miss_mp3 = include_bytes!("../assets/Miss.mp3").to_vec();
+        self.sound_effects.insert(
+            "Miss".to_string(),
+            audio_context.create_sound_emitter(miss_mp3),
+        );
+    }
 }
 
 fn add_backstop(
     world: &mut World,
-    physics_context: &mut hotham::resources::PhysicsContext,
+    physics_context: &mut hotham::contexts::PhysicsContext,
 ) -> Entity {
     let collider = ColliderBuilder::cuboid(1., 1., 0.1)
         .translation([0., 1., 1.].into())
@@ -158,12 +209,8 @@ fn add_backstop(
     world.spawn((Collider::new(handle),))
 }
 
-fn add_pointer(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-) -> Entity {
-    let pointer = add_model_to_world("Blue Pointer", models, world, physics_context, None).unwrap();
+fn add_pointer(models: &std::collections::HashMap<String, World>, world: &mut World) -> Entity {
+    let pointer = add_model_to_world("Blue Pointer", models, world, None).unwrap();
 
     world
         .insert_one(
@@ -178,67 +225,9 @@ fn add_pointer(
     pointer
 }
 
-fn add_environment(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-) {
-    add_model_to_world("Environment", models, world, physics_context, None);
-    add_model_to_world("Ramp", models, world, physics_context, None);
-}
-
-pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContext) {
-    let main_menu_mp3 = include_bytes!("../../assets/TrackTribe - Cloud Echo.mp3").to_vec();
-    game_context.songs.insert(
-        "Main Menu".to_string(),
-        Song {
-            beat_length: Duration::new(0, 0),
-            track: audio_context.add_music_track(main_menu_mp3),
-        },
-    );
-
-    let game_over_mp3 = include_bytes!("../../assets/Chasms - Dark Matter.mp3").to_vec();
-    game_context.songs.insert(
-        "Game Over".to_string(),
-        Song {
-            beat_length: Duration::new(0, 0),
-            track: audio_context.add_music_track(game_over_mp3),
-        },
-    );
-
-    let right_here_beside_you =
-        include_bytes!("../../assets/Spence - Right Here Beside You.mp3").to_vec();
-    game_context.songs.insert(
-        "Spence - Right Here Beside You".to_string(),
-        Song {
-            beat_length: Duration::from_millis(60_000 / 129),
-            track: audio_context.add_music_track(right_here_beside_you),
-        },
-    );
-
-    let tell_me_that_i_cant =
-        include_bytes!("../../assets/NEFFEX - Tell Me That I Can't.mp3").to_vec();
-    game_context.songs.insert(
-        "NEFFEX - Tell Me That I Can't".to_string(),
-        Song {
-            beat_length: Duration::from_millis(60_000 / 70),
-            track: audio_context.add_music_track(tell_me_that_i_cant),
-        },
-    );
-}
-
-pub fn add_sound_effects(audio_context: &mut AudioContext, game_context: &mut GameContext) {
-    let hit_mp3 = include_bytes!("../../assets/Hit.mp3").to_vec();
-    game_context.sound_effects.insert(
-        "Hit".to_string(),
-        audio_context.create_sound_emitter(hit_mp3),
-    );
-
-    let miss_mp3 = include_bytes!("../../assets/Miss.mp3").to_vec();
-    game_context.sound_effects.insert(
-        "Miss".to_string(),
-        audio_context.create_sound_emitter(miss_mp3),
-    );
+fn add_environment(models: &std::collections::HashMap<String, World>, world: &mut World) {
+    add_model_to_world("Environment", models, world, None);
+    add_model_to_world("Ramp", models, world, None);
 }
 
 pub fn pre_spawn_cube(
@@ -253,7 +242,7 @@ pub fn pre_spawn_cube(
         Color::Blue => "Blue Cube",
     };
 
-    let cube = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
+    let cube = add_model_to_world(model_name, models, world, None).unwrap();
 
     let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
         .lock_rotations()

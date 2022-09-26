@@ -3,9 +3,9 @@ use nalgebra::Isometry3;
 
 use crate::{
     components::{GlobalTransform, LocalTransform, RigidBody, Stage},
+    contexts::PhysicsContext,
     hecs::{Entity, World},
     rapier3d::prelude::RigidBodyBuilder,
-    resources::PhysicsContext,
     util::matrix_to_isometry,
 };
 

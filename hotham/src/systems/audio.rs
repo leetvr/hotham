@@ -1,19 +1,28 @@
-use hecs::{PreparedQuery, World};
+use hecs::World;
 use nalgebra::{Point3, Vector3};
 use openxr::SpaceVelocityFlags;
 
 use crate::{
     components::{sound_emitter::SoundState, RigidBody, SoundEmitter},
-    resources::{AudioContext, PhysicsContext, XrContext},
+    contexts::{AudioContext, PhysicsContext, XrContext},
     util::is_space_valid,
+    Engine,
 };
 
 /// Audio system
 /// Walks through each SoundEmitter that has a RigidBody and:
 /// - updates its position in space
 /// - updates its playing state
-pub fn audio_system(
-    query: &mut PreparedQuery<(&mut SoundEmitter, &RigidBody)>,
+pub fn audio_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    let audio_context = &mut engine.audio_context;
+    let physics_context = &engine.physics_context;
+    let xr_context = &engine.xr_context;
+
+    audio_system_inner(world, audio_context, physics_context, xr_context);
+}
+
+fn audio_system_inner(
     world: &mut World,
     audio_context: &mut AudioContext,
     physics_context: &PhysicsContext,
@@ -46,7 +55,7 @@ pub fn audio_system(
     let listener_velocity_in_stage: Vector3<_> =
         mint::Vector3::from(listener_velocity_in_stage.linear_velocity).into();
 
-    for (_, (sound_emitter, rigid_body)) in query.query_mut(world) {
+    for (_, (sound_emitter, rigid_body)) in world.query_mut::<(&mut SoundEmitter, &RigidBody)>() {
         // Get the position and velocity of the entity.
         let rigid_body = physics_context
             .rigid_bodies
@@ -105,7 +114,7 @@ pub fn audio_system(
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
-    use hecs::{Entity, PreparedQuery, World};
+    use hecs::{Entity, World};
     use std::{
         thread,
         time::{Duration, Instant},
@@ -115,7 +124,7 @@ mod tests {
     const DURATION_SECS: u32 = 8;
 
     use crate::{
-        resources::{audio_context::MusicTrack, XrContext},
+        contexts::{audio_context::MusicTrack, XrContext},
         HothamError, VIEW_TYPE,
     };
 
@@ -151,9 +160,6 @@ mod tests {
         let mut world = World::new();
         let audio_entity = world.spawn((sound_emitter, rigid_body));
 
-        // Create query
-        let mut audio_query = PreparedQuery::<(&mut SoundEmitter, &RigidBody)>::default();
-
         // Timers
         let start = Instant::now();
 
@@ -164,7 +170,7 @@ mod tests {
                 break;
             }
 
-            schedule(
+            tick(
                 &mut xr_context,
                 audio_entity,
                 &mut world,
@@ -173,12 +179,11 @@ mod tests {
                 right_here,
                 tell_me_that_i_cant,
                 &mut physics_context,
-                &mut audio_query,
             );
         }
     }
 
-    fn schedule(
+    fn tick(
         xr_context: &mut XrContext,
         audio_entity: Entity,
         world: &mut World,
@@ -187,7 +192,6 @@ mod tests {
         right_here: MusicTrack,
         tell_me_that_i_cant: MusicTrack,
         physics_context: &mut PhysicsContext,
-        audio_query: &mut PreparedQuery<(&mut SoundEmitter, &RigidBody)>,
     ) {
         update_xr(xr_context);
         update_audio(
@@ -200,13 +204,7 @@ mod tests {
         );
         physics_context.update();
         xr_context.end_frame().unwrap();
-        audio_system(
-            audio_query,
-            world,
-            audio_context,
-            physics_context,
-            xr_context,
-        );
+        audio_system_inner(world, audio_context, physics_context, xr_context);
     }
 
     fn update_xr(xr_context: &mut XrContext) {

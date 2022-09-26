@@ -10,7 +10,7 @@ use xr::{
 };
 
 use crate::{
-    resources::VulkanContext, util::is_view_valid, HothamError, HothamResult, BLEND_MODE,
+    contexts::VulkanContext, util::is_view_valid, HothamError, HothamResult, BLEND_MODE,
     COLOR_FORMAT, VIEW_COUNT, VIEW_TYPE,
 };
 

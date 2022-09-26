@@ -2,23 +2,20 @@ use std::time::{Duration, Instant};
 
 use crate::{
     components::{Color, Cube},
-    resources::{
-        game_context::{GameState, Song},
-        GameContext,
-    },
+    game_context::{GameContext, GameState, Song},
 };
 
-use super::CrabSaberQueries;
 use hotham::{
     components::{
         hand::Handedness, sound_emitter::SoundState, ui_panel::UIPanelButton, Collider, Info,
         RigidBody, UIPanel, Visible,
     },
-    hecs::{Entity, World},
-    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
-    resources::{
+    contexts::{
         physics_context::DEFAULT_COLLISION_GROUP, AudioContext, HapticContext, PhysicsContext,
     },
+    hecs::{Entity, With, Without, World},
+    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
+    Engine,
 };
 use rand::prelude::*;
 
@@ -26,17 +23,25 @@ const CUBE_X_OFFSETS: [f32; 4] = [-0.6, -0.2, 0.2, 0.6];
 const CUBE_Y: f32 = 1.1;
 const CUBE_Z: f32 = -10.;
 
-pub fn game_system(
-    queries: &mut CrabSaberQueries,
-    world: &mut World,
+pub fn game_system(engine: &mut Engine, game_context: &mut GameContext) {
+    game_system_inner(
+        game_context,
+        &mut engine.world,
+        &mut engine.audio_context,
+        &mut engine.physics_context,
+        &mut engine.haptic_context,
+    )
+}
+
+fn game_system_inner(
     game_context: &mut GameContext,
+    world: &mut World,
     audio_context: &mut AudioContext,
     physics_context: &mut PhysicsContext,
     haptic_context: &mut HapticContext,
 ) {
     // Get next state
     if let Some(next_state) = run(
-        queries,
         world,
         game_context,
         audio_context,
@@ -45,7 +50,6 @@ pub fn game_system(
     ) {
         // If state has changed, transition
         transition(
-            queries,
             world,
             game_context,
             audio_context,
@@ -56,7 +60,6 @@ pub fn game_system(
 }
 
 fn transition(
-    queries: &mut CrabSaberQueries,
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
@@ -137,9 +140,8 @@ fn transition(
             let _ = world.remove_one::<Visible>(game_context.red_saber);
 
             // Destroy all cubes
-            let live_cubes = queries
-                .live_cubes_query
-                .query(world)
+            let live_cubes = world
+                .query::<With<Visible, With<Cube, (&Color, &RigidBody, &Collider)>>>()
                 .iter()
                 .map(|(e, _)| e)
                 .collect::<Vec<_>>();
@@ -172,7 +174,6 @@ fn transition(
 }
 
 fn run(
-    queries: &mut CrabSaberQueries,
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
@@ -190,7 +191,6 @@ fn run(
         }
         GameState::Playing(song) => {
             spawn_cube(
-                queries,
                 world,
                 physics_context,
                 song,
@@ -222,7 +222,6 @@ fn run(
 }
 
 fn spawn_cube(
-    queries: &mut CrabSaberQueries,
     world: &mut World,
     physics_context: &mut PhysicsContext,
     song: &mut Song,
@@ -233,9 +232,9 @@ fn spawn_cube(
     }
 
     let color = if random() { Color::Red } else { Color::Blue };
-    let dead_cube = queries
-        .dead_cubes_query
-        .query_mut(world)
+    let dead_cube = world
+        .query_mut::<Without<Visible, With<Cube, &Color>>>()
+        .into_iter()
         .find_map(|(e, c)| if c == &color { Some(e) } else { None })
         .unwrap();
     revive_cube(dead_cube, world, physics_context, song);
@@ -415,22 +414,21 @@ mod tests {
 
     use hotham::{
         components::{Collider, RigidBody, SoundEmitter},
+        contexts::HapticContext,
         hecs::Entity,
         nalgebra::Vector3,
         rapier3d::prelude::{RigidBodyBuilder, RigidBodyType},
-        resources::HapticContext,
         Engine,
     };
 
     use super::*;
-    use crate::{components::Cube, resources::game_context::Song};
+    use crate::{components::Cube, game_context::Song};
 
     #[test]
     pub fn game_system_test() {
         let mut engine = Engine::new();
-        let mut queries = Default::default();
         let mut world = World::new();
-        let mut game_context = GameContext::new(&mut engine, &mut world);
+        let mut game_context = GameContext::new(&mut engine);
         let audio_context = &mut engine.audio_context;
         let physics_context = &mut engine.physics_context;
         let haptic_context = &mut engine.haptic_context;
@@ -474,10 +472,9 @@ mod tests {
             .insert("Miss".to_string(), audio_context.dummy_sound_emitter());
 
         // INIT -> MAIN_MENU
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -500,10 +497,9 @@ mod tests {
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -517,17 +513,16 @@ mod tests {
         assert!(is_visible(world, game_context.score_panel));
 
         // PLAYING - TICK ONE
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
         );
 
         {
-            let mut q = queries.live_cubes_query.query(world);
+            let mut q = world.query::<With<Visible, With<Cube, (&Color, &RigidBody, &Collider)>>>();
             let mut i = q.iter();
             assert_eq!(i.len(), 1);
             let (_, (_, rigid_body, _)) = i.next().unwrap();
@@ -549,10 +544,9 @@ mod tests {
         }
 
         // PLAYING - TICK TWO
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -567,15 +561,13 @@ mod tests {
         }
 
         // PLAYING - TICK THREE
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
         );
-
         {
             assert_cube_processed(world, game_context.blue_saber, haptic_context);
             reset(world, game_context, haptic_context);
@@ -588,10 +580,9 @@ mod tests {
         }
 
         // PLAYING - TICK FOUR
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -610,10 +601,9 @@ mod tests {
         }
 
         // PLAYING - TICK FIVE
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -627,10 +617,9 @@ mod tests {
         }
 
         // PLAYING - TICK SIX
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -645,10 +634,9 @@ mod tests {
         }
 
         // PLAYING - TICK SEVEN
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -662,10 +650,9 @@ mod tests {
         }
 
         // PLAYING - TICK EIGHT
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -679,10 +666,9 @@ mod tests {
         }
 
         // PLAYING - TICK NINE -> GAME OVER
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -709,10 +695,9 @@ mod tests {
         }
 
         // GAME_OVER -> MAIN_MENU
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -752,10 +737,9 @@ mod tests {
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,
@@ -771,10 +755,9 @@ mod tests {
         assert!(is_visible(world, game_context.score_panel));
 
         // PLAYING - TICK ONE
-        game_system(
-            &mut queries,
-            world,
+        game_system_inner(
             game_context,
+            world,
             audio_context,
             physics_context,
             haptic_context,

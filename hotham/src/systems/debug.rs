@@ -1,7 +1,10 @@
-use crate::resources::{InputContext, RenderContext};
+use crate::Engine;
 
 /// A simple system used to assist with debugging the fragment shader.
-pub fn debug_system(input_context: &InputContext, render_context: &mut RenderContext) {
+pub fn debug_system(engine: &mut Engine) {
+    let input_context = &mut engine.input_context;
+    let render_context = &mut engine.render_context;
+
     if input_context.left.x_button_just_pressed() {
         let params = &mut render_context.scene_data.params;
         params.w = 0.;

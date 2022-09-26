@@ -1,16 +1,32 @@
 use crate::{
     components::{hand::Handedness, Panel, UIPanel},
-    resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
+    contexts::{GuiContext, HapticContext, RenderContext, VulkanContext},
+    Engine,
 };
-use hecs::{PreparedQuery, World};
+use hecs::World;
 static GUI_HAPTIC_AMPLITUDE: f32 = 0.5;
 
 /// GUI system
 /// Walks through each panel in the World and
 /// - draws the panel to a texture
 /// - updates any input state
-pub fn draw_gui_system(
-    query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
+pub fn draw_gui_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    let vulkan_context = &mut engine.vulkan_context;
+    let render_context = &mut engine.render_context;
+    let gui_context = &mut engine.gui_context;
+    let haptic_context = &mut engine.haptic_context;
+
+    draw_gui_system_inner(
+        world,
+        vulkan_context,
+        render_context,
+        gui_context,
+        haptic_context,
+    );
+}
+
+fn draw_gui_system_inner(
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
@@ -20,7 +36,7 @@ pub fn draw_gui_system(
     let mut new_hover = false;
 
     // Draw each panel
-    for (_, (panel, ui_panel)) in query.query_mut(world) {
+    for (_, (panel, ui_panel)) in world.query_mut::<(&mut Panel, &mut UIPanel)>() {
         // Reset the button state
         for button in &mut ui_panel.buttons {
             button.hovered_this_frame = false;
@@ -66,17 +82,16 @@ mod tests {
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
+        contexts::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
-        resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
-            rendering_system, update_global_transform_system,
-            update_global_transform_with_parent_system,
+            rendering::rendering_system_inner,
+            update_global_transform::update_global_transform_system_inner,
+            update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
         },
         util::get_from_device_memory,
         COLOR_FORMAT,
     };
-
-    use super::draw_gui_system;
 
     #[test]
     pub fn test_draw_gui() {
@@ -96,9 +111,7 @@ mod tests {
         // Begin. Use renderdoc in headless mode for debugging.
         let mut renderdoc = begin_renderdoc();
 
-        let mut query = Default::default();
         draw(
-            &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
@@ -116,9 +129,8 @@ mod tests {
         assert!(!button_was_clicked(&mut world));
 
         // Release the trigger slightly
-        release_trigger(&mut world, &mut query);
+        release_trigger(&mut world);
         draw(
-            &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
@@ -133,9 +145,8 @@ mod tests {
         assert!(button_was_clicked(&mut world));
 
         // Move the cursor off the panel and release the trigger entirely
-        move_cursor_off_panel(&mut world, &mut query);
+        move_cursor_off_panel(&mut world);
         draw(
-            &mut query,
             &mut world,
             &mut gui_context,
             &mut haptic_context,
@@ -158,7 +169,6 @@ mod tests {
     }
 
     fn draw(
-        query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
         world: &mut World,
         gui_context: &mut GuiContext,
         haptic_context: &mut HapticContext,
@@ -171,22 +181,17 @@ mod tests {
         haptic_context.right_hand_amplitude_this_frame = 0.;
 
         // Update transforms, etc.
-        update_global_transform_system(&mut Default::default(), world);
+        update_global_transform_system_inner(world);
 
         // Update parent transform matrix
-        update_global_transform_with_parent_system(
-            &mut Default::default(),
-            &mut Default::default(),
-            world,
-        );
+        update_global_transform_with_parent_system_inner(world);
 
         // Render
         render_context.begin_frame(&vulkan_context);
 
         // Draw the GUI
         println!("[DRAW_GUI_TEST] draw_gui_system");
-        draw_gui_system(
-            query,
+        draw_gui_system_inner(
             world,
             vulkan_context,
             render_context,
@@ -196,14 +201,7 @@ mod tests {
 
         let views = get_views();
         println!("[DRAW_GUI_TEST] rendering_system");
-        rendering_system(
-            &mut Default::default(),
-            world,
-            vulkan_context,
-            render_context,
-            &views,
-            0,
-        );
+        rendering_system_inner(world, vulkan_context, render_context, &views, 0);
         render_context.end_frame(vulkan_context);
     }
 
@@ -240,19 +238,26 @@ mod tests {
         return panel.buttons[0].clicked_this_frame;
     }
 
-    fn release_trigger(world: &mut World, query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>) {
-        let (panel, _ui_panel) = query.query_mut(world).into_iter().next().unwrap().1;
+    fn release_trigger(world: &mut World) {
+        let (panel, _ui_panel) = world
+            .query_mut::<(&mut Panel, &mut UIPanel)>()
+            .into_iter()
+            .next()
+            .unwrap()
+            .1;
         panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 0.2,
         });
     }
 
-    fn move_cursor_off_panel(
-        world: &mut World,
-        query: &mut PreparedQuery<(&mut Panel, &mut UIPanel)>,
-    ) {
-        let (panel, _ui_panel) = query.query_mut(world).into_iter().next().unwrap().1;
+    fn move_cursor_off_panel(world: &mut World) {
+        let (panel, _ui_panel) = world
+            .query_mut::<(&mut Panel, &mut UIPanel)>()
+            .into_iter()
+            .next()
+            .unwrap()
+            .1;
         panel.input = Some(PanelInput {
             cursor_location: Pos2::new(0., 0.),
             trigger_value: 0.0,
@@ -331,13 +336,9 @@ mod tests {
         let gltf_data: Vec<&[u8]> = vec![include_bytes!(
             "../../../test_assets/ferris-the-crab/source/ferris.glb"
         )];
-        let mut models = asset_importer::load_models_from_glb(
-            &gltf_data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let mut models =
+            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
+                .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
         let panel = add_ui_panel_to_world(

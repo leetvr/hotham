@@ -1,5 +1,5 @@
 use crate::{
-    resources::XrContext,
+    contexts::XrContext,
     util::{is_space_valid, posef_to_isometry},
     xr,
 };

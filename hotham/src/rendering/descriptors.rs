@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use crate::resources::{render_context::PIPELINE_DEPTH, VulkanContext};
+use crate::contexts::{render_context::PIPELINE_DEPTH, VulkanContext};
 use ash::vk;
 
 pub const DRAW_DATA_BINDING: u32 = 0;
