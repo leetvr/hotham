@@ -1,11 +1,17 @@
 use hotham::{
     asset_importer::{add_model_to_world, Models},
     components::LocalTransform,
+    contexts::PhysicsContext,
     hecs::World,
     nalgebra::Vector3,
 };
 
-pub fn setup_cubes(world: &mut World, resolution: usize, models: &Models) {
+pub fn setup_cubes(
+    world: &mut World,
+    physics_context: &mut PhysicsContext,
+    resolution: usize,
+    models: &Models,
+) {
     let step = 2. / resolution as f32;
     let scale_factor = 3.;
     let scale = Vector3::repeat(step / scale_factor);
@@ -15,7 +21,7 @@ pub fn setup_cubes(world: &mut World, resolution: usize, models: &Models) {
     for floor in 0..resolution {
         for row in 0..resolution {
             for column in 0..resolution {
-                let c = add_model_to_world("Cube", models, world, None).unwrap();
+                let c = add_model_to_world("Cube", models, world, physics_context, None).unwrap();
                 let mut t = world.get_mut::<LocalTransform>(c).unwrap();
                 t.scale = scale;
                 t.translation.y = floor as f32 / scale_factor;
