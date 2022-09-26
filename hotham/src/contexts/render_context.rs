@@ -17,6 +17,7 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 const CULLING_TIMEOUT: u64 = u64::MAX;
 
 use crate::{
+    contexts::{VulkanContext, XrContext},
     rendering::{
         camera::Camera,
         descriptors::Descriptors,
@@ -28,7 +29,6 @@ use crate::{
         swapchain::{Swapchain, SwapchainInfo},
         vertex::Vertex,
     },
-    resources::{VulkanContext, XrContext},
     COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;

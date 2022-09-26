@@ -1,6 +1,9 @@
 use openxr::{Duration, HapticVibration};
 
-use crate::resources::{HapticContext, XrContext};
+use crate::{
+    contexts::{HapticContext, XrContext},
+    Engine,
+};
 static HAPTIC_FREQUENCY: f32 = 400.;
 static HAPTIC_DURATION: i64 = 1e+8 as _; // 100ms
 
@@ -15,7 +18,11 @@ static HAPTIC_DURATION: i64 = 1e+8 as _; // 100ms
 ///    apply_haptic_feedback(xr_context, haptic_context)
 /// }
 /// ```
-pub fn apply_haptic_feedback(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
+pub fn haptics_system(engine: &mut Engine) {
+    haptics_system_inner(&mut engine.xr_context, &mut engine.haptic_context)
+}
+
+fn haptics_system_inner(xr_context: &mut XrContext, haptic_context: &mut HapticContext) {
     let input = &xr_context.input;
 
     let haptic_duration = Duration::from_nanos(HAPTIC_DURATION);
@@ -61,6 +68,6 @@ mod tests {
         let (mut xr_context, _) = XrContext::testing();
         let mut haptic_context = HapticContext::default();
 
-        apply_haptic_feedback(&mut xr_context, &mut haptic_context);
+        haptics_system_inner(&mut xr_context, &mut haptic_context);
     }
 }

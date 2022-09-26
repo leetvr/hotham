@@ -1,15 +1,17 @@
-use crate::{components::Collider, resources::PhysicsContext};
-use hecs::{PreparedQuery, World};
+use crate::{components::Collider, contexts::PhysicsContext, Engine};
+use hecs::World;
 
 /// Collision system
 /// Walks through each collider and checks if it has collided with any other entity
 /// If collisions are detected they are added to `collisions_this_frame` for ease of reference.
-pub fn collision_system(
-    query: &mut PreparedQuery<&mut Collider>,
-    world: &World,
-    physics_context: &mut PhysicsContext,
-) {
-    for (_, collider) in query.query(world).iter() {
+pub fn collision_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    let physics_context = &mut engine.physics_context;
+    collision_system_inner(world, physics_context);
+}
+
+fn collision_system_inner(world: &World, physics_context: &mut PhysicsContext) {
+    for (_, collider) in world.query::<&mut Collider>().iter() {
         // Clear out any collisions from previous frames.
         collider.collisions_this_frame.clear();
         for (a, b, intersecting) in physics_context
@@ -31,7 +33,7 @@ pub fn collision_system(
 mod tests {
     use super::*;
     use crate::components::{Collider, Info};
-    use crate::resources::PhysicsContext;
+    use crate::contexts::PhysicsContext;
 
     use hecs::Entity;
     use rapier3d::prelude::*;
@@ -73,7 +75,7 @@ mod tests {
         physics_context.update();
 
         // do something that would cause a and b to collide
-        collision_system(&mut Default::default(), &world, &mut physics_context);
+        collision_system_inner(&world, &mut physics_context);
 
         let a_collider = world.get_mut::<Collider>(a).unwrap();
         assert!(a_collider.collisions_this_frame.contains(&b));

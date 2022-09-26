@@ -1,17 +1,25 @@
 use crate::{
     asset_importer::add_model_to_world,
     components::{hand::Handedness, AnimationController, Hand, RigidBody, Stage},
-    resources::{InputContext, PhysicsContext},
+    contexts::{InputContext, PhysicsContext},
+    Engine,
 };
-use hecs::{PreparedQuery, With, World};
+use hecs::{With, World};
 use rapier3d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
 };
 
 /// Hands system
 /// Used to allow users to interact with objects using their controllers as representations of their hands
-pub fn hands_system(
-    query: &mut PreparedQuery<(&mut Hand, &mut AnimationController, &mut RigidBody)>,
+pub fn hands_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    let input_context = &mut engine.input_context;
+    let physics_context = &mut engine.physics_context;
+
+    hands_system_inner(world, input_context, physics_context);
+}
+
+pub fn hands_system_inner(
     world: &mut World,
     input_context: &InputContext,
     physics_context: &mut PhysicsContext,
@@ -25,7 +33,10 @@ pub fn hands_system(
             *physics_context.rigid_bodies[rigid_body.handle].position()
         });
 
-    for (_, (hand, animation_controller, rigid_body_component)) in query.query(world).iter() {
+    for (_, (hand, animation_controller, rigid_body_component)) in world
+        .query::<(&mut Hand, &mut AnimationController, &mut RigidBody)>()
+        .iter()
+    {
         // Get our the space and path of the hand.
         let (stage_from_local, grip_value) = match hand.handedness {
             Handedness::Left => (
@@ -74,7 +85,7 @@ pub fn add_hand(
         Handedness::Left => "Left Hand",
         Handedness::Right => "Right Hand",
     };
-    let hand = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
+    let hand = add_model_to_world(model_name, models, world, None).unwrap();
     {
         // Add a hand component
         world
@@ -118,8 +129,8 @@ mod tests {
     };
 
     use crate::{
-        components::LocalTransform, resources::XrContext,
-        systems::update_local_transform_with_rigid_body_system,
+        components::LocalTransform, contexts::XrContext,
+        systems::update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
     };
 
     #[test]
@@ -130,7 +141,7 @@ mod tests {
 
         let hand = add_hand_to_world(&mut physics_context, &mut world, None);
 
-        schedule(&mut world, &input_context, &mut physics_context);
+        tick(&mut world, &input_context, &mut physics_context);
 
         let (local_transform, hand, animation_controller) = world
             .query_one_mut::<(&LocalTransform, &Hand, &AnimationController)>(hand)
@@ -155,7 +166,7 @@ mod tests {
         let grabbed_entity = world.spawn((RigidBody { handle }, LocalTransform::default()));
         add_hand_to_world(&mut physics_context, &mut world, Some(grabbed_entity));
 
-        schedule(&mut world, &input_context, &mut physics_context);
+        tick(&mut world, &input_context, &mut physics_context);
 
         let local_transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
         assert_relative_eq!(local_transform.translation, vector![-0.2, 1.4, -0.5]);
@@ -170,23 +181,10 @@ mod tests {
         (world, input_context, xr_context, physics_context)
     }
 
-    fn schedule(
-        world: &mut World,
-        input_context: &InputContext,
-        physics_context: &mut PhysicsContext,
-    ) {
-        hands_system(
-            &mut Default::default(),
-            world,
-            input_context,
-            physics_context,
-        );
+    fn tick(world: &mut World, input_context: &InputContext, physics_context: &mut PhysicsContext) {
+        hands_system_inner(world, input_context, physics_context);
         physics_context.update();
-        update_local_transform_with_rigid_body_system(
-            &mut Default::default(),
-            world,
-            physics_context,
-        );
+        update_local_transform_with_rigid_body_system_inner(world, physics_context);
     }
 
     fn add_hand_to_world(

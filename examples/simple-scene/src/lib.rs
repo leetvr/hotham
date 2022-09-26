@@ -1,20 +1,25 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, LocalTransform},
+    contexts::PhysicsContext,
     hecs::World,
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
-    resources::PhysicsContext,
-    schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
-        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
-        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
-        Queries,
+        physics_system, rendering::rendering_system, skinning::skinning_system,
+        update_global_transform_system, update_global_transform_with_parent_system,
+        update_local_transform_with_rigid_body_system,
     },
     xr, Engine, HothamResult, TickData,
 };
+
+#[derive(Clone, Debug, Default)]
+/// Most Hotham applications will want to keep track of some sort of state.
+/// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
+/// this is something you'd probably want to do!
+struct State {}
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -25,24 +30,39 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let mut world = init(&mut engine)?;
-    let mut queries = Default::default();
     let mut state = Default::default();
+    init(&mut engine)?;
 
     while let Ok(tick_data) = engine.update() {
-        tick(tick_data, &mut engine, &mut world, &mut queries, &mut state);
+        tick(tick_data, &mut engine, &mut state);
         engine.finish()?;
     }
 
     Ok(())
 }
 
-fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
+fn tick(tick_data: TickData, engine: &mut Engine, _state: &mut State) {
+    if tick_data.current_state == xr::SessionState::FOCUSED {
+        hands_system(engine);
+        grabbing_system(engine);
+        physics_system(engine);
+        collision_system(engine);
+        update_local_transform_with_rigid_body_system(engine);
+        animation_system(engine);
+        update_global_transform_system(engine);
+        update_global_transform_with_parent_system(engine);
+        skinning_system(engine);
+    }
+
+    rendering_system(engine, tick_data.swapchain_image_index);
+}
+
+fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let render_context = &mut engine.render_context;
 
     let vulkan_context = &mut engine.vulkan_context;
     let physics_context = &mut engine.physics_context;
-    let mut world = World::default();
+    let world = &mut engine.world;
 
     let mut glb_buffers: Vec<&[u8]> = vec![
         include_bytes!("../../../test_assets/left_hand.glb"),
@@ -57,17 +77,13 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     #[cfg(not(target_os = "android"))]
     glb_buffers.push(include_bytes!("../../../test_assets/damaged_helmet.glb"));
 
-    let models = asset_importer::load_models_from_glb(
-        &glb_buffers,
-        vulkan_context,
-        render_context,
-        physics_context,
-    )?;
-    add_helmet(&models, &mut world, physics_context);
-    add_hand(&models, Handedness::Left, &mut world, physics_context);
-    add_hand(&models, Handedness::Right, &mut world, physics_context);
+    let models =
+        asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    add_helmet(&models, world, physics_context);
+    add_hand(&models, Handedness::Left, world, physics_context);
+    add_hand(&models, Handedness::Right, world, physics_context);
 
-    Ok(world)
+    Ok(())
 }
 
 fn add_helmet(
@@ -75,7 +91,7 @@ fn add_helmet(
     world: &mut World,
     physics_context: &mut PhysicsContext,
 ) {
-    let helmet = add_model_to_world("Damaged Helmet", models, world, physics_context, None)
+    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
         .expect("Could not find Damaged Helmet");
     let mut local_transform = world.get_mut::<LocalTransform>(helmet).unwrap();
     local_transform.translation.z = -1.;
@@ -93,58 +109,3 @@ fn add_helmet(
     let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
     world.insert(helmet, components).unwrap();
 }
-
-fn tick(
-    tick_data: TickData,
-    engine: &mut Engine,
-    world: &mut World,
-    queries: &mut Queries,
-    _state: &mut State,
-) {
-    let xr_context = &mut engine.xr_context;
-    let input_context = &engine.input_context;
-    let vulkan_context = &engine.vulkan_context;
-    let render_context = &mut engine.render_context;
-    let physics_context = &mut engine.physics_context;
-
-    if tick_data.current_state == xr::SessionState::FOCUSED {
-        hands_system(
-            &mut queries.hands_query,
-            world,
-            input_context,
-            physics_context,
-        );
-        grabbing_system(&mut queries.grabbing_query, world, physics_context);
-        physics_step(physics_context);
-        collision_system(&mut queries.collision_query, world, physics_context);
-        update_local_transform_with_rigid_body_system(
-            &mut queries.update_rigid_body_transforms_query,
-            world,
-            physics_context,
-        );
-        animation_system(&mut queries.animation_query, world);
-        update_global_transform_system(&mut queries.update_global_transform_query, world);
-        update_global_transform_with_parent_system(
-            &mut queries.parent_query,
-            &mut queries.roots_query,
-            world,
-        );
-        skinning_system(&mut queries.skins_query, world, render_context);
-    }
-
-    let views = xr_context.update_views();
-    rendering_system(
-        &mut queries.rendering_query,
-        world,
-        vulkan_context,
-        render_context,
-        views,
-        tick_data.swapchain_image_index,
-    );
-}
-
-#[derive(Clone, Debug, Default)]
-/// Most Hotham applications will want to keep track of some sort of state.
-/// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
-/// this is something you'd probably want to do!
-struct State {}

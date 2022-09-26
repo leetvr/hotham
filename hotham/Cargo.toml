@@ -19,7 +19,6 @@ egui = "0.15"
 generational-arena = "0.2.8"
 gltf = {version = "1.0", features = ["KHR_lights_punctual", "KHR_materials_unlit", "names", "utils"], default-features = false}
 hecs = "0.7.7"
-hotham-debug-server = {path = "../hotham-debug-server", version = "0.2", optional = true}
 id-arena = "2.2.1"
 image = {version = "0.24.3", default-features = false, features = ["jpeg", "png"]}
 itertools = "0.10.0"
@@ -48,6 +47,3 @@ serde_json = "1.0"
 jni = "0.19.0"
 ndk = "0.6"
 ndk-glue = "0.6"
-
-[features]
-debug_server = ["hotham-debug-server"]

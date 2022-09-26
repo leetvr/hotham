@@ -3,7 +3,7 @@ use id_arena::Arena;
 use nalgebra::{Matrix4, Vector4};
 use vulkan_context::VulkanContext;
 
-use crate::resources::vulkan_context;
+use crate::contexts::vulkan_context;
 
 use super::{
     buffer::Buffer,

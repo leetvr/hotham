@@ -3,7 +3,7 @@ use core::ptr::copy_nonoverlapping;
 use ash::vk;
 use vulkan_context::VulkanContext;
 
-use crate::resources::vulkan_context;
+use crate::contexts::vulkan_context;
 
 use super::memory::allocate_memory;
 

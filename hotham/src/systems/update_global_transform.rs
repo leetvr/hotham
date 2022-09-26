@@ -1,15 +1,22 @@
 use nalgebra::Matrix4;
 
-use crate::components::{GlobalTransform, LocalTransform};
-use hecs::{PreparedQuery, World};
+use crate::{
+    components::{GlobalTransform, LocalTransform},
+    Engine,
+};
+use hecs::World;
 
 /// Update global transform matrix system
 /// Walks through each LocalTransform and applies it to a 4x4 matrix used by the vertex shader
-pub fn update_global_transform_system(
-    query: &mut PreparedQuery<(&LocalTransform, &mut GlobalTransform)>,
-    world: &mut World,
-) {
-    for (_, (local_transform, global_transform)) in query.query_mut(world) {
+pub fn update_global_transform_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    update_global_transform_system_inner(world);
+}
+
+pub(crate) fn update_global_transform_system_inner(world: &mut World) {
+    for (_, (local_transform, global_transform)) in
+        world.query_mut::<(&LocalTransform, &mut GlobalTransform)>()
+    {
         global_transform.0 = Matrix4::new_translation(&local_transform.translation)
             * Matrix4::from(local_transform.rotation)
             * Matrix4::new_nonuniform_scaling(&local_transform.scale);
@@ -47,7 +54,7 @@ mod tests {
             local_transform.scale = test_translation;
         }
 
-        update_global_transform_system(&mut Default::default(), &mut world);
+        update_global_transform_system_inner(&mut world);
 
         let expected_matrix = Matrix4::new_translation(&test_translation)
             * Matrix4::from(test_rotation)

@@ -2,8 +2,8 @@ use std::io::{Cursor, Read};
 
 use crate::{
     asset_importer::ImportContext,
+    contexts::{RenderContext, VulkanContext},
     rendering::image::Image,
-    resources::{RenderContext, VulkanContext},
     COLOR_FORMAT,
 };
 use ash::vk;

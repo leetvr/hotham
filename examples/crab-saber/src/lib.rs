@@ -1,26 +1,21 @@
 mod components;
-mod resources;
+mod game_context;
 mod systems;
 
 use hotham::{
     components::Visible,
     hecs::{Entity, World},
-    schedule_functions::{apply_haptic_feedback, physics_step},
     systems::{
-        audio_system, collision_system, draw_gui_system, rendering_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
-        update_local_transform_with_rigid_body_system,
+        audio_system, collision_system, draw_gui_system, haptics_system, pointers_system,
+        rendering_system, update_global_transform_system,
+        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
     },
-    systems::{pointers_system, Queries},
     xr::{self, SessionState},
     Engine, HothamResult, TickData,
 };
 
-use resources::{
-    game_context::{add_songs, add_sound_effects, GameState},
-    GameContext,
-};
-use systems::{game::game_system, sabers_system, CrabSaberQueries};
+use game_context::{GameContext, GameState};
+use systems::{game::game_system, sabers_system};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -30,130 +25,54 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let (mut world, mut game_context) = init(&mut engine);
-    let mut hotham_queries = Default::default();
-    let mut crab_saber_queries = Default::default();
+    let mut game_context = init(&mut engine);
 
     while let Ok(tick_data) = engine.update() {
-        tick(
-            tick_data,
-            &mut engine,
-            &mut world,
-            &mut hotham_queries,
-            &mut crab_saber_queries,
-            &mut game_context,
-        );
+        tick(tick_data, &mut engine, &mut game_context);
         engine.finish()?;
     }
 
     Ok(())
 }
 
-fn tick(
-    tick_data: TickData,
-    engine: &mut Engine,
-    world: &mut World,
-    hotham_queries: &mut Queries,
-    crab_saber_queries: &mut CrabSaberQueries,
-    game_context: &mut GameContext,
-) {
-    let xr_context = &mut engine.xr_context;
-    let input_context = &mut engine.input_context;
-    let vulkan_context = &engine.vulkan_context;
-    let render_context = &mut engine.render_context;
-    let physics_context = &mut engine.physics_context;
-    let gui_context = &mut engine.gui_context;
-    let haptic_context = &mut engine.haptic_context;
-    let audio_context = &mut engine.audio_context;
-
-    handle_state_change(&tick_data, audio_context, game_context, world);
+fn tick(tick_data: TickData, engine: &mut Engine, game_context: &mut GameContext) {
+    handle_state_change(&tick_data, engine, game_context);
 
     // Simulation tasks - these are only necessary in the focussed state.
     if tick_data.current_state == xr::SessionState::FOCUSED {
         // Handle input
-        sabers_system(
-            &mut crab_saber_queries.sabers_query,
-            world,
-            input_context,
-            physics_context,
-        );
-        pointers_system(
-            &mut hotham_queries.pointers_query,
-            world,
-            input_context,
-            physics_context,
-        );
+        sabers_system(engine);
+        pointers_system(engine);
 
         // Physics
-        physics_step(physics_context);
-        collision_system(&mut hotham_queries.collision_query, world, physics_context);
+        haptics_system(engine);
+        collision_system(engine);
 
         // Game logic
-        game_system(
-            crab_saber_queries,
-            world,
-            game_context,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system(engine, game_context);
 
         // Update the world
-        update_local_transform_with_rigid_body_system(
-            &mut hotham_queries.update_rigid_body_transforms_query,
-            world,
-            physics_context,
-        );
-        update_global_transform_system(&mut hotham_queries.update_global_transform_query, world);
-        update_global_transform_with_parent_system(
-            &mut hotham_queries.parent_query,
-            &mut hotham_queries.roots_query,
-            world,
-        );
+        update_local_transform_with_rigid_body_system(engine);
+        update_global_transform_system(engine);
+        update_global_transform_with_parent_system(engine);
 
         // Haptics
-        apply_haptic_feedback(xr_context, haptic_context);
+        haptics_system(engine);
 
         // Audio
-        audio_system(
-            &mut hotham_queries.audio_query,
-            world,
-            audio_context,
-            physics_context,
-            xr_context,
-        );
+        audio_system(engine);
     }
 
     // Draw GUI
-    draw_gui_system(
-        &mut hotham_queries.draw_gui_query,
-        world,
-        vulkan_context,
-        render_context,
-        gui_context,
-        haptic_context,
-    );
-
-    // Update the views - we always want to do this at the last possible minute to get an accurate position of the player's head.
-    let views = xr_context.update_views();
+    draw_gui_system(engine);
 
     // Draw objects
-    rendering_system(
-        &mut hotham_queries.rendering_query,
-        world,
-        vulkan_context,
-        render_context,
-        views,
-        tick_data.swapchain_image_index,
-    );
+    rendering_system(engine, tick_data.swapchain_image_index);
 }
 
-fn handle_state_change(
-    tick_data: &TickData,
-    audio_context: &mut hotham::resources::AudioContext,
-    game_context: &mut GameContext,
-    world: &mut World,
-) {
+fn handle_state_change(tick_data: &TickData, engine: &mut Engine, game_context: &mut GameContext) {
+    let world = &mut engine.world;
+    let audio_context = &mut engine.audio_context;
     match (tick_data.previous_state, tick_data.current_state) {
         (SessionState::VISIBLE, SessionState::FOCUSED) => {
             audio_context.resume_music_track();
@@ -185,12 +104,11 @@ fn handle_state_change(
     }
 }
 
-fn init(engine: &mut Engine) -> (World, GameContext) {
-    let mut world = World::default();
-    let mut game_context = GameContext::new(engine, &mut world);
-    add_songs(&mut engine.audio_context, &mut game_context);
-    add_sound_effects(&mut engine.audio_context, &mut game_context);
-    (world, game_context)
+fn init(engine: &mut Engine) -> GameContext {
+    let mut game_context = GameContext::new(engine);
+    game_context.add_songs(&mut engine.audio_context);
+    game_context.add_sound_effects(&mut engine.audio_context);
+    game_context
 }
 
 fn hide(world: &mut World, entity: Entity) {

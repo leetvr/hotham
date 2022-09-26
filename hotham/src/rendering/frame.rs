@@ -1,6 +1,6 @@
 use ash::vk;
 
-use crate::resources::{render_context::CullParams, VulkanContext};
+use crate::contexts::{render_context::CullParams, VulkanContext};
 use anyhow::Result;
 
 use super::{

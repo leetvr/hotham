@@ -1,6 +1,6 @@
 use ash::vk;
 use egui::Pos2;
-use hecs::{PreparedQuery, With, World};
+use hecs::{With, World};
 use nalgebra::{
     point, vector, Isometry3, Orthographic3, Point3, Quaternion, Translation3, UnitQuaternion,
     Vector2,
@@ -30,13 +30,21 @@ use crate::{
         hand::Handedness, panel::PanelInput, Info, LocalTransform, Panel, Pointer, RigidBody,
         Stage, Visible,
     },
-    resources::{InputContext, PhysicsContext},
+    contexts::{InputContext, PhysicsContext},
+    Engine,
 };
 
 /// Pointers system
 /// Allows users to interact with `Panel`s using their controllers
-pub fn pointers_system(
-    query: &mut PreparedQuery<With<Visible, (&mut Pointer, &mut LocalTransform)>>,
+pub fn pointers_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    let input_context = &mut engine.input_context;
+    let physics_context = &mut engine.physics_context;
+
+    pointers_system_inner(world, input_context, physics_context);
+}
+
+pub fn pointers_system_inner(
     world: &mut World,
     input_context: &InputContext,
     physics_context: &mut PhysicsContext,
@@ -52,7 +60,10 @@ pub fn pointers_system(
 
     let grip_from_local = ROTATION_OFFSET * POSITION_OFFSET;
 
-    for (_, (pointer, local_transform)) in query.query(world).iter() {
+    for (_, (pointer, local_transform)) in world
+        .query::<With<Visible, (&mut Pointer, &mut LocalTransform)>>()
+        .iter()
+    {
         // Get our the space and path of the pointer.
         let (stage_from_grip, trigger_value) = match pointer.handedness {
             Handedness::Left => (
@@ -167,7 +178,7 @@ fn ray_to_panel_space(
 mod tests {
     use super::*;
 
-    use crate::resources::XrContext;
+    use crate::contexts::XrContext;
     use approx::assert_relative_eq;
     use ash::vk;
 
@@ -176,7 +187,7 @@ mod tests {
     pub fn test_pointers_system() {
         use crate::{
             components::{Collider, LocalTransform, Panel},
-            resources::{
+            contexts::{
                 physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
                 RenderContext,
             },
@@ -273,12 +284,7 @@ mod tests {
         input_context: &InputContext,
     ) {
         physics_context.update();
-        pointers_system(
-            &mut Default::default(),
-            world,
-            input_context,
-            physics_context,
-        )
+        pointers_system_inner(world, input_context, physics_context)
     }
 
     #[test]

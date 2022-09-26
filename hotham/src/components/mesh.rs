@@ -1,5 +1,5 @@
 use crate::{
-    asset_importer::ImportContext, rendering::mesh_data::MeshData, resources::RenderContext,
+    asset_importer::ImportContext, contexts::RenderContext, rendering::mesh_data::MeshData,
 };
 use id_arena::Id;
 
