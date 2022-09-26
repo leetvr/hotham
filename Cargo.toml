@@ -1,11 +1,8 @@
 [workspace]
-members = ["hotham", "hotham-simulator", "examples/simple-scene", "examples/crab-saber", "hotham-debug-server", "benchmarks/stress-test"]
+members = ["hotham", "hotham-simulator", "examples/simple-scene", "examples/crab-saber", "benchmarks/stress-test"]
 
 # Make performance critical packages compile with optimizations
 [profile.dev.package.rapier3d]
-opt-level = 3
-
-[profile.dev.package.base64]
 opt-level = 3
 
 [profile.dev.package.gltf]
