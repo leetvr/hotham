@@ -1,5 +1,5 @@
 mod components;
-mod resources;
+mod game_context;
 mod systems;
 
 use hotham::{
@@ -16,10 +16,7 @@ use hotham::{
     Engine, HothamResult, TickData,
 };
 
-use resources::{
-    game_context::{add_songs, add_sound_effects, GameState},
-    GameContext,
-};
+use game_context::{GameContext, GameState};
 use systems::{game::game_system, sabers_system};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -111,8 +108,8 @@ fn handle_state_change(tick_data: &TickData, engine: &mut Engine, game_context: 
 
 fn init(engine: &mut Engine) -> GameContext {
     let mut game_context = GameContext::new(engine);
-    add_songs(&mut engine.audio_context, &mut game_context);
-    add_sound_effects(&mut engine.audio_context, &mut game_context);
+    game_context.add_songs(&mut engine.audio_context);
+    game_context.add_sound_effects(&mut engine.audio_context);
     game_context
 }
 

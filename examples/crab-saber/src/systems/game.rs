@@ -2,10 +2,7 @@ use std::time::{Duration, Instant};
 
 use crate::{
     components::{Color, Cube},
-    resources::{
-        game_context::{GameState, Song},
-        GameContext,
-    },
+    game_context::{GameContext, GameState, Song},
 };
 
 use hotham::{
@@ -425,7 +422,7 @@ mod tests {
     };
 
     use super::*;
-    use crate::{components::Cube, resources::game_context::Song};
+    use crate::{components::Cube, game_context::Song};
 
     #[test]
     pub fn game_system_test() {

@@ -61,7 +61,7 @@ impl GameContext {
         let gui_context = &engine.gui_context;
         let world = &mut engine.world;
 
-        let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
+        let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../assets/crab_saber.glb")];
         let models =
             asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
                 .expect("Unable to load models!");
@@ -134,6 +134,60 @@ impl GameContext {
             sound_effects: Default::default(),
         }
     }
+
+    pub fn add_songs(&mut self, audio_context: &mut AudioContext) {
+        let main_menu_mp3 = include_bytes!("../assets/TrackTribe - Cloud Echo.mp3").to_vec();
+        self.songs.insert(
+            "Main Menu".to_string(),
+            Song {
+                beat_length: Duration::new(0, 0),
+                track: audio_context.add_music_track(main_menu_mp3),
+            },
+        );
+
+        let game_over_mp3 = include_bytes!("../assets/Chasms - Dark Matter.mp3").to_vec();
+        self.songs.insert(
+            "Game Over".to_string(),
+            Song {
+                beat_length: Duration::new(0, 0),
+                track: audio_context.add_music_track(game_over_mp3),
+            },
+        );
+
+        let right_here_beside_you =
+            include_bytes!("../assets/Spence - Right Here Beside You.mp3").to_vec();
+        self.songs.insert(
+            "Spence - Right Here Beside You".to_string(),
+            Song {
+                beat_length: Duration::from_millis(60_000 / 129),
+                track: audio_context.add_music_track(right_here_beside_you),
+            },
+        );
+
+        let tell_me_that_i_cant =
+            include_bytes!("../assets/NEFFEX - Tell Me That I Can't.mp3").to_vec();
+        self.songs.insert(
+            "NEFFEX - Tell Me That I Can't".to_string(),
+            Song {
+                beat_length: Duration::from_millis(60_000 / 70),
+                track: audio_context.add_music_track(tell_me_that_i_cant),
+            },
+        );
+    }
+
+    pub fn add_sound_effects(&mut self, audio_context: &mut AudioContext) {
+        let hit_mp3 = include_bytes!("../assets/Hit.mp3").to_vec();
+        self.sound_effects.insert(
+            "Hit".to_string(),
+            audio_context.create_sound_emitter(hit_mp3),
+        );
+
+        let miss_mp3 = include_bytes!("../assets/Miss.mp3").to_vec();
+        self.sound_effects.insert(
+            "Miss".to_string(),
+            audio_context.create_sound_emitter(miss_mp3),
+        );
+    }
 }
 
 fn add_backstop(
@@ -174,60 +228,6 @@ fn add_pointer(models: &std::collections::HashMap<String, World>, world: &mut Wo
 fn add_environment(models: &std::collections::HashMap<String, World>, world: &mut World) {
     add_model_to_world("Environment", models, world, None);
     add_model_to_world("Ramp", models, world, None);
-}
-
-pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContext) {
-    let main_menu_mp3 = include_bytes!("../../assets/TrackTribe - Cloud Echo.mp3").to_vec();
-    game_context.songs.insert(
-        "Main Menu".to_string(),
-        Song {
-            beat_length: Duration::new(0, 0),
-            track: audio_context.add_music_track(main_menu_mp3),
-        },
-    );
-
-    let game_over_mp3 = include_bytes!("../../assets/Chasms - Dark Matter.mp3").to_vec();
-    game_context.songs.insert(
-        "Game Over".to_string(),
-        Song {
-            beat_length: Duration::new(0, 0),
-            track: audio_context.add_music_track(game_over_mp3),
-        },
-    );
-
-    let right_here_beside_you =
-        include_bytes!("../../assets/Spence - Right Here Beside You.mp3").to_vec();
-    game_context.songs.insert(
-        "Spence - Right Here Beside You".to_string(),
-        Song {
-            beat_length: Duration::from_millis(60_000 / 129),
-            track: audio_context.add_music_track(right_here_beside_you),
-        },
-    );
-
-    let tell_me_that_i_cant =
-        include_bytes!("../../assets/NEFFEX - Tell Me That I Can't.mp3").to_vec();
-    game_context.songs.insert(
-        "NEFFEX - Tell Me That I Can't".to_string(),
-        Song {
-            beat_length: Duration::from_millis(60_000 / 70),
-            track: audio_context.add_music_track(tell_me_that_i_cant),
-        },
-    );
-}
-
-pub fn add_sound_effects(audio_context: &mut AudioContext, game_context: &mut GameContext) {
-    let hit_mp3 = include_bytes!("../../assets/Hit.mp3").to_vec();
-    game_context.sound_effects.insert(
-        "Hit".to_string(),
-        audio_context.create_sound_emitter(hit_mp3),
-    );
-
-    let miss_mp3 = include_bytes!("../../assets/Miss.mp3").to_vec();
-    game_context.sound_effects.insert(
-        "Miss".to_string(),
-        audio_context.create_sound_emitter(miss_mp3),
-    );
 }
 
 pub fn pre_spawn_cube(
