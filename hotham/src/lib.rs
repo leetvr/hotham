@@ -30,7 +30,6 @@ pub mod asset_importer;
 /// Contexts are wrappers around some external state that the engine will interact with
 pub mod contexts;
 mod hotham_error;
-pub mod schedule_functions;
 /// Systems are functions called each frame to update either the external state or the current simulation
 pub mod systems;
 

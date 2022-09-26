@@ -6,11 +6,11 @@ use hotham::{
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
-    schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
-        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
-        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
+        physics_system, rendering::rendering_system, skinning::skinning_system,
+        update_global_transform_system, update_global_transform_with_parent_system,
+        update_local_transform_with_rigid_body_system,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -45,7 +45,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, _state: &mut State) {
     if tick_data.current_state == xr::SessionState::FOCUSED {
         hands_system(engine);
         grabbing_system(engine);
-        physics_step(&mut engine.physics_context);
+        physics_system(engine);
         collision_system(engine);
         update_local_transform_with_rigid_body_system(engine);
         animation_system(engine);

@@ -5,12 +5,10 @@ mod systems;
 use hotham::{
     components::Visible,
     hecs::{Entity, World},
-    schedule_functions::{apply_haptic_feedback, physics_step},
-    systems::pointers_system,
     systems::{
-        audio_system, collision_system, draw_gui_system, rendering_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
-        update_local_transform_with_rigid_body_system,
+        audio_system, collision_system, draw_gui_system, haptics_system, pointers_system,
+        rendering_system, update_global_transform_system,
+        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
     },
     xr::{self, SessionState},
     Engine, HothamResult, TickData,
@@ -47,7 +45,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, game_context: &mut GameContext
         pointers_system(engine);
 
         // Physics
-        physics_step(&mut engine.physics_context);
+        haptics_system(engine);
         collision_system(engine);
 
         // Game logic
@@ -59,7 +57,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, game_context: &mut GameContext
         update_global_transform_with_parent_system(engine);
 
         // Haptics
-        apply_haptic_feedback(&mut engine.xr_context, &mut engine.haptic_context);
+        haptics_system(engine);
 
         // Audio
         audio_system(engine);
