@@ -57,12 +57,8 @@ fn init(engine: &mut Engine) -> Result<World, hotham::HothamError> {
     #[cfg(not(target_os = "android"))]
     glb_buffers.push(include_bytes!("../../../test_assets/damaged_helmet.glb"));
 
-    let models = asset_importer::load_models_from_glb(
-        &glb_buffers,
-        vulkan_context,
-        render_context,
-        physics_context,
-    )?;
+    let models =
+        asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_helmet(&models, &mut world, physics_context);
     add_hand(&models, Handedness::Left, &mut world, physics_context);
     add_hand(&models, Handedness::Right, &mut world, physics_context);
@@ -75,7 +71,7 @@ fn add_helmet(
     world: &mut World,
     physics_context: &mut PhysicsContext,
 ) {
-    let helmet = add_model_to_world("Damaged Helmet", models, world, physics_context, None)
+    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
         .expect("Could not find Damaged Helmet");
     let mut local_transform = world.get_mut::<LocalTransform>(helmet).unwrap();
     local_transform.translation.z = -1.;
@@ -102,45 +98,22 @@ fn tick(
     _state: &mut State,
 ) {
     let xr_context = &mut engine.xr_context;
-    let input_context = &engine.input_context;
-    let vulkan_context = &engine.vulkan_context;
-    let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
 
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        hands_system(
-            &mut queries.hands_query,
-            world,
-            input_context,
-            physics_context,
-        );
-        grabbing_system(&mut queries.grabbing_query, world, physics_context);
+        // hands_system(engine);
+        // grabbing_system(engine);
         physics_step(physics_context);
-        collision_system(&mut queries.collision_query, world, physics_context);
-        update_local_transform_with_rigid_body_system(
-            &mut queries.update_rigid_body_transforms_query,
-            world,
-            physics_context,
-        );
-        animation_system(&mut queries.animation_query, world);
-        update_global_transform_system(&mut queries.update_global_transform_query, world);
-        update_global_transform_with_parent_system(
-            &mut queries.parent_query,
-            &mut queries.roots_query,
-            world,
-        );
-        skinning_system(&mut queries.skins_query, world, render_context);
+        // collision_system(engine);
+        // update_local_transform_with_rigid_body_system(engine);
+        // animation_system(engine);
+        // update_global_transform_system(engine);
+        // update_global_transform_with_parent_system(engine);
+        // skinning_system(engine);
     }
 
     let views = xr_context.update_views();
-    rendering_system(
-        &mut queries.rendering_query,
-        world,
-        vulkan_context,
-        render_context,
-        views,
-        tick_data.swapchain_image_index,
-    );
+    // rendering_system(engine, views, tick_data.swapchain_image_index);
 }
 
 #[derive(Clone, Debug, Default)]

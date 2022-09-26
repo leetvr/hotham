@@ -61,16 +61,12 @@ impl GameContext {
         let gui_context = &engine.gui_context;
 
         let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../assets/crab_saber.glb")];
-        let models = asset_importer::load_models_from_glb(
-            &glb_buffers,
-            vulkan_context,
-            render_context,
-            physics_context,
-        )
-        .expect("Unable to load models!");
+        let models =
+            asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                .expect("Unable to load models!");
 
         // Add the environment models
-        add_environment(&models, world, physics_context);
+        add_environment(&models, world);
 
         // Add sabers
         let sabers = [Color::Blue, Color::Red]
@@ -82,7 +78,7 @@ impl GameContext {
         }
 
         // Add a pointer to let the player interact with the UI
-        let pointer = add_pointer(&models, world, physics_context);
+        let pointer = add_pointer(&models, world);
 
         // Add a "backstop" collider to detect when a cube was missed
         let backstop = add_backstop(world, physics_context);
@@ -158,12 +154,8 @@ fn add_backstop(
     world.spawn((Collider::new(handle),))
 }
 
-fn add_pointer(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-) -> Entity {
-    let pointer = add_model_to_world("Blue Pointer", models, world, physics_context, None).unwrap();
+fn add_pointer(models: &std::collections::HashMap<String, World>, world: &mut World) -> Entity {
+    let pointer = add_model_to_world("Blue Pointer", models, world, None).unwrap();
 
     world
         .insert_one(
@@ -178,13 +170,9 @@ fn add_pointer(
     pointer
 }
 
-fn add_environment(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-) {
-    add_model_to_world("Environment", models, world, physics_context, None);
-    add_model_to_world("Ramp", models, world, physics_context, None);
+fn add_environment(models: &std::collections::HashMap<String, World>, world: &mut World) {
+    add_model_to_world("Environment", models, world, None);
+    add_model_to_world("Ramp", models, world, None);
 }
 
 pub fn add_songs(audio_context: &mut AudioContext, game_context: &mut GameContext) {
@@ -253,7 +241,7 @@ pub fn pre_spawn_cube(
         Color::Blue => "Blue Cube",
     };
 
-    let cube = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
+    let cube = add_model_to_world(model_name, models, world, None).unwrap();
 
     let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
         .lock_rotations()

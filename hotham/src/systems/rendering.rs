@@ -9,8 +9,9 @@ use crate::{
         RenderContext,
     },
     systems::stage,
+    Engine,
 };
-use hecs::{PreparedQuery, With, World};
+use hecs::{With, World};
 use nalgebra::Isometry3;
 use openxr as xr;
 
@@ -23,8 +24,20 @@ use openxr as xr;
 ///
 /// Advanced users may instead call [`begin`], [`draw_world`], and [`end`] manually.
 #[allow(clippy::type_complexity)]
-pub fn rendering_system(
-    query: &mut PreparedQuery<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>,
+pub fn rendering_system(engine: &mut Engine, views: &[xr::View], swapchain_image_index: usize) {
+    let world = &mut engine.world;
+    let vulkan_context = &mut engine.vulkan_context;
+    let render_context = &mut engine.render_context;
+    rendering_system_inner(
+        world,
+        vulkan_context,
+        render_context,
+        views,
+        swapchain_image_index,
+    );
+}
+
+pub(crate) fn rendering_system_inner(
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
@@ -33,7 +46,6 @@ pub fn rendering_system(
 ) {
     unsafe {
         begin(
-            query,
             world,
             vulkan_context,
             render_context,
@@ -54,7 +66,6 @@ pub fn rendering_system(
 /// Must be called at the start of the process or after [`end`]
 #[allow(clippy::type_complexity)]
 pub unsafe fn begin(
-    query: &mut PreparedQuery<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>,
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
@@ -74,7 +85,9 @@ pub unsafe fn begin(
     let gos_from_stage: Isometry3<f32> = gos_from_global * global_from_stage;
     let matrix_gos_from_global = gos_from_global.to_homogeneous();
 
-    for (_, (mesh, global_transform, skin)) in query.query_mut(world) {
+    for (_, (mesh, global_transform, skin)) in
+        world.query_mut::<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>()
+    {
         let mesh = meshes.get(mesh.handle).unwrap();
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
         for primitive in &mesh.primitives {
@@ -245,8 +258,9 @@ mod tests {
     use ash::vk;
     use ash::vk::Handle;
     use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
-    use nalgebra::{Isometry3, Translation3, UnitQuaternion, Vector3};
+    use nalgebra::{Translation3, UnitQuaternion, Vector3};
     use openxr::{Fovf, Quaternionf, Vector3f};
+    use rapier3d::prelude::Isometry;
     use update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system;
 
     use crate::{
@@ -257,8 +271,13 @@ mod tests {
         },
         resources::{PhysicsContext, RenderContext},
         systems::{
-            add_stage, update_global_transform_system, update_global_transform_with_parent_system,
-            update_local_transform_with_rigid_body,
+            add_stage,
+            update_global_transform::update_global_transform_system_inner,
+            update_global_transform_system,
+            update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
+            update_local_transform_with_rigid_body::{
+                self, update_local_transform_with_rigid_body_system_inner,
+            },
         },
         util::{get_from_device_memory, isometry_to_posef, posef_to_isometry},
         COLOR_FORMAT,
@@ -267,7 +286,6 @@ mod tests {
     #[test]
     pub fn test_rendering_pbr() {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let mut physics_context = PhysicsContext::default();
         let resolution = vk::Extent2D {
             height: 800,
             width: 800,
@@ -293,30 +311,23 @@ mod tests {
 
         let mut render_context =
             RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
+        let mut physics_context = PhysicsContext::default();
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-        let mut models = asset_importer::load_models_from_glb(
-            &gltf_data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let mut models =
+            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
+                .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform
-        let global_from_stage = Isometry3::from_parts(
+        let global_from_stage = Isometry::from_parts(
             Translation3::new(0.1, 0.2, 0.3),
             UnitQuaternion::from_scaled_axis(Vector3::y() * (std::f32::consts::TAU * 0.1)),
         );
         let stage_entity = add_stage(&mut world, &mut physics_context);
         physics_context.rigid_bodies[world.get_mut::<RigidBody>(stage_entity).unwrap().handle]
             .set_position(global_from_stage, true);
-        update_local_transform_with_rigid_body_system(
-            &mut Default::default(),
-            &mut world,
-            &physics_context,
-        );
+        update_local_transform_with_rigid_body_system_inner(&mut world, &physics_context);
 
         // Set views
         let rotation: mint::Quaternion<f32> =
@@ -501,20 +512,9 @@ mod tests {
         render_context.scene_data.params.z = debug_shader_inputs;
         render_context.scene_data.params.x = debug_ibl_intensity;
         render_context.scene_data.lights[0] = light.clone();
-        update_global_transform_system(&mut Default::default(), world);
-        update_global_transform_with_parent_system(
-            &mut Default::default(),
-            &mut Default::default(),
-            world,
-        );
-        rendering_system(
-            &mut Default::default(),
-            world,
-            vulkan_context,
-            render_context,
-            views,
-            0,
-        );
+        update_global_transform_system_inner(world);
+        update_global_transform_with_parent_system_inner(world);
+        rendering_system_inner(world, vulkan_context, render_context, views, 0);
         render_context.end_frame(vulkan_context);
     }
 

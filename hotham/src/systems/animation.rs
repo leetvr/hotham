@@ -1,10 +1,16 @@
-use crate::components::{animation_controller::AnimationController, LocalTransform};
-use hecs::{PreparedQuery, World};
+use crate::{
+    components::{animation_controller::AnimationController, LocalTransform},
+    Engine,
+};
 
 /// Animation system
 /// Walks through each AnimationController and applies the appropriate animation to its targets.
-pub fn animation_system(query: &mut PreparedQuery<&AnimationController>, world: &mut World) {
-    for (_, controller) in query.query(world).iter() {
+pub fn animation_system(engine: &mut Engine) {
+    animation_system_inner(&mut engine.world);
+}
+
+fn animation_system_inner(world: &mut hecs::World) {
+    for (_, controller) in world.query::<&AnimationController>().iter() {
         let blend_from = controller.blend_from;
         let blend_to = controller.blend_to;
         let blend_amount = controller.blend_amount;
@@ -26,29 +32,20 @@ pub fn animation_system(query: &mut PreparedQuery<&AnimationController>, world: 
 mod tests {
     use crate::{
         asset_importer::{add_model_to_world, load_models_from_glb},
-        resources::{PhysicsContext, RenderContext},
+        resources::RenderContext,
     };
 
     use super::*;
     #[test]
     pub fn animation_test() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut physics_context = PhysicsContext::default();
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
-        let models = load_models_from_glb(
-            &data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
-        let mut world = World::new();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
+        let mut world = hecs::World::new();
 
         // Add the left hand
-        let left_hand =
-            add_model_to_world("Left Hand", &models, &mut world, &mut physics_context, None)
-                .unwrap();
+        let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
         {
             let mut left_hand_controller = world.get_mut::<AnimationController>(left_hand).unwrap();
             left_hand_controller.blend_from = 0;
@@ -64,7 +61,7 @@ mod tests {
             .collect::<Vec<LocalTransform>>();
 
         // Run the animation system
-        animation_system(&mut Default::default(), &mut world);
+        animation_system_inner(&mut world);
 
         // Collect all the transforms after the system has been run.
         let transforms_after = world

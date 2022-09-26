@@ -1,19 +1,22 @@
-use hecs::{PreparedQuery, World};
+use hecs::World;
 use render_context::RenderContext;
 
 use crate::{
     components::{GlobalTransform, Skin},
     resources::render_context,
+    Engine,
 };
 
 /// Skinning system
 /// Walks through each joint in the system and builds up the `joint_matrices` that will be sent to the vertex shader
-pub fn skinning_system(
-    skins_query: &mut PreparedQuery<(&Skin, &GlobalTransform)>,
-    world: &mut World,
-    render_context: &mut RenderContext,
-) {
-    for (_, (skin, global_transform)) in skins_query.query(world).iter() {
+pub fn skinning_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    let render_context = &mut engine.render_context;
+    skinning_system_inner(world, render_context);
+}
+
+fn skinning_system_inner(world: &mut World, render_context: &mut RenderContext) {
+    for (_, (skin, global_transform)) in world.query::<(&Skin, &GlobalTransform)>().iter() {
         let buffer = unsafe { render_context.resources.skins_buffer.as_slice_mut() };
         let joint_matrices = &mut buffer[skin.id as usize];
         let local_from_global = global_transform.0.try_inverse().unwrap();
@@ -39,7 +42,6 @@ mod tests {
 
     use crate::{
         components::{Info, Skin},
-        resources::PhysicsContext,
         util::get_world_with_hands,
     };
 
@@ -50,10 +52,8 @@ mod tests {
     #[test]
     pub fn test_hand_skinning() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut physics_context = PhysicsContext::default();
-        let mut world =
-            get_world_with_hands(&vulkan_context, &mut render_context, &mut physics_context);
-        skinning_system(&mut Default::default(), &mut world, &mut render_context);
+        let mut world = get_world_with_hands(&vulkan_context, &mut render_context);
+        skinning_system_inner(&mut world, &mut render_context);
 
         assert!(verify_matrices(&world, &render_context));
 
@@ -64,7 +64,7 @@ mod tests {
                 global_transform.0 = Matrix4::zeros();
             }
         }
-        skinning_system(&mut Default::default(), &mut world, &mut render_context);
+        skinning_system_inner(&mut world, &mut render_context);
 
         assert!(!verify_matrices(&world, &render_context));
     }

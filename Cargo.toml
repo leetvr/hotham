@@ -5,12 +5,6 @@ members = ["hotham", "hotham-simulator", "examples/simple-scene", "examples/crab
 [profile.dev.package.rapier3d]
 opt-level = 3
 
-[profile.dev.package.parry3d]
-opt-level = 3
-
-[profile.dev.package.nalgebra]
-opt-level = 3
-
 [profile.dev.package.base64]
 opt-level = 3
 

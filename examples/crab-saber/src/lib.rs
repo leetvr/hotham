@@ -59,10 +59,7 @@ fn tick(
 ) {
     let xr_context = &mut engine.xr_context;
     let input_context = &mut engine.input_context;
-    let vulkan_context = &engine.vulkan_context;
-    let render_context = &mut engine.render_context;
     let physics_context = &mut engine.physics_context;
-    let gui_context = &mut engine.gui_context;
     let haptic_context = &mut engine.haptic_context;
     let audio_context = &mut engine.audio_context;
 
@@ -77,16 +74,11 @@ fn tick(
             input_context,
             physics_context,
         );
-        pointers_system(
-            &mut hotham_queries.pointers_query,
-            world,
-            input_context,
-            physics_context,
-        );
+        // pointers_system(engine);
 
         // Physics
         physics_step(physics_context);
-        collision_system(&mut hotham_queries.collision_query, world, physics_context);
+        // collision_system(engine);
 
         // Game logic
         game_system(
@@ -99,53 +91,25 @@ fn tick(
         );
 
         // Update the world
-        update_local_transform_with_rigid_body_system(
-            &mut hotham_queries.update_rigid_body_transforms_query,
-            world,
-            physics_context,
-        );
-        update_global_transform_system(&mut hotham_queries.update_global_transform_query, world);
-        update_global_transform_with_parent_system(
-            &mut hotham_queries.parent_query,
-            &mut hotham_queries.roots_query,
-            world,
-        );
+        // update_local_transform_with_rigid_body_system(engine);
+        // update_global_transform_system(engine);
+        // update_global_transform_with_parent_system(engine);
 
         // Haptics
         apply_haptic_feedback(xr_context, haptic_context);
 
         // Audio
-        audio_system(
-            &mut hotham_queries.audio_query,
-            world,
-            audio_context,
-            physics_context,
-            xr_context,
-        );
+        // audio_system(engine);
     }
 
     // Draw GUI
-    draw_gui_system(
-        &mut hotham_queries.draw_gui_query,
-        world,
-        vulkan_context,
-        render_context,
-        gui_context,
-        haptic_context,
-    );
+    // draw_gui_system(engine);
 
     // Update the views - we always want to do this at the last possible minute to get an accurate position of the player's head.
     let views = xr_context.update_views();
 
     // Draw objects
-    rendering_system(
-        &mut hotham_queries.rendering_query,
-        world,
-        vulkan_context,
-        render_context,
-        views,
-        tick_data.swapchain_image_index,
-    );
+    // rendering_system(engine, views, tick_data.swapchain_image_index);
 }
 
 fn handle_state_change(

@@ -31,12 +31,20 @@ use crate::{
         Stage, Visible,
     },
     resources::{InputContext, PhysicsContext},
+    Engine,
 };
 
 /// Pointers system
 /// Allows users to interact with `Panel`s using their controllers
-pub fn pointers_system(
-    query: &mut PreparedQuery<With<Visible, (&mut Pointer, &mut LocalTransform)>>,
+pub fn pointers_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    let input_context = &mut engine.input_context;
+    let physics_context = &mut engine.physics_context;
+
+    pointers_system_inner(world, input_context, physics_context);
+}
+
+pub fn pointers_system_inner(
     world: &mut World,
     input_context: &InputContext,
     physics_context: &mut PhysicsContext,
@@ -52,7 +60,10 @@ pub fn pointers_system(
 
     let grip_from_local = ROTATION_OFFSET * POSITION_OFFSET;
 
-    for (_, (pointer, local_transform)) in query.query(world).iter() {
+    for (_, (pointer, local_transform)) in world
+        .query::<With<Visible, (&mut Pointer, &mut LocalTransform)>>()
+        .iter()
+    {
         // Get our the space and path of the pointer.
         let (stage_from_grip, trigger_value) = match pointer.handedness {
             Handedness::Left => (
@@ -273,12 +284,7 @@ mod tests {
         input_context: &InputContext,
     ) {
         physics_context.update();
-        pointers_system(
-            &mut Default::default(),
-            world,
-            input_context,
-            physics_context,
-        )
+        pointers_system_inner(world, input_context, physics_context)
     }
 
     #[test]

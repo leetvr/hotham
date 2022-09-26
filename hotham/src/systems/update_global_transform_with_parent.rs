@@ -1,26 +1,30 @@
 use std::collections::HashMap;
 
-use crate::components::{GlobalTransform, Parent};
-use hecs::{Entity, PreparedQuery, Without, World};
+use crate::{
+    components::{GlobalTransform, Parent},
+    Engine,
+};
+use hecs::{Entity, Without, World};
 
 use nalgebra::Matrix4;
 
 /// Update global transform with parent transform system
 /// Walks through each entity that has a Parent and builds a hierarchy
 /// Then transforms each entity based on the hierarchy
-pub fn update_global_transform_with_parent_system(
-    parent_query: &mut PreparedQuery<&Parent>,
-    roots_query: &mut PreparedQuery<Without<Parent, &GlobalTransform>>,
-    world: &mut World,
-) {
+pub fn update_global_transform_with_parent_system(engine: &mut Engine) {
+    let world = &mut engine.world;
+    update_global_transform_with_parent_system_inner(world);
+}
+
+pub(crate) fn update_global_transform_with_parent_system_inner(world: &mut World) {
     // Build hierarchy
     let mut hierarchy: HashMap<Entity, Vec<Entity>> = HashMap::new();
-    for (entity, parent) in parent_query.query_mut(world) {
+    for (entity, parent) in world.query_mut::<&Parent>() {
         let children = hierarchy.entry(parent.0).or_default();
         children.push(entity);
     }
 
-    let mut roots = roots_query.query(world);
+    let mut roots = world.query::<Without<Parent, &GlobalTransform>>();
     for (root, root_matrix) in roots.iter() {
         update_global_transforms_recursively(&root_matrix.0, root, &hierarchy, world);
     }
@@ -53,7 +57,10 @@ mod tests {
 
     use crate::{
         components::{Info, LocalTransform},
-        systems::update_global_transform_system,
+        systems::{
+            update_global_transform::update_global_transform_system_inner,
+            update_global_transform_system,
+        },
     };
 
     use super::*;
@@ -67,7 +74,7 @@ mod tests {
         let child = world.spawn((parent_global_transform, Parent(parent)));
         let grandchild = world.spawn((parent_global_transform, Parent(child)));
 
-        schedule(&mut world);
+        tick(&mut world);
 
         {
             let global_transform = world.get_mut::<GlobalTransform>(grandchild).unwrap();
@@ -126,7 +133,7 @@ mod tests {
             let mut local_transform = world.get_mut::<LocalTransform>(*root_entity).unwrap();
             local_transform.translation = vector![100.0, 100.0, 100.0];
         }
-        schedule(&mut world);
+        tick(&mut world);
 
         for (_, (global_transform, parent, info)) in
             world.query::<(&GlobalTransform, &Parent, &Info)>().iter()
@@ -169,15 +176,11 @@ mod tests {
     pub fn test_entities_without_transforms() {
         let mut world = World::new();
         world.spawn((0,));
-        schedule(&mut world);
+        tick(&mut world);
     }
 
-    fn schedule(world: &mut World) {
-        update_global_transform_system(&mut Default::default(), world);
-        update_global_transform_with_parent_system(
-            &mut Default::default(),
-            &mut Default::default(),
-            world,
-        );
+    fn tick(world: &mut World) {
+        update_global_transform_system_inner(world);
+        update_global_transform_with_parent_system_inner(world);
     }
 }
