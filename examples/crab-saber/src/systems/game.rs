@@ -13,11 +13,11 @@ use hotham::{
         hand::Handedness, sound_emitter::SoundState, ui_panel::UIPanelButton, Collider, Info,
         RigidBody, UIPanel, Visible,
     },
-    hecs::{Entity, With, Without, World},
-    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
-    resources::{
+    contexts::{
         physics_context::DEFAULT_COLLISION_GROUP, AudioContext, HapticContext, PhysicsContext,
     },
+    hecs::{Entity, With, Without, World},
+    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
     Engine,
 };
 use rand::prelude::*;
@@ -417,10 +417,10 @@ mod tests {
 
     use hotham::{
         components::{Collider, RigidBody, SoundEmitter},
+        contexts::HapticContext,
         hecs::Entity,
         nalgebra::Vector3,
         rapier3d::prelude::{RigidBodyBuilder, RigidBodyType},
-        resources::HapticContext,
         Engine,
     };
 

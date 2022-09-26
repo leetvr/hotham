@@ -1,11 +1,11 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, LocalTransform},
+    contexts::PhysicsContext,
     hecs::World,
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
-    resources::PhysicsContext,
     schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,

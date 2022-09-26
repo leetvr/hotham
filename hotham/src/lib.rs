@@ -27,9 +27,9 @@ mod engine;
 
 /// A tool to import models from glTF files into Hotham
 pub mod asset_importer;
+/// Contexts are wrappers around some external state that the engine will interact with
+pub mod contexts;
 mod hotham_error;
-/// Resources are wrappers around some external state that the engine will interact with
-pub mod resources;
 pub mod schedule_functions;
 /// Systems are functions called each frame to update either the external state or the current simulation
 pub mod systems;

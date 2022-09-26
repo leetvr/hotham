@@ -36,7 +36,7 @@ use hecs::World;
 #[cfg(test)]
 use crate::{
     asset_importer::{add_model_to_world, load_models_from_glb},
-    resources::{RenderContext, VulkanContext},
+    contexts::{RenderContext, VulkanContext},
 };
 
 /// Convenience function to get a world with hands

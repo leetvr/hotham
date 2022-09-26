@@ -1,4 +1,4 @@
-use crate::resources::VulkanContext;
+use crate::contexts::VulkanContext;
 use ash::vk;
 
 pub(crate) unsafe fn allocate_memory(

@@ -3,7 +3,7 @@ use rapier3d::prelude::RigidBodyType;
 
 use crate::{
     components::{Collider, Grabbable, Hand, RigidBody},
-    resources::PhysicsContext,
+    contexts::PhysicsContext,
     Engine,
 };
 
@@ -65,7 +65,7 @@ mod tests {
 
     use crate::{
         components::{hand::Handedness, Info},
-        resources::PhysicsContext,
+        contexts::PhysicsContext,
         systems::update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
     };
 

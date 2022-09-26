@@ -3,7 +3,7 @@ use render_context::RenderContext;
 
 use crate::{
     components::{GlobalTransform, Skin},
-    resources::render_context,
+    contexts::render_context,
     Engine,
 };
 

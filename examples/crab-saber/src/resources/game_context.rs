@@ -10,14 +10,14 @@ use hotham::{
         hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, Pointer, RigidBody,
         SoundEmitter, Visible,
     },
+    contexts::{
+        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
+        PhysicsContext,
+    },
     hecs::{Entity, World},
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
         RigidBodyType,
-    },
-    resources::{
-        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
-        PhysicsContext,
     },
     vk, Engine,
 };
@@ -138,7 +138,7 @@ impl GameContext {
 
 fn add_backstop(
     world: &mut World,
-    physics_context: &mut hotham::resources::PhysicsContext,
+    physics_context: &mut hotham::contexts::PhysicsContext,
 ) -> Entity {
     let collider = ColliderBuilder::cuboid(1., 1., 0.1)
         .translation([0., 1., 1.].into())

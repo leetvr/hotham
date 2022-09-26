@@ -1,5 +1,5 @@
 use crate::{
-    resources::{
+    contexts::{
         AudioContext, GuiContext, HapticContext, InputContext, PhysicsContext, RenderContext,
         VulkanContext, XrContext, XrContextBuilder,
     },

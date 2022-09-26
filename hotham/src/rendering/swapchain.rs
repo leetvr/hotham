@@ -3,7 +3,7 @@ use ash::vk::{self, Handle};
 use openxr::{Swapchain as SwapchainHandle, Vulkan};
 use vulkan_context::VulkanContext;
 
-use crate::{resources::vulkan_context, COLOR_FORMAT, DEPTH_FORMAT};
+use crate::{contexts::vulkan_context, COLOR_FORMAT, DEPTH_FORMAT};
 
 use super::texture::DEFAULT_COMPONENT_MAPPING;
 

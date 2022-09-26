@@ -8,6 +8,7 @@ pub mod systems;
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{GlobalTransform, LocalTransform, Mesh, Visible},
+    contexts::RenderContext,
     hecs::{With, World},
     nalgebra::{UnitQuaternion, Vector3},
     rendering::{
@@ -17,7 +18,6 @@ use hotham::{
         primitive::{calculate_bounding_sphere, Primitive},
         vertex::Vertex,
     },
-    resources::RenderContext,
     schedule_functions::physics_step,
     systems::{
         animation_system, collision_system, debug::debug_system, grabbing_system, hands_system,

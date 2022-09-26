@@ -1,6 +1,6 @@
 use openxr::{Duration, HapticVibration};
 
-use crate::resources::{HapticContext, XrContext};
+use crate::contexts::{HapticContext, XrContext};
 static HAPTIC_FREQUENCY: f32 = 400.;
 static HAPTIC_DURATION: i64 = 1e+8 as _; // 100ms
 

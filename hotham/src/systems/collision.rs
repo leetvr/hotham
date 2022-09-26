@@ -1,4 +1,4 @@
-use crate::{components::Collider, resources::PhysicsContext, Engine};
+use crate::{components::Collider, contexts::PhysicsContext, Engine};
 use hecs::World;
 
 /// Collision system
@@ -33,7 +33,7 @@ fn collision_system_inner(world: &World, physics_context: &mut PhysicsContext) {
 mod tests {
     use super::*;
     use crate::components::{Collider, Info};
-    use crate::resources::PhysicsContext;
+    use crate::contexts::PhysicsContext;
 
     use hecs::Entity;
     use rapier3d::prelude::*;

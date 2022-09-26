@@ -1,6 +1,6 @@
 use crate::{
     components::{hand::Handedness, Panel, UIPanel},
-    resources::{GuiContext, HapticContext, RenderContext, VulkanContext},
+    contexts::{GuiContext, HapticContext, RenderContext, VulkanContext},
     Engine,
 };
 use hecs::World;
@@ -82,8 +82,8 @@ mod tests {
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
+        contexts::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
-        resources::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
         systems::{
             rendering::rendering_system_inner,
             update_global_transform::update_global_transform_system_inner,

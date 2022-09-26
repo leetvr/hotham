@@ -32,7 +32,7 @@ fn animation_system_inner(world: &mut hecs::World) {
 mod tests {
     use crate::{
         asset_importer::{add_model_to_world, load_models_from_glb},
-        resources::RenderContext,
+        contexts::RenderContext,
     };
 
     use super::*;

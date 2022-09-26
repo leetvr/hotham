@@ -30,7 +30,7 @@ use crate::{
         hand::Handedness, panel::PanelInput, Info, LocalTransform, Panel, Pointer, RigidBody,
         Stage, Visible,
     },
-    resources::{InputContext, PhysicsContext},
+    contexts::{InputContext, PhysicsContext},
     Engine,
 };
 
@@ -178,7 +178,7 @@ fn ray_to_panel_space(
 mod tests {
     use super::*;
 
-    use crate::resources::XrContext;
+    use crate::contexts::XrContext;
     use approx::assert_relative_eq;
     use ash::vk;
 
@@ -187,7 +187,7 @@ mod tests {
     pub fn test_pointers_system() {
         use crate::{
             components::{Collider, LocalTransform, Panel},
-            resources::{
+            contexts::{
                 physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
                 RenderContext,
             },

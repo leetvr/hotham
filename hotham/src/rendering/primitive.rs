@@ -1,8 +1,8 @@
 use crate::{
     asset_importer::ImportContext,
     components::GlobalTransform,
+    contexts::render_context,
     rendering::{material::NO_MATERIAL, vertex::Vertex},
-    resources::render_context,
 };
 use itertools::izip;
 use nalgebra::{vector, Point3, Vector3, Vector4};

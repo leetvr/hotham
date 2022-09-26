@@ -2,12 +2,12 @@ use std::convert::TryInto;
 
 use crate::{
     components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Visible},
-    rendering::resources::{DrawData, PrimitiveCullData},
-    resources::VulkanContext,
-    resources::{
+    contexts::VulkanContext,
+    contexts::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
     },
+    rendering::resources::{DrawData, PrimitiveCullData},
     systems::stage,
     Engine,
 };
@@ -268,10 +268,10 @@ mod tests {
     use crate::{
         asset_importer,
         components::RigidBody,
+        contexts::{PhysicsContext, RenderContext},
         rendering::{
             image::Image, legacy_buffer::Buffer, light::Light, scene_data, swapchain::SwapchainInfo,
         },
-        resources::{PhysicsContext, RenderContext},
         systems::{
             add_stage, update_global_transform::update_global_transform_system_inner,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,

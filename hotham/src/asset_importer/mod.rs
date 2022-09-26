@@ -6,8 +6,8 @@ use crate::{
         animation_controller::AnimationController, GlobalTransform, Info, LocalTransform, Mesh,
         Parent, Root, Skin, Visible,
     },
+    contexts::{RenderContext, VulkanContext},
     rendering::{light::Light, material::Material},
-    resources::{RenderContext, VulkanContext},
 };
 use anyhow::Result;
 

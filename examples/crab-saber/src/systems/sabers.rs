@@ -5,9 +5,9 @@ use hotham::Engine;
 use hotham::{
     asset_importer::{add_model_to_world, Models},
     components::RigidBody,
+    contexts::{InputContext, PhysicsContext},
     hecs::{Entity, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
-    resources::{InputContext, PhysicsContext},
 };
 
 use crate::components::{Color, Saber};
@@ -109,7 +109,7 @@ mod tests {
     fn test_sabers() {
         use hotham::{
             components::{GlobalTransform, LocalTransform},
-            resources::{PhysicsContext, XrContext},
+            contexts::{PhysicsContext, XrContext},
         };
 
         let mut world = World::new();

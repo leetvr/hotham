@@ -1,7 +1,7 @@
 use crate::{
     asset_importer::add_model_to_world,
     components::{hand::Handedness, AnimationController, Hand, RigidBody, Stage},
-    resources::{InputContext, PhysicsContext},
+    contexts::{InputContext, PhysicsContext},
     Engine,
 };
 use hecs::{With, World};
@@ -129,7 +129,7 @@ mod tests {
     };
 
     use crate::{
-        components::LocalTransform, resources::XrContext,
+        components::LocalTransform, contexts::XrContext,
         systems::update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
     };
 

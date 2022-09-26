@@ -3,7 +3,7 @@ use nalgebra::UnitQuaternion;
 
 use crate::{
     components::{LocalTransform, RigidBody},
-    resources::PhysicsContext,
+    contexts::PhysicsContext,
     Engine,
 };
 

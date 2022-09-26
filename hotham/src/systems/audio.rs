@@ -4,7 +4,7 @@ use openxr::SpaceVelocityFlags;
 
 use crate::{
     components::{sound_emitter::SoundState, RigidBody, SoundEmitter},
-    resources::{AudioContext, PhysicsContext, XrContext},
+    contexts::{AudioContext, PhysicsContext, XrContext},
     util::is_space_valid,
     Engine,
 };
@@ -124,7 +124,7 @@ mod tests {
     const DURATION_SECS: u32 = 8;
 
     use crate::{
-        resources::{audio_context::MusicTrack, XrContext},
+        contexts::{audio_context::MusicTrack, XrContext},
         HothamError, VIEW_TYPE,
     };
 
