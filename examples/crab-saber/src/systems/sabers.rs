@@ -1,10 +1,9 @@
-use hotham::components::Stage;
+use hotham::components::{LocalTransform, Stage};
 use hotham::nalgebra::{Quaternion, Translation3, UnitQuaternion};
 use hotham::rapier3d::prelude::RigidBodyType;
 use hotham::Engine;
 use hotham::{
     asset_importer::{add_model_to_world, Models},
-    components::RigidBody,
     contexts::{InputContext, PhysicsContext},
     hecs::{Entity, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
@@ -27,30 +26,24 @@ const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 
 /// Sync the postion of the player's sabers with the position of their controllers in OpenXR
 pub fn sabers_system(engine: &mut Engine) {
-    sabers_system_inner(
-        &mut engine.world,
-        &engine.input_context,
-        &mut engine.physics_context,
-    )
+    sabers_system_inner(&mut engine.world, &engine.input_context)
 }
 
-fn sabers_system_inner(
-    world: &mut World,
-    input_context: &InputContext,
-    physics_context: &mut PhysicsContext,
-) {
+fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
     // Get the isometry of the stage
     let global_from_stage = world
-        .query_mut::<With<Stage, &RigidBody>>()
+        .query_mut::<With<Stage, &LocalTransform>>()
         .into_iter()
         .next()
-        .map_or(Default::default(), |(_, rigid_body)| {
-            *physics_context.rigid_bodies[rigid_body.handle].position()
+        .map_or(Default::default(), |(_, local_transform)| {
+            local_transform.position()
         });
 
     let grip_from_saber = ROTATION_OFFSET * POSITION_OFFSET;
 
-    for (_, (color, rigid_body)) in world.query_mut::<With<Saber, (&Color, &RigidBody)>>() {
+    for (_, (color, local_transform)) in
+        world.query_mut::<With<Saber, (&Color, &mut LocalTransform)>>()
+    {
         // Get our the space and path of the hand.
         let stage_from_grip = match color {
             Color::Red => input_context.left.stage_from_grip(),
@@ -58,14 +51,8 @@ fn sabers_system_inner(
         };
 
         // Apply transform
-        let rigid_body = physics_context
-            .rigid_bodies
-            .get_mut(rigid_body.handle)
-            .unwrap();
-
         let position = global_from_stage * stage_from_grip * grip_from_saber;
-
-        rigid_body.set_next_kinematic_position(position);
+        local_transform.update_from_isometry(&position);
     }
 }
 
@@ -96,7 +83,7 @@ fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, sa
     let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
 
     // Add the components to the entity.
-    let components = physics_context.get_rigid_body_and_collider(saber, rigid_body, collider);
+    let components = physics_context.create_rigid_body_and_collider(saber, rigid_body, collider);
     world.insert(saber, components).unwrap();
 }
 
@@ -109,30 +96,26 @@ mod tests {
     fn test_sabers() {
         use hotham::{
             components::{GlobalTransform, LocalTransform},
-            contexts::{PhysicsContext, XrContext},
+            contexts::XrContext,
         };
 
         let mut world = World::new();
         let path = std::path::Path::new("../../openxr_loader.dll");
         let (xr_context, _) = XrContext::new_from_path(path).unwrap();
         let mut input_context = InputContext::default();
-        let mut physics_context = PhysicsContext::default();
         let saber = world.spawn((
             Color::Red,
             Saber {},
             LocalTransform::default(),
             GlobalTransform::default(),
         ));
-        add_saber_physics(&mut world, &mut physics_context, saber);
 
         input_context.update(&xr_context);
-        sabers_system_inner(&mut world, &input_context, &mut physics_context);
-        physics_context.update();
+        sabers_system_inner(&mut world, &input_context);
 
-        let rigid_body_handle = world.get::<RigidBody>(saber).unwrap().handle;
-        let rigid_body = physics_context.rigid_bodies.get(rigid_body_handle).unwrap();
+        let local_transform = world.get::<LocalTransform>(saber).unwrap();
         approx::assert_relative_eq!(
-            rigid_body.position().translation,
+            local_transform.translation,
             [-0.2, 1.3258252, -0.4700315].into()
         );
     }

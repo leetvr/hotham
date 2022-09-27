@@ -139,6 +139,7 @@ impl RenderContext {
     }
 
     #[cfg(test)]
+    #[cfg(target_os = "windows")]
     pub(crate) fn testing() -> (Self, VulkanContext) {
         let vulkan_context = VulkanContext::testing().unwrap();
         let resolution = vk::Extent2D {
@@ -167,6 +168,40 @@ impl RenderContext {
         (
             RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap(),
             vulkan_context,
+        )
+    }
+
+    #[cfg(test)]
+    #[cfg(target_os = "windows")]
+    pub(crate) fn testing_with_image() -> (Self, VulkanContext, Image) {
+        let vulkan_context = VulkanContext::testing().unwrap();
+        let resolution = vk::Extent2D {
+            height: 800,
+            width: 800,
+        };
+        // Create an image with vulkan_context
+        let image = vulkan_context
+            .create_image(
+                COLOR_FORMAT,
+                &resolution,
+                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
+                2,
+                1,
+            )
+            .unwrap();
+        vulkan_context
+            .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
+            .unwrap();
+
+        let swapchain = SwapchainInfo {
+            images: vec![image.handle],
+            resolution,
+        };
+
+        (
+            RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap(),
+            vulkan_context,
+            image,
         )
     }
 

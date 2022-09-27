@@ -6,9 +6,9 @@ use hotham::{
     components::Visible,
     hecs::{Entity, World},
     systems::{
-        audio_system, collision_system, draw_gui_system, haptics_system, pointers_system,
+        audio_system, draw_gui_system, haptics_system, physics_system, pointers_system,
         rendering_system, update_global_transform_system,
-        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
+        update_global_transform_with_parent_system,
     },
     xr::{self, SessionState},
     Engine, HothamResult, TickData,
@@ -40,31 +40,25 @@ fn tick(tick_data: TickData, engine: &mut Engine, game_context: &mut GameContext
 
     // Simulation tasks - these are only necessary in the focussed state.
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        // Handle input
+        // Sync world with input contexts
         sabers_system(engine);
         pointers_system(engine);
 
-        // Physics
-        haptics_system(engine);
-        collision_system(engine);
+        // Update physics simulation
+        physics_system(engine);
 
-        // Game logic
+        // Update game simulation
         game_system(engine, game_context);
 
-        // Update the world
-        update_local_transform_with_rigid_body_system(engine);
-        update_global_transform_system(engine);
+        // Update world
         update_global_transform_with_parent_system(engine);
+        update_global_transform_system(engine);
 
-        // Haptics
+        // Sync world with output contexts
         haptics_system(engine);
-
-        // Audio
         audio_system(engine);
+        draw_gui_system(engine);
     }
-
-    // Draw GUI
-    draw_gui_system(engine);
 
     // Draw objects
     rendering_system(engine, tick_data.swapchain_image_index);

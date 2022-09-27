@@ -190,3 +190,87 @@ pub(crate) fn get_asset_from_path(path: &str) -> Result<Vec<u8>> {
 
     Ok(asset.get_buffer()?.to_vec())
 }
+
+#[cfg(test)]
+pub(crate) unsafe fn save_image_to_disk(
+    vulkan_context: &VulkanContext,
+    image: crate::rendering::image::Image,
+    name: &str,
+) -> Result<(), String> {
+    use crate::rendering::buffer::Buffer;
+    use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
+
+    let resolution = image.extent;
+    let size = (resolution.height * resolution.width * 4) as usize;
+    let mut buffer = Buffer::new(&vulkan_context, vk::BufferUsageFlags::TRANSFER_DST, size);
+    vulkan_context.transition_image_layout(
+        image.handle,
+        vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+        vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+        1,
+        1,
+    );
+    vulkan_context.copy_image_to_buffer(
+        &image,
+        vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
+        buffer.buffer,
+    );
+
+    // We have to set the buffer's length manually as `copy_image_to_buffer` doesn't.
+    buffer.len = size;
+
+    vulkan_context.device.device_wait_idle().unwrap();
+    let image_bytes = buffer.as_slice().to_vec();
+    assert_eq!(image_bytes.len(), size);
+    let image_from_vulkan = DynamicImage::ImageRgba8(
+        RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
+    );
+    let output_path = format!("../test_assets/render_{}.jpg", name);
+    {
+        let output_path = std::path::Path::new(&output_path);
+        let mut file = std::fs::File::create(output_path).unwrap();
+        let mut jpeg_encoder = JpegEncoder::new(&mut file);
+        jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
+    }
+    let output_hash = hash_file(&output_path);
+    let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
+    let known_good_hash = hash_file(&known_good_path);
+
+    if !output_hash.is_ok() {
+        return Err(format!("Failed to hash output image: {}", name));
+    }
+    if !known_good_hash.is_ok() {
+        return Err(format!("Failed to hash known good image: {}", name));
+    }
+    if output_hash != known_good_hash {
+        return Err(format!("Bad render: {}", name));
+    }
+    Ok(())
+}
+
+fn hash_file(file_path: &str) -> anyhow::Result<u64, ()> {
+    use std::hash::Hasher;
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+
+    let bytes = match std::fs::read(&file_path) {
+        Ok(it) => it,
+        Err(_) => return Err(()),
+    };
+    bytes.iter().for_each(|b| hasher.write_u8(*b));
+    Ok(hasher.finish())
+}
+
+#[cfg(all(test, not(any(target_os = "macos", target_os = "ios"))))]
+use renderdoc::RenderDoc;
+
+#[cfg(all(test, not(any(target_os = "macos", target_os = "ios"))))]
+pub(crate) fn begin_renderdoc() -> Result<RenderDoc<renderdoc::V141>, renderdoc::Error> {
+    let mut renderdoc = RenderDoc::<renderdoc::V141>::new()?;
+    renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
+    Ok(renderdoc)
+}
+
+#[cfg(all(test, not(any(target_os = "macos", target_os = "ios"))))]
+pub(crate) fn end_renderdoc(renderdoc: &mut RenderDoc<renderdoc::V141>) {
+    let _ = renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
+}

@@ -517,3 +517,18 @@ impl InputContext {
         }
     }
 }
+
+#[cfg(test)]
+impl InputContext {
+    /// Get an `InputContext` used for testing. Uses the same values as defined in the simulator.
+    pub fn testing() -> Self {
+        let mut input_context = Self::default();
+        let rotation = nalgebra::UnitQuaternion::new_unchecked([0.707, 0., 0., 0.707].into());
+        input_context.left.stage_from_grip =
+            Isometry3::from_parts([-0.2, 1.4, -0.5].into(), rotation);
+        input_context.right.stage_from_grip =
+            Isometry3::from_parts([0.2, 1.4, -0.5].into(), rotation);
+
+        input_context
+    }
+}

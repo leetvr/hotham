@@ -121,7 +121,7 @@ mod tests {
     };
 
     use rapier3d::prelude::{RigidBodyBuilder, RigidBodyType};
-    const DURATION_SECS: u32 = 8;
+    const DURATION_SECS: u32 = 3;
 
     use crate::{
         contexts::{audio_context::MusicTrack, XrContext},
@@ -239,10 +239,10 @@ mod tests {
             _ => {}
         }
 
-        if start.elapsed().as_secs() >= 4 && audio_context.current_music_track != Some(right_here) {
+        if start.elapsed().as_secs() >= 2 && audio_context.current_music_track != Some(right_here) {
             audio_context.play_music_track(right_here);
-        } else if start.elapsed().as_secs() >= 2
-            && start.elapsed().as_secs() < 4
+        } else if start.elapsed().as_secs() >= 1
+            && start.elapsed().as_secs() < 2
             && audio_context.current_music_track != Some(tell_me_that_i_cant)
         {
             audio_context.play_music_track(tell_me_that_i_cant);

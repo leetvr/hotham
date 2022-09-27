@@ -8,8 +8,26 @@ opt-level = 3
 [profile.dev.package.gltf]
 opt-level = 3
 
+[profile.dev.package.gltf-json]
+opt-level = 3
+
+[profile.dev.package.serde]
+opt-level = 3
+
 [profile.dev.package.image]
 opt-level = 3
 
+[profile.dev.package.png]
+opt-level = 3
+
+[profile.dev.package.bytemuck]
+opt-level = 3
+
 [profile.dev.package.symphonia]
+opt-level = 3
+
+[profile.dev.package.symphonia-core]
+opt-level = 3
+
+[profile.dev.package.symphonia-bundle-mp3]
 opt-level = 3

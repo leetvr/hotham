@@ -66,7 +66,7 @@ mod tests {
     use crate::{
         components::{hand::Handedness, Info},
         contexts::PhysicsContext,
-        systems::update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
+        systems::physics::physics_system_inner,
     };
 
     #[test]
@@ -83,7 +83,7 @@ mod tests {
             },
             Grabbable {},
         ));
-        let components = physics_context.get_rigid_body_and_collider(
+        let components = physics_context.create_rigid_body_and_collider(
             grabbed_entity,
             grabbed_rigid_body,
             grabbed_collider,
@@ -132,7 +132,6 @@ mod tests {
 
     fn tick(world: &mut World, physics_context: &mut PhysicsContext) {
         grabbing_system_inner(world, physics_context);
-        physics_context.update();
-        update_local_transform_with_rigid_body_system_inner(world, physics_context);
+        physics_system_inner(physics_context, world);
     }
 }
