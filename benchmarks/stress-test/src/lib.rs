@@ -19,10 +19,9 @@ use hotham::{
         vertex::Vertex,
     },
     systems::{
-        animation_system, collision_system, debug::debug_system, grabbing_system, hands_system,
-        physics_system, rendering::rendering_system, skinning::skinning_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
-        update_local_transform_with_rigid_body_system,
+        animation_system, debug::debug_system, grabbing_system, hands_system, physics_system,
+        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
+        update_global_transform_with_parent_system,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -269,8 +268,6 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
-        collision_system(engine);
-        update_local_transform_with_rigid_body_system(engine);
 
         match &tick_props.test {
             // StressTest::ManyCubes => rotate_models(world, timer.total_time().as_secs_f32()),

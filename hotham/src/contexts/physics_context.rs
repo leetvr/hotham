@@ -1,5 +1,6 @@
+use anyhow::{anyhow, Result};
 use crossbeam::channel::Receiver;
-use hecs::Entity;
+use hecs::{Entity, World};
 use rapier3d::na::Matrix3x1;
 use rapier3d::prelude::*;
 
@@ -32,7 +33,10 @@ impl Default for PhysicsContext {
         let (contact_force_send, contact_force_recv) = crossbeam::channel::unbounded();
         let event_handler = ChannelEventCollector::new(collision_send, contact_force_send);
         let gravity: Matrix3x1<f32> = vector![0.0, 0.0, 0.0]; // TODO: no gravity in SPACE baby! But some games may uh, need this.
-        let integration_parameters = IntegrationParameters::default();
+        let mut integration_parameters = IntegrationParameters::default();
+
+        // TODO: This is *usually* 72fps on the Quest 2, but we may support higher resolutions later.
+        integration_parameters.dt = 1. / 72.;
         let physics_pipeline = PhysicsPipeline::new();
         let impulse_joints = ImpulseJointSet::new();
         let multibody_joints = MultibodyJointSet::new();
@@ -79,7 +83,7 @@ impl PhysicsContext {
             .update(&self.island_manager, &self.rigid_bodies, &self.colliders);
     }
 
-    pub fn get_rigid_body_and_collider(
+    pub fn create_rigid_body_and_collider(
         &mut self,
         entity: Entity,
         rigid_body: RigidBody,
@@ -107,5 +111,27 @@ impl PhysicsContext {
         };
 
         (rigid_body_component, collider_component)
+    }
+
+    pub fn get_rigid_body<'a>(
+        &'a mut self,
+        world: &World,
+        entity: Entity,
+    ) -> Result<&'a mut RigidBody> {
+        let rigid_body_handle = world.get::<RigidBodyComponent>(entity)?.handle;
+        self.rigid_bodies
+            .get_mut(rigid_body_handle)
+            .ok_or_else(|| anyhow!("Unable to get Rigid Body for handle!"))
+    }
+
+    pub fn get_collider<'a>(
+        &'a mut self,
+        world: &World,
+        entity: Entity,
+    ) -> Result<&'a mut Collider> {
+        let collider_handle = world.get::<ColliderComponent>(entity)?.handle;
+        self.colliders
+            .get_mut(collider_handle)
+            .ok_or_else(|| anyhow!("Unable to get Collider for handle!"))
     }
 }

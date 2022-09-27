@@ -6,7 +6,6 @@ use crate::{
     contexts::PhysicsContext,
     hecs::{Entity, World},
     rapier3d::prelude::RigidBodyBuilder,
-    util::matrix_to_isometry,
 };
 
 /// Setup Stage entities to track player's frame of reference in global space
@@ -33,6 +32,6 @@ pub fn get_global_from_stage(world: &mut World) -> Isometry3<f32> {
         .query_mut::<With<Stage, &GlobalTransform>>()
         .into_iter()
         .next()
-        .map(|(_, global_transform)| matrix_to_isometry(global_transform.0))
+        .map(|(_, global_transform)| global_transform.to_isometry())
         .unwrap_or_else(Isometry3::<_>::identity)
 }

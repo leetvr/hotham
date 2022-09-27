@@ -7,7 +7,6 @@
 			"args": [
 				"-p",
 				"hotham",
-				"--release",
 				"--",
 				"--test-threads",
 				"1"
@@ -19,6 +18,28 @@
 				"$rustc"
 			],
 			"label": "Run Hotham test suite"
+		},
+		{
+			"type": "cargo",
+			"command": "test",
+			"args": [
+				"-p",
+				"hotham",
+				"--",
+				"systems::pointers::tests::test_pointers_system",
+				"--nocapture"
+			],
+			"env": {
+				"RUST_BACKTRACE": "1"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "Run a specific test",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
 		},
 		{
 			"type": "cargo",
@@ -57,7 +78,7 @@
 			"label": "Run Hotham simple scene on the simulator",
 			"group": {
 				"kind": "test",
-				"isDefault": true
+				"isDefault": false,
 			}
 		}
 	]

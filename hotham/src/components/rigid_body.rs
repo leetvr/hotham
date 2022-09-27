@@ -6,3 +6,9 @@ pub struct RigidBody {
     /// Handle to the `rapier` `RigidBody`
     pub handle: RigidBodyHandle,
 }
+
+impl RigidBody {
+    pub fn new(handle: RigidBodyHandle) -> Self {
+        Self { handle }
+    }
+}

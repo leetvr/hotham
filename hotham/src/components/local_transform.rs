@@ -47,4 +47,10 @@ impl LocalTransform {
             translation: self.translation.into(),
         }
     }
+
+    /// Update the translation and rotation from a [`nalgebra::Isometry3`]
+    pub fn update_from_isometry(&mut self, isometry: &Isometry3<f32>) {
+        self.translation = isometry.translation.vector;
+        self.rotation = isometry.rotation;
+    }
 }

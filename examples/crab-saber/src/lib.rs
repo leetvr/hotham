@@ -6,9 +6,8 @@ use hotham::{
     components::Visible,
     hecs::{Entity, World},
     systems::{
-        audio_system, collision_system, draw_gui_system, haptics_system, pointers_system,
-        rendering_system, update_global_transform_system,
-        update_global_transform_with_parent_system, update_local_transform_with_rigid_body_system,
+        audio_system, draw_gui_system, haptics_system, physics_system, pointers_system,
+        rendering_system,
     },
     xr::{self, SessionState},
     Engine, HothamResult, TickData,
@@ -45,16 +44,10 @@ fn tick(tick_data: TickData, engine: &mut Engine, game_context: &mut GameContext
         pointers_system(engine);
 
         // Physics
-        haptics_system(engine);
-        collision_system(engine);
+        physics_system(engine);
 
         // Game logic
         game_system(engine, game_context);
-
-        // Update the world
-        update_local_transform_with_rigid_body_system(engine);
-        update_global_transform_system(engine);
-        update_global_transform_with_parent_system(engine);
 
         // Haptics
         haptics_system(engine);

@@ -1,6 +1,9 @@
 use crate::{
     asset_importer::add_model_to_world,
-    components::{hand::Handedness, AnimationController, Hand, RigidBody, Stage},
+    components::{
+        hand::Handedness, local_transform::LocalTransform, AnimationController, Hand, RigidBody,
+        Stage,
+    },
     contexts::{InputContext, PhysicsContext},
     Engine,
 };
@@ -33,12 +36,12 @@ pub fn hands_system_inner(
             *physics_context.rigid_bodies[rigid_body.handle].position()
         });
 
-    for (_, (hand, animation_controller, rigid_body_component)) in world
-        .query::<(&mut Hand, &mut AnimationController, &mut RigidBody)>()
+    for (_, (hand, animation_controller, local_transform)) in world
+        .query::<(&mut Hand, &mut AnimationController, &mut LocalTransform)>()
         .iter()
     {
-        // Get our the space and path of the hand.
-        let (stage_from_local, grip_value) = match hand.handedness {
+        // Get the position of the hand in stage space.
+        let (stage_from_grip, grip_value) = match hand.handedness {
             Handedness::Left => (
                 input_context.left.stage_from_grip(),
                 input_context.left.grip_analog(),
@@ -50,20 +53,15 @@ pub fn hands_system_inner(
         };
 
         // Get global transform
-        let global_from_local = global_from_stage * stage_from_local;
+        let global_from_local = global_from_stage * stage_from_grip;
 
         // Apply transform
-        let rigid_body = physics_context
-            .rigid_bodies
-            .get_mut(rigid_body_component.handle)
-            .unwrap();
+        local_transform.update_from_isometry(&global_from_local);
 
-        rigid_body.set_next_kinematic_position(global_from_local);
-
+        // If we've grabbed something, update its position too.
         if let Some(grabbed_entity) = hand.grabbed_entity {
-            let handle = world.get::<RigidBody>(grabbed_entity).unwrap().handle;
-            let rigid_body = physics_context.rigid_bodies.get_mut(handle).unwrap();
-            rigid_body.set_next_kinematic_position(global_from_local);
+            let mut local_transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
+            local_transform.update_from_isometry(&global_from_local);
         }
 
         // Apply grip value to hand
@@ -112,12 +110,11 @@ pub fn add_hand(
             .active_events(ActiveEvents::COLLISION_EVENTS)
             .build();
         let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
-        let components = physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
+        let components = physics_context.create_rigid_body_and_collider(hand, rigid_body, collider);
         world.insert(hand, components).unwrap();
     }
 }
 
-#[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -128,16 +125,11 @@ mod tests {
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder,
     };
 
-    use crate::{
-        components::LocalTransform, contexts::XrContext,
-        systems::update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
-    };
+    use crate::components::LocalTransform;
 
     #[test]
     pub fn test_hands_system() {
-        let (mut world, mut input_context, xr_context, mut physics_context) = setup();
-
-        input_context.update(&xr_context);
+        let (mut world, input_context, mut physics_context) = setup();
 
         let hand = add_hand_to_world(&mut physics_context, &mut world, None);
 
@@ -148,15 +140,13 @@ mod tests {
             .unwrap();
 
         assert_relative_eq!(hand.grip_value, 0.0);
-        assert_relative_eq!(local_transform.translation, vector![-0.2, 1.4, -0.5]);
+        assert_relative_eq!(local_transform.translation, [-0.2, 1.4, -0.5].into());
         assert_relative_eq!(animation_controller.blend_amount, 0.0);
     }
 
     #[test]
     pub fn test_move_grabbed_objects() {
-        let (mut world, mut input_context, xr_context, mut physics_context) = setup();
-
-        input_context.update(&xr_context);
+        let (mut world, input_context, mut physics_context) = setup();
 
         let grabbed_object_rigid_body =
             RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build(); // grabber sets the rigid body as kinematic
@@ -173,18 +163,15 @@ mod tests {
     }
 
     // HELPER FUNCTIONS
-    fn setup() -> (World, InputContext, XrContext, PhysicsContext) {
+    fn setup() -> (World, InputContext, PhysicsContext) {
         let world = World::new();
-        let input_context = InputContext::default();
-        let (xr_context, _) = XrContext::testing();
+        let input_context = InputContext::testing();
         let physics_context = PhysicsContext::default();
-        (world, input_context, xr_context, physics_context)
+        (world, input_context, physics_context)
     }
 
     fn tick(world: &mut World, input_context: &InputContext, physics_context: &mut PhysicsContext) {
         hands_system_inner(world, input_context, physics_context);
-        physics_context.update();
-        update_local_transform_with_rigid_body_system_inner(world, physics_context);
     }
 
     fn add_hand_to_world(
@@ -210,7 +197,7 @@ mod tests {
                 RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
             rigid_body.set_next_kinematic_translation(vector![0.0, 1.4, 0.0]);
             let components =
-                physics_context.get_rigid_body_and_collider(hand, rigid_body, collider);
+                physics_context.create_rigid_body_and_collider(hand, rigid_body, collider);
             world.insert(hand, components).unwrap();
         }
 

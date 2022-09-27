@@ -64,16 +64,11 @@ fn draw_gui_system_inner(
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
-    #![allow(deprecated)]
-
     use super::*;
-    use anyhow::Result;
     use ash::vk::{self, Handle};
     use egui::Pos2;
-    use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
     use nalgebra::UnitQuaternion;
     use openxr::{Fovf, Quaternionf, Vector3f};
-    use std::process::Command;
 
     use crate::{
         asset_importer,
@@ -83,13 +78,13 @@ mod tests {
             UIPanel,
         },
         contexts::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
-        rendering::{image::Image, legacy_buffer::Buffer, swapchain::SwapchainInfo},
+        rendering::{image::Image, swapchain::SwapchainInfo},
         systems::{
             rendering::rendering_system_inner,
             update_global_transform::update_global_transform_system_inner,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
         },
-        util::get_from_device_memory,
+        util::{begin_renderdoc, end_renderdoc, save_image_to_disk},
         COLOR_FORMAT,
     };
 
@@ -109,7 +104,7 @@ mod tests {
         ) = setup(resolution.clone());
 
         // Begin. Use renderdoc in headless mode for debugging.
-        let mut renderdoc = begin_renderdoc();
+        let mut renderdoc = begin_renderdoc().unwrap();
 
         draw(
             &mut world,
@@ -163,9 +158,7 @@ mod tests {
         end_renderdoc(&mut renderdoc);
 
         // Get the image off the GPU
-        write_image_to_disk(&vulkan_context, image, resolution);
-
-        open_file(&mut renderdoc);
+        unsafe { save_image_to_disk(&vulkan_context, image, "draw_gui").unwrap() };
     }
 
     fn draw(
@@ -264,40 +257,6 @@ mod tests {
         });
     }
 
-    fn write_image_to_disk(vulkan_context: &VulkanContext, image: Image, resolution: vk::Extent2D) {
-        let size = (resolution.height * resolution.width * 4) as usize;
-        let image_data = vec![0; size];
-        let buffer = Buffer::new(
-            &vulkan_context,
-            &image_data,
-            vk::BufferUsageFlags::TRANSFER_DST,
-        )
-        .unwrap();
-        vulkan_context.transition_image_layout(
-            image.handle,
-            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            1,
-            1,
-        );
-        vulkan_context.copy_image_to_buffer(
-            &image,
-            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            buffer.handle,
-        );
-        let image_bytes = unsafe { get_from_device_memory(&vulkan_context, &buffer) }.to_vec();
-        let image_from_vulkan = DynamicImage::ImageRgba8(
-            RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
-        );
-        let output_path = "../test_assets/render_gui.jpg";
-        {
-            let output_path = std::path::Path::new(&output_path);
-            let mut file = std::fs::File::create(output_path).unwrap();
-            let mut jpeg_encoder = JpegEncoder::new(&mut file);
-            jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
-        }
-    }
-
     pub fn setup(
         resolution: vk::Extent2D,
     ) -> (
@@ -379,53 +338,4 @@ mod tests {
             gui_context,
         )
     }
-
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    use renderdoc::RenderDoc;
-
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn begin_renderdoc() -> Result<RenderDoc<renderdoc::V141>> {
-        let mut renderdoc = RenderDoc::<renderdoc::V141>::new()?;
-        renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
-        Ok(renderdoc)
-    }
-
-    #[cfg(target_os = "windows")]
-    fn open_file(renderdoc: &mut Result<RenderDoc<renderdoc::V141>>) {
-        if !renderdoc
-            .as_mut()
-            .map(|r| r.is_target_control_connected())
-            .unwrap_or(false)
-        {
-            let _ = Command::new("explorer.exe")
-                .args(["..\\test_assets\\render_gui.jpg"])
-                .output()
-                .unwrap();
-        }
-    }
-
-    #[cfg(target_os = "macos")]
-    fn open_file(_: &mut ()) {
-        let _ = Command::new("open")
-            .args(["../test_assets/render_gui.jpg"])
-            .output()
-            .unwrap();
-    }
-
-    // TODO: Support opening files on Linux
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    fn open_file(_: &mut Result<RenderDoc<renderdoc::V141>>) {}
-
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
-    fn begin_renderdoc() {}
-
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn end_renderdoc(renderdoc: &mut Result<RenderDoc<renderdoc::V141>>) {
-        let _ = renderdoc
-            .as_mut()
-            .map(|r| r.end_frame_capture(std::ptr::null(), std::ptr::null()));
-    }
-
-    #[cfg(any(target_os = "macos", target_os = "ios"))]
-    fn end_renderdoc(_: &mut ()) {}
 }

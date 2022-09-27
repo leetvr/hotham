@@ -27,12 +27,13 @@ const ROTATION_OFFSET: UnitQuaternion<f32> = UnitQuaternion::new_unchecked(Quate
 
 use crate::{
     components::{
-        hand::Handedness, panel::PanelInput, Info, LocalTransform, Panel, Pointer, RigidBody,
-        Stage, Visible,
+        hand::Handedness, panel::PanelInput, Info, LocalTransform, Panel, Pointer, Visible,
     },
     contexts::{InputContext, PhysicsContext},
     Engine,
 };
+
+use super::stage;
 
 /// Pointers system
 /// Allows users to interact with `Panel`s using their controllers
@@ -50,21 +51,16 @@ pub fn pointers_system_inner(
     physics_context: &mut PhysicsContext,
 ) {
     // Get the isometry of the stage
-    let global_from_stage = world
-        .query_mut::<With<Stage, &RigidBody>>()
-        .into_iter()
-        .next()
-        .map_or(Default::default(), |(_, rigid_body)| {
-            *physics_context.rigid_bodies[rigid_body.handle].position()
-        });
+    let global_from_stage = stage::get_global_from_stage(world);
 
+    // Create a transform from local space to grip space.
     let grip_from_local = ROTATION_OFFSET * POSITION_OFFSET;
 
     for (_, (pointer, local_transform)) in world
         .query::<With<Visible, (&mut Pointer, &mut LocalTransform)>>()
         .iter()
     {
-        // Get our the space and path of the pointer.
+        // Get the position of the pointer in stage space.
         let (stage_from_grip, trigger_value) = match pointer.handedness {
             Handedness::Left => (
                 input_context.left.stage_from_grip(),
@@ -75,12 +71,13 @@ pub fn pointers_system_inner(
                 input_context.right.trigger_analog(),
             ),
         };
+        println!("Grip position is {:?}", stage_from_grip);
 
         // Compose transform
         let global_from_local = global_from_stage * stage_from_grip * grip_from_local;
-
-        local_transform.translation = global_from_local.translation.vector;
-        local_transform.rotation = global_from_local.rotation;
+        println!("Setting saber position to {:?}", global_from_local);
+        local_transform.update_from_isometry(&global_from_local);
+        println!("Saber position is {:?}", local_transform.translation);
 
         // Get trigger value
         pointer.trigger_value = trigger_value;
@@ -178,7 +175,6 @@ fn ray_to_panel_space(
 mod tests {
     use super::*;
 
-    use crate::contexts::XrContext;
     use approx::assert_relative_eq;
     use ash::vk;
 
@@ -194,14 +190,12 @@ mod tests {
         };
         use nalgebra::vector;
         use rapier3d::prelude::ColliderBuilder;
+        const POINTER_Z: f32 = -0.47001815;
 
-        let (xr_context, vulkan_context) = XrContext::testing();
-        let mut render_context = RenderContext::new(&vulkan_context, &xr_context).unwrap();
+        let (mut render_context, vulkan_context) = RenderContext::testing();
         let mut physics_context = PhysicsContext::default();
-        let mut input_context = InputContext::default();
+        let input_context = InputContext::testing();
         let mut world = World::default();
-
-        input_context.update(&xr_context);
 
         let panel = Panel::create(
             &vulkan_context,
@@ -222,7 +216,7 @@ mod tests {
                 PANEL_COLLISION_GROUP,
                 PANEL_COLLISION_GROUP,
             ))
-            .translation(vector![-0.2, 2., -0.433918])
+            .translation([-0.2, 2., POINTER_Z].into())
             .rotation(vector![(3. * std::f32::consts::PI) * 0.5, 0., 0.])
             .user_data(panel_entity.id() as _)
             .build();
@@ -240,7 +234,7 @@ mod tests {
                 DEFAULT_COLLISION_GROUP,
                 DEFAULT_COLLISION_GROUP,
             ))
-            .translation(vector![-0.2, 1.5, -0.433918])
+            .translation([-0.2, 1.5, POINTER_Z].into())
             .rotation(vector![(3. * std::f32::consts::PI) * 0.5, 0., 0.])
             .build();
         let handle = physics_context.colliders.insert(collider);
@@ -261,19 +255,18 @@ mod tests {
 
         tick(&mut physics_context, &mut world, &input_context);
 
-        let local_transform = world.get_mut::<LocalTransform>(pointer_entity).unwrap();
+        let local_transform = world.get::<LocalTransform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
         assert_relative_eq!(
             local_transform.translation,
-            vector![-0.2, 1.328827, -0.433918]
+            [-0.2, 1.3258567, POINTER_Z].into()
         );
 
-        dbg!(panel_entity);
         let panel = world.get_mut::<Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 150.);
-        assert_relative_eq!(input.cursor_location.y, 88.473_13);
+        assert_relative_eq!(input.cursor_location.y, 77.30967);
         assert_eq!(input.trigger_value, 0.);
     }
 
@@ -283,8 +276,10 @@ mod tests {
         world: &mut hecs::World,
         input_context: &InputContext,
     ) {
-        physics_context.update();
-        pointers_system_inner(world, input_context, physics_context)
+        use crate::systems::physics::physics_system_inner;
+
+        physics_system_inner(physics_context, world);
+        pointers_system_inner(world, input_context, physics_context);
     }
 
     #[test]

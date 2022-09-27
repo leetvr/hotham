@@ -254,61 +254,28 @@ pub fn end(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
 #[cfg(target_os = "windows")]
 #[cfg(test)]
 mod tests {
-    #![allow(deprecated)]
-    use std::{collections::hash_map::DefaultHasher, hash::Hasher};
-
     use super::*;
-    use ash::vk;
-    use ash::vk::Handle;
-    use image::{codecs::jpeg::JpegEncoder, DynamicImage, RgbaImage};
-    use nalgebra::{Translation3, UnitQuaternion, Vector3};
+    use nalgebra::{UnitQuaternion, Vector3};
     use openxr::{Fovf, Quaternionf, Vector3f};
-    use rapier3d::prelude::Isometry;
 
     use crate::{
         asset_importer,
-        components::RigidBody,
+        components::LocalTransform,
         contexts::{PhysicsContext, RenderContext},
-        rendering::{
-            image::Image, legacy_buffer::Buffer, light::Light, scene_data, swapchain::SwapchainInfo,
-        },
+        rendering::{image::Image, light::Light, scene_data},
         systems::{
             add_stage, update_global_transform::update_global_transform_system_inner,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
-            update_local_transform_with_rigid_body::update_local_transform_with_rigid_body_system_inner,
         },
-        util::{get_from_device_memory, isometry_to_posef, posef_to_isometry},
-        COLOR_FORMAT,
+        util::{
+            begin_renderdoc, end_renderdoc, isometry_to_posef, posef_to_isometry,
+            save_image_to_disk,
+        },
     };
 
     #[test]
     pub fn test_rendering_pbr() {
-        let vulkan_context = VulkanContext::testing().unwrap();
-
-        let resolution = vk::Extent2D {
-            height: 800,
-            width: 800,
-        };
-        // Create an image with vulkan_context
-        let image = vulkan_context
-            .create_image(
-                COLOR_FORMAT,
-                &resolution,
-                vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::TRANSFER_SRC,
-                2,
-                1,
-            )
-            .unwrap();
-        vulkan_context
-            .set_debug_name(vk::ObjectType::IMAGE, image.handle.as_raw(), "Screenshot")
-            .unwrap();
-
-        let swapchain = SwapchainInfo {
-            images: vec![image.handle],
-            resolution,
-        };
-        let mut render_context =
-            RenderContext::new_from_swapchain_info(&vulkan_context, &swapchain).unwrap();
+        let (mut render_context, vulkan_context, image) = RenderContext::testing_with_image();
         let mut physics_context = PhysicsContext::default();
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
@@ -322,14 +289,14 @@ mod tests {
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform
-        let global_from_stage = Isometry::from_parts(
-            Translation3::new(0.1, 0.2, 0.3),
-            UnitQuaternion::from_scaled_axis(Vector3::y() * (std::f32::consts::TAU * 0.1)),
-        );
         let stage_entity = add_stage(&mut world, &mut physics_context);
-        physics_context.rigid_bodies[world.get_mut::<RigidBody>(stage_entity).unwrap().handle]
-            .set_position(global_from_stage, true);
-        update_local_transform_with_rigid_body_system_inner(&mut world, &physics_context);
+        let mut stage_local_transform = world.get_mut::<LocalTransform>(stage_entity).unwrap();
+        stage_local_transform.translation = [0.1, 0.2, 0.3].into();
+        stage_local_transform.rotation =
+            UnitQuaternion::from_scaled_axis(Vector3::y() * (std::f32::consts::TAU * 0.1));
+
+        let global_from_stage = stage_local_transform.position();
+        drop(stage_local_transform);
 
         // Set views
         let rotation: mint::Quaternion<f32> =
@@ -402,7 +369,6 @@ mod tests {
                     &vulkan_context,
                     &mut render_context,
                     &mut world,
-                    resolution,
                     image.clone(),
                     name,
                     *debug_shader_inputs,
@@ -420,7 +386,6 @@ mod tests {
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,
         world: &mut World,
-        resolution: vk::Extent2D,
         image: Image,
         name: &str,
         debug_shader_inputs: f32,
@@ -445,60 +410,7 @@ mod tests {
 
         // Save the resulting image to the disk and get its hash, along with a "known good" hash
         // of what the image *should* be.
-        save_image_to_disk(resolution, vulkan_context, image, name)
-    }
-
-    fn save_image_to_disk(
-        resolution: vk::Extent2D,
-        vulkan_context: &VulkanContext,
-        image: Image,
-        name: &str,
-    ) -> Result<(), String> {
-        let size = (resolution.height * resolution.width * 4) as usize;
-        let image_data = vec![0; size];
-        let buffer = Buffer::new(
-            &vulkan_context,
-            &image_data,
-            vk::BufferUsageFlags::TRANSFER_DST,
-        )
-        .unwrap();
-        vulkan_context.transition_image_layout(
-            image.handle,
-            vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            1,
-            1,
-        );
-        vulkan_context.copy_image_to_buffer(
-            &image,
-            vk::ImageLayout::TRANSFER_SRC_OPTIMAL,
-            buffer.handle,
-        );
-        let image_bytes = unsafe { get_from_device_memory(&vulkan_context, &buffer) }.to_vec();
-        let image_from_vulkan = DynamicImage::ImageRgba8(
-            RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
-        );
-        let output_path = format!("../test_assets/render_{}.jpg", name);
-        {
-            let output_path = std::path::Path::new(&output_path);
-            let mut file = std::fs::File::create(output_path).unwrap();
-            let mut jpeg_encoder = JpegEncoder::new(&mut file);
-            jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
-        }
-        let output_hash = hash_file(&output_path);
-        let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
-        let known_good_hash = hash_file(&known_good_path);
-
-        if !output_hash.is_ok() {
-            return Err(format!("Failed to hash output image: {}", name));
-        }
-        if !known_good_hash.is_ok() {
-            return Err(format!("Failed to hash known good image: {}", name));
-        }
-        if output_hash != known_good_hash {
-            return Err(format!("Bad render: {}", name));
-        }
-        Ok(())
+        unsafe { save_image_to_disk(vulkan_context, image, name) }
     }
 
     fn render(
@@ -518,30 +430,5 @@ mod tests {
         update_global_transform_with_parent_system_inner(world);
         rendering_system_inner(world, vulkan_context, render_context, views, 0);
         render_context.end_frame(vulkan_context);
-    }
-
-    fn hash_file(file_path: &str) -> Result<u64, ()> {
-        let mut hasher = DefaultHasher::new();
-        let bytes = match std::fs::read(&file_path) {
-            Ok(it) => it,
-            Err(_) => return Err(()),
-        };
-        bytes.iter().for_each(|b| hasher.write_u8(*b));
-        return Ok(hasher.finish());
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    use renderdoc::RenderDoc;
-
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn begin_renderdoc() -> Result<RenderDoc<renderdoc::V141>, renderdoc::Error> {
-        let mut renderdoc = RenderDoc::<renderdoc::V141>::new()?;
-        renderdoc.start_frame_capture(std::ptr::null(), std::ptr::null());
-        Ok(renderdoc)
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "ios")))]
-    fn end_renderdoc(renderdoc: &mut RenderDoc<renderdoc::V141>) {
-        let _ = renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
     }
 }

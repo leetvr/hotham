@@ -7,10 +7,9 @@ use hotham::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
     },
     systems::{
-        animation_system, collision_system, grabbing_system, hands::add_hand, hands_system,
-        physics_system, rendering::rendering_system, skinning::skinning_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
-        update_local_transform_with_rigid_body_system,
+        animation_system, grabbing_system, hands::add_hand, hands_system, physics_system,
+        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
+        update_global_transform_with_parent_system,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -46,8 +45,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, _state: &mut State) {
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
-        collision_system(engine);
-        update_local_transform_with_rigid_body_system(engine);
         animation_system(engine);
         update_global_transform_system(engine);
         update_global_transform_with_parent_system(engine);
@@ -109,6 +106,6 @@ fn add_helmet(
     let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
         .position(position)
         .build();
-    let components = physics_context.get_rigid_body_and_collider(helmet, rigid_body, collider);
+    let components = physics_context.create_rigid_body_and_collider(helmet, rigid_body, collider);
     world.insert(helmet, components).unwrap();
 }
