@@ -266,7 +266,6 @@ mod tests {
         assert_eq!(input.trigger_value, 0.);
     }
 
-    #[cfg(target_os = "windows")]
     fn tick(
         physics_context: &mut PhysicsContext,
         world: &mut hecs::World,
