@@ -7,8 +7,8 @@ use std::{
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{
-        hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, Pointer, RigidBody,
-        SoundEmitter, Visible,
+        hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, PhysicsControlled, Pointer,
+        RigidBody, SoundEmitter, Visible,
     },
     contexts::{
         audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
@@ -263,7 +263,10 @@ pub fn pre_spawn_cube(
 
     world.remove_one::<Visible>(cube).unwrap();
     world
-        .insert(cube, (Cube {}, color, RigidBody { handle }))
+        .insert(
+            cube,
+            (Cube {}, color, RigidBody { handle }, PhysicsControlled {}),
+        )
         .unwrap();
 }
 

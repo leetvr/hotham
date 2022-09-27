@@ -71,13 +71,10 @@ pub fn pointers_system_inner(
                 input_context.right.trigger_analog(),
             ),
         };
-        println!("Grip position is {:?}", stage_from_grip);
 
         // Compose transform
         let global_from_local = global_from_stage * stage_from_grip * grip_from_local;
-        println!("Setting saber position to {:?}", global_from_local);
         local_transform.update_from_isometry(&global_from_local);
-        println!("Saber position is {:?}", local_transform.translation);
 
         // Get trigger value
         pointer.trigger_value = trigger_value;
@@ -178,7 +175,6 @@ mod tests {
     use approx::assert_relative_eq;
     use ash::vk;
 
-    #[cfg(target_os = "windows")]
     #[test]
     pub fn test_pointers_system() {
         use crate::{

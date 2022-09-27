@@ -8,7 +8,7 @@ use crate::{
 
 /// Update the physics simulation and synchronise it with the game simulation.
 ///
-/// There are two ways we synchronise between the physics simulation and the game:
+/// There are two ways we synchronize between the physics simulation and the game:
 ///
 /// 1. **Game controlled** - physics objects have their positions set by the **game** simulation
 /// 1. **Physics controlled** - game objects have their positions set by the **physics** simulation

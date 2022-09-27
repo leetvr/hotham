@@ -2,10 +2,21 @@ use gltf::scene::Transform as TransformData;
 use nalgebra::{vector, Isometry3, Quaternion, Unit, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
 
-/// Component that represents the transform of the entity from local to parent space.
-/// This is the same as local to global space if there is no parent.
-/// Added automatically by `gltf_loader`, will be overridden if the entity also contains a `rigid_body` and
-/// `update_rigid_body_transforms_system` is running
+/// The component's position in global space (ie. the game simulation), relative to its parent.
+///
+/// There are two ways to set an entity's position in Hotham:
+///
+/// 1. **Game controlled** - this entity will have its rigid body position set by the **game** simulation
+/// 1. **Physics controlled** - this entity will have its position set by the **physics** simulation
+///
+/// If an entity has the [`super::PhysicsControlled`] component and a [`super::RigidBody`], then you
+/// are indicating that you want this entity's position in the game simulation (ie. its global position)
+/// to be entirely controlled by the physics simulation.
+///
+/// Otherwise, you can just modify [`LocalTransform`] and your entity will have its position in the game
+/// simulation AND the physics simulation (if it has a [`super::RigidBody`]) set relative to its [`super::Parent`].
+///
+/// If the entity doesn't have a [`super::Parent`], then the global transform is just whatever you've set here.
 #[derive(Clone, PartialEq, Debug, Copy, Deserialize, Serialize)]
 pub struct LocalTransform {
     /// The translation of the entity
