@@ -257,7 +257,7 @@ fn hash_file(file_path: &str) -> anyhow::Result<u64, ()> {
         Err(_) => return Err(()),
     };
     bytes.iter().for_each(|b| hasher.write_u8(*b));
-    return Ok(hasher.finish());
+    Ok(hasher.finish())
 }
 
 #[cfg(all(test, not(any(target_os = "macos", target_os = "ios"))))]

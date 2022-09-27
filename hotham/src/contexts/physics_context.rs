@@ -33,10 +33,12 @@ impl Default for PhysicsContext {
         let (contact_force_send, contact_force_recv) = crossbeam::channel::unbounded();
         let event_handler = ChannelEventCollector::new(collision_send, contact_force_send);
         let gravity: Matrix3x1<f32> = vector![0.0, 0.0, 0.0]; // TODO: no gravity in SPACE baby! But some games may uh, need this.
-        let mut integration_parameters = IntegrationParameters::default();
+        let integration_parameters = IntegrationParameters {
+            dt: 1. / 72.,
+            ..Default::default()
+        };
 
         // TODO: This is *usually* 72fps on the Quest 2, but we may support higher resolutions later.
-        integration_parameters.dt = 1. / 72.;
         let physics_pipeline = PhysicsPipeline::new();
         let impulse_joints = ImpulseJointSet::new();
         let multibody_joints = MultibodyJointSet::new();
