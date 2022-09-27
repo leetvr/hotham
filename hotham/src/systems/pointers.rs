@@ -176,6 +176,7 @@ mod tests {
     use ash::vk;
 
     #[test]
+    #[cfg(windows)]
     pub fn test_pointers_system() {
         use crate::{
             components::{Collider, LocalTransform, Panel},
@@ -266,6 +267,7 @@ mod tests {
         assert_eq!(input.trigger_value, 0.);
     }
 
+    #[cfg(windows)]
     fn tick(
         physics_context: &mut PhysicsContext,
         world: &mut hecs::World,
