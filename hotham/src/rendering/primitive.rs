@@ -99,11 +99,11 @@ impl Primitive {
 
         if let Some(iter) = reader.read_joints(0) {
             for t in iter.into_u16() {
-                joint_indices.push([t[0] as u8, t[1] as u8, t[2] as u8, t[3] as u8].into());
+                joint_indices.push([t[0] as u8, t[1] as u8, t[2] as u8, t[3] as u8]);
             }
         } else {
             for _ in 0..positions.len() {
-                joint_indices.push([0, 0, 0, 0].into());
+                joint_indices.push([0, 0, 0, 0]);
             }
         }
 

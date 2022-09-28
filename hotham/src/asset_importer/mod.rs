@@ -255,7 +255,7 @@ fn load_node(
     // First, get the transform of the node.
     let local_transform = LocalTransform::load(node.transform());
 
-    let matrix = Mat4::from_cols_array_2d(&node.transform().matrix()).into();
+    let matrix = Mat4::from_cols_array_2d(&node.transform().matrix());
     let global_transform = GlobalTransform(Affine3A::from_mat4(matrix));
 
     // Next, collect some information about the node and store it in an [`Info`] component
