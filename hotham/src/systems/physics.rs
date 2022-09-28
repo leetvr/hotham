@@ -109,8 +109,8 @@ fn update_collisions(world: &hecs::World, physics_context: &mut PhysicsContext) 
 #[cfg(test)]
 mod tests {
     use approx::assert_relative_eq;
+    use glam::{Affine3A, Quat, Vec3};
     use hecs::World;
-    use nalgebra::Isometry3;
     use rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder,
     };
@@ -130,7 +130,7 @@ mod tests {
         let mut world = hecs::World::default();
         let mut physics_context = PhysicsContext::default();
 
-        let expected_transform = global_transform([1., 2., 3.], [1.0, 0., 0.]);
+        let expected_transform = GlobalTransform(Affine3A::from_translation([1., 2., 3.].into()));
 
         // Create our test entity.
         let rigid_body_entity = world.spawn((
@@ -160,7 +160,7 @@ mod tests {
         let mut world = hecs::World::default();
         let mut physics_context = PhysicsContext::default();
 
-        let expected_transform = global_transform([1., 2., 3.], [1.0, 0., 0.]);
+        let expected_transform = GlobalTransform(Affine3A::from_translation([1., 2., 3.].into()));
 
         // Create our test entity.
         let collider_entity = world.spawn((
@@ -190,14 +190,17 @@ mod tests {
         let mut world = hecs::World::default();
         let mut physics_context = PhysicsContext::default();
 
-        let expected_position = isometry([1., 2., 3.], [1.0, 0., 0.]);
+        let expected_position = LocalTransform::from_rotation_translation(
+            Quat::from_axis_angle(Vec3::X, std::f32::consts::PI),
+            [1., 2., 3.].into(),
+        );
 
         // Create our test entity.
         let rigid_body_entity = world.spawn((
             RigidBody::new(
                 physics_context.rigid_bodies.insert(
                     RigidBodyBuilder::dynamic()
-                        .position(expected_position)
+                        .position(expected_position.to_isometry())
                         .build(),
                 ),
             ),
@@ -210,29 +213,19 @@ mod tests {
 
         // Get the local transform
         let local_transform = world.get::<LocalTransform>(rigid_body_entity).unwrap();
-        assert_relative_eq!(local_transform.position(), &expected_position);
-    }
-
-    // This is *so* gross. I hate nalgebra so much.
-    pub fn global_transform(translation: [f32; 3], rotation: [f32; 3]) -> GlobalTransform {
-        GlobalTransform(isometry(translation, rotation).to_homogeneous())
-    }
-
-    pub fn isometry(translation: [f32; 3], rotation: [f32; 3]) -> Isometry3<f32> {
-        nalgebra::Isometry3::from_parts(
-            translation.into(),
-            nalgebra::UnitQuaternion::from_euler_angles(rotation[0], rotation[1], rotation[2]),
-        )
+        assert_eq!(*local_transform, expected_position);
     }
 
     #[test]
     pub fn test_collision() {
         let mut physics_context = PhysicsContext::default();
         let mut world = hecs::World::default();
+        let position =
+            LocalTransform::from_rotation_translation(Quat::IDENTITY, [0.5, 0., 0.].into());
 
         let a = make_collider(
             ColliderBuilder::cuboid(1.0, 1.0, 1.0)
-                .position(isometry([0.5, 0.0, 0.0].into(), [0.0, 0.0, 0.0].into()))
+                .position(position.to_isometry())
                 .active_collision_types(ActiveCollisionTypes::all())
                 .active_events(ActiveEvents::COLLISION_EVENTS)
                 .sensor(true)

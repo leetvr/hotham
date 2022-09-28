@@ -19,7 +19,7 @@ const CULLING_TIMEOUT: u64 = u64::MAX;
 use crate::{
     contexts::{VulkanContext, XrContext},
     rendering::{
-        camera::Camera,
+        camera::{extract_planes_from_frustum, Camera, Frustum},
         descriptors::Descriptors,
         frame::Frame,
         image::Image,
@@ -33,7 +33,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::vk::{self, Handle};
-use nalgebra::{Isometry3, Matrix4, RowVector4, Vector4};
+use glam::{Affine3A, Mat4, Vec4};
 use openxr as xr;
 use vk_shader_macros::include_glsl;
 
@@ -208,8 +208,8 @@ impl RenderContext {
     pub(crate) fn update_scene_data(
         &mut self,
         views: &[xr::View],
-        gos_from_global: &Isometry3<f32>,
-        gos_from_stage: &Isometry3<f32>,
+        gos_from_global: &Affine3A,
+        gos_from_stage: &Affine3A,
     ) {
         self.views = views.to_owned();
 
@@ -246,8 +246,8 @@ impl RenderContext {
             scene_data.params = self.scene_data.params;
             scene_data.lights = self.scene_data.lights;
             for light in &mut scene_data.lights {
-                light.position = gos_from_global.transform_point(&light.position);
-                light.direction = gos_from_global.transform_vector(&light.direction);
+                light.position = gos_from_global.transform_point3(light.position);
+                light.direction = gos_from_global.transform_vector3(light.direction);
             }
         }
     }
@@ -281,31 +281,12 @@ impl RenderContext {
         let command_buffer = frame.compute_command_buffer;
         let fence = frame.compute_fence;
 
-        // Normals of the clipping planes are pointing towards the inside of the frustum.
-        // We are only using four planes per camera. The near and far planes are not used.
-        // This link points to a paper describing the math behind these expressions:
-        // https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
-        let left_frustum_from_world = self.scene_data.view_projection[0];
-        let right_frustum_from_world = self.scene_data.view_projection[1];
-        let normalize_plane = |p: RowVector4<_>| p / p.columns(0, 3).norm();
-        let cull_data = CullParams {
-            left_clip_planes: Matrix4::<_>::from_rows(&[
-                normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(0)),
-                normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(0)),
-                normalize_plane(left_frustum_from_world.row(3) + left_frustum_from_world.row(1)),
-                normalize_plane(left_frustum_from_world.row(3) - left_frustum_from_world.row(1)),
-            ]),
-            right_clip_planes: Matrix4::<_>::from_rows(&[
-                normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(0)),
-                normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(0)),
-                normalize_plane(right_frustum_from_world.row(3) + right_frustum_from_world.row(1)),
-                normalize_plane(right_frustum_from_world.row(3) - right_frustum_from_world.row(1)),
-            ]),
-            draw_calls: primitive_cull_buffer.len as u32,
-        };
+        // Create the cull parameters to pass to the compute shader
+        let cull_params =
+            CullParams::new(&self.scene_data.view_projection, primitive_cull_buffer.len);
 
         unsafe {
-            frame.cull_params_buffer.overwrite(&[cull_data]);
+            frame.cull_params_buffer.overwrite(&[cull_params]);
         }
 
         let group_count_x = (primitive_cull_buffer.len / 1024) + 1;
@@ -484,53 +465,13 @@ pub(crate) struct InstancedPrimitive {
 }
 
 pub(crate) struct Instance {
-    pub(crate) gos_from_local: Matrix4<f32>,
-    pub(crate) bounding_sphere: Vector4<f32>,
+    pub(crate) gos_from_local: Affine3A,
+    pub(crate) bounding_sphere: Vec4,
     pub(crate) skin_id: u32,
 }
 
 pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(p as *const T as *const u8, size_of::<T>()) }
-}
-
-#[derive(Debug, Copy, Clone)]
-pub struct Frustum {
-    pub left: f32,
-    pub right: f32,
-    pub up: f32,
-    pub down: f32,
-}
-
-impl Frustum {
-    #[rustfmt::skip]
-    /// Compute right-handed y-up inverse Z perspective projection matrix
-    pub fn projection(&self, znear: f32) -> Matrix4<f32> {
-        // Based on http://dev.theomader.com/depth-precision/ + OpenVR docs
-        let left = self.left.tan();
-        let right = self.right.tan();
-        let down = self.down.tan();
-        let up = self.up.tan();
-        let idx = 1.0 / (right - left);
-        let idy = 1.0 / (down - up);
-        let sx = right + left;
-        let sy = down + up;
-        Matrix4::new(
-            2.0 * idx, 0.0, sx * idx, 0.0,
-            0.0, 2.0 * idy, sy * idy, 0.0,
-            0.0,       0.0,      0.0, znear,
-            0.0,       0.0,     -1.0, 0.0)
-    }
-}
-
-impl From<xr::Fovf> for Frustum {
-    fn from(x: xr::Fovf) -> Self {
-        Self {
-            left: x.angle_left,
-            right: x.angle_right,
-            up: x.angle_up,
-            down: x.angle_down,
-        }
-    }
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
@@ -810,9 +751,19 @@ fn create_pipeline_layout(
 #[derive(Debug, Clone)]
 pub struct CullParams {
     /// Four clip planes per camera, one plane per row.
-    pub left_clip_planes: Matrix4<f32>,
-    pub right_clip_planes: Matrix4<f32>,
+    pub left_clip_planes: Mat4,
+    pub right_clip_planes: Mat4,
     pub draw_calls: u32,
+}
+
+impl CullParams {
+    fn new(view_projections: &[Mat4; 2], draw_calls: usize) -> Self {
+        Self {
+            left_clip_planes: extract_planes_from_frustum(&view_projections[0]),
+            right_clip_planes: extract_planes_from_frustum(&view_projections[1]),
+            draw_calls: draw_calls as u32,
+        }
+    }
 }
 
 fn create_compute_pipeline(

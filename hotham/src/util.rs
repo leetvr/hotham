@@ -2,11 +2,9 @@
 #![allow(deprecated)]
 
 use anyhow::Result;
-use nalgebra::{
-    Isometry, Isometry3, Matrix3, Matrix4, Quaternion, Rotation3, Translation3, Unit,
-    UnitQuaternion, Vector3,
-};
-use openxr::{Posef, Quaternionf, SpaceLocation, SpaceLocationFlags, Vector3f, ViewStateFlags};
+use glam::{Affine3A, Quat, Vec3};
+use openxr::{Posef, SpaceLocation, SpaceLocationFlags, ViewStateFlags};
+use rapier3d::na::Vector3;
 use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
 
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
@@ -81,46 +79,51 @@ pub fn get_world_with_hands(
     world
 }
 
-/// Convert a `Posef` from OpenXR into a `nalgebra::Isometry3`
 #[inline]
-pub fn posef_to_isometry(pose: Posef) -> Isometry3<f32> {
-    let translation: Vector3<f32> = mint::Vector3::from(pose.position).into();
-    let translation: Translation3<f32> = Translation3::from(translation);
+/// Convert a `Posef` from OpenXR into an Affine3
+pub fn affine_from_posef(pose: Posef) -> Affine3A {
+    let translation: Vec3 = mint::Vector3::from(pose.position).into();
+    let rotation: Quat = mint::Quaternion::from(pose.orientation).into();
 
-    let rotation: Quaternion<f32> = mint::Quaternion::from(pose.orientation).into();
-    let rotation: UnitQuaternion<f32> = Unit::new_normalize(rotation);
-
-    Isometry {
-        rotation,
-        translation,
-    }
+    Affine3A::from_rotation_translation(rotation, translation)
 }
 
-/// Convert a `nalgebra::Isometry3` into a `Posef` from OpenXR
 #[inline]
-pub fn isometry_to_posef(isometry: Isometry3<f32>) -> Posef {
+/// Convert a [`glam::Affine3A`] into a [`openxr::Posef`]
+pub fn posef_from_affine(transform: Affine3A) -> Posef {
+    let (_, rotation, translation) = transform.to_scale_rotation_translation();
     Posef {
-        orientation: Quaternionf {
-            x: isometry.rotation.i,
-            y: isometry.rotation.j,
-            z: isometry.rotation.k,
-            w: isometry.rotation.w,
-        },
-        position: Vector3f {
-            x: isometry.translation.vector.x,
-            y: isometry.translation.vector.y,
-            z: isometry.translation.vector.z,
-        },
+        orientation: mint::Quaternion::from(rotation).into(),
+        position: mint::Vector3::from(translation).into(),
     }
 }
 
-/// Convert a `Matrix4` into a `nalgebra::Isometry3`
 #[inline]
-pub fn matrix_to_isometry(m: Matrix4<f32>) -> Isometry3<f32> {
-    let translation = m.column(3).xyz();
-    let m: Matrix3<f32> = m.fixed_slice::<3, 3>(0, 0).into();
-    let rotation = Rotation3::from_matrix(&m);
-    Isometry3::from_parts(translation.into(), rotation.into())
+/// Convert a [`glam::Affine3A`] into a [`rapier3d::na::Isometry3`]
+pub fn isometry_from_affine(a: &glam::f32::Affine3A) -> rapier3d::na::Isometry3<f32> {
+    use rapier3d::na;
+    let (_, r, t) = a.to_scale_rotation_translation();
+    let translation = na::Translation3::new(t.x, t.y, t.z);
+
+    let rotation: na::UnitQuaternion<f32> =
+        na::UnitQuaternion::new_unchecked([r.x, r.y, r.z, r.w].into());
+
+    na::Isometry3::from_parts(translation, rotation)
+}
+
+#[inline]
+/// Decompose a [`rapier3d::na::Isometry3`] into its rotation and translation components
+pub fn decompose_isometry(i: &rapier3d::na::Isometry3<f32>) -> (glam::Quat, glam::Vec3) {
+    (
+        glam::Quat::from_array(i.rotation.quaternion().coords.data.0[0]),
+        mint::Vector3::from(i.translation.vector.data.0[0]).into(),
+    )
+}
+
+#[inline]
+/// Convert a [`glam::Vec3`] into a [`rapier3d::na::Vector3`]
+pub fn na_vector_from_glam_vec(v: Vec3) -> Vector3<f32> {
+    [v.x, v.y, v.z].into()
 }
 
 #[cfg(test)]
@@ -225,7 +228,7 @@ pub(crate) unsafe fn save_image_to_disk(
     let image_from_vulkan = DynamicImage::ImageRgba8(
         RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
     );
-    let output_path = format!("../test_assets/render_{}.jpg", name);
+    let output_path = format!("../test_assets/render_{}_known_good.jpg", name);
     {
         let output_path = std::path::Path::new(&output_path);
         let mut file = std::fs::File::create(output_path).unwrap();

@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use gltf::animation::util::ReadOutputs;
 use itertools::Itertools;
-use nalgebra::{Quaternion, UnitQuaternion};
 
 use crate::{asset_importer::ImportContext, components::AnimationTarget};
+use glam::Quat;
 
 #[derive(Debug, Clone, PartialEq, Default)]
 
@@ -54,12 +54,9 @@ impl AnimationController {
                 }
                 Some(ReadOutputs::Rotations(rotation_data)) => {
                     for r in rotation_data.into_f32() {
-                        // gltf gives us a quaternion in [x, y, z, w] but we need [w, x, y, z]
                         animation_target
                             .rotations
-                            .push(UnitQuaternion::new_normalize(Quaternion::new(
-                                r[3], r[0], r[1], r[2],
-                            )));
+                            .push(Quat::from_xyzw(r[0], r[1], r[2], r[3]));
                     }
                 }
                 Some(ReadOutputs::Scales(scale_data)) => {

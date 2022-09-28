@@ -9,8 +9,8 @@ use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{GlobalTransform, LocalTransform, Mesh, Visible},
     contexts::RenderContext,
+    glam::{EulerRot, Quat, Vec3},
     hecs::{With, World},
-    nalgebra::{UnitQuaternion, Vector3},
     rendering::{
         light::Light,
         material::Material,
@@ -36,7 +36,7 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
-    let test = StressTest::ManyHelmets;
+    let test = StressTest::NormalTangentTest;
     let models = init(&mut engine, &test);
     let timer = Default::default();
 
@@ -169,10 +169,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
                 let e = add_model_to_world("Damaged Helmet", &models, world, physics_context, None)
                     .expect("Could not find cube?");
                 let mut t = world.get_mut::<LocalTransform>(e).unwrap();
-                t.rotation = UnitQuaternion::from_axis_angle(
-                    &Vector3::x_axis(),
-                    std::f32::consts::FRAC_PI_2,
-                );
+                t.rotation = Quat::from_axis_angle(Vec3::X, std::f32::consts::FRAC_PI_2);
             }
             models
         }
@@ -323,8 +320,12 @@ fn model_system(
 
 fn rotate_models(world: &mut World, total_time: f32) {
     for (_, local_transform) in world.query_mut::<With<Mesh, &mut LocalTransform>>() {
-        local_transform.rotation =
-            UnitQuaternion::from_euler_angles(90.0_f32.to_radians(), total_time.sin() * 2., 0.);
+        local_transform.rotation = Quat::from_euler(
+            EulerRot::XYZ,
+            90.0_f32.to_radians(),
+            total_time.sin() * 2.,
+            0.,
+        );
     }
 }
 
@@ -349,7 +350,7 @@ fn rearrange_models(world: &mut World) {
         local_transform.translation.y = (row as f32) - 0.5;
         local_transform.translation.z = -4.0;
 
-        local_transform.scale = Vector3::repeat(scale);
+        local_transform.scale = Vec3::splat(scale);
 
         column += 1;
     }

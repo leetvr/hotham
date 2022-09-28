@@ -1,13 +1,12 @@
 use crate::{
     asset_importer::add_model_to_world,
     components::{
-        hand::Handedness, local_transform::LocalTransform, AnimationController, Hand, RigidBody,
-        Stage,
+        hand::Handedness, local_transform::LocalTransform, stage, AnimationController, Hand,
     },
     contexts::{InputContext, PhysicsContext},
     Engine,
 };
-use hecs::{With, World};
+use hecs::World;
 use rapier3d::prelude::{
     ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
 };
@@ -17,24 +16,12 @@ use rapier3d::prelude::{
 pub fn hands_system(engine: &mut Engine) {
     let world = &mut engine.world;
     let input_context = &mut engine.input_context;
-    let physics_context = &mut engine.physics_context;
-
-    hands_system_inner(world, input_context, physics_context);
+    hands_system_inner(world, input_context);
 }
 
-pub fn hands_system_inner(
-    world: &mut World,
-    input_context: &InputContext,
-    physics_context: &mut PhysicsContext,
-) {
-    // Get the isometry of the stage
-    let global_from_stage = world
-        .query_mut::<With<Stage, &RigidBody>>()
-        .into_iter()
-        .next()
-        .map_or(Default::default(), |(_, rigid_body)| {
-            *physics_context.rigid_bodies[rigid_body.handle].position()
-        });
+pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
+    // Get the position
+    let global_from_stage = stage::get_global_from_stage(world);
 
     for (_, (hand, animation_controller, local_transform)) in world
         .query::<(&mut Hand, &mut AnimationController, &mut LocalTransform)>()
@@ -56,12 +43,12 @@ pub fn hands_system_inner(
         let global_from_local = global_from_stage * stage_from_grip;
 
         // Apply transform
-        local_transform.update_from_isometry(&global_from_local);
+        local_transform.update_from_affine(&global_from_local);
 
         // If we've grabbed something, update its position too.
         if let Some(grabbed_entity) = hand.grabbed_entity {
             let mut local_transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
-            local_transform.update_from_isometry(&global_from_local);
+            local_transform.update_from_affine(&global_from_local);
         }
 
         // Apply grip value to hand
@@ -120,20 +107,16 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use hecs::Entity;
-    use nalgebra::vector;
-    use rapier3d::prelude::{
-        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder,
-    };
+    use rapier3d::prelude::RigidBodyBuilder;
 
-    use crate::components::LocalTransform;
+    use crate::components::{LocalTransform, RigidBody};
 
     #[test]
     pub fn test_hands_system() {
-        let (mut world, input_context, mut physics_context) = setup();
+        let (mut world, input_context, _) = setup();
+        let hand = add_hand_to_world(&mut world, None);
 
-        let hand = add_hand_to_world(&mut physics_context, &mut world, None);
-
-        tick(&mut world, &input_context, &mut physics_context);
+        tick(&mut world, &input_context);
 
         let (local_transform, hand, animation_controller) = world
             .query_one_mut::<(&LocalTransform, &Hand, &AnimationController)>(hand)
@@ -154,12 +137,12 @@ mod tests {
             .rigid_bodies
             .insert(grabbed_object_rigid_body);
         let grabbed_entity = world.spawn((RigidBody { handle }, LocalTransform::default()));
-        add_hand_to_world(&mut physics_context, &mut world, Some(grabbed_entity));
+        add_hand_to_world(&mut world, Some(grabbed_entity));
 
-        tick(&mut world, &input_context, &mut physics_context);
+        tick(&mut world, &input_context);
 
         let local_transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
-        assert_relative_eq!(local_transform.translation, vector![-0.2, 1.4, -0.5]);
+        assert_relative_eq!(local_transform.translation, [-0.2, 1.4, -0.5].into());
     }
 
     // HELPER FUNCTIONS
@@ -170,37 +153,17 @@ mod tests {
         (world, input_context, physics_context)
     }
 
-    fn tick(world: &mut World, input_context: &InputContext, physics_context: &mut PhysicsContext) {
-        hands_system_inner(world, input_context, physics_context);
+    fn tick(world: &mut World, input_context: &InputContext) {
+        hands_system_inner(world, input_context);
     }
 
-    fn add_hand_to_world(
-        physics_context: &mut PhysicsContext,
-        world: &mut World,
-        grabbed_entity: Option<Entity>,
-    ) -> Entity {
+    fn add_hand_to_world(world: &mut World, grabbed_entity: Option<Entity>) -> Entity {
         let mut animation_controller = AnimationController::default();
         animation_controller.blend_amount = 100.0; // bogus value
 
         let mut hand = Hand::left();
         hand.grip_value = 100.0; // bogus value
         hand.grabbed_entity = grabbed_entity;
-        let hand = world.spawn((animation_controller, hand, LocalTransform::default()));
-        {
-            // Give it a collider and rigid-body
-            let collider = ColliderBuilder::capsule_y(0.05, 0.02)
-                .sensor(true)
-                .active_collision_types(ActiveCollisionTypes::all())
-                .active_events(ActiveEvents::COLLISION_EVENTS)
-                .build();
-            let mut rigid_body =
-                RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
-            rigid_body.set_next_kinematic_translation(vector![0.0, 1.4, 0.0]);
-            let components =
-                physics_context.create_rigid_body_and_collider(hand, rigid_body, collider);
-            world.insert(hand, components).unwrap();
-        }
-
-        hand
+        world.spawn((animation_controller, hand, LocalTransform::default()))
     }
 }

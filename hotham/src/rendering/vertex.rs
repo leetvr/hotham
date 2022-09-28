@@ -1,16 +1,16 @@
 use ash::vk;
-use nalgebra::{Vector2, Vector3, Vector4};
+use glam::{Vec2, Vec3, Vec4};
 
 /// Representation of a single vertex, usually imported from a glTF file.
 #[repr(C)]
 #[derive(Clone, Debug, Copy, PartialEq, Default)]
 pub struct Vertex {
     /// Position in model space
-    pub position: Vector3<f32>,
+    pub position: Vec3,
     /// Normal in model space
-    pub normal: Vector3<f32>,
+    pub normal: Vec3,
     /// First set of texture coordinates
-    pub texture_coords: Vector2<f32>,
+    pub texture_coords: Vec2,
     /// Joint indices (for skinning), one byte per index.
     pub joint_indices: u32,
     /// Joint weights (for skinning), one byte per weight.
@@ -20,9 +20,9 @@ pub struct Vertex {
 impl Vertex {
     /// Create a new vertex
     pub fn new(
-        position: Vector3<f32>,
-        normal: Vector3<f32>,
-        texture_coords: Vector2<f32>,
+        position: Vec3,
+        normal: Vec3,
+        texture_coords: Vec2,
         joint_indices: u32,
         joint_weights: u32,
     ) -> Self {
@@ -38,17 +38,9 @@ impl Vertex {
     /// Create a new vertex from a zip - useful when importing from glTF
     // Clippy warning suppressed for adjudication separately
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
-    pub fn from_zip(
-        t: (
-            Vector3<f32>,
-            Vector3<f32>,
-            Vector2<f32>,
-            Vector4<u8>,
-            Vector4<f32>,
-        ),
-    ) -> Self {
+    pub fn from_zip(t: (Vec3, Vec3, Vec2, [u8; 4], Vec4)) -> Self {
         // Normalize weights to 0 <= w <= 255 while avoiding division with zero.
-        let max_weight = t.4.max().max(f32::EPSILON);
+        let max_weight = t.4.max_element().max(f32::EPSILON);
         let weight_normalization = 255.0 / max_weight;
         Vertex::new(
             t.0,

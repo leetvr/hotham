@@ -1,9 +1,9 @@
 use crate::{
     contexts::XrContext,
-    util::{is_space_valid, posef_to_isometry},
+    util::{affine_from_posef, is_space_valid},
     xr,
 };
-use nalgebra::{Isometry3, Vector2, Vector3};
+use glam::{Affine3A, Vec2, Vec3};
 
 #[derive(Debug, Default)]
 pub struct LeftInputContext {
@@ -37,13 +37,13 @@ pub struct LeftInputContext {
     trigger_analog: f32,
     trigger_analog_prev: f32,
     // vec2 input
-    thumbstick_xy: Vector2<f32>,
+    thumbstick_xy: Vec2,
     // vec3 input
-    linear_velocity: Vector3<f32>,
-    angular_velocity: Vector3<f32>,
+    linear_velocity: Vec3,
+    angular_velocity: Vec3,
     // pose input
-    stage_from_grip: Isometry3<f32>,
-    stage_from_aim: Isometry3<f32>,
+    stage_from_grip: Affine3A,
+    stage_from_aim: Affine3A,
 }
 
 impl LeftInputContext {
@@ -152,19 +152,19 @@ impl LeftInputContext {
     pub fn trigger_analog(&self) -> f32 {
         self.trigger_analog
     }
-    pub fn thumbstick_xy(&self) -> Vector2<f32> {
+    pub fn thumbstick_xy(&self) -> Vec2 {
         self.thumbstick_xy
     }
-    pub fn linear_velocity(&self) -> Vector3<f32> {
+    pub fn linear_velocity(&self) -> Vec3 {
         self.linear_velocity
     }
-    pub fn angular_velocity(&self) -> Vector3<f32> {
+    pub fn angular_velocity(&self) -> Vec3 {
         self.angular_velocity
     }
-    pub fn stage_from_grip(&self) -> Isometry3<f32> {
+    pub fn stage_from_grip(&self) -> Affine3A {
         self.stage_from_grip
     }
-    pub fn stage_from_aim(&self) -> Isometry3<f32> {
+    pub fn stage_from_aim(&self) -> Affine3A {
         self.stage_from_aim
     }
 }
@@ -199,13 +199,13 @@ pub struct RightInputContext {
     trigger_analog: f32,
     trigger_analog_prev: f32,
     // vec2 input
-    thumbstick_xy: Vector2<f32>,
+    thumbstick_xy: Vec2,
     // vec3 input
-    linear_velocity: Vector3<f32>,
-    angular_velocity: Vector3<f32>,
+    linear_velocity: Vec3,
+    angular_velocity: Vec3,
     // pose input
-    stage_from_grip: Isometry3<f32>,
-    stage_from_aim: Isometry3<f32>,
+    stage_from_grip: Affine3A,
+    stage_from_aim: Affine3A,
 }
 
 impl RightInputContext {
@@ -305,19 +305,19 @@ impl RightInputContext {
     pub fn trigger_analog(&self) -> f32 {
         self.trigger_analog
     }
-    pub fn thumbstick_xy(&self) -> Vector2<f32> {
+    pub fn thumbstick_xy(&self) -> Vec2 {
         self.thumbstick_xy
     }
-    pub fn linear_velocity(&self) -> Vector3<f32> {
+    pub fn linear_velocity(&self) -> Vec3 {
         self.linear_velocity
     }
-    pub fn angular_velocity(&self) -> Vector3<f32> {
+    pub fn angular_velocity(&self) -> Vec3 {
         self.angular_velocity
     }
-    pub fn stage_from_grip(&self) -> Isometry3<f32> {
+    pub fn stage_from_grip(&self) -> Affine3A {
         self.stage_from_grip
     }
-    pub fn stage_from_aim(&self) -> Isometry3<f32> {
+    pub fn stage_from_aim(&self) -> Affine3A {
         self.stage_from_aim
     }
 }
@@ -430,7 +430,7 @@ impl InputContext {
             .relate(&xr_context.stage_space, time)
             .unwrap();
         if is_space_valid(location) {
-            self.left.stage_from_grip = posef_to_isometry(location.pose);
+            self.left.stage_from_grip = affine_from_posef(location.pose);
             self.left.linear_velocity = mint::Vector3::from(velocity.linear_velocity).into();
             self.left.angular_velocity = mint::Vector3::from(velocity.angular_velocity).into();
         }
@@ -439,7 +439,7 @@ impl InputContext {
             .locate(&xr_context.stage_space, time)
             .unwrap();
         if is_space_valid(location) {
-            self.left.stage_from_aim = posef_to_isometry(location.pose);
+            self.left.stage_from_aim = affine_from_posef(location.pose);
         }
 
         self.right.a_button =
@@ -504,7 +504,7 @@ impl InputContext {
             .relate(&xr_context.stage_space, time)
             .unwrap();
         if is_space_valid(location) {
-            self.right.stage_from_grip = posef_to_isometry(location.pose);
+            self.right.stage_from_grip = affine_from_posef(location.pose);
             self.right.linear_velocity = mint::Vector3::from(velocity.linear_velocity).into();
             self.right.angular_velocity = mint::Vector3::from(velocity.angular_velocity).into();
         }
@@ -513,7 +513,7 @@ impl InputContext {
             .locate(&xr_context.stage_space, time)
             .unwrap();
         if is_space_valid(location) {
-            self.right.stage_from_aim = posef_to_isometry(location.pose);
+            self.right.stage_from_aim = affine_from_posef(location.pose);
         }
     }
 }
@@ -523,11 +523,11 @@ impl InputContext {
     /// Get an `InputContext` used for testing. Uses the same values as defined in the simulator.
     pub fn testing() -> Self {
         let mut input_context = Self::default();
-        let rotation = nalgebra::UnitQuaternion::new_unchecked([0.707, 0., 0., 0.707].into());
+        let rotation = glam::Quat::from_xyzw(0.707, 0., 0., 0.707);
         input_context.left.stage_from_grip =
-            Isometry3::from_parts([-0.2, 1.4, -0.5].into(), rotation);
+            glam::Affine3A::from_rotation_translation(rotation, [-0.2, 1.4, -0.5].into());
         input_context.right.stage_from_grip =
-            Isometry3::from_parts([0.2, 1.4, -0.5].into(), rotation);
+            glam::Affine3A::from_rotation_translation(rotation, [0.2, 1.4, -0.5].into());
 
         input_context
     }

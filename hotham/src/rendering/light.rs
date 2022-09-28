@@ -1,4 +1,4 @@
-use nalgebra::{Point3, UnitQuaternion, Vector3};
+use glam::{Quat, Vec3};
 use serde::{Deserialize, Serialize};
 
 /// A directional light.
@@ -18,19 +18,19 @@ pub const MAX_LIGHTS: usize = 4;
 #[repr(C, align(16))]
 pub struct Light {
     /// The direction the light is facing.
-    pub direction: Vector3<f32>,
+    pub direction: Vec3,
     /// The range of the light. -1 indicates infinite range.
     pub range: f32,
 
     /// RGB value for the color of the light in linear space.
-    pub color: Vector3<f32>,
+    pub color: Vec3,
     /// Brightness of light in the type specific units.
     /// Point and spot lights use luminous intensity in candela (lm/sr), while directional lights use
     /// illuminance in lux (lm/m2)
     pub intensity: f32,
 
     /// The position of the light
-    pub position: Point3<f32>,
+    pub position: Vec3,
     /// Cosine of the angle, in radians, from center of spotlight where falloff begins.
     pub inner_cone_cos: f32,
 
@@ -51,11 +51,11 @@ impl Light {
 
     /// Create a new spotlight
     pub fn new_spotlight(
-        direction: Vector3<f32>,
+        direction: Vec3,
         range: f32,
         intensity: f32,
-        color: Vector3<f32>,
-        position: Point3<f32>,
+        color: Vec3,
+        position: Vec3,
         inner_cone_angle: f32,
         outer_cone_angle: f32,
     ) -> Self {
@@ -72,7 +72,7 @@ impl Light {
     }
 
     /// Create a new directional light
-    pub fn new_directional(direction: Vector3<f32>, intensity: f32, color: Vector3<f32>) -> Self {
+    pub fn new_directional(direction: Vec3, intensity: f32, color: Vec3) -> Self {
         Self {
             direction,
             color,
@@ -83,12 +83,7 @@ impl Light {
     }
 
     /// Create a new point light
-    pub fn new_point(
-        position: Point3<f32>,
-        range: f32,
-        intensity: f32,
-        color: Vector3<f32>,
-    ) -> Self {
+    pub fn new_point(position: Vec3, range: f32, intensity: f32, color: Vec3) -> Self {
         Self {
             position,
             range,
@@ -102,12 +97,11 @@ impl Light {
     pub(crate) fn from_gltf(light: &gltf::khr_lights_punctual::Light, node: &gltf::Node) -> Self {
         // TODO: Technically scale could apply here as well.
         let (translation, rotation, _) = node.transform().decomposed();
-        let rotation = UnitQuaternion::new_unchecked(rotation.into());
+        let rotation = Quat::from_array(rotation);
         let intensity = light.intensity();
         let color = light.color().into();
         let range = light.range().unwrap_or(-1.);
-        let along_negative_z = [0., 0., -1.].into();
-        let direction = rotation.transform_vector(&along_negative_z);
+        let direction = rotation * Vec3::NEG_Z;
         let position = translation.into();
 
         match light.kind() {

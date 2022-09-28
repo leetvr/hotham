@@ -1,6 +1,7 @@
-use hotham::components::{LocalTransform, Stage};
-use hotham::nalgebra::{Quaternion, Translation3, UnitQuaternion};
+use hotham::components::{stage, LocalTransform};
+use hotham::glam::Affine3A;
 use hotham::rapier3d::prelude::RigidBodyType;
+use hotham::systems::pointers::{POSITION_OFFSET, ROTATION_OFFSET};
 use hotham::Engine;
 use hotham::{
     asset_importer::{add_model_to_world, Models},
@@ -10,14 +11,6 @@ use hotham::{
 };
 
 use crate::components::{Color, Saber};
-
-const POSITION_OFFSET: Translation3<f32> = Translation3::new(0., -0.08, 0.);
-const ROTATION_OFFSET: UnitQuaternion<f32> = UnitQuaternion::new_unchecked(Quaternion::<f32>::new(
-    -0.558_149_9,
-    0.827_491_2,
-    0.034_137_91,
-    -0.050_611_533,
-));
 
 const SABER_HEIGHT: f32 = 0.8;
 const SABER_HALF_HEIGHT: f32 = SABER_HEIGHT / 2.;
@@ -31,15 +24,10 @@ pub fn sabers_system(engine: &mut Engine) {
 
 fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
     // Get the isometry of the stage
-    let global_from_stage = world
-        .query_mut::<With<Stage, &LocalTransform>>()
-        .into_iter()
-        .next()
-        .map_or(Default::default(), |(_, local_transform)| {
-            local_transform.position()
-        });
+    let global_from_stage = stage::get_global_from_stage(world);
 
-    let grip_from_saber = ROTATION_OFFSET * POSITION_OFFSET;
+    // Create a transform from local space to grip space.
+    let grip_from_local = Affine3A::from_rotation_translation(ROTATION_OFFSET, POSITION_OFFSET);
 
     for (_, (color, local_transform)) in
         world.query_mut::<With<Saber, (&Color, &mut LocalTransform)>>()
@@ -51,8 +39,8 @@ fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
         };
 
         // Apply transform
-        let position = global_from_stage * stage_from_grip * grip_from_saber;
-        local_transform.update_from_isometry(&position);
+        let position = global_from_stage * stage_from_grip * grip_from_local;
+        local_transform.update_from_affine(&position);
     }
 }
 

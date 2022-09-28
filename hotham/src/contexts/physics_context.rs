@@ -8,6 +8,8 @@ use crate::components::{Collider as ColliderComponent, RigidBody as RigidBodyCom
 
 pub const DEFAULT_COLLISION_GROUP: u32 = 0b01;
 pub const PANEL_COLLISION_GROUP: u32 = 0b10;
+/// TODO: This is *usually* 72fps on the Quest 2, but we may support higher resolutions later.
+pub const DELTA_TIME: f32 = 1. / 72.;
 
 pub struct PhysicsContext {
     pub physics_pipeline: PhysicsPipeline,
@@ -32,13 +34,11 @@ impl Default for PhysicsContext {
         let (collision_send, collision_recv) = crossbeam::channel::unbounded();
         let (contact_force_send, contact_force_recv) = crossbeam::channel::unbounded();
         let event_handler = ChannelEventCollector::new(collision_send, contact_force_send);
-        let gravity: Matrix3x1<f32> = vector![0.0, 0.0, 0.0]; // TODO: no gravity in SPACE baby! But some games may uh, need this.
         let integration_parameters = IntegrationParameters {
-            dt: 1. / 72.,
+            dt: DELTA_TIME,
             ..Default::default()
         };
 
-        // TODO: This is *usually* 72fps on the Quest 2, but we may support higher resolutions later.
         let physics_pipeline = PhysicsPipeline::new();
         let impulse_joints = ImpulseJointSet::new();
         let multibody_joints = MultibodyJointSet::new();
@@ -46,7 +46,7 @@ impl Default for PhysicsContext {
 
         PhysicsContext {
             physics_pipeline,
-            gravity,
+            gravity: [0., 0., 0.].into(),
             query_pipeline: QueryPipeline::new(),
             colliders: ColliderSet::new(),
             broad_phase: BroadPhase::new(),

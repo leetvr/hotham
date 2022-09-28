@@ -1,11 +1,10 @@
 use crate::{
     asset_importer::ImportContext,
-    components::GlobalTransform,
     contexts::render_context,
     rendering::{material::NO_MATERIAL, vertex::Vertex},
 };
+use glam::{Affine3A, Vec3, Vec4};
 use itertools::izip;
-use nalgebra::{vector, Point3, Vector3, Vector4};
 use render_context::RenderContext;
 
 /// Geometry for a mesh
@@ -21,7 +20,7 @@ pub struct Primitive {
     /// Material used
     pub material_id: u32,
     /// Bounding sphere - used for culling
-    pub bounding_sphere: Vector4<f32>,
+    pub bounding_sphere: Vec4,
 }
 
 impl Primitive {
@@ -67,7 +66,7 @@ impl Primitive {
             .read_positions()
             .unwrap_or_else(|| panic!("Mesh {} has no positions!", mesh_name))
         {
-            positions.push(vector![v[0], v[1], v[2]]);
+            positions.push([v[0], v[1], v[2]].into());
         }
 
         // Indices
@@ -80,41 +79,41 @@ impl Primitive {
         // Normals
         if let Some(iter) = reader.read_normals() {
             for v in iter {
-                normals.push(vector![v[0], v[1], v[2]]);
+                normals.push([v[0], v[1], v[2]].into());
             }
         } else {
             for _ in 0..positions.len() {
-                normals.push(vector![0., 0., 0.]);
+                normals.push([0., 0., 0.].into());
             }
         }
 
         if let Some(iter) = reader.read_tex_coords(0) {
             for v in iter.into_f32() {
-                tex_coords.push(vector![v[0], v[1]]);
+                tex_coords.push([v[0], v[1]].into());
             }
         } else {
             for _ in 0..positions.len() {
-                tex_coords.push(vector![0., 0.]);
+                tex_coords.push([0., 0.].into());
             }
         }
 
         if let Some(iter) = reader.read_joints(0) {
             for t in iter.into_u16() {
-                joint_indices.push(vector![t[0] as u8, t[1] as u8, t[2] as u8, t[3] as u8]);
+                joint_indices.push([t[0] as u8, t[1] as u8, t[2] as u8, t[3] as u8]);
             }
         } else {
             for _ in 0..positions.len() {
-                joint_indices.push(vector![0, 0, 0, 0]);
+                joint_indices.push([0, 0, 0, 0]);
             }
         }
 
         if let Some(iter) = reader.read_weights(0) {
             for t in iter.into_f32() {
-                joint_weights.push(vector![t[0] as f32, t[1] as f32, t[2] as f32, t[3] as f32]);
+                joint_weights.push([t[0] as f32, t[1] as f32, t[2] as f32, t[3] as f32].into());
             }
         } else {
             for _ in 0..positions.len() {
-                joint_weights.push(vector![0., 0., 0., 0.]);
+                joint_weights.push([0., 0., 0., 0.].into());
             }
         }
 
@@ -142,57 +141,45 @@ impl Primitive {
     }
 
     /// Get a bounding sphere for the primitive, applying a transform
-    pub fn get_bounding_sphere(&self, global_transform: &GlobalTransform) -> Vector4<f32> {
-        let center_in_local: Point3<_> = self.bounding_sphere.xyz().into();
-        let center_in_global =
-            Point3::<_>::from_homogeneous(global_transform.0 * center_in_local.to_homogeneous())
-                .unwrap();
+    pub fn get_bounding_sphere_in_gos(&self, gos_from_local: &Affine3A) -> Vec4 {
+        let center_in_local = self.bounding_sphere.truncate();
+        let center_in_gos = gos_from_local.transform_point3(center_in_local);
 
-        // The linear part contains the rotation and scale, we are interested in the scale.
-        let global_from_local_linear_part = global_transform.0.fixed_slice::<3, 3>(0, 0);
-
-        // The scale of the sphere is taken as the largest scale in any dimension.
-        // If the scale is uniform, the quality of the bounding sphere will be unchanged.
-        // If the scale is non-uniform and axis aligned in local space, there could be a tighter bounding sphere.
-        // If the scale is non-uniform and not axis aligned in local space (skew), the bounding sphere may be too tight.
-        // If the case with skew becomes a problem in practice, there are several ways to solve it, eg:
-        // * Using singular value decomposition can give a solution similar to the axis aligned case.
-        // * Using a fudge factor can ensure correctness with a bounding sphere that usually is bigger than it needs to be.
-        let scale = global_from_local_linear_part
-            .column(0)
-            .magnitude_squared()
-            .max(global_from_local_linear_part.column(1).magnitude_squared())
-            .max(global_from_local_linear_part.column(2).magnitude_squared())
-            .sqrt();
-        let radius_in_global = self.bounding_sphere.w * scale;
+        // If this entity was scaled, we'll need to multiply the radius of its sphere by the *largest* element
+        // of its scale.
+        let (scale, _, _) = gos_from_local.to_scale_rotation_translation();
+        let scale = scale.max_element();
+        let radius_in_gos = self.bounding_sphere.w * scale;
 
         [
-            center_in_global.x,
-            center_in_global.y,
-            center_in_global.z,
-            radius_in_global,
+            center_in_gos.x,
+            center_in_gos.y,
+            center_in_gos.z,
+            radius_in_gos,
         ]
         .into()
     }
 }
 
 /// Get a bounding sphere for the primitive, used for occlusion culling
-pub fn calculate_bounding_sphere(vertices: &[Vertex]) -> Vector4<f32> {
+///
+/// This algorithm is loosely lifted from the official Vulkan examples - don't ask me how it works.
+pub fn calculate_bounding_sphere(vertices: &[Vertex]) -> Vec4 {
     let points = vertices.iter().map(|v| v.position).collect::<Vec<_>>();
     let num_points = points.len();
     if num_points == 0 {
         return Default::default();
     }
 
-    let mut center = Vector3::zeros();
+    let mut center = Vec3::ZERO;
     for p in &points {
-        center += p;
+        center += *p;
     }
 
     center /= num_points as f32;
-    let mut radius = (points[0] - center).norm_squared();
+    let mut radius = (points[0] - center).length_squared();
     for p in points.iter().skip(1) {
-        radius = radius.max((p - center).norm_squared());
+        radius = radius.max((*p - center).length_squared());
     }
 
     radius = next_up(radius.sqrt());

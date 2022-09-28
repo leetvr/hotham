@@ -1,6 +1,6 @@
 use ash::vk;
+use glam::{Mat4, Vec4};
 use id_arena::Arena;
-use nalgebra::{Matrix4, Vector4};
 use vulkan_context::VulkanContext;
 
 use crate::contexts::vulkan_context;
@@ -36,7 +36,7 @@ pub struct Resources {
     pub mesh_data: Arena<MeshData>,
 
     /// Buffer for skins
-    pub skins_buffer: Buffer<[Matrix4<f32>; 64]>,
+    pub skins_buffer: Buffer<[Mat4; 64]>,
 
     /// Shared sampler in repeat mode, takes care of most things
     pub texture_sampler: vk::Sampler,
@@ -201,10 +201,10 @@ fn load_ibl_textures(
 #[repr(C, align(16))]
 pub struct DrawData {
     /// The transform of the parent mesh
-    pub gos_from_local: Matrix4<f32>,
+    pub gos_from_local: Mat4,
     /// The inverse of the transform of the parent mesh
     /// Transform normals by multiplying with the matrix on the right hand side
-    pub local_from_gos: Matrix4<f32>,
+    pub local_from_gos: Mat4,
     /// The ID of the material to use.
     pub material_id: u32,
     /// An optional skin to use.
@@ -215,7 +215,7 @@ pub struct DrawData {
 #[derive(Debug, Default, Clone)]
 #[repr(C, align(16))]
 pub(crate) struct PrimitiveCullData {
-    pub bounding_sphere: Vector4<f32>,
+    pub bounding_sphere: Vec4,
     pub index_instance: u32,
     pub index_offset: u32,
     pub visible: bool,

@@ -97,7 +97,7 @@ fn add_helmet(
     local_transform.translation.z = -1.;
     local_transform.translation.y = 1.4;
     local_transform.scale = [0.5, 0.5, 0.5].into();
-    let position = local_transform.position();
+    let position = local_transform.to_isometry();
     drop(local_transform);
     let collider = ColliderBuilder::ball(0.35)
         .active_collision_types(ActiveCollisionTypes::all())

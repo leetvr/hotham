@@ -11,10 +11,10 @@ use crate::{
 };
 use anyhow::Result;
 
+use glam::{Affine3A, Mat4};
 use gltf::Document;
 use hecs::{Entity, World};
 use itertools::Itertools;
-use nalgebra::Isometry3;
 use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use self::scene::Scene;
@@ -254,7 +254,9 @@ fn load_node(
 ) -> Entity {
     // First, get the transform of the node.
     let local_transform = LocalTransform::load(node.transform());
-    let global_transform = GlobalTransform(node.transform().matrix().into());
+
+    let matrix = Mat4::from_cols_array_2d(&node.transform().matrix());
+    let global_transform = GlobalTransform(Affine3A::from_mat4(matrix));
 
     // Next, collect some information about the node and store it in an [`Info`] component
     let info = Info {
@@ -287,12 +289,9 @@ fn load_node(
     }
 
     // If this node has corresponding collider geometry, add it in.
-    if let Some(collider) = get_collider_for_node(
-        node,
-        import_context,
-        this_entity,
-        local_transform.position(),
-    ) {
+    if let Some(collider) =
+        get_collider_for_node(node, import_context, this_entity, local_transform)
+    {
         world.insert_one(this_entity, collider).unwrap();
     }
 
@@ -314,7 +313,7 @@ fn get_collider_for_node(
     node: &gltf::Node,
     import_context: &mut ImportContext,
     this_entity: Entity,
-    position: Isometry3<f32>,
+    transform: LocalTransform,
 ) -> Option<Collider> {
     // First, get the name of the node, if it has one.
     let node_name = node.name()?;
@@ -329,6 +328,7 @@ fn get_collider_for_node(
 
     // Build a collider using the mesh.
     let shape = get_shape_from_mesh(mesh, import_context);
+    let position = transform.to_isometry();
     let collider_builder = rapier3d::geometry::ColliderBuilder::new(shape)
         .user_data(this_entity.to_bits().get() as _)
         .position(position);
@@ -568,7 +568,7 @@ mod tests {
         contexts::physics_context,
     };
     use approx::assert_relative_eq;
-    use nalgebra::{vector, Quaternion, UnitQuaternion};
+    use glam::Quat;
 
     #[test]
     pub fn test_load_models() {
@@ -586,34 +586,36 @@ mod tests {
             &mut physics_context,
         )
         .unwrap();
+
         let test_data = vec![
             (
                 "Damaged Helmet",
                 0,
                 46356,
-                vector![0., 0., 0.],
-                Quaternion::new(0.70710677, 0.70710677, 0., 0.),
+                [0., 0., 0.].into(),
+                Quat::from_xyzw(0.70710677, 0., 0., 0.70710677),
             ),
             (
                 "Asteroid",
                 0,
                 1800,
-                vector![0., 0., 0.],
-                Quaternion::new(1., 0., 0., 0.),
+                [0., 0., 0.].into(),
+                Quat::from_xyzw(0., 0., 0., 1.),
             ),
             (
                 "Refinery",
                 1,
                 23928,
-                vector![-0.06670809, 2.1408155, -0.46151406],
-                Quaternion::new(
-                    0.719318151473999,
+                [-0.06670809, 2.1408155, -0.46151406].into(),
+                Quat::from_xyzw(
                     -0.09325116872787476,
                     0.6883626580238342,
                     0.006518156733363867,
+                    0.719318151473999,
                 ),
             ),
         ];
+
         for (name, id, indices_count, translation, rotation) in &test_data {
             let _ = models
                 .get(*name)
@@ -659,17 +661,8 @@ mod tests {
             }
 
             // Ensure the transform was populated correctly
-            assert_eq!(
-                local_transform.translation, *translation,
-                "Model {} has wrong translation",
-                name
-            );
-            assert_eq!(
-                local_transform.rotation,
-                UnitQuaternion::new_normalize(*rotation),
-                "Model {} has wrong rotation",
-                name
-            );
+            assert_relative_eq!(local_transform.translation, *translation,);
+            assert_relative_eq!(local_transform.rotation, *rotation,);
             assert_eq!(&info.name, *name);
             assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
         }
@@ -716,7 +709,7 @@ mod tests {
         assert_eq!(&root.1.name, "Left Hand");
 
         // Make sure its transform is correct
-        assert_relative_eq!(root.2.translation, vector![0.0, 0.0, 0.0]);
+        assert_relative_eq!(root.2.translation, [0.0, 0.0, 0.0].into());
 
         // Make sure we imported the mesh
         let meshes = world
