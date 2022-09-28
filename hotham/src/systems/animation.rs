@@ -18,11 +18,11 @@ fn animation_system_inner(world: &mut hecs::World) {
         for target in &controller.targets {
             let mut local_transform = world.get_mut::<LocalTransform>(target.target).unwrap();
             local_transform.translation =
-                target.translations[blend_from].lerp(&target.translations[blend_to], blend_amount);
+                target.translations[blend_from].lerp(target.translations[blend_to], blend_amount);
             local_transform.rotation =
-                target.rotations[blend_from].slerp(&target.rotations[blend_to], blend_amount);
+                target.rotations[blend_from].slerp(target.rotations[blend_to], blend_amount);
             local_transform.scale =
-                target.scales[blend_from].lerp(&target.scales[blend_to], blend_amount);
+                target.scales[blend_from].lerp(target.scales[blend_to], blend_amount);
         }
     }
 }

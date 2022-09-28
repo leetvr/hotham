@@ -17,6 +17,7 @@ crossbeam = "0.8.1"
 ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
 generational-arena = "0.2.8"
+glam = {features = ["mint", "serde", "approx"], version = "0.21.3"}
 gltf = {version = "1.0", features = ["KHR_lights_punctual", "KHR_materials_unlit", "names", "utils"], default-features = false}
 hecs = "0.7.7"
 id-arena = "2.2.1"
@@ -25,7 +26,6 @@ itertools = "0.10.0"
 ktx2 = "0.3"
 memoffset = "0.6.5"
 mint = "0.5.6"
-nalgebra = {features = ["convert-mint", "serde-serialize"], version = "0.31.0"}
 oddio = "0.5"
 openxr = {features = ["loaded", "mint"], version = "0.16"}
 rapier3d = "0.14.0"

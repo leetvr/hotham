@@ -1,6 +1,8 @@
+use glam::{Affine3A, Quat, Vec3};
 use gltf::scene::Transform as TransformData;
-use nalgebra::{vector, Isometry3, Quaternion, Unit, UnitQuaternion, Vector3};
 use serde::{Deserialize, Serialize};
+
+use crate::util::{decompose_isometry, isometry_from_affine};
 
 /// The component's position in global space (ie. the game simulation), relative to its parent.
 ///
@@ -20,19 +22,19 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, PartialEq, Debug, Copy, Deserialize, Serialize)]
 pub struct LocalTransform {
     /// The translation of the entity
-    pub translation: Vector3<f32>,
+    pub translation: Vec3,
     /// The rotation of the entity
-    pub rotation: UnitQuaternion<f32>,
+    pub rotation: Quat,
     /// The non-uniform scale of the entity
-    pub scale: Vector3<f32>,
+    pub scale: Vec3,
 }
 
 impl Default for LocalTransform {
     fn default() -> Self {
         Self {
-            translation: Vector3::zeros(),
-            rotation: UnitQuaternion::identity(),
-            scale: vector![1.0, 1.0, 1.0],
+            translation: Vec3::ZERO,
+            rotation: Quat::IDENTITY,
+            scale: Vec3::ONE,
         }
     }
 }
@@ -40,9 +42,9 @@ impl Default for LocalTransform {
 impl LocalTransform {
     pub(crate) fn load(transform_data: TransformData) -> LocalTransform {
         let (t, r, s) = transform_data.decomposed();
-        let translation = vector![t[0], t[1], t[2]];
-        let rotation = Unit::new_normalize(Quaternion::new(r[3], r[0], r[1], r[2]));
-        let scale = vector![s[0], s[1], s[2]];
+        let translation = t.into();
+        let rotation = Quat::from_xyzw(r[0], r[1], r[2], r[3]);
+        let scale = s.into();
 
         LocalTransform {
             scale,
@@ -51,17 +53,31 @@ impl LocalTransform {
         }
     }
 
-    /// Convenience function to convert the `LocalTransform` into a `nalgebra::Isometry3`
-    pub fn position(&self) -> Isometry3<f32> {
-        Isometry3 {
-            rotation: self.rotation,
-            translation: self.translation.into(),
+    pub fn from_rotation_translation(rotation: Quat, translation: Vec3) -> Self {
+        LocalTransform {
+            rotation,
+            translation,
+            ..Default::default()
         }
     }
 
-    /// Update the translation and rotation from a [`nalgebra::Isometry3`]
-    pub fn update_from_isometry(&mut self, isometry: &Isometry3<f32>) {
-        self.translation = isometry.translation.vector;
-        self.rotation = isometry.rotation;
+    /// Convenience function to convert the [`LocalTransform`] into a [`rapier3d::na::Isometry3`]
+    pub fn to_isometry(&self) -> rapier3d::na::Isometry3<f32> {
+        isometry_from_affine(&self.to_affine())
+    }
+
+    /// Update the translation and rotation from a [`rapier3d::na::Isometry3`]
+    pub fn update_from_isometry(&mut self, isometry: &rapier3d::na::Isometry3<f32>) {
+        (self.rotation, self.translation) = decompose_isometry(isometry);
+    }
+
+    /// Update the scale, rotation and rotation from a [`glam::Affine3A`]
+    pub fn update_from_affine(&mut self, transform: &glam::Affine3A) {
+        (self.scale, self.rotation, self.translation) = transform.to_scale_rotation_translation();
+    }
+
+    /// Convenience function to convert the [`LocalTransform`] into a [`glam::Affine3A`]
+    pub fn to_affine(&self) -> Affine3A {
+        Affine3A::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
     }
 }

@@ -61,8 +61,7 @@ pub const XR_KHR_COMPOSITION_LAYER_EQUIRECT_EXTENSION_NAME: &[u8; 34usize] =
     b"XR_KHR_composition_layer_equirect\0";
 pub const XR_KHR_visibility_mask: u32 = 1;
 pub const XR_KHR_visibility_mask_SPEC_VERSION: u32 = 2;
-pub const XR_KHR_VISIBILITY_MASK_EXTENSION_NAME: &[u8; 23usize] =
-    b"XR_KHR_visibility_mask\0";
+pub const XR_KHR_VISIBILITY_MASK_EXTENSION_NAME: &[u8; 23usize] = b"XR_KHR_visibility_mask\0";
 pub const XR_KHR_composition_layer_color_scale_bias: u32 = 1;
 pub const XR_KHR_composition_layer_color_scale_bias_SPEC_VERSION: u32 = 5;
 pub const XR_KHR_COMPOSITION_LAYER_COLOR_SCALE_BIAS_EXTENSION_NAME: &[u8; 42usize] =
@@ -104,8 +103,7 @@ pub const XR_MSFT_UNBOUNDED_REFERENCE_SPACE_EXTENSION_NAME: &[u8; 34usize] =
     b"XR_MSFT_unbounded_reference_space\0";
 pub const XR_MSFT_spatial_anchor: u32 = 1;
 pub const XR_MSFT_spatial_anchor_SPEC_VERSION: u32 = 1;
-pub const XR_MSFT_SPATIAL_ANCHOR_EXTENSION_NAME: &[u8; 23usize] =
-    b"XR_MSFT_spatial_anchor\0";
+pub const XR_MSFT_SPATIAL_ANCHOR_EXTENSION_NAME: &[u8; 23usize] = b"XR_MSFT_spatial_anchor\0";
 pub const XR_MND_headless: u32 = 1;
 pub const XR_MND_headless_SPEC_VERSION: u32 = 2;
 pub const XR_MND_HEADLESS_EXTENSION_NAME: &[u8; 16usize] = b"XR_MND_headless\0";
@@ -127,8 +125,7 @@ pub const XR_MSFT_SPATIAL_GRAPH_BRIDGE_EXTENSION_NAME: &[u8; 29usize] =
     b"XR_MSFT_spatial_graph_bridge\0";
 pub const XR_MSFT_hand_interaction: u32 = 1;
 pub const XR_MSFT_hand_interaction_SPEC_VERSION: u32 = 1;
-pub const XR_MSFT_HAND_INTERACTION_EXTENSION_NAME: &[u8; 25usize] =
-    b"XR_MSFT_hand_interaction\0";
+pub const XR_MSFT_HAND_INTERACTION_EXTENSION_NAME: &[u8; 25usize] = b"XR_MSFT_hand_interaction\0";
 pub const XR_EXT_hand_tracking: u32 = 1;
 pub const XR_HAND_JOINT_COUNT_EXT: u32 = 26;
 pub const XR_EXT_hand_tracking_SPEC_VERSION: u32 = 4;
@@ -148,8 +145,7 @@ pub const XR_MSFT_FIRST_PERSON_OBSERVER_EXTENSION_NAME: &[u8; 30usize] =
 pub const XR_MSFT_controller_model: u32 = 1;
 pub const XR_NULL_CONTROLLER_MODEL_KEY_MSFT: u32 = 0;
 pub const XR_MSFT_controller_model_SPEC_VERSION: u32 = 2;
-pub const XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME: &[u8; 25usize] =
-    b"XR_MSFT_controller_model\0";
+pub const XR_MSFT_CONTROLLER_MODEL_EXTENSION_NAME: &[u8; 25usize] = b"XR_MSFT_controller_model\0";
 pub const XR_MAX_CONTROLLER_MODEL_NODE_NAME_SIZE_MSFT: u32 = 64;
 pub const XR_EXT_win32_appcontainer_compatible: u32 = 1;
 pub const XR_EXT_win32_appcontainer_compatible_SPEC_VERSION: u32 = 1;
@@ -165,8 +161,7 @@ pub const XR_HUAWEI_CONTROLLER_INTERACTION_EXTENSION_NAME: &[u8; 33usize] =
     b"XR_HUAWEI_controller_interaction\0";
 pub const XR_VALVE_analog_threshold: u32 = 1;
 pub const XR_VALVE_analog_threshold_SPEC_VERSION: u32 = 1;
-pub const XR_VALVE_ANALOG_THRESHOLD_EXTENSION_NAME: &[u8; 26usize] =
-    b"XR_VALVE_analog_threshold\0";
+pub const XR_VALVE_ANALOG_THRESHOLD_EXTENSION_NAME: &[u8; 26usize] = b"XR_VALVE_analog_threshold\0";
 pub const XR_EXT_hand_joints_motion_range: u32 = 1;
 pub const XR_EXT_hand_joints_motion_range_SPEC_VERSION: u32 = 1;
 pub const XR_EXT_HAND_JOINTS_MOTION_RANGE_EXTENSION_NAME: &[u8; 32usize] =

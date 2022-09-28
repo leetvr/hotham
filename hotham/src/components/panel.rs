@@ -1,7 +1,7 @@
 use ash::vk::{self};
 use egui::Pos2;
+use glam::Vec2;
 use itertools::izip;
-use nalgebra::{vector, Vector2};
 
 use crate::components::Mesh;
 use crate::hotham_error::HothamError;
@@ -17,8 +17,8 @@ use crate::{
 pub struct Panel {
     /// The resolution of the Panel
     pub resolution: vk::Extent2D,
-    /// The world-size of the Panel
-    pub world_size: Vector2<f32>,
+    /// The size of the panel in the world
+    pub world_size: Vec2,
     /// Texture backing the Panel
     pub texture: Texture,
     /// Input received this frame
@@ -30,7 +30,7 @@ impl Panel {
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,
         resolution: vk::Extent2D,
-        world_size: Vector2<f32>,
+        world_size: Vec2,
     ) -> Result<(Panel, Mesh), HothamError> {
         let texture = Texture::empty(vulkan_context, render_context, resolution);
         let mesh = create_panel_mesh(&texture, render_context, world_size);
@@ -50,22 +50,22 @@ impl Panel {
 fn create_panel_mesh(
     output_texture: &Texture,
     render_context: &mut RenderContext,
-    world_size: Vector2<f32>,
+    world_size: Vec2,
 ) -> Mesh {
     let material_id = add_material(output_texture, render_context);
     let (half_width, half_height) = (world_size.x / 2., world_size.y / 2.);
 
     let positions = [
-        vector![-half_width, half_height, 0.],  // v0
-        vector![half_width, -half_height, 0.],  // v1
-        vector![half_width, half_height, 0.],   // v2
-        vector![-half_width, -half_height, 0.], // v3
+        [-half_width, half_height, 0.].into(),  // v0
+        [half_width, -half_height, 0.].into(),  // v1
+        [half_width, half_height, 0.].into(),   // v2
+        [-half_width, -half_height, 0.].into(), // v3
     ];
     let tex_coords_0 = [
-        vector![0., 0.], // v0
-        vector![1., 1.], // v1
-        vector![1., 0.], // v2
-        vector![0., 1.], // v3
+        [0., 0.].into(), // v0
+        [1., 1.].into(), // v1
+        [1., 0.].into(), // v2
+        [0., 1.].into(), // v3
     ];
     let vertices: Vec<Vertex> = izip!(positions, tex_coords_0)
         .into_iter()

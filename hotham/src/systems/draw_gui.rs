@@ -67,7 +67,6 @@ mod tests {
     use super::*;
     use ash::vk::{self, Handle};
     use egui::Pos2;
-    use nalgebra::UnitQuaternion;
     use openxr::{Fovf, Quaternionf, Vector3f};
 
     use crate::{
@@ -199,7 +198,7 @@ mod tests {
     }
 
     fn get_views() -> Vec<openxr::View> {
-        let rotation: mint::Quaternion<f32> = UnitQuaternion::from_euler_angles(0., 0., 0.).into();
+        let rotation: mint::Quaternion<f32> = Quaternionf::IDENTITY.into();
         let position = Vector3f {
             x: -1.0,
             y: 0.0,

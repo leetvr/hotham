@@ -9,7 +9,6 @@ const float epsilon = 1e-6;
 
 struct Material {
     vec4 baseColorFactor;
-    vec4 emissiveFactor;
     uint workflow;
     uint baseColorTextureID;
     uint physicalDescriptorTextureID;

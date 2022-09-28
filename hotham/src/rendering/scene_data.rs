@@ -1,4 +1,4 @@
-use nalgebra::{Matrix4, Vector4};
+use glam::{Mat4, Vec4};
 use serde::{Deserialize, Serialize};
 
 use super::light::{Light, MAX_LIGHTS};
@@ -11,11 +11,11 @@ pub const DEFAULT_IBL_INTENSITY: f32 = 0.4;
 #[repr(C)]
 pub struct SceneData {
     /// View-Projection matrices (one per eye)
-    pub view_projection: [Matrix4<f32>; 2],
+    pub view_projection: [Mat4; 2],
     /// Position of the cameras (one per eye)
-    pub camera_position: [Vector4<f32>; 2],
+    pub camera_position: [Vec4; 2],
     /// Scene Parameters - x = IBL intensity, y = unused, z = debug render inputs, w = debug render algorithm
-    pub params: Vector4<f32>,
+    pub params: Vec4,
     /// Dynamic punctual lights
     pub lights: [Light; MAX_LIGHTS],
 }
@@ -23,8 +23,8 @@ pub struct SceneData {
 impl Default for SceneData {
     fn default() -> Self {
         Self {
-            view_projection: [Matrix4::identity(), Matrix4::identity()],
-            camera_position: [Vector4::zeros(), Vector4::zeros()],
+            view_projection: [Mat4::IDENTITY, Mat4::IDENTITY],
+            camera_position: [Vec4::ZERO, Vec4::ZERO],
             params: [DEFAULT_IBL_INTENSITY, 0., 0., 0.].into(),
             lights: [Light::none(); MAX_LIGHTS],
         }

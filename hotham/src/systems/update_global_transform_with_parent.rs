@@ -4,9 +4,8 @@ use crate::{
     components::{GlobalTransform, Parent},
     Engine,
 };
+use glam::Affine3A;
 use hecs::{Entity, Without, World};
-
-use nalgebra::Matrix4;
 
 /// Update global transform with parent transform system
 /// Walks through each entity that has a Parent and builds a hierarchy
@@ -31,7 +30,7 @@ pub(crate) fn update_global_transform_with_parent_system_inner(world: &mut World
 }
 
 fn update_global_transforms_recursively(
-    parent_matrix: &Matrix4<f32>,
+    parent_matrix: &Affine3A,
     entity: Entity,
     hierarchy: &HashMap<Entity, Vec<Entity>>,
     world: &World,
@@ -40,7 +39,7 @@ fn update_global_transforms_recursively(
         for child in children {
             {
                 let child_matrix = &mut world.get_mut::<GlobalTransform>(*child).unwrap().0;
-                *child_matrix = parent_matrix * *child_matrix;
+                *child_matrix = *parent_matrix * *child_matrix;
             }
             let child_matrix = world.get::<GlobalTransform>(*child).unwrap().0;
             update_global_transforms_recursively(&child_matrix, *child, hierarchy, world);
@@ -53,7 +52,7 @@ mod tests {
     use std::collections::HashMap;
 
     use approx::{assert_relative_eq, relative_eq};
-    use nalgebra::vector;
+    use glam::Affine3A;
 
     use crate::{
         components::{Info, LocalTransform},
@@ -65,7 +64,7 @@ mod tests {
     pub fn test_transform_system() {
         let mut world = World::new();
         let parent_global_transform =
-            GlobalTransform(Matrix4::new_translation(&vector![1.0, 1.0, 100.0]));
+            GlobalTransform(Affine3A::from_translation([1.0, 1.0, 100.0].into()));
 
         let parent = world.spawn((parent_global_transform,));
         let child = world.spawn((parent_global_transform, Parent(parent)));
@@ -75,13 +74,13 @@ mod tests {
 
         {
             let global_transform = world.get_mut::<GlobalTransform>(grandchild).unwrap();
-            let expected_matrix = Matrix4::new_translation(&vector![3.0, 3.0, 300.0]);
+            let expected_matrix = Affine3A::from_translation([3.0, 3.0, 300.0].into());
             assert_relative_eq!(global_transform.0, expected_matrix);
         }
 
         {
             let global_transform = world.get_mut::<GlobalTransform>(child).unwrap();
-            let expected_matrix = Matrix4::new_translation(&vector![2.0, 2.0, 200.0]);
+            let expected_matrix = Affine3A::from_translation([2.0, 2.0, 200.0].into());
             assert_relative_eq!(global_transform.0, expected_matrix);
         }
     }
@@ -107,7 +106,7 @@ mod tests {
                 node_id: n,
             };
             let local_transform = LocalTransform {
-                translation: vector![1.0, 1.0, 1.0],
+                translation: [1.0, 1.0, 1.0].into(),
                 ..Default::default()
             };
             let matrix = GlobalTransform::default();
@@ -128,7 +127,7 @@ mod tests {
         let root_entity = node_entity.get(&0).unwrap();
         {
             let mut local_transform = world.get_mut::<LocalTransform>(*root_entity).unwrap();
-            local_transform.translation = vector![100.0, 100.0, 100.0];
+            local_transform.translation = [100.0, 100.0, 100.0].into();
         }
         tick(&mut world);
 
@@ -161,10 +160,10 @@ mod tests {
         }
     }
 
-    fn get_expected_matrix(depth: usize) -> Matrix4<f32> {
-        let mut transform = Matrix4::new_translation(&vector![100.0, 100.0, 100.0]);
+    fn get_expected_matrix(depth: usize) -> Affine3A {
+        let mut transform = Affine3A::from_translation([100.0, 100.0, 100.0].into());
         for _ in 0..depth {
-            transform *= Matrix4::new_translation(&vector![1.0, 1.0, 1.0]);
+            transform = transform * Affine3A::from_translation([1.0, 1.0, 1.0].into());
         }
         transform
     }

@@ -24,7 +24,6 @@ pub use physics::physics_system;
 pub use pointers::pointers_system;
 pub use rendering::rendering_system;
 pub use skinning::skinning_system;
-pub use stage::add_stage;
 pub use update_global_transform::update_global_transform_system;
 pub use update_global_transform_with_parent::update_global_transform_with_parent_system;
 

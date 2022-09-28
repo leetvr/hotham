@@ -4,8 +4,8 @@ use ash::vk::{self};
 use egui::emath::vec2;
 use egui::epaint::Vertex as EguiVertex;
 use egui::CtxRef;
+use glam::{Vec2, Vec3};
 use hecs::{Entity, World};
-use nalgebra::{Vector2, Vector3};
 use rapier3d::prelude::{ColliderBuilder, InteractionGroups};
 
 const BUFFER_SIZE: usize = 1024;
@@ -68,8 +68,8 @@ impl UIPanelButton {
 pub fn add_ui_panel_to_world(
     text: &str,
     resolution: vk::Extent2D,
-    world_size: Vector2<f32>,
-    translation: Vector3<f32>,
+    world_size: Vec2,
+    translation: Vec3,
     buttons: Vec<UIPanelButton>,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
@@ -131,13 +131,15 @@ pub fn add_ui_panel_to_world(
 
     let panel_entity = world.spawn(components);
     let (half_width, half_height) = (world_size.x / 2., world_size.y / 2.);
+
+    let translation: [f32; 3] = translation.into();
     let collider = ColliderBuilder::cuboid(half_width, half_height, 0.0)
         .sensor(true)
         .collision_groups(InteractionGroups::new(
             PANEL_COLLISION_GROUP,
             PANEL_COLLISION_GROUP,
         ))
-        .translation(translation)
+        .translation(translation.into())
         .user_data(panel_entity.id() as _)
         .build();
     let handle = physics_context.colliders.insert(collider);

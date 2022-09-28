@@ -1,11 +1,11 @@
+use glam::Vec3;
 use hecs::World;
-use nalgebra::{Point3, Vector3};
 use openxr::SpaceVelocityFlags;
 
 use crate::{
     components::{sound_emitter::SoundState, RigidBody, SoundEmitter},
     contexts::{AudioContext, PhysicsContext, XrContext},
-    util::is_space_valid,
+    util::{decompose_isometry, is_space_valid},
     Engine,
 };
 
@@ -50,9 +50,9 @@ fn audio_system_inner(
 
     audio_context.update_listener_rotation(stage_from_listener.pose.orientation.into());
 
-    let listener_position_in_stage: Vector3<_> =
+    let listener_position_in_stage: Vec3 =
         mint::Vector3::from(stage_from_listener.pose.position).into();
-    let listener_velocity_in_stage: Vector3<_> =
+    let listener_velocity_in_stage: Vec3 =
         mint::Vector3::from(listener_velocity_in_stage.linear_velocity).into();
 
     for (_, (sound_emitter, rigid_body)) in world.query_mut::<(&mut SoundEmitter, &RigidBody)>() {
@@ -61,9 +61,8 @@ fn audio_system_inner(
             .rigid_bodies
             .get(rigid_body.handle)
             .expect("Unable to get RigidBody");
-
-        let source_position_in_stage: Point3<_> = (*rigid_body.translation()).into();
-        let source_velocity_in_stage: Vector3<_> = *rigid_body.linvel();
+        let (_, source_position_in_stage) = decompose_isometry(rigid_body.position());
+        let source_velocity_in_stage: Vec3 = rigid_body.linvel().data.0[0].into();
 
         // Compute relative position and velocity
         let relative_position_in_stage =

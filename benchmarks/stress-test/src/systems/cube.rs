@@ -2,8 +2,8 @@ use hotham::{
     asset_importer::{add_model_to_world, Models},
     components::LocalTransform,
     contexts::PhysicsContext,
+    glam::Vec3,
     hecs::World,
-    nalgebra::Vector3,
 };
 
 pub fn setup_cubes(
@@ -14,7 +14,7 @@ pub fn setup_cubes(
 ) {
     let step = 2. / resolution as f32;
     let scale_factor = 3.;
-    let scale = Vector3::repeat(step / scale_factor);
+    let scale = Vec3::splat(step / scale_factor);
     let half_resolution = resolution as f32 / 2.;
     let x_offset = half_resolution / scale_factor;
 

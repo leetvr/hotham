@@ -1,5 +1,3 @@
-use nalgebra::Matrix4;
-
 use crate::{
     components::{GlobalTransform, LocalTransform},
     Engine,
@@ -17,9 +15,7 @@ pub(crate) fn update_global_transform_system_inner(world: &mut World) {
     for (_, (local_transform, global_transform)) in
         world.query_mut::<(&LocalTransform, &mut GlobalTransform)>()
     {
-        global_transform.0 = Matrix4::new_translation(&local_transform.translation)
-            * Matrix4::from(local_transform.rotation)
-            * Matrix4::new_nonuniform_scaling(&local_transform.scale);
+        global_transform.0 = local_transform.to_affine();
     }
 }
 
@@ -27,7 +23,7 @@ pub(crate) fn update_global_transform_system_inner(world: &mut World) {
 mod tests {
     use crate::components::LocalTransform;
     use approx::assert_relative_eq;
-    use nalgebra::{vector, UnitQuaternion};
+    use glam::{Affine3A, EulerRot, Quat};
 
     use super::*;
 
@@ -41,11 +37,11 @@ mod tests {
 
         {
             let matrix = world.get_mut::<GlobalTransform>(entity).unwrap();
-            assert_eq!(matrix.0, Matrix4::identity());
+            assert_eq!(matrix.0, Affine3A::IDENTITY);
         }
 
-        let test_translation = vector![5.0, 1.0, 2.0];
-        let test_rotation = UnitQuaternion::from_euler_angles(0.3, 0.3, 0.3);
+        let test_translation = [5.0, 1.0, 2.0].into();
+        let test_rotation = Quat::from_euler(EulerRot::XYZ, 0.3, 0.3, 0.3);
 
         {
             let mut local_transform = world.get_mut::<LocalTransform>(entity).unwrap();
@@ -56,9 +52,11 @@ mod tests {
 
         update_global_transform_system_inner(&mut world);
 
-        let expected_matrix = Matrix4::new_translation(&test_translation)
-            * Matrix4::from(test_rotation)
-            * Matrix4::new_nonuniform_scaling(&vector![5.0, 1.0, 2.0]);
+        let expected_matrix = Affine3A::from_scale_rotation_translation(
+            [5.0, 1.0, 2.0].into(),
+            test_rotation,
+            test_translation,
+        );
 
         let global_transform = world.get_mut::<GlobalTransform>(entity).unwrap();
         assert_relative_eq!(global_transform.0, expected_matrix);

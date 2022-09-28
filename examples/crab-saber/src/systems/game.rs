@@ -416,8 +416,10 @@ mod tests {
         components::{Collider, RigidBody, SoundEmitter},
         contexts::HapticContext,
         hecs::Entity,
-        nalgebra::Vector3,
-        rapier3d::prelude::{RigidBodyBuilder, RigidBodyType},
+        rapier3d::{
+            na,
+            prelude::{RigidBodyBuilder, RigidBodyType},
+        },
         Engine,
     };
 
@@ -539,7 +541,7 @@ mod tests {
             assert_eq!(t[1], CUBE_Y);
             assert_eq!(t[2], CUBE_Z);
 
-            assert_eq!(rigid_body.linvel(), &Vector3::new(0., 0., 5.,));
+            assert_eq!(rigid_body.linvel(), &na::Vector3::new(0., 0., 5.));
             assert_score_is(world, game_context, 0);
         }
 

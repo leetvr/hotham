@@ -4,7 +4,7 @@ use ash::{
     Device, Entry as AshEntry, Instance as AshInstance,
 };
 
-use nalgebra::{Quaternion, Unit, UnitQuaternion, Vector3};
+use glam::{Quat, Vec3};
 use openxr_sys::{Action, Bool32, Path, Posef, SessionState, Space, Vector3f};
 use winit::event::KeyboardInput;
 
@@ -231,13 +231,14 @@ impl State {
         let pose = &mut self.view_poses[0];
 
         let position = &mut pose.position;
-        let orientation = &pose.orientation;
+        let o = pose.orientation;
+        let orientation = Quat::from_xyzw(o.x, o.y, o.z, o.w);
         // get the forward vector rotated by the camera rotation quaternion
-        let forward = rotate_vector_by_quaternion(Vector3::new(0f32, 0f32, 1f32), *orientation);
+        let forward = orientation * Vec3::Z;
         // get the right vector rotated by the camera rotation quaternion
-        let right = rotate_vector_by_quaternion(Vector3::new(1f32, 0f32, 0f32), *orientation);
+        let right = orientation * Vec3::X;
 
-        let up = Vector3::new(0f32, 1f32, 0f32);
+        let up = Vec3::Y;
         let movement_speed = 2f32 * dt;
         for pressed in self.input_state.pressed.iter() {
             match pressed {
@@ -301,15 +302,16 @@ impl State {
         self.camera.yaw += x_rot * mouse_sensitivity;
         self.camera.pitch += y_rot * mouse_sensitivity;
 
-        // I think I'm converting these two types incorrectly but it seems to work and I'm too scared to break it lol
-        let rotation: Unit<Quaternion<f32>> =
-            UnitQuaternion::from_euler_angles(self.camera.pitch, self.camera.yaw, 0f32);
+        let rotation =
+            Quat::from_euler(glam::EulerRot::XYZ, self.camera.pitch, self.camera.yaw, 0.);
 
-        orientation.x = rotation.i;
-        orientation.y = rotation.j;
-        orientation.z = rotation.k;
+        // Could probably just do this with mem::transmute, but.. better not.
+        orientation.x = rotation.x;
+        orientation.y = rotation.y;
+        orientation.z = rotation.z;
         orientation.w = rotation.w;
 
+        // Make the right view identical to the left. We could probably offset them, but whatever.
         self.view_poses[1] = self.view_poses[0];
         Some(())
     }
@@ -347,26 +349,5 @@ impl State {
     fn press(&mut self, path_string: &str) {
         let path = self.string_path.get(path_string).unwrap();
         self.action_state.set_boolean(path, true);
-    }
-}
-
-/// Rotates a Vector by the quaternion
-/// Used to get the forward, right direction to control the camera
-fn rotate_vector_by_quaternion(
-    vector: Vector3<f32>,
-    openxr_sys::Quaternionf { x, y, z, w }: openxr_sys::Quaternionf,
-) -> Vector3f {
-    let i = x;
-    let j = y;
-    let k = z;
-    let w = w;
-    let q1: Unit<Quaternion<f32>> = UnitQuaternion::from_quaternion(Quaternion::new(w, i, j, k));
-
-    let rotated_vector = q1.transform_vector(&vector);
-
-    Vector3f {
-        x: rotated_vector.x,
-        y: rotated_vector.y,
-        z: rotated_vector.z,
     }
 }

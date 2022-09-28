@@ -1,6 +1,6 @@
 use crate::{asset_importer::ImportContext, rendering::resources::MAX_JOINTS};
+use glam::{Affine3A, Mat4};
 use hecs::Entity;
-use nalgebra::Matrix4;
 
 pub static NO_SKIN: u32 = std::u32::MAX;
 
@@ -11,7 +11,7 @@ pub struct Skin {
     /// List of joints
     pub joints: Vec<Entity>,
     /// Inverse bind matrices, used to build the final joint matrices for this skin
-    pub inverse_bind_matrices: Vec<Matrix4<f32>>,
+    pub inverse_bind_matrices: Vec<Affine3A>,
     /// Index into skin buffer
     pub(crate) id: u32,
 }
@@ -21,8 +21,8 @@ impl Skin {
         let reader = skin.reader(|_| Some(&import_context.buffer));
         let inverse_bind_matrices = reader
             .read_inverse_bind_matrices()
-            .unwrap() //}
-            .map(Matrix4::from)
+            .unwrap()
+            .map(|m| Affine3A::from_mat4(Mat4::from_cols_array_2d(&m)))
             .collect();
 
         let joints = skin
@@ -36,7 +36,7 @@ impl Skin {
             })
             .collect();
 
-        let empty_matrices = [Matrix4::identity(); MAX_JOINTS];
+        let empty_matrices = [Mat4::IDENTITY; MAX_JOINTS];
         let id = unsafe {
             import_context
                 .render_context

@@ -1,26 +1,21 @@
 use std::convert::TryInto;
 
 use crate::{
-    components::{skin::NO_SKIN, GlobalTransform, Mesh, Skin, Visible},
+    components::{skin::NO_SKIN, stage, GlobalTransform, Mesh, Skin, Visible},
     contexts::VulkanContext,
     contexts::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
     },
     rendering::resources::{DrawData, PrimitiveCullData},
-    systems::stage,
     Engine,
 };
+use glam::Affine3A;
 use hecs::{With, World};
-use nalgebra::Isometry3;
 use openxr as xr;
 
 /// Rendering system
 /// Walks through each Mesh that is Visible and renders it.
-///
-/// Requirements:
-/// - BEFORE: ensure you have called render_context.begin_frame
-/// - AFTER: ensure you have called render_context.end_frame
 ///
 /// Advanced users may instead call [`begin`], [`draw_world`], and [`end`] manually.
 pub fn rendering_system(engine: &mut Engine, swapchain_image_index: usize) {
@@ -84,9 +79,12 @@ pub unsafe fn begin(
 
     // Create transformations to globally oriented stage space
     let global_from_stage = stage::get_global_from_stage(world);
-    let gos_from_global: Isometry3<f32> = global_from_stage.translation.inverse().into();
-    let gos_from_stage: Isometry3<f32> = gos_from_global * global_from_stage;
-    let matrix_gos_from_global = gos_from_global.to_homogeneous();
+
+    // `gos_from_global` is just the inverse of `global_from_stage`'s translation - rotation is ignored.
+    let gos_from_global =
+        Affine3A::from_translation(global_from_stage.translation.into()).inverse();
+
+    let gos_from_stage: Affine3A = gos_from_global * global_from_stage;
 
     for (_, (mesh, global_transform, skin)) in
         world.query_mut::<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>()
@@ -95,6 +93,9 @@ pub unsafe fn begin(
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
         for primitive in &mesh.primitives {
             let key = primitive.index_buffer_offset;
+
+            // Create a transform from this primitive's local space into gos space.
+            let gos_from_local = gos_from_global * global_transform.0;
 
             render_context
                 .primitive_map
@@ -105,9 +106,8 @@ pub unsafe fn begin(
                 })
                 .instances
                 .push(Instance {
-                    gos_from_local: matrix_gos_from_global * global_transform.0,
-                    bounding_sphere: matrix_gos_from_global
-                        * primitive.get_bounding_sphere(global_transform),
+                    gos_from_local,
+                    bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
                     skin_id,
                 });
         }
@@ -210,8 +210,8 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                 .unwrap();
             let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
             let draw_data = DrawData {
-                gos_from_local: instance.gos_from_local,
-                local_from_gos: instance.gos_from_local.try_inverse().unwrap(),
+                gos_from_local: instance.gos_from_local.into(),
+                local_from_gos: instance.gos_from_local.inverse().into(),
                 material_id: instanced_primitive.primitive.material_id,
                 skin_id: instance.skin_id,
             };
@@ -255,7 +255,6 @@ pub fn end(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use nalgebra::{UnitQuaternion, Vector3};
     use openxr::{Fovf, Quaternionf, Vector3f};
 
     use crate::{
@@ -264,14 +263,15 @@ mod tests {
         contexts::{PhysicsContext, RenderContext},
         rendering::{image::Image, light::Light, scene_data},
         systems::{
-            add_stage, update_global_transform::update_global_transform_system_inner,
+            update_global_transform::update_global_transform_system_inner,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
         },
         util::{
-            begin_renderdoc, end_renderdoc, isometry_to_posef, posef_to_isometry,
+            affine_from_posef, begin_renderdoc, end_renderdoc, posef_from_affine,
             save_image_to_disk,
         },
     };
+    use glam::{Quat, Vec3};
 
     #[test]
     pub fn test_rendering_pbr() {
@@ -289,18 +289,18 @@ mod tests {
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform
-        let stage_entity = add_stage(&mut world, &mut physics_context);
+        let stage_entity = stage::add_stage(&mut world, &mut physics_context);
         let mut stage_local_transform = world.get_mut::<LocalTransform>(stage_entity).unwrap();
         stage_local_transform.translation = [0.1, 0.2, 0.3].into();
         stage_local_transform.rotation =
-            UnitQuaternion::from_scaled_axis(Vector3::y() * (std::f32::consts::TAU * 0.1));
+            Quat::from_scaled_axis(Vec3::Y * (std::f32::consts::TAU * 0.1));
 
-        let global_from_stage = stage_local_transform.position();
+        let global_from_stage = stage_local_transform.to_affine();
         drop(stage_local_transform);
 
         // Set views
         let rotation: mint::Quaternion<f32> =
-            UnitQuaternion::from_euler_angles(0., 45_f32.to_radians(), 0.).into();
+            Quat::from_axis_angle(Vec3::Y, 45_f32.to_radians()).into();
         let position = Vector3f {
             x: 1.4,
             y: 0.0,
@@ -323,7 +323,7 @@ mod tests {
         // Compensate stage transform by adjusting the views
         for view in &mut views {
             view.pose =
-                isometry_to_posef(global_from_stage.inverse() * posef_to_isometry(view.pose));
+                posef_from_affine(global_from_stage.inverse() * affine_from_posef(view.pose));
         }
 
         let params = vec![

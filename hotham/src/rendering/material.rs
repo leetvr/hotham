@@ -1,5 +1,5 @@
+use glam::Vec4;
 use gltf::Material as MaterialData;
-use nalgebra::{vector, Vector4};
 
 use crate::{
     asset_importer::ImportContext,
@@ -20,9 +20,7 @@ pub static NO_MATERIAL: usize = 0;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     /// The base color of the material
-    pub base_color_factor: Vector4<f32>,
-    /// The color and intensity of the light being emitted by the material
-    pub emissive_factor: Vector4<f32>,
+    pub base_color_factor: Vec4,
     /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
     pub workflow: u32,
     /// The base color texture.
@@ -61,7 +59,7 @@ impl Material {
         let base_color_texture_set = base_color_texture_info
             .map(|i| Texture::load(i.texture(), TextureUsage::BaseColor, import_context))
             .unwrap_or(NO_TEXTURE);
-        let base_color_factor = Vector4::from(pbr_metallic_roughness.base_color_factor());
+        let base_color_factor = Vec4::from(pbr_metallic_roughness.base_color_factor());
 
         // Metallic Roughness
         let metallic_roughness_texture_info = pbr_metallic_roughness.metallic_roughness_texture();
@@ -88,7 +86,6 @@ impl Material {
             .unwrap_or(NO_TEXTURE);
 
         // Factors
-        let emissive_factor = vector![0., 0., 0., 0.];
         let metallic_factor = pbr_metallic_roughness.metallic_factor();
         let roughness_factor = pbr_metallic_roughness.roughness_factor();
 
@@ -110,7 +107,6 @@ impl Material {
         // Collect the material properties.
         let material = Material {
             base_color_factor,
-            emissive_factor,
             workflow,
             base_color_texture_set,
             physical_descriptor_texture_id: metallic_roughness_texture_set,
@@ -146,7 +142,6 @@ impl Material {
     pub fn gltf_default() -> Self {
         Self {
             base_color_factor: [1., 1., 1., 1.].into(),
-            emissive_factor: Default::default(),
             workflow: METALLIC_ROUGHNESS_WORKFLOW,
             base_color_texture_set: NO_TEXTURE,
             physical_descriptor_texture_id: NO_TEXTURE,

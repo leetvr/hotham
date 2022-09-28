@@ -19,7 +19,7 @@ fn skinning_system_inner(world: &mut World, render_context: &mut RenderContext) 
     for (_, (skin, global_transform)) in world.query::<(&Skin, &GlobalTransform)>().iter() {
         let buffer = unsafe { render_context.resources.skins_buffer.as_slice_mut() };
         let joint_matrices = &mut buffer[skin.id as usize];
-        let local_from_global = global_transform.0.try_inverse().unwrap();
+        let local_from_global = global_transform.0.inverse();
 
         for (n, (joint, joint_from_mesh)) in skin
             .joints
@@ -28,8 +28,8 @@ fn skinning_system_inner(world: &mut World, render_context: &mut RenderContext) 
             .enumerate()
         {
             let global_from_joint = world.get::<GlobalTransform>(*joint).unwrap().0;
-            let local_from_mesh = local_from_global * global_from_joint * joint_from_mesh;
-            joint_matrices[n] = local_from_mesh;
+            let local_from_mesh = local_from_global * global_from_joint * *joint_from_mesh;
+            joint_matrices[n] = local_from_mesh.into();
         }
     }
 }
@@ -47,7 +47,7 @@ mod tests {
 
     use super::*;
     use approx::relative_eq;
-    use nalgebra::Matrix4;
+    use glam::{Affine3A, Mat4};
 
     #[test]
     pub fn test_hand_skinning() {
@@ -64,7 +64,7 @@ mod tests {
         for (_, skin) in world.query::<&Skin>().iter() {
             for joint in &skin.joints {
                 let mut global_transform = world.get_mut::<GlobalTransform>(*joint).unwrap();
-                global_transform.0 = Matrix4::zeros();
+                global_transform.0 = Affine3A::ZERO;
             }
         }
         skinning_system_inner(&mut world, &mut render_context);
@@ -76,7 +76,7 @@ mod tests {
     fn verify_matrices(world: &World, render_context: &RenderContext) -> bool {
         let mut called = 0;
         for (_, (skin, info)) in world.query::<(&Skin, &Info)>().iter() {
-            let correct_matrices: Vec<Matrix4<f32>> = if info.name == "hands:Lhand" {
+            let correct_matrices: Vec<Mat4> = if info.name == "hands:Lhand" {
                 println!("Left hand!");
                 serde_json::from_slice(include_bytes!(
                     "../../../test_assets/left_hand_skinned_matrices.json"
