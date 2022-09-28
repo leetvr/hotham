@@ -10,7 +10,6 @@ pub mod physics;
 pub mod pointers;
 pub mod rendering;
 pub mod skinning;
-pub mod stage;
 pub mod update_global_transform;
 pub mod update_global_transform_with_parent;
 

@@ -27,8 +27,6 @@ fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
     let global_from_stage = stage::get_global_from_stage(world);
 
     // Create a transform from local space to grip space.
-    // NOTE: This is most likely *WRONG* as the order for these transforms was not recoreded correctly.
-    // TODO: Make these correct.
     let grip_from_local = Affine3A::from_rotation_translation(ROTATION_OFFSET, POSITION_OFFSET);
 
     for (_, (color, local_transform)) in
