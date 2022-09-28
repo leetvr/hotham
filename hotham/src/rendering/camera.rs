@@ -32,10 +32,10 @@ impl Camera {
         self.view_from_gos
     }
 
-    /// Get the camera's position
+    /// Get the camera's position in homogenous coordinates
     pub fn position_in_gos(&self) -> Vec4 {
         let p = self.gos_from_view.translation;
-        [p[0], p[1], p[2], 0.].into()
+        [p[0], p[1], p[2], 1.].into()
     }
 
     /// Build the camera's view matrix
