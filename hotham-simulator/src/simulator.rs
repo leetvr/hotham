@@ -66,6 +66,7 @@ static SWAPCHAIN_COLOR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 pub const NUM_VIEWS: usize = 2; // TODO: Make dynamic
 pub const VIEWPORT_HEIGHT: u32 = 1000;
 pub const VIEWPORT_WIDTH: u32 = 1000;
+pub const CAMERA_FIELD_OF_VIEW: f32 = 1.; // about 57 degrees
 
 lazy_static! {
     static ref STATE: Mutex<State> = Default::default();
@@ -1560,15 +1561,17 @@ pub unsafe extern "system" fn locate_views(
     #[allow(clippy::approx_constant)]
     for (i, view) in views.iter_mut().enumerate() {
         let pose = state.view_poses[i];
+
+        // The actual fov is defined as (right - left). As these are all symetrical, we just divide the fov variable by 2.
         *view = View {
             ty: StructureType::VIEW,
             next: null_mut(),
             pose,
             fov: Fovf {
-                angle_down: -0.785398,
-                angle_up: 0.785398,
-                angle_left: -0.785398,
-                angle_right: 0.785398,
+                angle_down: -CAMERA_FIELD_OF_VIEW / 2.,
+                angle_up: CAMERA_FIELD_OF_VIEW / 2.,
+                angle_left: -CAMERA_FIELD_OF_VIEW / 2.,
+                angle_right: CAMERA_FIELD_OF_VIEW / 2.,
             },
         };
     }
