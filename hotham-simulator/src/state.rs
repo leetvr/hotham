@@ -237,8 +237,8 @@ impl State {
         let forward = orientation * Vec3::Z;
         // get the right vector rotated by the camera rotation quaternion
         let right = orientation * Vec3::X;
-
         let up = Vec3::Y;
+
         let movement_speed = 2f32 * dt;
         for pressed in self.input_state.pressed.iter() {
             match pressed {
@@ -291,19 +291,21 @@ impl State {
             y_rot -= y as f32;
         }
 
+        if x_rot == 0. && y_rot == 0. {
+            return Some(());
+        }
+
         // Camera position & Rotation
         let pose = &mut self.view_poses[0];
-
-        // Update Rotation
-        let orientation = &mut pose.orientation;
-
         let mouse_sensitivity = 0.2 * std::f32::consts::TAU / 360f32;
 
+        let rotation =
+            Quat::from_euler(glam::EulerRot::YXZ, self.camera.yaw, self.camera.pitch, 0.);
         self.camera.yaw += x_rot * mouse_sensitivity;
         self.camera.pitch += y_rot * mouse_sensitivity;
 
-        let rotation =
-            Quat::from_euler(glam::EulerRot::XYZ, self.camera.pitch, self.camera.yaw, 0.);
+        // Update Rotation
+        let orientation = &mut pose.orientation;
 
         // Could probably just do this with mem::transmute, but.. better not.
         orientation.x = rotation.x;
