@@ -8,6 +8,10 @@ use crate::components::{Collider as ColliderComponent, RigidBody as RigidBodyCom
 
 pub const DEFAULT_COLLISION_GROUP: u32 = 0b01;
 pub const PANEL_COLLISION_GROUP: u32 = 0b10;
+pub const HAND_COLLISION_GROUP: u32 = 0b00000100;
+pub const WALL_COLLISION_GROUP: u32 = 0b00001000;
+pub const SENSOR_COLLISION_GROUP: u32 = 0b00010000;
+
 /// TODO: This is *usually* 72fps on the Quest 2, but we may support higher resolutions later.
 pub const DELTA_TIME: f32 = 1. / 72.;
 

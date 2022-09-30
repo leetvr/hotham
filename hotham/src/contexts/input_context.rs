@@ -1,6 +1,6 @@
 use crate::{
     contexts::XrContext,
-    util::{affine_from_posef, is_space_valid},
+    util::{affine_from_posef, is_space_valid, lerp_slerp},
     xr,
 };
 use glam::{Affine3A, Vec2, Vec3};
@@ -323,6 +323,28 @@ impl RightInputContext {
 }
 
 #[derive(Debug, Default)]
+/// Input from the Head Mounted Display (HMD, or headset)
+pub struct HmdInputContext {
+    left_eye_in_stage: Affine3A,
+    right_eye_in_stage: Affine3A,
+}
+
+impl HmdInputContext {
+    pub(crate) fn update(&mut self, xr_context: &XrContext) {
+        // Since engine will call `update_views()` *just before* calling this method, we
+        // can be sure that this data is up-to-date.
+        let views = &xr_context.views;
+        self.left_eye_in_stage = affine_from_posef(views[0].pose);
+        self.right_eye_in_stage = affine_from_posef(views[1].pose);
+    }
+
+    /// The position of the HMD in the real world (stage space)
+    pub(crate) fn position_in_stage(&self) -> Affine3A {
+        lerp_slerp(&self.left_eye_in_stage, &self.right_eye_in_stage, 0.5)
+    }
+}
+
+#[derive(Debug, Default)]
 /// Context that holds input state. Allows users to query for input events without having to
 /// worry about OpenXR internals.
 ///
@@ -331,12 +353,13 @@ impl RightInputContext {
 pub struct InputContext {
     pub left: LeftInputContext,
     pub right: RightInputContext,
+    pub hmd: HmdInputContext,
 }
 
 impl InputContext {
     /// Synchronize the context state with OpenXR. Automatically called by `Engine`
     /// each tick.
-    pub fn update(&mut self, xr_context: &XrContext) {
+    pub(crate) fn update(&mut self, xr_context: &XrContext) {
         let input = &xr_context.input;
         let session = &xr_context.session;
         let left_subaction_path = input.left_hand_subaction_path;
@@ -515,10 +538,11 @@ impl InputContext {
         if is_space_valid(location) {
             self.right.stage_from_aim = affine_from_posef(location.pose);
         }
+
+        self.hmd.update(xr_context);
     }
 }
 
-#[cfg(test)]
 impl InputContext {
     /// Get an `InputContext` used for testing. Uses the same values as defined in the simulator.
     pub fn testing() -> Self {
@@ -530,5 +554,26 @@ impl InputContext {
             glam::Affine3A::from_rotation_translation(rotation, [0.2, 1.4, -0.5].into());
 
         input_context
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::HmdInputContext;
+
+    #[test]
+    pub fn test_hmd_context() {
+        let expected_translation = glam::Vec3::Y;
+
+        // The midpoint should thus be (0., 1., 0)
+        let hmd_context = HmdInputContext {
+            left_eye_in_stage: glam::Affine3A::from_translation([-1., 1., 0.].into()),
+            right_eye_in_stage: glam::Affine3A::from_translation([1., 1., 0.].into()),
+        };
+
+        let (_, _, translation) = hmd_context
+            .position_in_stage()
+            .to_scale_rotation_translation();
+        assert_eq!(translation, expected_translation);
     }
 }

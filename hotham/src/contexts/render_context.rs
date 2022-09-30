@@ -133,7 +133,6 @@ impl RenderContext {
             scene_data,
             descriptors,
             resources,
-
             primitive_map: HashMap::default(),
         })
     }

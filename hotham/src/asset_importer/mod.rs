@@ -6,7 +6,10 @@ use crate::{
         animation_controller::AnimationController, Collider, GlobalTransform, Info, LocalTransform,
         Mesh, Parent, Root, Skin, Visible,
     },
-    contexts::{physics_context::PhysicsContext, RenderContext, VulkanContext},
+    contexts::{
+        physics_context::{self, PhysicsContext},
+        RenderContext, VulkanContext,
+    },
     rendering::{light::Light, material::Material},
 };
 use anyhow::Result;
@@ -15,6 +18,7 @@ use glam::{Affine3A, Mat4};
 use gltf::Document;
 use hecs::{Entity, World};
 use itertools::Itertools;
+use rapier3d::prelude::InteractionGroups;
 use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use self::scene::Scene;
@@ -289,9 +293,7 @@ fn load_node(
     }
 
     // If this node has corresponding collider geometry, add it in.
-    if let Some(collider) =
-        get_collider_for_node(node, import_context, this_entity, local_transform)
-    {
+    if let Some(collider) = get_collider_for_node(node, import_context, this_entity) {
         world.insert_one(this_entity, collider).unwrap();
     }
 
@@ -313,7 +315,6 @@ fn get_collider_for_node(
     node: &gltf::Node,
     import_context: &mut ImportContext,
     this_entity: Entity,
-    transform: LocalTransform,
 ) -> Option<Collider> {
     // First, get the name of the node, if it has one.
     let node_name = node.name()?;
@@ -327,11 +328,13 @@ fn get_collider_for_node(
     };
 
     // Build a collider using the mesh.
+    println!(
+        "[HOTHAM_ASSET_IMPORTER] Getting shape for {}",
+        collider_node_name
+    );
     let shape = get_shape_from_mesh(mesh, import_context);
-    let position = transform.to_isometry();
-    let collider_builder = rapier3d::geometry::ColliderBuilder::new(shape)
-        .user_data(this_entity.to_bits().get() as _)
-        .position(position);
+    let collider_builder =
+        rapier3d::geometry::ColliderBuilder::new(shape).user_data(this_entity.to_bits().get() as _);
 
     // If this is a wall collider, ensure it's not a sensor.
     let collider = if collider_node_name.ends_with(WALL_COLLIDER_TAG) {
@@ -339,13 +342,25 @@ fn get_collider_for_node(
             "[HOTHAM_ASSET_IMPORTER] Created wall collider for model {}",
             collider_node_name
         );
-        collider_builder.sensor(false).build()
+        collider_builder
+            .sensor(false)
+            .collision_groups(InteractionGroups::new(
+                physics_context::WALL_COLLISION_GROUP,
+                u32::MAX,
+            ))
+            .build()
     } else {
         println!(
             "[HOTHAM_ASSET_IMPORTER] Created sensor collider for model {}",
             collider_node_name
         );
-        collider_builder.sensor(true).build()
+        collider_builder
+            .sensor(true)
+            .collision_groups(InteractionGroups::new(
+                physics_context::SENSOR_COLLISION_GROUP,
+                u32::MAX,
+            ))
+            .build()
     };
 
     let handle = import_context.physics_context.colliders.insert(collider);
@@ -399,7 +414,17 @@ fn get_shape_from_mesh(
         }
     }
 
-    rapier3d::geometry::SharedShape::convex_decomposition(&positions, &indices)
+    println!(
+        "[HOTHAM_ASSET_IMPORTER] Attempting to create convex mesh from {:?} positions",
+        positions.len()
+    );
+
+    rapier3d::geometry::SharedShape::convex_mesh(positions.clone(), &indices).unwrap_or_else(|| {
+        println!(
+            "[HOTHAM_ASSET_IMPORTER] ERROR! Unable to create convex mesh, attempting decomposition"
+        );
+        rapier3d::geometry::SharedShape::convex_decomposition(&positions, &indices)
+    })
 }
 
 /// Recursively walk through this node's hierarchy and connect child nodes to their parents by adding a [`Parent`] component.

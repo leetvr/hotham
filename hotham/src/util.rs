@@ -277,3 +277,15 @@ pub(crate) fn begin_renderdoc() -> Result<RenderDoc<renderdoc::V141>, renderdoc:
 pub(crate) fn end_renderdoc(renderdoc: &mut RenderDoc<renderdoc::V141>) {
     let _ = renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
 }
+
+/// Interpolate between two affine transforms
+pub fn lerp_slerp(a: &Affine3A, b: &Affine3A, s: f32) -> Affine3A {
+    let (a_scale, a_rotation, a_translation) = a.to_scale_rotation_translation();
+    let (b_scale, b_rotation, b_translation) = b.to_scale_rotation_translation();
+
+    Affine3A::from_scale_rotation_translation(
+        a_scale.lerp(b_scale, s),
+        a_rotation.slerp(b_rotation, s),
+        a_translation.lerp(b_translation, s),
+    )
+}
