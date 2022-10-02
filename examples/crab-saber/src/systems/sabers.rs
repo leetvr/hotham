@@ -17,7 +17,7 @@ const SABER_HALF_HEIGHT: f32 = SABER_HEIGHT / 2.;
 const SABER_WIDTH: f32 = 0.02;
 const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 
-/// Sync the postion of the player's sabers with the position of their controllers in OpenXR
+/// Sync the transform of the player's sabers with the pose of their controllers in OpenXR
 pub fn sabers_system(engine: &mut Engine) {
     sabers_system_inner(&mut engine.world, &engine.input_context)
 }
@@ -39,8 +39,8 @@ fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
         };
 
         // Apply transform
-        let position = global_from_stage * stage_from_grip * grip_from_local;
-        local_transform.update_from_affine(&position);
+        let global_from_local = global_from_stage * stage_from_grip * grip_from_local;
+        local_transform.update_from_affine(&global_from_local);
     }
 }
 
