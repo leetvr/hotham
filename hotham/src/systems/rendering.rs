@@ -259,7 +259,7 @@ mod tests {
 
     use crate::{
         asset_importer,
-        components::LocalTransform,
+        components::{stage::Stage, LocalTransform},
         contexts::{PhysicsContext, RenderContext},
         rendering::{image::Image, light::Light, scene_data},
         systems::{
@@ -289,14 +289,17 @@ mod tests {
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform
-        let stage_entity = stage::add_stage(&mut world, &mut physics_context);
-        let mut stage_local_transform = world.get_mut::<LocalTransform>(stage_entity).unwrap();
-        stage_local_transform.translation = [0.1, 0.2, 0.3].into();
-        stage_local_transform.rotation =
-            Quat::from_scaled_axis(Vec3::Y * (std::f32::consts::TAU * 0.1));
-
+        let stage_local_transform = LocalTransform {
+            translation: [0.1, 0.2, 0.3].into(),
+            rotation: Quat::from_scaled_axis(Vec3::Y * (std::f32::consts::TAU * 0.1)),
+            ..Default::default()
+        };
         let global_from_stage = stage_local_transform.to_affine();
-        drop(stage_local_transform);
+        world.spawn((
+            Stage {},
+            stage_local_transform,
+            GlobalTransform(global_from_stage.clone()),
+        ));
 
         // Set views
         let rotation: mint::Quaternion<f32> =

@@ -17,7 +17,7 @@ const SABER_HALF_HEIGHT: f32 = SABER_HEIGHT / 2.;
 const SABER_WIDTH: f32 = 0.02;
 const SABER_HALF_WIDTH: f32 = SABER_WIDTH / 2.;
 
-/// Sync the postion of the player's sabers with the position of their controllers in OpenXR
+/// Sync the transform of the player's sabers with the pose of their controllers in OpenXR
 pub fn sabers_system(engine: &mut Engine) {
     sabers_system_inner(&mut engine.world, &engine.input_context)
 }
@@ -39,8 +39,8 @@ fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
         };
 
         // Apply transform
-        let position = global_from_stage * stage_from_grip * grip_from_local;
-        local_transform.update_from_affine(&position);
+        let global_from_local = global_from_stage * stage_from_grip * grip_from_local;
+        local_transform.update_from_affine(&global_from_local);
     }
 }
 
@@ -79,32 +79,24 @@ fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, sa
 mod tests {
     use super::*;
 
-    #[cfg(target_os = "windows")]
     #[test]
     fn test_sabers() {
-        use hotham::{
-            components::{GlobalTransform, LocalTransform},
-            contexts::XrContext,
-        };
+        use hotham::components::{GlobalTransform, LocalTransform};
 
         let mut world = World::new();
-        let path = std::path::Path::new("../../openxr_loader.dll");
-        let (xr_context, _) = XrContext::new_from_path(path).unwrap();
-        let mut input_context = InputContext::default();
+        let input_context = InputContext::testing();
         let saber = world.spawn((
             Color::Red,
             Saber {},
             LocalTransform::default(),
             GlobalTransform::default(),
         ));
-
-        input_context.update(&xr_context);
         sabers_system_inner(&mut world, &input_context);
 
         let local_transform = world.get::<LocalTransform>(saber).unwrap();
         approx::assert_relative_eq!(
             local_transform.translation,
-            [-0.2, 1.3258252, -0.4700315].into()
+            [-0.2, 1.3258567, -0.47001815].into()
         );
     }
 }

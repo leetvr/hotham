@@ -1,4 +1,5 @@
 use crate::{
+    components::{GlobalTransform, LocalTransform, Parent, Stage, HMD},
     contexts::{
         AudioContext, GuiContext, HapticContext, InputContext, PhysicsContext, RenderContext,
         VulkanContext, XrContext, XrContextBuilder,
@@ -85,21 +86,42 @@ impl<'a> EngineBuilder<'a> {
             .expect("!!FATAL ERROR - Unable to initialize renderer!");
         let gui_context = GuiContext::new(&vulkan_context);
 
+        // Initialize the world with our "tracking" entities, the stage and the HMD.
+        let mut world = hecs::World::default();
+        let (stage_entity, hmd_entity) = create_tracking_entities(&mut world);
+
         Engine {
-            world: Default::default(),
+            world,
             should_quit,
             resumed,
             event_data_buffer: Default::default(),
             xr_context,
             vulkan_context,
             render_context,
-            physics_context: Default::default(),
             audio_context: Default::default(),
             gui_context,
             haptic_context: Default::default(),
             input_context: Default::default(),
+            physics_context: Default::default(),
+            stage_entity,
+            hmd_entity,
         }
     }
+}
+
+fn create_tracking_entities(world: &mut hecs::World) -> (hecs::Entity, hecs::Entity) {
+    let stage_entity = world.spawn((
+        Stage {},
+        LocalTransform::default(),
+        GlobalTransform::default(),
+    ));
+    let hmd_entity = world.spawn((
+        HMD {},
+        Parent(stage_entity),
+        LocalTransform::default(),
+        GlobalTransform::default(),
+    ));
+    (stage_entity, hmd_entity)
 }
 
 /// The Hotham Engine
@@ -129,6 +151,10 @@ pub struct Engine {
     pub haptic_context: HapticContext,
     /// Input context
     pub input_context: InputContext,
+    /// Stage entity
+    pub stage_entity: hecs::Entity,
+    /// HMD entity
+    pub hmd_entity: hecs::Entity,
 }
 
 /// The result of calling `update()` on Engine.
@@ -170,7 +196,17 @@ impl Engine {
 
             // If we're in the FOCUSSED state, process input.
             if current_state == SessionState::FOCUSED {
+                self.xr_context.update_views();
                 self.input_context.update(&self.xr_context);
+
+                // Since the HMD is parented to the Stage, its LocalTransform (ie. its transform with respect to the parent)
+                // is equal to its pose in stage space.
+                let hmd_in_stage = self.input_context.hmd.hmd_in_stage();
+                let mut transform = self
+                    .world
+                    .get_mut::<LocalTransform>(self.hmd_entity)
+                    .unwrap();
+                transform.update_from_affine(&hmd_in_stage);
             }
 
             // Handle any state transitions, as required.
