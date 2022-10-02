@@ -338,8 +338,8 @@ impl HmdInputContext {
         self.right_eye_in_stage = affine_from_posef(views[1].pose);
     }
 
-    /// The position of the HMD in the real world (stage space)
-    pub(crate) fn position_in_stage(&self) -> Affine3A {
+    /// The pose of the HMD in the real world (stage space)
+    pub(crate) fn hmd_in_stage(&self) -> Affine3A {
         lerp_slerp(&self.left_eye_in_stage, &self.right_eye_in_stage, 0.5)
     }
 }
@@ -571,9 +571,7 @@ pub mod tests {
             right_eye_in_stage: glam::Affine3A::from_translation([1., 1., 0.].into()),
         };
 
-        let (_, _, translation) = hmd_context
-            .position_in_stage()
-            .to_scale_rotation_translation();
+        let (_, _, translation) = hmd_context.hmd_in_stage().to_scale_rotation_translation();
         assert_eq!(translation, expected_translation);
     }
 }
