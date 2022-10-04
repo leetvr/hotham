@@ -26,8 +26,8 @@ fn grabbing_system_inner(world: &mut World, physics_context: &mut PhysicsContext
 
             // Check to see if we are colliding with an entity
             for other_entity in collider.collisions_this_frame.iter() {
-                if world.get::<Grabbable>(*other_entity).is_ok() {
-                    let rigid_body_handle = world.get::<RigidBody>(*other_entity).unwrap().handle;
+                if world.get::<&Grabbable>(*other_entity).is_ok() {
+                    let rigid_body_handle = world.get::<&RigidBody>(*other_entity).unwrap().handle;
                     let rigid_body = physics_context
                         .rigid_bodies
                         .get_mut(rigid_body_handle)
@@ -45,7 +45,7 @@ fn grabbing_system_inner(world: &mut World, physics_context: &mut PhysicsContext
         } else {
             // If we are not gripping, but we have a grabbed entity, release it
             if let Some(grabbed_entity) = hand.grabbed_entity.take() {
-                let rigid_body_handle = world.get::<RigidBody>(grabbed_entity).unwrap().handle;
+                let rigid_body_handle = world.get::<&RigidBody>(grabbed_entity).unwrap().handle;
                 let rigid_body = physics_context
                     .rigid_bodies
                     .get_mut(rigid_body_handle)
@@ -109,14 +109,14 @@ mod tests {
 
         tick(&mut world, &mut physics_context);
 
-        let mut hand = world.get_mut::<Hand>(hand_entity).unwrap();
+        let mut hand = world.get::<&mut Hand>(hand_entity).unwrap();
         assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
         hand.grip_value = 0.0;
         drop(hand);
 
         tick(&mut world, &mut physics_context);
 
-        let mut hand = world.get_mut::<Hand>(hand_entity).unwrap();
+        let mut hand = world.get::<&mut Hand>(hand_entity).unwrap();
         assert!(hand.grabbed_entity.is_none());
 
         // Make sure hand can't grip colliders *without* a Grabbable component
@@ -126,7 +126,7 @@ mod tests {
 
         tick(&mut world, &mut physics_context);
 
-        let hand = world.get::<Hand>(hand_entity).unwrap();
+        let hand = world.get::<&mut Hand>(hand_entity).unwrap();
         assert!(hand.grabbed_entity.is_none());
     }
 

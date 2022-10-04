@@ -13,7 +13,7 @@ use hotham::{
     contexts::{
         physics_context::DEFAULT_COLLISION_GROUP, AudioContext, HapticContext, PhysicsContext,
     },
-    hecs::{Entity, With, Without, World},
+    hecs::{Entity, With, World},
     rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
     Engine,
 };
@@ -86,7 +86,7 @@ fn transition(
 
             // Set panel text
             let mut panel = world
-                .get_mut::<UIPanel>(game_context.main_menu_panel)
+                .get::<&mut UIPanel>(game_context.main_menu_panel)
                 .unwrap();
 
             panel.text = "CRAB SABER".to_string();
@@ -141,7 +141,7 @@ fn transition(
 
             // Destroy all cubes
             let live_cubes = world
-                .query::<With<Visible, With<Cube, (&Color, &RigidBody, &Collider)>>>()
+                .query::<With<(&Color, &RigidBody, &Collider), (&Visible, &Cube)>>()
                 .iter()
                 .map(|(e, _)| e)
                 .collect::<Vec<_>>();
@@ -158,7 +158,7 @@ fn transition(
                 "YOU FAILED!"
             };
             let mut panel = world
-                .get_mut::<UIPanel>(game_context.main_menu_panel)
+                .get::<&mut UIPanel>(game_context.main_menu_panel)
                 .unwrap();
 
             panel.text = format!("Game Over\n{}", message);
@@ -183,7 +183,7 @@ fn run(
     match &mut game_context.state {
         GameState::Init => return Some(GameState::MainMenu),
         GameState::MainMenu => {
-            let panel = world.get::<UIPanel>(game_context.main_menu_panel).unwrap();
+            let panel = world.get::<&UIPanel>(game_context.main_menu_panel).unwrap();
             if let Some(button) = panel.buttons.iter().find(|p| p.clicked_this_frame) {
                 let song = game_context.songs.get(&button.text).unwrap();
                 return Some(GameState::Playing(song.clone()));
@@ -208,7 +208,7 @@ fn run(
         }
         GameState::GameOver => {
             if world
-                .get::<UIPanel>(game_context.main_menu_panel)
+                .get::<&UIPanel>(game_context.main_menu_panel)
                 .unwrap()
                 .buttons[0]
                 .clicked_this_frame
@@ -233,7 +233,9 @@ fn spawn_cube(
 
     let color = if random() { Color::Red } else { Color::Blue };
     let dead_cube = world
-        .query_mut::<Without<Visible, With<Cube, &Color>>>()
+        .query_mut::<&Color>()
+        .with::<&Cube>()
+        .without::<&Visible>()
         .into_iter()
         .find_map(|(e, c)| if c == &color { Some(e) } else { None })
         .unwrap();
@@ -243,7 +245,7 @@ fn spawn_cube(
 
 fn update_panel_text(world: &mut World, game_context: &mut GameContext) {
     world
-        .get_mut::<UIPanel>(game_context.score_panel)
+        .get::<&mut UIPanel>(game_context.score_panel)
         .unwrap()
         .text = format!("Score: {}", game_context.current_score);
 }
@@ -258,13 +260,13 @@ fn check_for_hits(
     let mut cubes_to_dispose = Vec::new();
 
     {
-        let blue_saber_collider = world.get::<Collider>(game_context.blue_saber).unwrap();
+        let blue_saber_collider = world.get::<&Collider>(game_context.blue_saber).unwrap();
         for c in &blue_saber_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
             if !is_cube(e) {
                 continue;
             };
-            if let Some(color) = e.get::<Color>() {
+            if let Some(color) = e.get::<&Color>() {
                 match *color {
                     Color::Red => {
                         game_context.current_score -= 1;
@@ -280,13 +282,13 @@ fn check_for_hits(
             }
         }
 
-        let red_saber_collider = world.get::<Collider>(game_context.red_saber).unwrap();
+        let red_saber_collider = world.get::<&Collider>(game_context.red_saber).unwrap();
         for c in &red_saber_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
             if !is_cube(e) {
                 continue;
             };
-            if let Some(color) = e.get::<Color>() {
+            if let Some(color) = e.get::<&Color>() {
                 match *color {
                     Color::Red => {
                         game_context.current_score += 1;
@@ -302,13 +304,13 @@ fn check_for_hits(
             }
         }
 
-        let backstop_collider = world.get::<Collider>(game_context.backstop).unwrap();
+        let backstop_collider = world.get::<&Collider>(game_context.backstop).unwrap();
         for c in &backstop_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
             if !is_cube(e) {
                 continue;
             };
-            if e.get::<Cube>().is_some() {
+            if e.get::<&Cube>().is_some() {
                 game_context.current_score -= 1;
                 pending_sound_effects.push((*c, "Miss"));
                 cubes_to_dispose.push(*c);
@@ -330,7 +332,7 @@ fn dispose_of_cubes(
     physics_context: &mut PhysicsContext,
 ) {
     for e in cubes_to_dispose.into_iter() {
-        match world.get::<Collider>(e) {
+        match world.get::<&Collider>(e) {
             Ok(c) => {
                 let handle = c.handle;
                 physics_context.colliders.remove(
@@ -341,7 +343,7 @@ fn dispose_of_cubes(
                 );
             }
             Err(_) => {
-                let info = world.get::<Info>(e).unwrap();
+                let info = world.get::<&Info>(e).unwrap();
                 println!("Unable to find collider for entity {:?} - {:?}", e, *info);
             }
         }
@@ -377,7 +379,7 @@ fn revive_cube(
     let z_linvel = -CUBE_Z / (song.beat_length.as_secs_f32() * 4.); // distance / time for 4 beats
 
     // Update the Rigid Body
-    let rigid_body_handle = world.get::<RigidBody>(cube_entity).unwrap().handle;
+    let rigid_body_handle = world.get::<&RigidBody>(cube_entity).unwrap().handle;
     let rigid_body = &mut physics_context.rigid_bodies[rigid_body_handle];
     rigid_body.set_translation([translation_x, CUBE_Y, CUBE_Z].into(), true);
     rigid_body.set_linvel([0., 0., z_linvel].into(), true);
@@ -495,7 +497,7 @@ mod tests {
         // MAIN_MENU -> PLAYING
         {
             let mut panel = world
-                .get_mut::<UIPanel>(game_context.main_menu_panel)
+                .get::<&mut UIPanel>(game_context.main_menu_panel)
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
@@ -524,7 +526,7 @@ mod tests {
         );
 
         {
-            let mut q = world.query::<With<Visible, With<Cube, (&Color, &RigidBody, &Collider)>>>();
+            let mut q = world.query::<With<(&Color, &RigidBody, &Collider), (&Visible, &Cube)>>();
             let mut i = q.iter();
             assert_eq!(i.len(), 1);
             let (_, (_, rigid_body, _)) = i.next().unwrap();
@@ -689,7 +691,7 @@ mod tests {
             assert_eq!(num_cubes(world), 0);
 
             let mut panel = world
-                .get_mut::<UIPanel>(game_context.main_menu_panel)
+                .get::<&mut UIPanel>(game_context.main_menu_panel)
                 .unwrap();
             assert_eq!(panel.text, "Game Over\nYOU FAILED!",);
             assert_eq!(panel.buttons[0].text, "Back to main menu",);
@@ -717,14 +719,14 @@ mod tests {
             );
             assert_eq!(
                 &world
-                    .get::<UIPanel>(game_context.main_menu_panel)
+                    .get::<&UIPanel>(game_context.main_menu_panel)
                     .unwrap()
                     .text,
                 "CRAB SABER",
             );
             assert_eq!(
                 &world
-                    .get::<UIPanel>(game_context.main_menu_panel)
+                    .get::<&UIPanel>(game_context.main_menu_panel)
                     .unwrap()
                     .buttons[0]
                     .text,
@@ -735,7 +737,7 @@ mod tests {
         // MAIN_MENU -> PLAYING
         {
             let mut panel = world
-                .get_mut::<UIPanel>(game_context.main_menu_panel)
+                .get::<&mut UIPanel>(game_context.main_menu_panel)
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
@@ -769,12 +771,12 @@ mod tests {
 
     fn collide_sabers(game_context: &mut GameContext, world: &mut World) {
         world
-            .get_mut::<Collider>(game_context.blue_saber)
+            .get::<&mut Collider>(game_context.blue_saber)
             .unwrap()
             .collisions_this_frame
             .push(game_context.red_saber.clone());
         world
-            .get_mut::<Collider>(game_context.red_saber)
+            .get::<&mut Collider>(game_context.red_saber)
             .unwrap()
             .collisions_this_frame
             .push(game_context.blue_saber.clone());
@@ -807,21 +809,21 @@ mod tests {
             Collider::new(collider),
         ));
         world
-            .get_mut::<Collider>(saber)
+            .get::<&mut Collider>(saber)
             .unwrap()
             .collisions_this_frame
             .push(cube);
     }
 
     fn assert_cube_processed(world: &mut World, saber: Entity, haptic_context: &mut HapticContext) {
-        let hit_cube = world.get::<Collider>(saber).unwrap().collisions_this_frame[0];
+        let hit_cube = world.get::<&Collider>(saber).unwrap().collisions_this_frame[0];
         let hit_cube = world.entity(hit_cube).unwrap();
         assert!(hit_cube.has::<SoundEmitter>());
         assert!(hit_cube.has::<RigidBody>()); // Necessary to play a sound
         assert!(!hit_cube.has::<Visible>());
         assert!(!hit_cube.has::<Collider>());
 
-        if let Ok(c) = world.get::<Color>(saber) {
+        if let Ok(c) = world.get::<&Color>(saber) {
             match *c {
                 Color::Red => assert_eq!(haptic_context.left_hand_amplitude_this_frame, 1.),
                 Color::Blue => assert_eq!(haptic_context.right_hand_amplitude_this_frame, 1.),
@@ -835,15 +837,15 @@ mod tests {
         haptic_context: &mut HapticContext,
     ) {
         world
-            .get_mut::<Collider>(game_context.red_saber)
+            .get::<&mut Collider>(game_context.red_saber)
             .unwrap()
             .collisions_this_frame = vec![];
         world
-            .get_mut::<Collider>(game_context.blue_saber)
+            .get::<&mut Collider>(game_context.blue_saber)
             .unwrap()
             .collisions_this_frame = vec![];
         world
-            .get_mut::<Collider>(game_context.backstop)
+            .get::<&mut Collider>(game_context.backstop)
             .unwrap()
             .collisions_this_frame = vec![];
 
@@ -852,13 +854,16 @@ mod tests {
     }
 
     pub fn is_visible(world: &World, entity: Entity) -> bool {
-        world.get::<Visible>(entity).is_ok()
+        world.get::<&Visible>(entity).is_ok()
     }
 
     pub fn assert_score_is(world: &mut World, game_context: &mut GameContext, score: i32) {
         assert_eq!(game_context.current_score, score);
         assert_eq!(
-            world.get::<UIPanel>(game_context.score_panel).unwrap().text,
+            world
+                .get::<&UIPanel>(game_context.score_panel)
+                .unwrap()
+                .text,
             format!("Score: {}", score)
         );
     }

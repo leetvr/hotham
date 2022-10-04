@@ -47,7 +47,7 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
 
         // If we've grabbed something, update its position too.
         if let Some(grabbed_entity) = hand.grabbed_entity {
-            let mut local_transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
+            let mut local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
             local_transform.update_from_affine(&global_from_local);
         }
 
@@ -85,7 +85,7 @@ pub fn add_hand(
             .unwrap();
 
         // Modify the animation controller
-        let mut animation_controller = world.get_mut::<AnimationController>(hand).unwrap();
+        let mut animation_controller = world.get::<&mut AnimationController>(hand).unwrap();
         animation_controller.blend_from = 0;
         animation_controller.blend_to = 1;
         drop(animation_controller);
@@ -141,7 +141,7 @@ mod tests {
 
         tick(&mut world, &input_context);
 
-        let local_transform = world.get_mut::<LocalTransform>(grabbed_entity).unwrap();
+        let local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
         assert_relative_eq!(local_transform.translation, [-0.2, 1.4, -0.5].into());
     }
 

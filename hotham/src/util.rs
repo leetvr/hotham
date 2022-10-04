@@ -59,14 +59,14 @@ pub fn get_world_with_hands(
     let left_hand =
         add_model_to_world("Left Hand", &models, &mut world, physics_context, None).unwrap();
     {
-        let mut local_transform = world.get_mut::<LocalTransform>(left_hand).unwrap();
+        let mut local_transform = world.get::<&mut LocalTransform>(left_hand).unwrap();
         local_transform.translation = [-0.2, 1.4, 0.0].into();
     }
 
     let right_hand =
         add_model_to_world("Right Hand", &models, &mut world, physics_context, None).unwrap();
     {
-        let mut local_transform = world.get_mut::<LocalTransform>(right_hand).unwrap();
+        let mut local_transform = world.get::<&mut LocalTransform>(right_hand).unwrap();
         local_transform.translation = [0.2, 1.4, 0.0].into();
     }
 

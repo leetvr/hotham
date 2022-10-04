@@ -23,7 +23,7 @@ pub(crate) fn update_global_transform_with_parent_system_inner(world: &mut World
         children.push(entity);
     }
 
-    let mut roots = world.query::<Without<Parent, &GlobalTransform>>();
+    let mut roots = world.query::<Without<&GlobalTransform, &Parent>>();
     for (root, root_matrix) in roots.iter() {
         update_global_transforms_recursively(&root_matrix.0, root, &hierarchy, world);
     }
@@ -38,10 +38,10 @@ fn update_global_transforms_recursively(
     if let Some(children) = hierarchy.get(&entity) {
         for child in children {
             {
-                let child_matrix = &mut world.get_mut::<GlobalTransform>(*child).unwrap().0;
+                let child_matrix = &mut world.get::<&mut GlobalTransform>(*child).unwrap().0;
                 *child_matrix = *parent_matrix * *child_matrix;
             }
-            let child_matrix = world.get::<GlobalTransform>(*child).unwrap().0;
+            let child_matrix = world.get::<&GlobalTransform>(*child).unwrap().0;
             update_global_transforms_recursively(&child_matrix, *child, hierarchy, world);
         }
     }
@@ -73,13 +73,13 @@ mod tests {
         tick(&mut world);
 
         {
-            let global_transform = world.get_mut::<GlobalTransform>(grandchild).unwrap();
+            let global_transform = world.get::<&GlobalTransform>(grandchild).unwrap();
             let expected_matrix = Affine3A::from_translation([3.0, 3.0, 300.0].into());
             assert_relative_eq!(global_transform.0, expected_matrix);
         }
 
         {
-            let global_transform = world.get_mut::<GlobalTransform>(child).unwrap();
+            let global_transform = world.get::<&GlobalTransform>(child).unwrap();
             let expected_matrix = Affine3A::from_translation([2.0, 2.0, 200.0].into());
             assert_relative_eq!(global_transform.0, expected_matrix);
         }
@@ -126,7 +126,7 @@ mod tests {
 
         let root_entity = node_entity.get(&0).unwrap();
         {
-            let mut local_transform = world.get_mut::<LocalTransform>(*root_entity).unwrap();
+            let mut local_transform = world.get::<&mut LocalTransform>(*root_entity).unwrap();
             local_transform.translation = [100.0, 100.0, 100.0].into();
         }
         tick(&mut world);
@@ -139,11 +139,11 @@ mod tests {
             let mut parent_entity = parent.0;
             let mut parent_matrices = vec![];
             loop {
-                let parent_global_transform = world.get::<GlobalTransform>(parent_entity).unwrap();
+                let parent_global_transform = world.get::<&GlobalTransform>(parent_entity).unwrap();
                 parent_matrices.push(parent_global_transform.0);
 
                 // Walk up the tree until we find the root.
-                if let Ok(grand_parent) = world.get::<Parent>(parent_entity) {
+                if let Ok(grand_parent) = world.get::<&Parent>(parent_entity) {
                     depth += 1;
                     parent_entity = grand_parent.0;
                 } else {

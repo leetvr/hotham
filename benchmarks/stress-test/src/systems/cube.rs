@@ -22,7 +22,7 @@ pub fn setup_cubes(
         for row in 0..resolution {
             for column in 0..resolution {
                 let c = add_model_to_world("Cube", models, world, physics_context, None).unwrap();
-                let mut t = world.get_mut::<LocalTransform>(c).unwrap();
+                let mut t = world.get::<&mut LocalTransform>(c).unwrap();
                 t.scale = scale;
                 t.translation.y = floor as f32 / scale_factor;
                 t.translation.x = column as f32 / scale_factor - x_offset;

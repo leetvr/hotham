@@ -87,7 +87,7 @@ pub unsafe fn begin(
     let gos_from_stage: Affine3A = gos_from_global * global_from_stage;
 
     for (_, (mesh, global_transform, skin)) in
-        world.query_mut::<With<Visible, (&Mesh, &GlobalTransform, Option<&Skin>)>>()
+        world.query_mut::<With<(&Mesh, &GlobalTransform, Option<&Skin>), &Visible>>()
     {
         let mesh = meshes.get(mesh.handle).unwrap();
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);

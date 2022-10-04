@@ -321,7 +321,7 @@ mod tests {
             &mut physics_context,
             &mut world,
         );
-        world.get_mut::<Panel>(panel).unwrap().input = Some(PanelInput {
+        world.get::<&mut Panel>(panel).unwrap().input = Some(PanelInput {
             cursor_location: Pos2::new(0.5 * 800., 0.15 * 800.),
             trigger_value: 1.,
         });

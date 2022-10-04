@@ -232,7 +232,7 @@ mod tests {
         right_here: MusicTrack,
         tell_me_that_i_cant: MusicTrack,
     ) {
-        let mut source = world.get_mut::<SoundEmitter>(entity).unwrap();
+        let mut source = world.get::<&mut SoundEmitter>(entity).unwrap();
         match source.current_state() {
             SoundState::Stopped => source.play(),
             _ => {}

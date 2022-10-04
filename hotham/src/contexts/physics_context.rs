@@ -124,7 +124,7 @@ impl PhysicsContext {
         world: &World,
         entity: Entity,
     ) -> Result<&'a mut RigidBody> {
-        let rigid_body_handle = world.get::<RigidBodyComponent>(entity)?.handle;
+        let rigid_body_handle = world.get::<&RigidBodyComponent>(entity)?.handle;
         self.rigid_bodies
             .get_mut(rigid_body_handle)
             .ok_or_else(|| anyhow!("Unable to get Rigid Body for handle!"))
@@ -135,7 +135,7 @@ impl PhysicsContext {
         world: &World,
         entity: Entity,
     ) -> Result<&'a mut Collider> {
-        let collider_handle = world.get::<ColliderComponent>(entity)?.handle;
+        let collider_handle = world.get::<&ColliderComponent>(entity)?.handle;
         self.colliders
             .get_mut(collider_handle)
             .ok_or_else(|| anyhow!("Unable to get Collider for handle!"))

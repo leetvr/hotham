@@ -168,7 +168,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
             for _ in 0..20 {
                 let e = add_model_to_world("Damaged Helmet", &models, world, physics_context, None)
                     .expect("Could not find cube?");
-                let mut t = world.get_mut::<LocalTransform>(e).unwrap();
+                let mut t = world.get::<&mut LocalTransform>(e).unwrap();
                 t.rotation = Quat::from_axis_angle(Vec3::X, std::f32::consts::FRAC_PI_2);
             }
             models
@@ -319,7 +319,7 @@ fn model_system(
 }
 
 fn rotate_models(world: &mut World, total_time: f32) {
-    for (_, local_transform) in world.query_mut::<With<Mesh, &mut LocalTransform>>() {
+    for (_, local_transform) in world.query_mut::<With<&mut LocalTransform, &Mesh>>() {
         local_transform.rotation = Quat::from_euler(
             EulerRot::XYZ,
             90.0_f32.to_radians(),
@@ -330,7 +330,7 @@ fn rotate_models(world: &mut World, total_time: f32) {
 }
 
 fn rearrange_models(world: &mut World) {
-    let query = world.query_mut::<With<Mesh, &mut LocalTransform>>();
+    let query = world.query_mut::<With<&mut LocalTransform, &Mesh>>();
     let query_iter = query.into_iter();
     let num_models = query_iter.len() as f32;
 

@@ -16,7 +16,7 @@ fn animation_system_inner(world: &mut hecs::World) {
         let blend_amount = controller.blend_amount;
 
         for target in &controller.targets {
-            let mut local_transform = world.get_mut::<LocalTransform>(target.target).unwrap();
+            let mut local_transform = world.get::<&mut LocalTransform>(target.target).unwrap();
             local_transform.translation =
                 target.translations[blend_from].lerp(target.translations[blend_to], blend_amount);
             local_transform.rotation =
@@ -56,7 +56,8 @@ mod tests {
             add_model_to_world("Left Hand", &models, &mut world, &mut physics_context, None)
                 .unwrap();
         {
-            let mut left_hand_controller = world.get_mut::<AnimationController>(left_hand).unwrap();
+            let mut left_hand_controller =
+                world.get::<&mut AnimationController>(left_hand).unwrap();
             left_hand_controller.blend_from = 0;
             left_hand_controller.blend_to = 1;
             left_hand_controller.blend_amount = 0.0;

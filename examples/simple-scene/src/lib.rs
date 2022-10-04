@@ -93,7 +93,7 @@ fn add_helmet(
 ) {
     let helmet = add_model_to_world("Damaged Helmet", models, world, physics_context, None)
         .expect("Could not find Damaged Helmet");
-    let mut local_transform = world.get_mut::<LocalTransform>(helmet).unwrap();
+    let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
     local_transform.translation.z = -1.;
     local_transform.translation.y = 1.4;
     local_transform.scale = [0.5, 0.5, 0.5].into();

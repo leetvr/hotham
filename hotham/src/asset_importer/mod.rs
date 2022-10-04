@@ -469,30 +469,32 @@ pub fn add_model_to_world(
 
     // Go through each entity in the source world and clone its components into the new world.
     for (source_entity, destination_entity) in &entity_map {
-        if let Ok(local_transform) = source_world.get_mut::<LocalTransform>(*source_entity) {
+        let source_entity = source_world.entity(*source_entity).unwrap();
+
+        if let Some(local_transform) = source_entity.get::<&LocalTransform>() {
             destination_world
                 .insert_one(*destination_entity, *local_transform)
                 .unwrap();
         }
 
-        if let Ok(global_transform) = source_world.get_mut::<GlobalTransform>(*source_entity) {
+        if let Some(global_transform) = source_entity.get::<&GlobalTransform>() {
             destination_world
                 .insert_one(*destination_entity, *global_transform)
                 .unwrap();
         }
 
         // Create a new mesh for this entity in the destination world.
-        if let Ok(mesh) = source_world.get_mut::<Mesh>(*source_entity) {
+        if let Some(mesh) = source_entity.get::<&Mesh>() {
             destination_world
-                .insert_one(*destination_entity, mesh.clone())
+                .insert_one(*destination_entity, (*mesh).clone())
                 .unwrap();
         }
 
         // If the source entity had a skin, insert it into the new world.
         // Right now inserting a model with a skin into the world more than once is not supported. This is because
         // we would have to allocate a new skin_id, which would require some mucking about with our buffers.
-        if let Ok(skin) = source_world.get_mut::<Skin>(*source_entity) {
-            let mut new_skin = skin.clone();
+        if let Some(skin) = source_entity.get::<&Skin>() {
+            let mut new_skin = (*skin).clone();
 
             // Go through each of the joints and map them to their new entities.
             new_skin
@@ -506,14 +508,14 @@ pub fn add_model_to_world(
         }
 
         // If the source entity had a parent, set it to the corresponding entity in the destination world.
-        if let Ok(parent) = source_world.get_mut::<Parent>(*source_entity) {
+        if let Some(parent) = source_entity.get::<&Parent>() {
             let new_parent = entity_map.get(&parent.0).unwrap();
             destination_world
                 .insert_one(*destination_entity, Parent(*new_parent))
                 .unwrap();
         }
 
-        if let Ok(root) = source_world.get_mut::<Root>(*source_entity) {
+        if let Some(root) = source_entity.get::<&Root>() {
             destination_world
                 .insert_one(*destination_entity, *root)
                 .unwrap();
@@ -527,16 +529,14 @@ pub fn add_model_to_world(
             }
         }
 
-        if let Ok(info) = source_world.get_mut::<Info>(*source_entity) {
+        if let Some(info) = source_entity.get::<&Info>() {
             destination_world
-                .insert_one(*destination_entity, info.clone())
+                .insert_one(*destination_entity, (*info).clone())
                 .unwrap();
         }
 
-        if let Ok(animation_controller) =
-            source_world.get_mut::<AnimationController>(*source_entity)
-        {
-            let mut new_animation_controller = animation_controller.clone();
+        if let Some(animation_controller) = source_entity.get::<&AnimationController>() {
+            let mut new_animation_controller = (*animation_controller).clone();
 
             // Go through each of the joints and map them to their new entities.
             new_animation_controller
@@ -549,20 +549,20 @@ pub fn add_model_to_world(
                 .unwrap();
         }
 
-        if let Ok(visible) = source_world.get_mut::<Visible>(*source_entity) {
+        if let Some(visible) = source_entity.get::<&Visible>() {
             destination_world
                 .insert_one(*destination_entity, *visible)
                 .unwrap();
         }
 
         // If the entity had a collider attached, clone it and update its user data to point to the new entity.
-        if let Ok(collider) = source_world.get_mut::<Collider>(*source_entity) {
+        if let Some(collider) = source_entity.get::<&Collider>() {
             let mut new_collider = physics_context
                 .colliders
                 .get(collider.handle)
                 .unwrap()
                 .clone();
-            new_collider.user_data = source_entity.to_bits().get() as _;
+            new_collider.user_data = source_entity.entity().to_bits().get() as _;
             let new_collider = Collider::new(physics_context.colliders.insert(new_collider));
 
             destination_world
@@ -804,7 +804,7 @@ mod tests {
         assert_eq!(query.into_iter().len(), 1);
 
         // ..and make sure we got the sensor collider
-        let query = world.query_mut::<hecs::Without<Mesh, &Collider>>();
+        let query = world.query_mut::<hecs::Without<&mut Collider, &Mesh>>();
         assert_eq!(query.into_iter().len(), 1);
     }
 }

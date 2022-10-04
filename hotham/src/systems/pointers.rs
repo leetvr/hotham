@@ -42,7 +42,7 @@ pub fn pointers_system_inner(
     let grip_from_local = Affine3A::from_rotation_translation(ROTATION_OFFSET, POSITION_OFFSET);
 
     for (_, (pointer, local_transform)) in world
-        .query::<With<Visible, (&mut Pointer, &mut LocalTransform)>>()
+        .query::<With<(&mut Pointer, &mut LocalTransform), &Visible>>()
         .iter()
     {
         // Get the position of the pointer in stage space.
@@ -88,7 +88,7 @@ pub fn pointers_system_inner(
             let hit_point = ray.point_at(toi); // Same as: `ray.origin + ray.dir * toi`
             let hit_collider = physics_context.colliders.get(handle).unwrap();
             let entity = unsafe { world.find_entity_from_id(hit_collider.user_data as _) };
-            match world.get_mut::<Panel>(entity) {
+            match world.get::<&mut Panel>(entity) {
                 Ok(mut panel) => {
                     let panel_transform = hit_collider.position();
                     let cursor_location = get_cursor_location_for_panel(
@@ -103,7 +103,7 @@ pub fn pointers_system_inner(
                     });
                 }
                 Err(_) => {
-                    let info = world.get::<Info>(entity).map(|i| format!("{:?}", *i));
+                    let info = world.get::<&Info>(entity).map(|i| format!("{:?}", *i));
                     println!("[HOTHAM_POINTERS] Ray collided with object that does not have a panel: {:?} - {:?}", entity, info);
                 }
             }
@@ -238,7 +238,7 @@ mod tests {
 
         tick(&mut physics_context, &mut world, &input_context);
 
-        let local_transform = world.get::<LocalTransform>(pointer_entity).unwrap();
+        let local_transform = world.get::<&LocalTransform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
         assert_relative_eq!(
@@ -246,7 +246,7 @@ mod tests {
             [-0.2, 1.3258567, POINTER_Z].into()
         );
 
-        let panel = world.get_mut::<Panel>(panel_entity).unwrap();
+        let panel = world.get::<&mut Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 150.00153);
         assert_relative_eq!(input.cursor_location.y, 77.21232);
