@@ -36,7 +36,7 @@ mod tests {
         let entity = world.spawn((local_transform, global_transform));
 
         {
-            let matrix = world.get_mut::<GlobalTransform>(entity).unwrap();
+            let matrix = world.get::<&mut GlobalTransform>(entity).unwrap();
             assert_eq!(matrix.0, Affine3A::IDENTITY);
         }
 
@@ -44,7 +44,7 @@ mod tests {
         let test_rotation = Quat::from_euler(EulerRot::XYZ, 0.3, 0.3, 0.3);
 
         {
-            let mut local_transform = world.get_mut::<LocalTransform>(entity).unwrap();
+            let mut local_transform = world.get::<&mut LocalTransform>(entity).unwrap();
             local_transform.translation = test_translation;
             local_transform.rotation = test_rotation;
             local_transform.scale = test_translation;
@@ -58,7 +58,7 @@ mod tests {
             test_translation,
         );
 
-        let global_transform = world.get_mut::<GlobalTransform>(entity).unwrap();
+        let global_transform = world.get::<&mut GlobalTransform>(entity).unwrap();
         assert_relative_eq!(global_transform.0, expected_matrix);
     }
 }

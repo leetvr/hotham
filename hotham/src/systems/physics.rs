@@ -50,7 +50,7 @@ fn update_game_controlled_rigid_bodies(
     world: &mut hecs::World,
 ) {
     for (_, (rigid_body, global_transform)) in
-        world.query_mut::<hecs::Without<PhysicsControlled, (&RigidBody, &GlobalTransform)>>()
+        world.query_mut::<hecs::Without<(&RigidBody, &GlobalTransform), &PhysicsControlled>>()
     {
         let rigid_body = physics_context
             .rigid_bodies
@@ -62,9 +62,9 @@ fn update_game_controlled_rigid_bodies(
 
 fn update_game_controlled_colliders(physics_context: &mut PhysicsContext, world: &mut hecs::World) {
     for (_, (collider, global_transform)) in world.query_mut::<hecs::Without<
-        PhysicsControlled,
-        hecs::Without<RigidBody, (&mut Collider, &GlobalTransform)>,
-    >>() {
+        (&mut Collider, &GlobalTransform),
+        (&PhysicsControlled, &RigidBody)>
+    >() {
         let collider = physics_context.colliders.get_mut(collider.handle).unwrap();
         collider.set_position(global_transform.to_isometry());
     }
@@ -75,7 +75,10 @@ fn update_physics_controlled_rigid_bodies(
     world: &mut hecs::World,
 ) {
     for (_, (rigid_body, local_transform)) in
-        world.query_mut::<hecs::With<PhysicsControlled, hecs::Without<Parent, (&RigidBody, &mut LocalTransform)>>>()
+        world.query_mut::<hecs::With<
+            hecs::Without<(&RigidBody, &mut LocalTransform), &Parent>,
+            &PhysicsControlled,
+        >>()
     {
         let position_in_physics_simulation = physics_context
             .rigid_bodies
@@ -212,7 +215,7 @@ mod tests {
         physics_system_inner(&mut physics_context, &mut world);
 
         // Get the local transform
-        let local_transform = world.get::<LocalTransform>(rigid_body_entity).unwrap();
+        let local_transform = world.get::<&LocalTransform>(rigid_body_entity).unwrap();
         assert_eq!(*local_transform, expected_position);
     }
 
@@ -248,7 +251,7 @@ mod tests {
         // do something that would cause a and b to collide
         physics_system_inner(&mut physics_context, &mut world);
 
-        let a_collider = world.get_mut::<Collider>(a).unwrap();
+        let a_collider = world.get::<&mut Collider>(a).unwrap();
         assert!(a_collider.collisions_this_frame.contains(&b));
     }
 

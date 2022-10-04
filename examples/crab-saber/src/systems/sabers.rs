@@ -30,7 +30,7 @@ fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
     let grip_from_local = Affine3A::from_rotation_translation(ROTATION_OFFSET, POSITION_OFFSET);
 
     for (_, (color, local_transform)) in
-        world.query_mut::<With<Saber, (&Color, &mut LocalTransform)>>()
+        world.query_mut::<With<(&Color, &mut LocalTransform), &Saber>>()
     {
         // Get our the space and path of the hand.
         let stage_from_grip = match color {
@@ -93,7 +93,7 @@ mod tests {
         ));
         sabers_system_inner(&mut world, &input_context);
 
-        let local_transform = world.get::<LocalTransform>(saber).unwrap();
+        let local_transform = world.get::<&LocalTransform>(saber).unwrap();
         approx::assert_relative_eq!(
             local_transform.translation,
             [-0.2, 1.3258567, -0.47001815].into()

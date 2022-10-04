@@ -9,7 +9,8 @@
 				"hotham",
 				"--",
 				"--test-threads",
-				"1"
+				"1",
+				"--nocapture"
 			],
 			"env": {
 				"RUST_BACKTRACE": "1"

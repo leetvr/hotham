@@ -204,7 +204,7 @@ impl Engine {
                 let hmd_in_stage = self.input_context.hmd.hmd_in_stage();
                 let mut transform = self
                     .world
-                    .get_mut::<LocalTransform>(self.hmd_entity)
+                    .get::<&mut LocalTransform>(self.hmd_entity)
                     .unwrap();
                 transform.update_from_affine(&hmd_in_stage);
             }

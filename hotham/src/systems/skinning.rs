@@ -27,7 +27,7 @@ fn skinning_system_inner(world: &mut World, render_context: &mut RenderContext) 
             .zip(skin.inverse_bind_matrices.iter())
             .enumerate()
         {
-            let global_from_joint = world.get::<GlobalTransform>(*joint).unwrap().0;
+            let global_from_joint = world.get::<&GlobalTransform>(*joint).unwrap().0;
             let local_from_mesh = local_from_global * global_from_joint * *joint_from_mesh;
             joint_matrices[n] = local_from_mesh.into();
         }
@@ -63,7 +63,7 @@ mod tests {
         // Muck all the joints up
         for (_, skin) in world.query::<&Skin>().iter() {
             for joint in &skin.joints {
-                let mut global_transform = world.get_mut::<GlobalTransform>(*joint).unwrap();
+                let mut global_transform = world.get::<&mut GlobalTransform>(*joint).unwrap();
                 global_transform.0 = Affine3A::ZERO;
             }
         }

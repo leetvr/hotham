@@ -26,7 +26,7 @@ use crate::{components::GlobalTransform, hecs::World};
 pub fn get_global_from_stage(world: &World) -> Affine3A {
     // Get the stage transform
     world
-        .query::<With<Stage, &GlobalTransform>>()
+        .query::<With<&GlobalTransform, &Stage>>()
         .into_iter()
         .next()
         .map(|(_, global_transform)| global_transform.0)
