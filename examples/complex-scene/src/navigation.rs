@@ -37,8 +37,13 @@ fn navigation_system_inner(
     if input_context.right.grip_button_just_pressed() {
         state.global_from_right_grip = Some(global_from_stage * stage_from_right_grip);
     }
+    if input_context.right.grip_button() && input_context.left.grip_button_just_released() {
+        // Handle when going from two grips to one
+        state.global_from_right_grip = Some(global_from_stage * stage_from_right_grip);
+    }
     if !input_context.left.grip_button() {
         state.global_from_left_grip = None;
+        state.scale = None;
     }
     if !input_context.right.grip_button() {
         state.global_from_right_grip = None;
@@ -47,18 +52,29 @@ fn navigation_system_inner(
     // Adjust global_from_stage so that global_from_grip stays fixed.
     // global_from_stage * stage_from_grip = global_from_stored_grip
     // global_from_stage = global_from_stored_grip * grip_from_stage
-    match (state.global_from_left_grip, state.global_from_right_grip) {
-        (Some(global_from_stored_left_grip), None) => {
+    match (
+        state.global_from_left_grip,
+        state.global_from_right_grip,
+        state.scale,
+    ) {
+        (Some(global_from_stored_left_grip), None, None) => {
             stage_transform.update_from_affine(
                 &(global_from_stored_left_grip * stage_from_left_grip.inverse()),
             );
         }
-        (None, Some(global_from_stored_right_grip)) => {
+        (Some(global_from_stored_left_grip), None, Some(scale)) => {
+            stage_transform.update_from_affine(
+                &(global_from_stored_left_grip
+                    * Affine3A::from_scale(Vec3::new(scale, scale, scale))
+                    * stage_from_left_grip.inverse()),
+            );
+        }
+        (None, Some(global_from_stored_right_grip), _) => {
             stage_transform.update_from_affine(
                 &(global_from_stored_right_grip * stage_from_right_grip.inverse()),
             );
         }
-        (Some(global_from_stored_left_grip), Some(global_from_stored_right_grip)) => {
+        (Some(global_from_stored_left_grip), Some(global_from_stored_right_grip), _) => {
             // Gripping with both hands allows scaling the scene
             // The first hand acts as an anchor and the second hand only scales the scene.
             let stored_left_grip_in_global = global_from_stored_left_grip.translation;
@@ -76,14 +92,14 @@ fn navigation_system_inner(
                 stored_left_grip_in_global.distance(stored_right_grip_in_global);
             let dist_in_unscaled_global =
                 left_grip_in_unscaled_global.distance(right_grip_in_unscaled_global);
-            let scale_correction = stored_dist_in_global / dist_in_unscaled_global;
+            let scale = stored_dist_in_global / dist_in_unscaled_global;
+
+            // Remember scale for when one grip gets released.
+            state.scale = Some(scale);
 
             // Let left hand be dominant for now.
-            let stored_left_grip_from_left_grip = Affine3A::from_scale(Vec3::new(
-                scale_correction,
-                scale_correction,
-                scale_correction,
-            ));
+            let stored_left_grip_from_left_grip =
+                Affine3A::from_scale(Vec3::new(scale, scale, scale));
 
             stage_transform.update_from_affine(
                 &(global_from_stored_left_grip
@@ -91,6 +107,6 @@ fn navigation_system_inner(
                     * stage_from_left_grip.inverse()),
             );
         }
-        (None, None) => (),
+        (None, None, _) => (),
     };
 }

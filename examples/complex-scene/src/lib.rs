@@ -23,6 +23,7 @@ use navigation::navigation_system;
 pub struct State {
     global_from_left_grip: Option<glam::Affine3A>,
     global_from_right_grip: Option<glam::Affine3A>,
+    scale: Option<f32>,
 }
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
