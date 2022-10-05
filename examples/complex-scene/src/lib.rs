@@ -1,7 +1,10 @@
+pub mod navigation;
+
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, LocalTransform},
     contexts::PhysicsContext,
+    glam,
     hecs::World,
     rapier3d::prelude::{
         ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
@@ -13,12 +16,14 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
+use navigation::navigation_system;
 
 #[derive(Clone, Debug, Default)]
-/// Most Hotham applications will want to keep track of some sort of state.
-/// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
-/// this is something you'd probably want to do!
-struct State {}
+/// The state is used for manipulating the stage transform
+pub struct State {
+    global_from_left_grip: Option<glam::Affine3A>,
+    global_from_right_grip: Option<glam::Affine3A>,
+}
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -40,12 +45,13 @@ pub fn real_main() -> HothamResult<()> {
     Ok(())
 }
 
-fn tick(tick_data: TickData, engine: &mut Engine, _state: &mut State) {
+fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     if tick_data.current_state == xr::SessionState::FOCUSED {
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
         animation_system(engine);
+        navigation_system(engine, state);
         update_global_transform_system(engine);
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
