@@ -18,7 +18,7 @@ use glam::{Affine3A, Mat4};
 use gltf::Document;
 use hecs::{Entity, World};
 use itertools::Itertools;
-use rapier3d::prelude::InteractionGroups;
+use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, InteractionGroups};
 use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use self::scene::Scene;
@@ -90,7 +90,6 @@ pub fn load_scene_from_glb(
     }
 
     let lights = get_lights_from_gltf_data(&import_context.document)?;
-    dbg!(&lights);
 
     Ok(Scene { models, lights })
 }
@@ -360,6 +359,8 @@ fn get_collider_for_node(
                 physics_context::SENSOR_COLLISION_GROUP,
                 u32::MAX,
             ))
+            .active_collision_types(ActiveCollisionTypes::all())
+            .active_events(ActiveEvents::COLLISION_EVENTS)
             .build()
     };
 
@@ -562,7 +563,7 @@ pub fn add_model_to_world(
                 .get(collider.handle)
                 .unwrap()
                 .clone();
-            new_collider.user_data = source_entity.entity().to_bits().get() as _;
+            new_collider.user_data = destination_entity.to_bits().get() as _;
             let new_collider = Collider::new(physics_context.colliders.insert(new_collider));
 
             destination_world

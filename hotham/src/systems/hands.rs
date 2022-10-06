@@ -1,15 +1,14 @@
 use crate::{
     asset_importer::add_model_to_world,
     components::{
-        hand::Handedness, local_transform::LocalTransform, stage, AnimationController, Hand,
+        global_transform::GlobalTransform, hand::Handedness, local_transform::LocalTransform,
+        stage, AnimationController, Collider, Hand,
     },
-    contexts::{InputContext, PhysicsContext},
+    contexts::{physics_context::HAND_COLLISION_GROUP, InputContext, PhysicsContext},
     Engine,
 };
 use hecs::World;
-use rapier3d::prelude::{
-    ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
-};
+use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups};
 
 /// Hands system
 /// Used to allow users to interact with objects using their controllers as representations of their hands
@@ -23,8 +22,13 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
     // Get the position
     let global_from_stage = stage::get_global_from_stage(world);
 
-    for (_, (hand, animation_controller, local_transform)) in world
-        .query::<(&mut Hand, &mut AnimationController, &mut LocalTransform)>()
+    for (_, (hand, animation_controller, local_transform, global_transform)) in world
+        .query::<(
+            &mut Hand,
+            &mut AnimationController,
+            &mut LocalTransform,
+            &mut GlobalTransform,
+        )>()
         .iter()
     {
         // Get the position of the hand in stage space.
@@ -44,11 +48,14 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
 
         // Apply transform
         local_transform.update_from_affine(&global_from_local);
+        global_transform.0 = global_from_local;
 
-        // If we've grabbed something, update its position too.
+        // If we've grabbed something, update its transform, being careful to preserve its scale.
         if let Some(grabbed_entity) = hand.grabbed_entity {
             let mut local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
             local_transform.update_from_affine(&global_from_local);
+            let mut global_transform = world.get::<&mut GlobalTransform>(grabbed_entity).unwrap();
+            global_transform.0 = local_transform.to_affine();
         }
 
         // Apply grip value to hand
@@ -95,10 +102,15 @@ pub fn add_hand(
             .sensor(true)
             .active_collision_types(ActiveCollisionTypes::all())
             .active_events(ActiveEvents::COLLISION_EVENTS)
+            .collision_groups(InteractionGroups::new(HAND_COLLISION_GROUP, u32::MAX))
             .build();
-        let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
-        let components = physics_context.create_rigid_body_and_collider(hand, rigid_body, collider);
-        world.insert(hand, components).unwrap();
+
+        world
+            .insert_one(
+                hand,
+                Collider::new(physics_context.colliders.insert(collider)),
+            )
+            .unwrap();
     }
 }
 
@@ -107,7 +119,7 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use hecs::Entity;
-    use rapier3d::prelude::RigidBodyBuilder;
+    use rapier3d::prelude::{RigidBodyBuilder, RigidBodyType};
 
     use crate::components::{LocalTransform, RigidBody};
 
