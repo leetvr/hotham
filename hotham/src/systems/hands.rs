@@ -1,15 +1,14 @@
 use crate::{
     asset_importer::add_model_to_world,
     components::{
-        hand::Handedness, local_transform::LocalTransform, stage, AnimationController, Hand,
+        global_transform::GlobalTransform, hand::Handedness, local_transform::LocalTransform,
+        stage, AnimationController, Collider, Hand,
     },
-    contexts::{InputContext, PhysicsContext},
+    contexts::{physics_context::HAND_COLLISION_GROUP, InputContext, PhysicsContext},
     Engine,
 };
 use hecs::World;
-use rapier3d::prelude::{
-    ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
-};
+use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups};
 
 /// Hands system
 /// Used to allow users to interact with objects using their controllers as representations of their hands
@@ -23,8 +22,13 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
     // Get the position
     let global_from_stage = stage::get_global_from_stage(world);
 
-    for (_, (hand, animation_controller, local_transform)) in world
-        .query::<(&mut Hand, &mut AnimationController, &mut LocalTransform)>()
+    for (_, (hand, animation_controller, local_transform, global_transform)) in world
+        .query::<(
+            &mut Hand,
+            &mut AnimationController,
+            &mut LocalTransform,
+            &mut GlobalTransform,
+        )>()
         .iter()
     {
         // Get the position of the hand in stage space.
@@ -44,11 +48,14 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
 
         // Apply transform
         local_transform.update_from_affine(&global_from_local);
+        global_transform.0 = global_from_local;
 
-        // If we've grabbed something, update its position too.
+        // If we've grabbed something, update its transform, being careful to preserve its scale.
         if let Some(grabbed_entity) = hand.grabbed_entity {
             let mut local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
             local_transform.update_from_affine(&global_from_local);
+            let mut global_transform = world.get::<&mut GlobalTransform>(grabbed_entity).unwrap();
+            global_transform.0 = local_transform.to_affine();
         }
 
         // Apply grip value to hand
@@ -59,47 +66,41 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
     }
 }
 
-/// Convenience function to add a Hand and corresponding Mesh to the world
+/// Convenience function to add a Hand, Collider and corresponding Mesh to the world
 pub fn add_hand(
     models: &std::collections::HashMap<String, World>,
     handedness: Handedness,
     world: &mut World,
     physics_context: &mut PhysicsContext,
 ) {
-    let model_name = match handedness {
-        Handedness::Left => "Left Hand",
-        Handedness::Right => "Right Hand",
+    let (hand_component, model_name) = match handedness {
+        Handedness::Left => (Hand::left(), "Left Hand"),
+        Handedness::Right => (Hand::right(), "Right Hand"),
     };
-    let hand = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
-    {
-        // Add a hand component
-        world
-            .insert_one(
-                hand,
-                Hand {
-                    grip_value: 0.,
-                    handedness,
-                    grabbed_entity: None,
-                },
-            )
-            .unwrap();
 
-        // Modify the animation controller
-        let mut animation_controller = world.get::<&mut AnimationController>(hand).unwrap();
-        animation_controller.blend_from = 0;
-        animation_controller.blend_to = 1;
-        drop(animation_controller);
+    // Spawn the hand
+    let hand_entity = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
 
-        // Give it a collider and rigid-body
-        let collider = ColliderBuilder::capsule_y(0.05, 0.02)
-            .sensor(true)
-            .active_collision_types(ActiveCollisionTypes::all())
-            .active_events(ActiveEvents::COLLISION_EVENTS)
-            .build();
-        let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
-        let components = physics_context.create_rigid_body_and_collider(hand, rigid_body, collider);
-        world.insert(hand, components).unwrap();
-    }
+    // Modify the animation controller
+    let mut animation_controller = world.get::<&mut AnimationController>(hand_entity).unwrap();
+    animation_controller.blend_from = 0;
+    animation_controller.blend_to = 1;
+    drop(animation_controller);
+
+    // Give it a collider
+    let collider = ColliderBuilder::capsule_y(0.05, 0.02)
+        .sensor(true)
+        .active_collision_types(ActiveCollisionTypes::all())
+        .active_events(ActiveEvents::COLLISION_EVENTS)
+        .collision_groups(InteractionGroups::new(HAND_COLLISION_GROUP, u32::MAX))
+        .user_data(hand_entity.to_bits().get() as _)
+        .build();
+
+    let collider = Collider::new(physics_context.colliders.insert(collider));
+
+    world
+        .insert(hand_entity, (collider, hand_component))
+        .unwrap();
 }
 
 #[cfg(test)]
@@ -107,7 +108,7 @@ mod tests {
     use super::*;
     use approx::assert_relative_eq;
     use hecs::Entity;
-    use rapier3d::prelude::RigidBodyBuilder;
+    use rapier3d::prelude::{RigidBodyBuilder, RigidBodyType};
 
     use crate::components::{LocalTransform, RigidBody};
 
@@ -136,7 +137,11 @@ mod tests {
         let handle = physics_context
             .rigid_bodies
             .insert(grabbed_object_rigid_body);
-        let grabbed_entity = world.spawn((RigidBody { handle }, LocalTransform::default()));
+        let grabbed_entity = world.spawn((
+            RigidBody { handle },
+            LocalTransform::default(),
+            GlobalTransform::default(),
+        ));
         add_hand_to_world(&mut world, Some(grabbed_entity));
 
         tick(&mut world, &input_context);
@@ -164,6 +169,11 @@ mod tests {
         let mut hand = Hand::left();
         hand.grip_value = 100.0; // bogus value
         hand.grabbed_entity = grabbed_entity;
-        world.spawn((animation_controller, hand, LocalTransform::default()))
+        world.spawn((
+            animation_controller,
+            hand,
+            LocalTransform::default(),
+            GlobalTransform::default(),
+        ))
     }
 }
