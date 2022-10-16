@@ -278,7 +278,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
 
             // Change pipeline when we start to encounter holograms
             if let ShaderIndex::Quadric = cull_result.index_shader {
-                (&vulkan_context.device).cmd_bind_pipeline(
+                vulkan_context.device.cmd_bind_pipeline(
                     command_buffer,
                     vk::PipelineBindPoint::GRAPHICS,
                     render_context.quadrics_pipeline,
