@@ -88,8 +88,8 @@ pub unsafe fn begin(
 
     let gos_from_stage: Affine3A = gos_from_global * global_from_stage;
 
-    for (_, (mesh, global_transform, skin, hologram)) in world
-        .query_mut::<With<(&Mesh, &GlobalTransform, Option<&Skin>, Option<&Hologram>), &Visible>>()
+    for (_, (mesh, global_transform, skin)) in
+        world.query_mut::<With<(&Mesh, &GlobalTransform, Option<&Skin>), &Visible>>()
     {
         let mesh = meshes.get(mesh.handle).unwrap();
         let skin_id = skin.map(|s| s.id).unwrap_or(NO_SKIN);
@@ -99,37 +99,47 @@ pub unsafe fn begin(
             // Create a transform from this primitive's local space into gos space.
             let gos_from_local = gos_from_global * global_transform.0;
 
-            if let Some(hologram) = hologram {
-                render_context
-                    .quadrics_primitive_map
-                    .entry(key)
-                    .or_insert(InstancedQuadricPrimitive {
-                        primitive: primitive.clone(),
-                        instances: Default::default(),
-                    })
-                    .instances
-                    .push(QuadricInstance {
-                        gos_from_local,
-                        bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
-                        surface_q_in_local: hologram.surface_q_in_local,
-                        bounds_q_in_local: hologram.bounds_q_in_local,
-                        uv_from_local: hologram.uv_from_local,
-                    });
-            } else {
-                render_context
-                    .triangles_primitive_map
-                    .entry(key)
-                    .or_insert(InstancedPrimitive {
-                        primitive: primitive.clone(),
-                        instances: Default::default(),
-                    })
-                    .instances
-                    .push(Instance {
-                        gos_from_local,
-                        bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
-                        skin_id,
-                    });
-            };
+            render_context
+                .triangles_primitive_map
+                .entry(key)
+                .or_insert(InstancedPrimitive {
+                    primitive: primitive.clone(),
+                    instances: Default::default(),
+                })
+                .instances
+                .push(Instance {
+                    gos_from_local,
+                    bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
+                    skin_id,
+                });
+        }
+    }
+
+    for (_, (hologram, global_transform)) in
+        world.query_mut::<With<(&Hologram, &GlobalTransform), &Visible>>()
+    {
+        let mesh_data = meshes.get(hologram.mesh_data_handle).unwrap();
+        for primitive in &mesh_data.primitives {
+            let key = primitive.index_buffer_offset;
+
+            // Create a transform from this primitive's local space into gos space.
+            let gos_from_local = gos_from_global * global_transform.0;
+
+            render_context
+                .quadrics_primitive_map
+                .entry(key)
+                .or_insert(InstancedQuadricPrimitive {
+                    primitive: primitive.clone(),
+                    instances: Default::default(),
+                })
+                .instances
+                .push(QuadricInstance {
+                    gos_from_local,
+                    bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
+                    surface_q_in_local: hologram.hologram_data.surface_q_in_local,
+                    bounds_q_in_local: hologram.hologram_data.bounds_q_in_local,
+                    uv_from_local: hologram.hologram_data.uv_from_local,
+                });
         }
     }
 

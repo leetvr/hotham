@@ -2,7 +2,7 @@ pub mod navigation;
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, Hologram, LocalTransform},
+    components::{hand::Handedness, hologram::HologramData, Hologram, LocalTransform, Mesh},
     contexts::PhysicsContext,
     glam::{self, Mat4, Quat},
     hecs::World,
@@ -101,7 +101,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
             scale: [0.5, 0.5, 0.5].into(),
         },
         0.5,
-        Hologram {
+        HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 0.0, 0.0, 0.0].into()),
             uv_from_local: Mat4::IDENTITY,
@@ -117,7 +117,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
             scale: [0.5, 0.5, 0.5].into(),
         },
         0.5,
-        Hologram {
+        HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 0.0, -1.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 0.0, 1.0, -1.0].into()),
             uv_from_local: Mat4::IDENTITY,
@@ -157,7 +157,7 @@ fn add_quadric(
     physics_context: &mut PhysicsContext,
     local_transform: &LocalTransform,
     ball_radius: f32,
-    hologram: Hologram,
+    hologram_data: HologramData,
 ) {
     let entity = add_model_to_world("Sphere", models, world, physics_context, None)
         .expect("Could not find Sphere");
@@ -170,8 +170,21 @@ fn add_quadric(
     let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
         .position(position)
         .build();
-    let components = physics_context.create_rigid_body_and_collider(entity, rigid_body, collider);
+    let hologram_component = Hologram {
+        mesh_data_handle: world.get::<&Mesh>(entity).unwrap().handle,
+        hologram_data,
+    };
+    let physics_components =
+        physics_context.create_rigid_body_and_collider(entity, rigid_body, collider);
     world
-        .insert(entity, (components.0, components.1, hologram))
+        .insert(
+            entity,
+            (
+                physics_components.0,
+                physics_components.1,
+                hologram_component,
+            ),
+        )
         .unwrap();
+    world.remove_one::<Mesh>(entity).unwrap();
 }
