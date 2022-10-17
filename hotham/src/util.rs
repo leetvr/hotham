@@ -34,7 +34,7 @@ use hecs::World;
 #[cfg(test)]
 use crate::{
     asset_importer::{add_model_to_world, load_models_from_glb},
-    contexts::{PhysicsContext, RenderContext, VulkanContext},
+    contexts::{RenderContext, VulkanContext},
 };
 
 /// Convenience function to get a world with hands
@@ -42,7 +42,6 @@ use crate::{
 pub fn get_world_with_hands(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
-    physics_context: &mut PhysicsContext,
 ) -> World {
     use crate::components::{LocalTransform, Skin};
 
@@ -50,21 +49,18 @@ pub fn get_world_with_hands(
         include_bytes!("../../test_assets/left_hand.glb"),
         include_bytes!("../../test_assets/right_hand.glb"),
     ];
-    let models =
-        load_models_from_glb(&data, vulkan_context, render_context, physics_context).unwrap();
+    let models = load_models_from_glb(&data, vulkan_context, render_context).unwrap();
 
     let mut world = World::new();
 
     // Add two hands
-    let left_hand =
-        add_model_to_world("Left Hand", &models, &mut world, physics_context, None).unwrap();
+    let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
     {
         let mut local_transform = world.get::<&mut LocalTransform>(left_hand).unwrap();
         local_transform.translation = [-0.2, 1.4, 0.0].into();
     }
 
-    let right_hand =
-        add_model_to_world("Right Hand", &models, &mut world, physics_context, None).unwrap();
+    let right_hand = add_model_to_world("Right Hand", &models, &mut world, None).unwrap();
     {
         let mut local_transform = world.get::<&mut LocalTransform>(right_hand).unwrap();
         local_transform.translation = [0.2, 1.4, 0.0].into();
@@ -122,7 +118,13 @@ pub fn decompose_isometry(i: &rapier3d::na::Isometry3<f32>) -> (glam::Quat, glam
 
 #[inline]
 /// Convert a [`glam::Vec3`] into a [`rapier3d::na::Vector3`]
-pub fn na_vector_from_glam_vec(v: Vec3) -> Vector3<f32> {
+pub fn na_vector_from_glam(v: Vec3) -> Vector3<f32> {
+    [v.x, v.y, v.z].into()
+}
+
+#[inline]
+/// Convert a [`glam::Vec3`] into a [`rapier3d::na::Vector3`]
+pub fn glam_vec_from_na(v: &Vector3<f32>) -> glam::Vec3 {
     [v.x, v.y, v.z].into()
 }
 
@@ -206,6 +208,9 @@ pub(crate) unsafe fn save_image_to_disk(
     let resolution = image.extent;
     let size = (resolution.height * resolution.width * 4) as usize;
     let mut buffer = Buffer::new(&vulkan_context, vk::BufferUsageFlags::TRANSFER_DST, size);
+
+    vulkan_context.device.device_wait_idle().unwrap();
+
     vulkan_context.transition_image_layout(
         image.handle,
         vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,

@@ -39,22 +39,13 @@ mod tests {
     #[test]
     pub fn animation_test() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut physics_context = Default::default();
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
-        let models = load_models_from_glb(
-            &data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
         let mut world = hecs::World::new();
 
         // Add the left hand
-        let left_hand =
-            add_model_to_world("Left Hand", &models, &mut world, &mut physics_context, None)
-                .unwrap();
+        let left_hand = add_model_to_world("Left Hand", &models, &mut world, None).unwrap();
         {
             let mut left_hand_controller =
                 world.get::<&mut AnimationController>(left_hand).unwrap();

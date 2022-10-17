@@ -7,7 +7,7 @@ use crate::{
         Mesh, Parent, Root, Skin, Visible,
     },
     contexts::{
-        physics_context::{self, PhysicsContext},
+        physics_context::{self},
         RenderContext, VulkanContext,
     },
     rendering::{light::Light, material::Material},
@@ -18,7 +18,7 @@ use glam::{Affine3A, Mat4};
 use gltf::Document;
 use hecs::{Entity, World};
 use itertools::Itertools;
-use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, InteractionGroups};
+use rapier3d::prelude::ActiveCollisionTypes;
 use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use self::scene::Scene;
@@ -34,7 +34,6 @@ pub type Models = HashMap<String, World>;
 pub(crate) struct ImportContext<'a> {
     pub vulkan_context: &'a VulkanContext,
     pub render_context: &'a mut RenderContext,
-    pub physics_context: &'a mut PhysicsContext,
     pub models: Models,
     pub node_entity_map: HashMap<usize, Entity>,
     pub mesh_map: HashMap<usize, Mesh>,
@@ -47,7 +46,6 @@ impl<'a> ImportContext<'a> {
     fn new(
         vulkan_context: &'a VulkanContext,
         render_context: &'a mut RenderContext,
-        physics_context: &'a mut PhysicsContext,
         glb_buffer: &'a [u8],
     ) -> Self {
         let glb = gltf::Glb::from_slice(glb_buffer).unwrap();
@@ -59,7 +57,6 @@ impl<'a> ImportContext<'a> {
         Self {
             vulkan_context,
             render_context,
-            physics_context,
             models: Default::default(),
             node_entity_map: Default::default(),
             mesh_map: Default::default(),
@@ -75,13 +72,11 @@ pub fn load_scene_from_glb(
     glb_buffer: &[u8],
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
-    physics_context: &mut PhysicsContext,
 ) -> Result<Scene> {
     // Global models map, shared between imports.
     let mut models = HashMap::new();
 
-    let mut import_context =
-        ImportContext::new(vulkan_context, render_context, physics_context, glb_buffer);
+    let mut import_context = ImportContext::new(vulkan_context, render_context, glb_buffer);
     load_models_from_gltf_data(&mut import_context).unwrap();
 
     // Take all the models we imported and add them to the global map
@@ -115,14 +110,12 @@ pub fn load_models_from_glb(
     glb_buffers: &[&[u8]],
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
-    physics_context: &mut PhysicsContext,
 ) -> Result<Models> {
     // Global models map, shared between imports.
     let mut models = HashMap::new();
 
     for glb_buffer in glb_buffers {
-        let mut import_context =
-            ImportContext::new(vulkan_context, render_context, physics_context, glb_buffer);
+        let mut import_context = ImportContext::new(vulkan_context, render_context, glb_buffer);
         load_models_from_gltf_data(&mut import_context).unwrap();
 
         // Take all the models we imported and add them to the global map
@@ -292,7 +285,7 @@ fn load_node(
     }
 
     // If this node has corresponding collider geometry, add it in.
-    if let Some(collider) = get_collider_for_node(node, import_context, this_entity) {
+    if let Some(collider) = get_collider_for_node(node, import_context) {
         world.insert_one(this_entity, collider).unwrap();
     }
 
@@ -313,7 +306,6 @@ fn load_node(
 fn get_collider_for_node(
     node: &gltf::Node,
     import_context: &mut ImportContext,
-    this_entity: Entity,
 ) -> Option<Collider> {
     // First, get the name of the node, if it has one.
     let node_name = node.name()?;
@@ -332,8 +324,6 @@ fn get_collider_for_node(
         collider_node_name
     );
     let shape = get_shape_from_mesh(mesh, import_context);
-    let collider_builder =
-        rapier3d::geometry::ColliderBuilder::new(shape).user_data(this_entity.to_bits().get() as _);
 
     // If this is a wall collider, ensure it's not a sensor.
     let collider = if collider_node_name.ends_with(WALL_COLLIDER_TAG) {
@@ -341,32 +331,29 @@ fn get_collider_for_node(
             "[HOTHAM_ASSET_IMPORTER] Created wall collider for model {}",
             collider_node_name
         );
-        collider_builder
-            .sensor(false)
-            .collision_groups(InteractionGroups::new(
-                physics_context::WALL_COLLISION_GROUP,
-                u32::MAX,
-            ))
-            .build()
+        Collider {
+            sensor: false,
+            collision_groups: physics_context::WALL_COLLISION_GROUP,
+            collision_filter: u32::MAX,
+            shape,
+            ..Default::default()
+        }
     } else {
         println!(
             "[HOTHAM_ASSET_IMPORTER] Created sensor collider for model {}",
             collider_node_name
         );
-        collider_builder
-            .sensor(true)
-            .collision_groups(InteractionGroups::new(
-                physics_context::SENSOR_COLLISION_GROUP,
-                u32::MAX,
-            ))
-            .active_collision_types(ActiveCollisionTypes::all())
-            .active_events(ActiveEvents::COLLISION_EVENTS)
-            .build()
+        Collider {
+            sensor: true,
+            collision_groups: physics_context::SENSOR_COLLISION_GROUP,
+            collision_filter: u32::MAX,
+            active_collision_types: ActiveCollisionTypes::all(),
+            shape,
+            ..Default::default()
+        }
     };
 
-    let handle = import_context.physics_context.colliders.insert(collider);
-
-    Some(Collider::new(handle))
+    Some(collider)
 }
 
 fn find_wall_collider_for_node<'a>(
@@ -452,7 +439,6 @@ pub fn add_model_to_world(
     name: &str,
     models: &Models,
     destination_world: &mut World,
-    physics_context: &mut PhysicsContext,
     parent: Option<Entity>,
 ) -> Option<Entity> {
     let source_world = models.get(name)?;
@@ -556,18 +542,10 @@ pub fn add_model_to_world(
                 .unwrap();
         }
 
-        // If the entity had a collider attached, clone it and update its user data to point to the new entity.
+        // If the entity had a collider attached, clone it and insert it into the new world. Its underlying will be handled by `PhysicsContext`.
         if let Some(collider) = source_entity.get::<&Collider>() {
-            let mut new_collider = physics_context
-                .colliders
-                .get(collider.handle)
-                .unwrap()
-                .clone();
-            new_collider.user_data = destination_entity.to_bits().get() as _;
-            let new_collider = Collider::new(physics_context.colliders.insert(new_collider));
-
             destination_world
-                .insert_one(*destination_entity, new_collider)
+                .insert_one(*destination_entity, (*collider).clone())
                 .unwrap();
         }
     }
@@ -589,29 +567,19 @@ pub fn add_model_to_world(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        components::{LocalTransform, Root},
-        contexts::physics_context,
-    };
+    use crate::components::{LocalTransform, Root};
     use approx::assert_relative_eq;
     use glam::Quat;
 
     #[test]
     pub fn test_load_models() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut physics_context = Default::default();
 
         let data: Vec<&[u8]> = vec![
             include_bytes!("../../../test_assets/damaged_helmet.glb"),
             include_bytes!("../../../test_assets/asteroid.glb"),
         ];
-        let models = load_models_from_glb(
-            &data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
 
         let test_data = vec![
             (
@@ -648,7 +616,7 @@ mod tests {
                 .expect(&format!("Unable to find model with name {}", name));
 
             let mut world = World::default();
-            let model = add_model_to_world(*name, &models, &mut world, &mut physics_context, None);
+            let model = add_model_to_world(*name, &models, &mut world, None);
             assert!(model.is_some(), "Model {} could not be added", name);
 
             let model = model.unwrap();
@@ -697,34 +665,19 @@ mod tests {
     #[test]
     fn test_load_model_with_no_material() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut physics_context = PhysicsContext::default();
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/box_no_material.glb")];
-        let _models = load_models_from_glb(
-            &data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let _models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
     }
 
     #[test]
     pub fn test_hand() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut physics_context = PhysicsContext::default();
 
         let data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/left_hand.glb")];
-        let models = load_models_from_glb(
-            &data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
 
         let mut world = World::default();
-        let _hand =
-            add_model_to_world("Left Hand", &models, &mut world, &mut physics_context, None);
+        let _hand = add_model_to_world("Left Hand", &models, &mut world, None);
 
         // Make sure there is only one root
         let mut roots = world
@@ -779,21 +732,14 @@ mod tests {
     #[test]
     fn test_load_model_with_colliders() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut physics_context = physics_context::PhysicsContext::default();
         let mut world = World::default();
 
         let data: Vec<&[u8]> = vec![include_bytes!(
             "../../../test_assets/box_with_colliders.glb"
         )];
-        let models = load_models_from_glb(
-            &data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let models = load_models_from_glb(&data, &vulkan_context, &mut render_context).unwrap();
         for name in models.keys() {
-            add_model_to_world(name, &models, &mut world, &mut physics_context, None);
+            add_model_to_world(name, &models, &mut world, None);
         }
 
         // There are two wolv-- colliders.

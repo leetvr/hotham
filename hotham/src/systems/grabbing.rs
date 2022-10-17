@@ -1,9 +1,7 @@
 use hecs::World;
-use rapier3d::prelude::RigidBodyType;
 
 use crate::{
-    components::{Collider, Grabbable, Hand, RigidBody},
-    contexts::PhysicsContext,
+    components::{physics::BodyType, Collider, Grabbable, Hand, RigidBody},
     Engine,
 };
 
@@ -11,11 +9,10 @@ use crate::{
 /// Used to allow a player to grab objects. Used in conjunction with `hands_system`
 pub fn grabbing_system(engine: &mut Engine) {
     let world = &mut engine.world;
-    let physics_context = &mut engine.physics_context;
-    grabbing_system_inner(world, physics_context);
+    grabbing_system_inner(world);
 }
 
-fn grabbing_system_inner(world: &mut World, physics_context: &mut PhysicsContext) {
+fn grabbing_system_inner(world: &mut World) {
     for (_, (hand, collider)) in world.query::<(&mut Hand, &Collider)>().iter() {
         // Check to see if we are currently gripping
         if hand.grip_value >= 1.0 {
@@ -27,14 +24,10 @@ fn grabbing_system_inner(world: &mut World, physics_context: &mut PhysicsContext
             // Check to see if we are colliding with an entity
             for other_entity in collider.collisions_this_frame.iter() {
                 if world.get::<&Grabbable>(*other_entity).is_ok() {
-                    let rigid_body_handle = world.get::<&RigidBody>(*other_entity).unwrap().handle;
-                    let rigid_body = physics_context
-                        .rigid_bodies
-                        .get_mut(rigid_body_handle)
-                        .unwrap();
-
-                    // Set its body type to kinematic position based so it can be updated with the hand
-                    rigid_body.set_body_type(RigidBodyType::KinematicPositionBased);
+                    // If what we're grabbing has a rigid-body, set its body type to kinematic position based so it can be updated with the hand
+                    if let Ok(mut rigid_body) = world.get::<&mut RigidBody>(*other_entity) {
+                        rigid_body.body_type = BodyType::KinematicPositionBased;
+                    }
 
                     // Store a reference to the grabbed entity
                     hand.grabbed_entity.replace(*other_entity);
@@ -45,14 +38,11 @@ fn grabbing_system_inner(world: &mut World, physics_context: &mut PhysicsContext
         } else {
             // If we are not gripping, but we have a grabbed entity, release it
             if let Some(grabbed_entity) = hand.grabbed_entity.take() {
-                let rigid_body_handle = world.get::<&RigidBody>(grabbed_entity).unwrap().handle;
-                let rigid_body = physics_context
-                    .rigid_bodies
-                    .get_mut(rigid_body_handle)
-                    .unwrap();
-
-                // Set its body type back to dynamic
-                rigid_body.set_body_type(RigidBodyType::Dynamic);
+                // If what we're grabbing has a rigid-body, set it back to dynamic.
+                // TODO: This is a bug. We could have grabbed a rigid-body that was originally kinematic!
+                if let Ok(mut rigid_body) = world.get::<&mut RigidBody>(grabbed_entity) {
+                    rigid_body.body_type = BodyType::Dynamic;
+                }
             }
         }
     }
@@ -61,21 +51,15 @@ fn grabbing_system_inner(world: &mut World, physics_context: &mut PhysicsContext
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rapier3d::prelude::{ColliderBuilder, RigidBodyBuilder};
 
-    use crate::{
-        components::{hand::Handedness, Info},
-        contexts::PhysicsContext,
-        systems::physics::physics_system_inner,
-    };
+    use crate::components::{hand::Handedness, Info};
 
     #[test]
     fn test_grabbing_system() {
         let mut world = World::default();
-        let mut physics_context = PhysicsContext::default();
 
-        let grabbed_collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0).build();
-        let grabbed_rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic).build();
+        let grabbed_collider = Collider::default();
+        let grabbed_rigid_body = RigidBody::default();
         let grabbed_entity = world.spawn((
             Info {
                 name: "Test entity".to_string(),
@@ -83,12 +67,9 @@ mod tests {
             },
             Grabbable {},
         ));
-        let components = physics_context.create_rigid_body_and_collider(
-            grabbed_entity,
-            grabbed_rigid_body,
-            grabbed_collider,
-        );
-        world.insert(grabbed_entity, components).unwrap();
+        world
+            .insert(grabbed_entity, (grabbed_collider, grabbed_rigid_body))
+            .unwrap();
 
         // Fully gripped hand
         let hand = Hand {
@@ -98,23 +79,21 @@ mod tests {
         };
 
         // Collider
-        let hand_collider = ColliderBuilder::cuboid(1.0, 1.0, 1.0).build();
-        let handle = physics_context.colliders.insert(hand_collider);
         let collider = Collider {
-            handle,
-            collisions_this_frame: vec![grabbed_entity],
+            collisions_this_frame: [grabbed_entity].into(),
+            ..Default::default()
         };
 
         let hand_entity = world.spawn((hand, collider));
 
-        tick(&mut world, &mut physics_context);
+        tick(&mut world);
 
         let mut hand = world.get::<&mut Hand>(hand_entity).unwrap();
         assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
         hand.grip_value = 0.0;
         drop(hand);
 
-        tick(&mut world, &mut physics_context);
+        tick(&mut world);
 
         let mut hand = world.get::<&mut Hand>(hand_entity).unwrap();
         assert!(hand.grabbed_entity.is_none());
@@ -124,14 +103,13 @@ mod tests {
         drop(hand);
         world.remove::<(Grabbable,)>(grabbed_entity).unwrap();
 
-        tick(&mut world, &mut physics_context);
+        tick(&mut world);
 
         let hand = world.get::<&mut Hand>(hand_entity).unwrap();
         assert!(hand.grabbed_entity.is_none());
     }
 
-    fn tick(world: &mut World, physics_context: &mut PhysicsContext) {
-        grabbing_system_inner(world, physics_context);
-        physics_system_inner(physics_context, world);
+    fn tick(world: &mut World) {
+        grabbing_system_inner(world);
     }
 }

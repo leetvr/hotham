@@ -11,14 +11,14 @@ use crate::util::{decompose_isometry, isometry_from_affine};
 /// 1. **Game controlled** - this entity will have its rigid body position set by the **game** simulation
 /// 1. **Physics controlled** - this entity will have its position set by the **physics** simulation
 ///
-/// If an entity has the [`super::PhysicsControlled`] component and a [`super::RigidBody`], then you
+/// If an entity has a [`super::RigidBody`] component with a `body_type` of [`super::physics::BodyType::Dynamic`], then you
 /// are indicating that you want this entity's position in the game simulation (ie. its global position)
 /// to be entirely controlled by the physics simulation.
 ///
 /// Otherwise, you can just modify [`LocalTransform`] and your entity will have its position in the game
-/// simulation AND the physics simulation (if it has a [`super::RigidBody`]) set relative to its [`super::Parent`].
+/// simulation AND the physics simulation (if it has a [`super::RigidBody`] and/or [`super::Collider`]) set relative to its [`super::Parent`].
 ///
-/// If the entity doesn't have a [`super::Parent`], then the global transform is just whatever you've set here.
+/// If the entity doesn't have a [`super::Parent`], then the [`super::GlobalTransform`] is just whatever you've set here.
 #[derive(Clone, PartialEq, Debug, Copy, Deserialize, Serialize)]
 pub struct LocalTransform {
     /// The translation of the entity
@@ -76,8 +76,19 @@ impl LocalTransform {
         (self.scale, self.rotation, self.translation) = transform.to_scale_rotation_translation();
     }
 
+    /// Update ONLY rotation and rotation from a [`glam::Affine3A`]
+    pub fn update_rotation_translation_from_affine(&mut self, transform: &glam::Affine3A) {
+        (_, self.rotation, self.translation) = transform.to_scale_rotation_translation();
+    }
+
     /// Convenience function to convert the [`LocalTransform`] into a [`glam::Affine3A`]
     pub fn to_affine(&self) -> Affine3A {
         Affine3A::from_scale_rotation_translation(self.scale, self.rotation, self.translation)
+    }
+}
+
+impl From<LocalTransform> for Affine3A {
+    fn from(l: LocalTransform) -> Self {
+        l.to_affine()
     }
 }

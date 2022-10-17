@@ -4,11 +4,11 @@ use crate::{
         global_transform::GlobalTransform, hand::Handedness, local_transform::LocalTransform,
         stage, AnimationController, Collider, Hand,
     },
-    contexts::{physics_context::HAND_COLLISION_GROUP, InputContext, PhysicsContext},
+    contexts::{physics_context::HAND_COLLISION_GROUP, InputContext},
     Engine,
 };
 use hecs::World;
-use rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups};
+use rapier3d::prelude::{ActiveCollisionTypes, SharedShape};
 
 /// Hands system
 /// Used to allow users to interact with objects using their controllers as representations of their hands
@@ -53,9 +53,10 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
         // If we've grabbed something, update its transform, being careful to preserve its scale.
         if let Some(grabbed_entity) = hand.grabbed_entity {
             let mut local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
-            local_transform.update_from_affine(&global_from_local);
+            local_transform.update_rotation_translation_from_affine(&global_from_local);
+
             let mut global_transform = world.get::<&mut GlobalTransform>(grabbed_entity).unwrap();
-            global_transform.0 = local_transform.to_affine();
+            *global_transform = (*local_transform).into();
         }
 
         // Apply grip value to hand
@@ -71,7 +72,6 @@ pub fn add_hand(
     models: &std::collections::HashMap<String, World>,
     handedness: Handedness,
     world: &mut World,
-    physics_context: &mut PhysicsContext,
 ) {
     let (hand_component, model_name) = match handedness {
         Handedness::Left => (Hand::left(), "Left Hand"),
@@ -79,7 +79,7 @@ pub fn add_hand(
     };
 
     // Spawn the hand
-    let hand_entity = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
+    let hand_entity = add_model_to_world(model_name, models, world, None).unwrap();
 
     // Modify the animation controller
     let mut animation_controller = world.get::<&mut AnimationController>(hand_entity).unwrap();
@@ -88,15 +88,14 @@ pub fn add_hand(
     drop(animation_controller);
 
     // Give it a collider
-    let collider = ColliderBuilder::capsule_y(0.05, 0.02)
-        .sensor(true)
-        .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::COLLISION_EVENTS)
-        .collision_groups(InteractionGroups::new(HAND_COLLISION_GROUP, u32::MAX))
-        .user_data(hand_entity.to_bits().get() as _)
-        .build();
-
-    let collider = Collider::new(physics_context.colliders.insert(collider));
+    let collider = Collider {
+        shape: SharedShape::capsule_y(0.05, 0.02),
+        sensor: true,
+        active_collision_types: ActiveCollisionTypes::all(),
+        collision_groups: HAND_COLLISION_GROUP,
+        collision_filter: u32::MAX,
+        ..Default::default()
+    };
 
     world
         .insert(hand_entity, (collider, hand_component))
@@ -107,14 +106,14 @@ pub fn add_hand(
 mod tests {
     use super::*;
     use approx::assert_relative_eq;
+    use glam::Vec3;
     use hecs::Entity;
-    use rapier3d::prelude::{RigidBodyBuilder, RigidBodyType};
 
     use crate::components::{LocalTransform, RigidBody};
 
     #[test]
     pub fn test_hands_system() {
-        let (mut world, input_context, _) = setup();
+        let (mut world, input_context) = setup();
         let hand = add_hand_to_world(&mut world, None);
 
         tick(&mut world, &input_context);
@@ -130,16 +129,15 @@ mod tests {
 
     #[test]
     pub fn test_move_grabbed_objects() {
-        let (mut world, input_context, mut physics_context) = setup();
+        let (mut world, input_context) = setup();
 
-        let grabbed_object_rigid_body =
-            RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build(); // grabber sets the rigid body as kinematic
-        let handle = physics_context
-            .rigid_bodies
-            .insert(grabbed_object_rigid_body);
+        let expected_scale = Vec3::X * 1000.;
         let grabbed_entity = world.spawn((
-            RigidBody { handle },
-            LocalTransform::default(),
+            RigidBody::default(),
+            LocalTransform {
+                scale: expected_scale,
+                ..Default::default()
+            },
             GlobalTransform::default(),
         ));
         add_hand_to_world(&mut world, Some(grabbed_entity));
@@ -148,14 +146,16 @@ mod tests {
 
         let local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
         assert_relative_eq!(local_transform.translation, [-0.2, 1.4, -0.5].into());
+
+        // Make sure that scale gets preserved
+        assert_relative_eq!(local_transform.scale, expected_scale);
     }
 
     // HELPER FUNCTIONS
-    fn setup() -> (World, InputContext, PhysicsContext) {
+    fn setup() -> (World, InputContext) {
         let world = World::new();
         let input_context = InputContext::testing();
-        let physics_context = PhysicsContext::default();
-        (world, input_context, physics_context)
+        (world, input_context)
     }
 
     fn tick(world: &mut World, input_context: &InputContext) {
