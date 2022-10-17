@@ -19,6 +19,7 @@ pub use engine::{Engine, EngineBuilder, TickData};
 pub use glam;
 pub use hecs;
 pub use hotham_error::HothamError;
+pub use id_arena;
 
 /// Components are data that are used to update the simulation and interact with the external world
 pub mod components;

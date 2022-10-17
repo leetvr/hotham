@@ -1,12 +1,13 @@
 mod custom_rendering;
-pub mod navigation;
+mod hologram;
+mod navigation;
 
 use custom_rendering::custom_rendering_system;
+use hologram::{Hologram, HologramData};
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{
-        hand::Handedness, hologram::HologramData, physics::SharedShape, Collider, Grabbable,
-        Hologram, LocalTransform, Mesh,
+        hand::Handedness, physics::SharedShape, Collider, Grabbable, LocalTransform, Mesh,
     },
     glam::{Affine3A, Mat4, Quat, Vec3},
     hecs::World,

@@ -1,5 +1,6 @@
+use crate::hologram::Hologram;
 use hotham::{
-    components::{skin::NO_SKIN, stage, GlobalTransform, Hologram, Mesh, Skin, Visible},
+    components::{skin::NO_SKIN, stage, GlobalTransform, Mesh, Skin, Visible},
     contexts::{
         render_context::{
             Instance, InstancedPrimitive, InstancedQuadricPrimitive, QuadricInstance,
