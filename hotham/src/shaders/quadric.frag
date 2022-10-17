@@ -91,7 +91,7 @@ void main() {
     // Compute normal from gradient of surface quadric
     vec3 normal = normalize((d.surfaceQ * hitPoint).xyz);
 
-    vec4 uv4 = d.uvFromGlobal * hitPoint;
+    vec4 uv4 = d.uvFromGos * hitPoint;
     vec2 uv = uv4.xy / uv4.w;
 
     // Retrieve the material from the buffer.

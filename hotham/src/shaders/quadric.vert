@@ -22,7 +22,7 @@ void main() {
     QuadricData d = quadricDataBuffer.data[gl_InstanceIndex];
     outInstanceIndex = gl_InstanceIndex;
 
-    outRayOrigin = d.globalFromLocal * vec4(inPos, 1.0);
+    outRayOrigin = d.gosFromLocal * vec4(inPos, 1.0);
     outRayDir = vec4((outRayOrigin.xyz / outRayOrigin.w) - sceneData.cameraPosition[gl_ViewIndex].xyz, 0.0);
 
     outSurfaceQTimesRayOrigin = d.surfaceQ * outRayOrigin;

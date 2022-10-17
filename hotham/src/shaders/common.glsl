@@ -13,10 +13,10 @@ struct DrawData {
 };
 
 struct QuadricData {
-    mat4 globalFromLocal;
+    mat4 gosFromLocal;
     mat4 surfaceQ;
     mat4 boundsQ;
-    mat4 uvFromGlobal;
+    mat4 uvFromGos;
     uint materialID;
 };
 
