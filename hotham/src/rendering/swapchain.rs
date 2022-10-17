@@ -35,7 +35,7 @@ impl SwapchainInfo {
 }
 
 /// A thin container for OpenXR to pass the details of its Swapchain to RenderContext.
-pub(crate) struct Swapchain {
+pub struct Swapchain {
     /// The dimensions of the swapchain.
     pub render_area: vk::Rect2D,
     /// The framebuffers of the swapchain, one per swapchain image.
@@ -43,6 +43,7 @@ pub(crate) struct Swapchain {
 }
 
 impl Swapchain {
+    /// Create a swapchain
     pub fn new(
         swapchain_info: &SwapchainInfo,
         vulkan_context: &VulkanContext,
