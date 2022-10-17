@@ -1,5 +1,7 @@
+mod custom_rendering;
 pub mod navigation;
 
+use custom_rendering::custom_rendering_system;
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, hologram::HologramData, Hologram, LocalTransform, Mesh},
@@ -11,8 +13,8 @@ use hotham::{
     },
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
-        physics_system, rendering::rendering_system, skinning::skinning_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
+        physics_system, skinning::skinning_system, update_global_transform_system,
+        update_global_transform_with_parent_system,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -59,7 +61,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         debug_system(engine);
     }
 
-    rendering_system(engine, tick_data.swapchain_image_index);
+    custom_rendering_system(engine, tick_data.swapchain_image_index);
 }
 
 fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
