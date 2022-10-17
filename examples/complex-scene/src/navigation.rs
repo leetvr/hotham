@@ -27,8 +27,7 @@ fn navigation_system_inner(
         .query::<&Collider>()
         .with::<&Hand>()
         .iter()
-        .find(|(_, collider)| !collider.collisions_this_frame.is_empty())
-        .is_some();
+        .any(|(_, collider)| !collider.collisions_this_frame.is_empty());
 
     // If they have, then just return.
     if hands_have_collisions {

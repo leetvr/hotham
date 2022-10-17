@@ -7,11 +7,7 @@ use crate::{
 
 use hotham::{
     components::{
-        hand::Handedness,
-        physics::BodyType,
-        physics::{ActiveCollisionTypes, SharedShape, Teleport},
-        sound_emitter::SoundState,
-        ui_panel::UIPanelButton,
+        hand::Handedness, physics::Teleport, sound_emitter::SoundState, ui_panel::UIPanelButton,
         Collider, LocalTransform, RigidBody, UIPanel, Visible,
     },
     contexts::{AudioContext, HapticContext},
