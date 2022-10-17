@@ -61,7 +61,7 @@ void main() {
     // Pick the solution that is facing us
     float t = (b + sqrt(discriminant)) * -0.5 / a;
 
-    if (t < 0.0) {
+    if (t < -0.0001) {
         t = 0.0;
         gl_SampleMask[0] = 0;
     }
