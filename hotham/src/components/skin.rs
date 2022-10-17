@@ -13,7 +13,7 @@ pub struct Skin {
     /// Inverse bind matrices, used to build the final joint matrices for this skin
     pub inverse_bind_matrices: Vec<Affine3A>,
     /// Index into skin buffer
-    pub(crate) id: u32,
+    pub id: u32,
 }
 
 impl Skin {

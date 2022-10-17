@@ -19,6 +19,10 @@ layout (location = 1) in vec2 inUV;
 layout (location = 2) flat in uint inMaterialID;
 layout (location = 3) in vec3 inNormal;
 
+layout (std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
+    DrawData data[];
+} drawDataBuffer;
+
 layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
     Material materials[];
 } materialBuffer;
