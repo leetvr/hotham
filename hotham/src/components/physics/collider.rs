@@ -22,6 +22,10 @@ pub struct Collider {
     pub active_collision_types: ActiveCollisionTypes,
     /// Should this collider be offset from its parent (if it has one)?
     pub offset_from_parent: glam::Vec3,
+    /// How "bouncy" is this collider?
+    pub restitution: f32,
+    /// What is the mass of this collider?
+    pub mass: f32,
 }
 
 impl Debug for Collider {
@@ -33,6 +37,9 @@ impl Debug for Collider {
             .field("collision_groups", &self.collision_groups)
             .field("collision_filter", &self.collision_filter)
             .field("active_collision_types", &self.active_collision_types)
+            .field("offset_from_parent", &self.offset_from_parent)
+            .field("restitution", &self.restitution)
+            .field("mass", &self.mass)
             .finish()
     }
 }
@@ -57,6 +64,8 @@ impl Default for Collider {
             collision_filter: DEFAULT_COLLISION_GROUP | HAND_COLLISION_GROUP,
             active_collision_types: ActiveCollisionTypes::default(),
             offset_from_parent: Default::default(),
+            restitution: 0.,
+            mass: 0.,
         }
     }
 }

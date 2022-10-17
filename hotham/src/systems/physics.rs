@@ -97,7 +97,7 @@ fn create_colliders(world: &mut hecs::World, physics_context: &mut PhysicsContex
     let mut command_buffer = hecs::CommandBuffer::new();
 
     for (entity, (c, rigid_body_handle)) in world
-        .query::<(&Collider, Option<&RigidBodyHandle>)>()
+        .query::<(&mut Collider, Option<&RigidBodyHandle>)>()
         .without::<&ColliderHandle>()
         .iter()
     {
@@ -112,11 +112,18 @@ fn create_colliders(world: &mut hecs::World, physics_context: &mut PhysicsContex
             ))
             .build();
 
+        // This is a bit odd, but a developer can override the mass of a collider if they choose.
+        // To avoid having the mass overridden every frame, we check to see if the developer provided a mass on creation
+        // If not, then we set the mass on the collider *component* to be whatever the computed mass of the shape is. That way
+        // the collider's mass will be happily set to the *correct* value each frame.
+        if c.mass != 0. {
+            collider.set_mass(c.mass);
+        } else {
+            c.mass = collider.mass();
+        }
+
         let handle = if let Some(handle) = rigid_body_handle {
-            collider.set_position_wrt_parent(rapier3d::na::Isometry3 {
-                translation: na_vector_from_glam(c.offset_from_parent).into(),
-                ..Default::default()
-            });
+            collider.set_translation_wrt_parent(na_vector_from_glam(c.offset_from_parent));
             physics_context.colliders.insert_with_parent(
                 collider,
                 handle.0,
@@ -162,6 +169,13 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
         }
 
         rigid_body.set_body_type(body_type.into());
+
+        // We cheat here by just comparing with the first member of the array, as we don't yet support locking
+        // individual rotations.
+        if rigid_body_component.lock_rotations != rigid_body.is_rotation_locked()[0] {
+            rigid_body.lock_rotations(rigid_body_component.lock_rotations, true)
+        }
+
         let component_linear_velocity = na_vector_from_glam(rigid_body_component.linear_velocity);
 
         match body_type {
@@ -234,14 +248,26 @@ fn update_colliders_from_world(physics_context: &mut PhysicsContext, world: &mut
             collider.set_position(global_transform.to_isometry());
         }
 
+        let Collider {
+            sensor,
+            shape,
+            collision_groups,
+            collision_filter,
+            active_collision_types,
+            mass,
+            offset_from_parent,
+            restitution,
+            collisions_this_frame: _, // we intentionally ignore this value to force us to handle all other properties
+        } = collider_component;
+
         // Update the collider's other properties.
-        collider.set_sensor(collider_component.sensor);
-        collider.set_shape(collider_component.shape.clone());
-        collider.set_collision_groups(InteractionGroups::new(
-            collider_component.collision_groups,
-            collider_component.collision_filter,
-        ));
-        collider.set_active_collision_types(collider_component.active_collision_types);
+        collider.set_sensor(*sensor);
+        collider.set_shape(shape.clone());
+        collider.set_collision_groups(InteractionGroups::new(*collision_groups, *collision_filter));
+        collider.set_mass(*mass);
+        collider.set_restitution(*restitution);
+        collider.set_active_collision_types(*active_collision_types);
+        collider.set_translation_wrt_parent(na_vector_from_glam(*offset_from_parent));
     }
 }
 
