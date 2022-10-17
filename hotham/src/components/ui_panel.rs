@@ -6,14 +6,14 @@ use egui::epaint::Vertex as EguiVertex;
 use egui::CtxRef;
 use glam::{Vec2, Vec3};
 use hecs::{Entity, World};
-use rapier3d::prelude::{ColliderBuilder, InteractionGroups};
+use rapier3d::prelude::SharedShape;
 
 const BUFFER_SIZE: usize = 1024;
 
 use crate::components::Panel;
 use crate::contexts::gui_context::SCALE_FACTOR;
 use crate::contexts::physics_context::PANEL_COLLISION_GROUP;
-use crate::contexts::{GuiContext, PhysicsContext};
+use crate::contexts::GuiContext;
 use crate::contexts::{RenderContext, VulkanContext};
 use crate::rendering::legacy_buffer::Buffer;
 
@@ -74,7 +74,6 @@ pub fn add_ui_panel_to_world(
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
     gui_context: &GuiContext,
-    physics_context: &mut PhysicsContext,
     world: &mut World,
 ) -> Entity {
     println!("[PANEL] Adding panel with text {}", text);
@@ -132,20 +131,12 @@ pub fn add_ui_panel_to_world(
     let panel_entity = world.spawn(components);
     let (half_width, half_height) = (world_size.x / 2., world_size.y / 2.);
 
-    let translation: [f32; 3] = translation.into();
-    let collider = ColliderBuilder::cuboid(half_width, half_height, 0.0)
-        .sensor(true)
-        .collision_groups(InteractionGroups::new(
-            PANEL_COLLISION_GROUP,
-            PANEL_COLLISION_GROUP,
-        ))
-        .translation(translation.into())
-        .user_data(panel_entity.id() as _)
-        .build();
-    let handle = physics_context.colliders.insert(collider);
     let collider = Collider {
-        collisions_this_frame: Vec::new(),
-        handle,
+        shape: SharedShape::cuboid(half_width, half_height, 0.0),
+        sensor: true,
+        collision_groups: PANEL_COLLISION_GROUP,
+        collision_filter: PANEL_COLLISION_GROUP,
+        ..Default::default()
     };
     world.insert_one(panel_entity, collider).unwrap();
     println!("[PANEL] ..done! {:?}", panel_entity);

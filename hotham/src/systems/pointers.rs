@@ -8,7 +8,7 @@ use rapier3d::prelude::{InteractionGroups, QueryFilter, Ray};
 pub const POSITION_OFFSET: Vec3 = Vec3::new(4.656613e-10, 0.029968515, 0.0741747);
 pub const ROTATION_OFFSET: Quat = Quat::from_xyzw(0.8274912, 0.03413791, -0.050611533, -0.5581499);
 
-use crate::util::na_vector_from_glam_vec;
+use crate::util::na_vector_from_glam;
 use crate::{
     components::{
         hand::Handedness, panel::PanelInput, stage, Info, LocalTransform, Panel, Pointer, Visible,
@@ -65,8 +65,8 @@ pub fn pointers_system_inner(
         pointer.trigger_value = trigger_value;
 
         // Get the direction and position of the ray.
-        let ray_direction = na_vector_from_glam_vec(local_transform.rotation * Vec3::Y);
-        let ray_origin = na_vector_from_glam_vec(local_transform.translation);
+        let ray_direction = na_vector_from_glam(local_transform.rotation * Vec3::Y);
+        let ray_origin = na_vector_from_glam(local_transform.translation);
 
         // Sweet baby ray
         let ray = Ray::new(ray_origin.into(), ray_direction);
@@ -164,13 +164,10 @@ mod tests {
     #[cfg(windows)]
     pub fn test_pointers_system() {
         use crate::{
-            components::{Collider, LocalTransform, Panel},
-            contexts::{
-                physics_context::{DEFAULT_COLLISION_GROUP, PANEL_COLLISION_GROUP},
-                RenderContext,
-            },
+            components::{Collider, GlobalTransform, LocalTransform, Panel},
+            contexts::{physics_context::PANEL_COLLISION_GROUP, RenderContext},
         };
-        use rapier3d::prelude::ColliderBuilder;
+        use rapier3d::prelude::SharedShape;
         const POINTER_Z: f32 = -0.47001815;
 
         let (mut render_context, vulkan_context) = RenderContext::testing();
@@ -178,7 +175,7 @@ mod tests {
         let input_context = InputContext::testing();
         let mut world = World::default();
 
-        let panel = Panel::create(
+        let (panel, _) = Panel::create(
             &vulkan_context,
             &mut render_context,
             vk::Extent2D {
@@ -188,44 +185,44 @@ mod tests {
             [1.0, 1.0].into(),
         )
         .unwrap();
-        let panel_entity = world.spawn(panel);
 
         // Place the panel *directly above* where the pointer will be located.
-        let collider = ColliderBuilder::cuboid(0.5, 0.5, 0.0)
-            .sensor(true)
-            .collision_groups(InteractionGroups::new(
-                PANEL_COLLISION_GROUP,
-                PANEL_COLLISION_GROUP,
-            ))
-            .translation([-0.2, 2., POINTER_Z].into())
-            .rotation([(3. * std::f32::consts::PI) * 0.5, 0., 0.].into())
-            .user_data(panel_entity.id() as _)
-            .build();
-
-        let handle = physics_context.colliders.insert(collider);
-
         let collider = Collider {
-            collisions_this_frame: Vec::new(),
-            handle,
+            shape: SharedShape::cuboid(0.5, 0.5, 0.0),
+            sensor: true,
+            collision_groups: PANEL_COLLISION_GROUP,
+            collision_filter: PANEL_COLLISION_GROUP,
+            ..Default::default()
         };
-        world.insert_one(panel_entity, collider).unwrap();
+        let local_transform = LocalTransform::from_rotation_translation(
+            glam::Quat::from_axis_angle(Vec3::X, std::f32::consts::FRAC_PI_2 * 3.),
+            [-0.2, 2., POINTER_Z].into(),
+        );
+
+        let panel_entity = world.spawn((
+            panel,
+            collider,
+            local_transform,
+            GlobalTransform::from(local_transform),
+        ));
 
         // Add a decoy collider to ensure we're using collision groups correctly.
-        let collider = ColliderBuilder::cuboid(0.1, 0.1, 0.1)
-            .sensor(true)
-            .collision_groups(InteractionGroups::new(
-                DEFAULT_COLLISION_GROUP,
-                DEFAULT_COLLISION_GROUP,
-            ))
-            .translation([-0.2, 1.5, POINTER_Z].into())
-            .rotation([(3. * std::f32::consts::PI) * 0.5, 0., 0.].into())
-            .build();
-        let handle = physics_context.colliders.insert(collider);
         let collider = Collider {
-            collisions_this_frame: Vec::new(),
-            handle,
+            shape: SharedShape::cuboid(0.1, 0.1, 0.1),
+            sensor: true,
+            ..Default::default()
         };
-        world.spawn((collider,));
+
+        let local_transform = LocalTransform::from_rotation_translation(
+            glam::Quat::default(),
+            [-0.2, 1.5, POINTER_Z].into(),
+        );
+
+        world.spawn((
+            collider,
+            local_transform,
+            GlobalTransform::from(local_transform),
+        ));
 
         let pointer_entity = world.spawn((
             Visible {},
@@ -249,7 +246,7 @@ mod tests {
         let panel = world.get::<&mut Panel>(panel_entity).unwrap();
         let input = panel.input.clone().unwrap();
         assert_relative_eq!(input.cursor_location.x, 150.00153);
-        assert_relative_eq!(input.cursor_location.y, 77.21232);
+        assert_relative_eq!(input.cursor_location.y, 77.21234);
         assert_eq!(input.trigger_value, 0.);
     }
 

@@ -20,15 +20,11 @@ impl SwapchainInfo {
         handle: &SwapchainHandle<Vulkan>,
         resolution: vk::Extent2D,
     ) -> Result<Self> {
-        print!("[HOTHAM_INIT] Creating swapchain..");
-
         let images = handle
             .enumerate_images()?
             .into_iter()
             .map(vk::Image::from_raw)
             .collect::<Vec<_>>();
-
-        println!("..done!");
 
         Ok(Self { resolution, images })
     }

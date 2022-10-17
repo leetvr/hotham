@@ -4,13 +4,12 @@ pub mod navigation;
 use custom_rendering::custom_rendering_system;
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, hologram::HologramData, Hologram, LocalTransform, Mesh},
-    contexts::PhysicsContext,
-    glam::{self, Mat4, Quat},
-    hecs::World,
-    rapier3d::prelude::{
-        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
+    components::{
+        hand::Handedness, hologram::HologramData, physics::SharedShape, Collider, Grabbable,
+        Hologram, LocalTransform, Mesh,
     },
+    glam::{Affine3A, Mat4, Quat, Vec3},
+    hecs::World,
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, skinning::skinning_system, update_global_transform_system,
@@ -23,8 +22,8 @@ use navigation::navigation_system;
 #[derive(Clone, Debug, Default)]
 /// The state is used for manipulating the stage transform
 pub struct State {
-    global_from_left_grip: Option<glam::Affine3A>,
-    global_from_right_grip: Option<glam::Affine3A>,
+    global_from_left_grip: Option<Affine3A>,
+    global_from_right_grip: Option<Affine3A>,
     scale: Option<f32>,
 }
 
@@ -67,7 +66,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
 fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
-    let physics_context = &mut engine.physics_context;
     let world = &mut engine.world;
 
     let mut glb_buffers: Vec<&[u8]> = vec![
@@ -84,21 +82,17 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     #[cfg(not(target_os = "android"))]
     glb_buffers.push(include_bytes!("../../../test_assets/damaged_helmet.glb"));
 
-    let models = asset_importer::load_models_from_glb(
-        &glb_buffers,
-        vulkan_context,
-        render_context,
-        physics_context,
-    )?;
-    add_helmet(&models, world, physics_context);
-    add_hand(&models, Handedness::Left, world, physics_context);
-    add_hand(&models, Handedness::Right, world, physics_context);
+    let models =
+        asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    add_helmet(&models, world, [-1., 1.4, -1.].into());
+    add_helmet(&models, world, [1., 1.4, -1.].into());
+    add_hand(&models, Handedness::Left, world);
+    add_hand(&models, Handedness::Right, world);
     add_quadric(
         &models,
         world,
-        physics_context,
         &LocalTransform {
-            translation: [1.0, 1.4, -1.5].into(),
+            translation: [1.0, 3.0, -1.5].into(),
             rotation: Quat::IDENTITY,
             scale: [0.5, 0.5, 0.5].into(),
         },
@@ -112,9 +106,8 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_quadric(
         &models,
         world,
-        physics_context,
         &LocalTransform {
-            translation: [-1.0, 1.4, -1.5].into(),
+            translation: [-1.0, 3.0, -1.5].into(),
             rotation: Quat::IDENTITY,
             scale: [0.5, 0.5, 0.5].into(),
         },
@@ -132,61 +125,38 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
 fn add_helmet(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
-    physics_context: &mut PhysicsContext,
+    translation: Vec3,
 ) {
-    let helmet = add_model_to_world("Damaged Helmet", models, world, physics_context, None)
+    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
         .expect("Could not find Damaged Helmet");
-    let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
-    local_transform.translation.z = -1.;
-    local_transform.translation.y = 1.4;
-    local_transform.scale = [0.5, 0.5, 0.5].into();
-    let position = local_transform.to_isometry();
-    drop(local_transform);
-    let collider = ColliderBuilder::ball(0.35)
-        .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::COLLISION_EVENTS)
-        .build();
-    let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
-        .position(position)
-        .build();
-    let components = physics_context.create_rigid_body_and_collider(helmet, rigid_body, collider);
-    world.insert(helmet, components).unwrap();
+
+    {
+        let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
+        local_transform.translation = translation;
+        local_transform.scale = [0.5, 0.5, 0.5].into();
+    }
+
+    let collider = Collider::new(SharedShape::ball(0.35));
+
+    world.insert(helmet, (collider, Grabbable {})).unwrap();
 }
 
 fn add_quadric(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
-    physics_context: &mut PhysicsContext,
     local_transform: &LocalTransform,
     ball_radius: f32,
     hologram_data: HologramData,
 ) {
-    let entity = add_model_to_world("Sphere", models, world, physics_context, None)
-        .expect("Could not find Sphere");
+    let entity = add_model_to_world("Sphere", models, world, None).expect("Could not find Sphere");
     *world.get::<&mut LocalTransform>(entity).unwrap() = *local_transform;
-    let position = local_transform.to_isometry();
-    let collider = ColliderBuilder::ball(ball_radius)
-        .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::COLLISION_EVENTS)
-        .build();
-    let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
-        .position(position)
-        .build();
+    let collider = Collider::new(SharedShape::ball(ball_radius));
     let hologram_component = Hologram {
         mesh_data_handle: world.get::<&Mesh>(entity).unwrap().handle,
         hologram_data,
     };
-    let physics_components =
-        physics_context.create_rigid_body_and_collider(entity, rigid_body, collider);
     world
-        .insert(
-            entity,
-            (
-                physics_components.0,
-                physics_components.1,
-                hologram_component,
-            ),
-        )
+        .insert(entity, (collider, Grabbable {}, hologram_component))
         .unwrap();
     world.remove_one::<Mesh>(entity).unwrap();
 }

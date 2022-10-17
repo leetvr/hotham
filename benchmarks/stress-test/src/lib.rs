@@ -114,22 +114,17 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let world = &mut engine.world;
-    let physics_context = &mut engine.physics_context;
 
     match test {
         StressTest::ManyCubes => {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/cube.glb")];
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                render_context,
-                physics_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
 
             let resolution = 34; // 42,875 cubes
 
-            setup_cubes(world, physics_context, resolution, &models);
+            setup_cubes(world, resolution, &models);
 
             models
         }
@@ -137,16 +132,11 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!(
                 "../../../test_assets/culling_stress_test.glb"
             )];
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                render_context,
-                physics_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
 
-            add_model_to_world("Asteroid and Debris", &models, world, physics_context, None)
-                .unwrap();
+            add_model_to_world("Asteroid and Debris", &models, world, None).unwrap();
             models
         }
         StressTest::ManyHelmets => {
@@ -157,16 +147,12 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
             #[cfg(not(target_os = "android"))]
             let glb_buffers: Vec<&[u8]> =
                 vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                render_context,
-                physics_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
 
             for _ in 0..20 {
-                let e = add_model_to_world("Damaged Helmet", &models, world, physics_context, None)
+                let e = add_model_to_world("Damaged Helmet", &models, world, None)
                     .expect("Could not find cube?");
                 let mut t = world.get::<&mut LocalTransform>(e).unwrap();
                 t.rotation = Quat::from_axis_angle(Vec3::X, std::f32::consts::FRAC_PI_2);
@@ -180,15 +166,11 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
         StressTest::Sponza => {
             let file = std::fs::read("test_assets/sponza.glb").unwrap();
             let glb_buffers: Vec<&[u8]> = vec![&file];
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                render_context,
-                physics_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, world, physics_context, None);
+                add_model_to_world(name, &models, world, None);
             }
             models
         }
@@ -200,15 +182,11 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
             #[cfg(not(target_os = "android"))]
             let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/ibl_test.glb")];
 
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                render_context,
-                physics_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, world, physics_context, None);
+                add_model_to_world(name, &models, world, None);
             }
             models
         }
@@ -217,15 +195,11 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
                 "../../../test_assets/normal_tangent_test.glb"
             )];
 
-            let models = asset_importer::load_models_from_glb(
-                &glb_buffers,
-                vulkan_context,
-                render_context,
-                physics_context,
-            )
-            .unwrap();
+            let models =
+                asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                    .unwrap();
             for name in models.keys() {
-                add_model_to_world(name, &models, world, physics_context, None);
+                add_model_to_world(name, &models, world, None);
             }
 
             let scene_data = &mut render_context.scene_data;
@@ -308,10 +282,8 @@ fn model_system(
     model_name: &str,
 ) {
     let world = &mut engine.world;
-    let physics_context = &mut engine.physics_context;
     if timer.tick() {
-        add_model_to_world(model_name, models, world, physics_context, None)
-            .expect("Could not find object?");
+        add_model_to_world(model_name, models, world, None).expect("Could not find object?");
         rearrange_models(world);
     }
 

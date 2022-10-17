@@ -494,7 +494,6 @@ pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
-    print!("[HOTHAM_INIT] Creating render pass..");
     // Attachment used for MSAA
     let color_attachment = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
@@ -590,7 +589,6 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
             None,
         )
     }?;
-    println!("..done!");
 
     Ok(render_pass)
 }
@@ -601,7 +599,6 @@ fn create_pipelines(
     render_area: &vk::Rect2D,
     render_pass: vk::RenderPass,
 ) -> Result<(vk::Pipeline, vk::Pipeline)> {
-    print!("[HOTHAM_INIT] Creating pipeline..");
     // Build up the state of the pipeline
 
     // Triangle vertex shader stage

@@ -1,6 +1,8 @@
 use crate::util;
 use glam::{Affine3A, Quat, Vec3};
 
+use super::LocalTransform;
+
 /// Component used to represent the global transform of the entity in the renderer.
 /// This is the transformation from local to global space.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -21,5 +23,11 @@ impl GlobalTransform {
     /// Convenience function to decompose the [`GlobalTransform`] into its components
     pub fn to_scale_rotation_translation(&self) -> (Vec3, Quat, Vec3) {
         self.0.to_scale_rotation_translation()
+    }
+}
+
+impl From<LocalTransform> for GlobalTransform {
+    fn from(l: LocalTransform) -> Self {
+        GlobalTransform(l.to_affine())
     }
 }

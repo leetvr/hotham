@@ -76,14 +76,14 @@ mod tests {
             ui_panel::{add_ui_panel_to_world, UIPanelButton},
             UIPanel,
         },
-        contexts::{GuiContext, HapticContext, PhysicsContext, RenderContext, VulkanContext},
+        contexts::{GuiContext, HapticContext, RenderContext, VulkanContext},
         rendering::{image::Image, swapchain::SwapchainInfo},
         systems::{
             rendering::rendering_system_inner,
             update_global_transform::update_global_transform_system_inner,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
         },
-        util::{begin_renderdoc, end_renderdoc, save_image_to_disk},
+        util::save_image_to_disk,
         COLOR_FORMAT,
     };
 
@@ -103,7 +103,7 @@ mod tests {
         ) = setup(resolution.clone());
 
         // Begin. Use renderdoc in headless mode for debugging.
-        let mut renderdoc = begin_renderdoc().unwrap();
+        // let mut renderdoc = begin_renderdoc();
 
         draw(
             &mut world,
@@ -154,7 +154,9 @@ mod tests {
         // Assert that NO haptic feedback has been requested.
         assert_eq!(haptic_context.right_hand_amplitude_this_frame, 0.);
 
-        end_renderdoc(&mut renderdoc);
+        // if let Ok(renderdoc) = renderdoc.as_mut() {
+        //     end_renderdoc(renderdoc);
+        // }
 
         // Get the image off the GPU
         unsafe { save_image_to_disk(&vulkan_context, image, "draw_gui").unwrap() };
@@ -267,7 +269,6 @@ mod tests {
         GuiContext,
     ) {
         let vulkan_context = VulkanContext::testing().unwrap();
-        let mut physics_context = PhysicsContext::default();
         // Create an image with vulkan_context
         let image = vulkan_context
             .create_image(
@@ -294,13 +295,9 @@ mod tests {
         let gltf_data: Vec<&[u8]> = vec![include_bytes!(
             "../../../test_assets/ferris-the-crab/source/ferris.glb"
         )];
-        let mut models = asset_importer::load_models_from_glb(
-            &gltf_data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let mut models =
+            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
+                .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
         let panel = add_ui_panel_to_world(
@@ -318,7 +315,6 @@ mod tests {
             &vulkan_context,
             &mut render_context,
             &gui_context,
-            &mut physics_context,
             &mut world,
         );
         world.get::<&mut Panel>(panel).unwrap().input = Some(PanelInput {

@@ -84,13 +84,13 @@ impl XrContext {
         XrContextBuilder::new().build()
     }
 
-    pub fn new_from_path(path: &std::path::Path) -> Result<(XrContext, VulkanContext)> {
-        XrContextBuilder::new().path(Some(path)).build()
+    pub fn new_from_path<P: AsRef<std::path::Path>>(path: P) -> Result<(XrContext, VulkanContext)> {
+        XrContextBuilder::new().path(Some(path.as_ref())).build()
     }
 
     #[cfg(test)]
     pub fn testing() -> (XrContext, VulkanContext) {
-        XrContext::new_from_path(std::path::Path::new("../openxr_loader.dll")).unwrap()
+        XrContext::new_from_path("../openxr_loader.dll").unwrap()
     }
 
     fn _new(

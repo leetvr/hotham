@@ -391,32 +391,24 @@ mod tests {
     use crate::{
         asset_importer,
         components::{stage::Stage, LocalTransform},
-        contexts::{PhysicsContext, RenderContext},
+        contexts::RenderContext,
         rendering::{image::Image, light::Light, scene_data},
         systems::{
             update_global_transform::update_global_transform_system_inner,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
         },
-        util::{
-            affine_from_posef, begin_renderdoc, end_renderdoc, posef_from_affine,
-            save_image_to_disk,
-        },
+        util::{affine_from_posef, posef_from_affine, save_image_to_disk},
     };
     use glam::{Quat, Vec3};
 
     #[test]
     pub fn test_rendering_pbr() {
         let (mut render_context, vulkan_context, image) = RenderContext::testing_with_image();
-        let mut physics_context = PhysicsContext::default();
 
         let gltf_data: Vec<&[u8]> = vec![include_bytes!("../../../test_assets/damaged_helmet.glb")];
-        let mut models = asset_importer::load_models_from_glb(
-            &gltf_data,
-            &vulkan_context,
-            &mut render_context,
-            &mut physics_context,
-        )
-        .unwrap();
+        let mut models =
+            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
+                .unwrap();
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform
@@ -528,7 +520,10 @@ mod tests {
         views: &Vec<openxr::View>,
     ) -> Result<(), String> {
         // Render the scene
-        let mut renderdoc = begin_renderdoc();
+
+        // If you want to debug with renderdoc, uncomment the line below:
+        // let mut renderdoc = begin_renderdoc();
+
         render(
             render_context,
             vulkan_context,
@@ -538,9 +533,10 @@ mod tests {
             light,
             views,
         );
-        if let Ok(renderdoc) = renderdoc.as_mut() {
-            end_renderdoc(renderdoc);
-        }
+
+        // if let Ok(renderdoc) = renderdoc.as_mut() {
+        //     end_renderdoc(renderdoc);
+        // }
 
         // Save the resulting image to the disk and get its hash, along with a "known good" hash
         // of what the image *should* be.

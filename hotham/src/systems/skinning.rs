@@ -52,9 +52,7 @@ mod tests {
     #[test]
     pub fn test_hand_skinning() {
         let (mut render_context, vulkan_context) = RenderContext::testing();
-        let mut physics_context = Default::default();
-        let mut world =
-            get_world_with_hands(&vulkan_context, &mut render_context, &mut physics_context);
+        let mut world = get_world_with_hands(&vulkan_context, &mut render_context);
 
         skinning_system_inner(&mut world, &mut render_context);
 
@@ -77,13 +75,11 @@ mod tests {
         let mut called = 0;
         for (_, (skin, info)) in world.query::<(&Skin, &Info)>().iter() {
             let correct_matrices: Vec<Mat4> = if info.name == "hands:Lhand" {
-                println!("Left hand!");
                 serde_json::from_slice(include_bytes!(
                     "../../../test_assets/left_hand_skinned_matrices.json"
                 ))
                 .unwrap()
             } else {
-                println!("Right hand!");
                 serde_json::from_slice(include_bytes!(
                     "../../../test_assets/right_hand_skinned_matrices.json"
                 ))
