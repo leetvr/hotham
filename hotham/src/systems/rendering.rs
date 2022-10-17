@@ -1,5 +1,5 @@
 use crate::{
-    components::{skin::NO_SKIN, stage, GlobalTransform, Hologram, Mesh, Skin, Visible},
+    components::{skin::NO_SKIN, stage, GlobalTransform, Mesh, Skin, Visible},
     contexts::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
@@ -111,34 +111,6 @@ pub unsafe fn begin(
                     gos_from_local,
                     bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
                     skin_id,
-                });
-        }
-    }
-
-    for (_, (hologram, global_transform)) in
-        world.query_mut::<With<(&Hologram, &GlobalTransform), &Visible>>()
-    {
-        let mesh_data = meshes.get(hologram.mesh_data_handle).unwrap();
-        for primitive in &mesh_data.primitives {
-            let key = primitive.index_buffer_offset;
-
-            // Create a transform from this primitive's local space into gos space.
-            let gos_from_local = gos_from_global * global_transform.0;
-
-            render_context
-                .quadrics_primitive_map
-                .entry(key)
-                .or_insert(InstancedQuadricPrimitive {
-                    primitive: primitive.clone(),
-                    instances: Default::default(),
-                })
-                .instances
-                .push(QuadricInstance {
-                    gos_from_local,
-                    bounding_sphere: primitive.get_bounding_sphere_in_gos(&gos_from_local),
-                    surface_q_in_local: hologram.hologram_data.surface_q_in_local,
-                    bounds_q_in_local: hologram.hologram_data.bounds_q_in_local,
-                    uv_from_local: hologram.hologram_data.uv_from_local,
                 });
         }
     }
