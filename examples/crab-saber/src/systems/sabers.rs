@@ -1,13 +1,14 @@
-use hotham::components::{stage, LocalTransform};
-use hotham::glam::Affine3A;
-use hotham::rapier3d::prelude::RigidBodyType;
-use hotham::systems::pointers::{POSITION_OFFSET, ROTATION_OFFSET};
-use hotham::Engine;
 use hotham::{
     asset_importer::{add_model_to_world, Models},
-    contexts::{InputContext, PhysicsContext},
+    components::{
+        physics::{BodyType, SharedShape},
+        stage, Collider, LocalTransform, RigidBody,
+    },
+    contexts::InputContext,
+    glam::Affine3A,
     hecs::{Entity, With, World},
-    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder},
+    systems::pointers::{POSITION_OFFSET, ROTATION_OFFSET},
+    Engine,
 };
 
 use crate::components::{Color, Saber};
@@ -44,35 +45,31 @@ fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
     }
 }
 
-pub fn add_saber(
-    color: Color,
-    models: &Models,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-) -> Entity {
+pub fn add_saber(color: Color, models: &Models, world: &mut World) -> Entity {
     let model_name = match color {
         Color::Blue => "Blue Saber",
         Color::Red => "Red Saber",
     };
-    let saber = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
-    add_saber_physics(world, physics_context, saber);
+    let saber = add_model_to_world(model_name, models, world, None).unwrap();
+    add_saber_physics(world, saber);
     world.insert(saber, (Saber {}, color)).unwrap();
     saber
 }
 
-fn add_saber_physics(world: &mut World, physics_context: &mut PhysicsContext, saber: Entity) {
+fn add_saber_physics(world: &mut World, saber: Entity) {
     // Give it a collider and rigid-body
-    let collider = ColliderBuilder::cylinder(SABER_HALF_HEIGHT, SABER_HALF_WIDTH)
-        .translation([0., SABER_HALF_HEIGHT, 0.].into())
-        .sensor(true)
-        .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::COLLISION_EVENTS)
-        .build();
-    let rigid_body = RigidBodyBuilder::new(RigidBodyType::KinematicPositionBased).build();
+    let collider = Collider {
+        shape: SharedShape::cylinder(SABER_HALF_HEIGHT, SABER_HALF_WIDTH),
+        sensor: true,
+        ..Default::default()
+    };
+    let rigid_body = RigidBody {
+        body_type: BodyType::KinematicPositionBased,
+        ..Default::default()
+    };
 
     // Add the components to the entity.
-    let components = physics_context.create_rigid_body_and_collider(saber, rigid_body, collider);
-    world.insert(saber, components).unwrap();
+    world.insert(saber, (collider, rigid_body)).unwrap();
 }
 
 #[cfg(test)]

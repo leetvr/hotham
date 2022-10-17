@@ -27,7 +27,7 @@
 				"-p",
 				"hotham",
 				"--",
-				"systems::pointers::tests::test_pointers_system",
+				"systems::grabbing::tests::test_grabbing_system",
 				"--nocapture"
 			],
 			"env": {

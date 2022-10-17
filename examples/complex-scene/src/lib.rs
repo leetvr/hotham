@@ -2,13 +2,9 @@ pub mod navigation;
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, LocalTransform},
-    contexts::PhysicsContext,
+    components::{hand::Handedness, physics::SharedShape, Collider, Grabbable, LocalTransform},
     glam,
     hecs::World,
-    rapier3d::prelude::{
-        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, RigidBodyBuilder, RigidBodyType,
-    },
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, rendering::rendering_system, skinning::skinning_system,
@@ -65,7 +61,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
 fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
-    let physics_context = &mut engine.physics_context;
     let world = &mut engine.world;
 
     let mut glb_buffers: Vec<&[u8]> = vec![
@@ -81,15 +76,12 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     #[cfg(not(target_os = "android"))]
     glb_buffers.push(include_bytes!("../../../test_assets/damaged_helmet.glb"));
 
-    let models = asset_importer::load_models_from_glb(
-        &glb_buffers,
-        vulkan_context,
-        render_context,
-        physics_context,
-    )?;
-    add_helmet(&models, world, physics_context);
-    add_hand(&models, Handedness::Left, world, physics_context);
-    add_hand(&models, Handedness::Right, world, physics_context);
+    let models =
+        asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    add_helmet(&models, world, [-1., 1.4, -1.].into());
+    add_helmet(&models, world, [1., 1.4, -1.].into());
+    add_hand(&models, Handedness::Left, world);
+    add_hand(&models, Handedness::Right, world);
 
     Ok(())
 }
@@ -97,23 +89,18 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
 fn add_helmet(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
-    physics_context: &mut PhysicsContext,
+    translation: glam::Vec3,
 ) {
-    let helmet = add_model_to_world("Damaged Helmet", models, world, physics_context, None)
+    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
         .expect("Could not find Damaged Helmet");
-    let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
-    local_transform.translation.z = -1.;
-    local_transform.translation.y = 1.4;
-    local_transform.scale = [0.5, 0.5, 0.5].into();
-    let position = local_transform.to_isometry();
-    drop(local_transform);
-    let collider = ColliderBuilder::ball(0.35)
-        .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::COLLISION_EVENTS)
-        .build();
-    let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
-        .position(position)
-        .build();
-    let components = physics_context.create_rigid_body_and_collider(helmet, rigid_body, collider);
-    world.insert(helmet, components).unwrap();
+
+    {
+        let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
+        local_transform.translation = translation;
+        local_transform.scale = [0.5, 0.5, 0.5].into();
+    }
+
+    let collider = Collider::new(SharedShape::ball(0.35));
+
+    world.insert(helmet, (collider, Grabbable {})).unwrap();
 }

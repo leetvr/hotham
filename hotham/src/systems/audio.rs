@@ -3,9 +3,9 @@ use hecs::World;
 use openxr::SpaceVelocityFlags;
 
 use crate::{
-    components::{sound_emitter::SoundState, RigidBody, SoundEmitter},
-    contexts::{AudioContext, PhysicsContext, XrContext},
-    util::{decompose_isometry, is_space_valid},
+    components::{sound_emitter::SoundState, GlobalTransform, RigidBody, SoundEmitter},
+    contexts::{AudioContext, XrContext},
+    util::is_space_valid,
     Engine,
 };
 
@@ -16,18 +16,12 @@ use crate::{
 pub fn audio_system(engine: &mut Engine) {
     let world = &mut engine.world;
     let audio_context = &mut engine.audio_context;
-    let physics_context = &engine.physics_context;
     let xr_context = &engine.xr_context;
 
-    audio_system_inner(world, audio_context, physics_context, xr_context);
+    audio_system_inner(world, audio_context, xr_context);
 }
 
-fn audio_system_inner(
-    world: &mut World,
-    audio_context: &mut AudioContext,
-    physics_context: &PhysicsContext,
-    xr_context: &XrContext,
-) {
+fn audio_system_inner(world: &mut World, audio_context: &mut AudioContext, xr_context: &XrContext) {
     // First, where is the listener?
     let (stage_from_listener, listener_velocity_in_stage) = xr_context
         .view_space
@@ -55,14 +49,12 @@ fn audio_system_inner(
     let listener_velocity_in_stage: Vec3 =
         mint::Vector3::from(listener_velocity_in_stage.linear_velocity).into();
 
-    for (_, (sound_emitter, rigid_body)) in world.query_mut::<(&mut SoundEmitter, &RigidBody)>() {
+    for (_, (sound_emitter, rigid_body, global_transform)) in
+        world.query_mut::<(&mut SoundEmitter, &RigidBody, &GlobalTransform)>()
+    {
         // Get the position and velocity of the entity.
-        let rigid_body = physics_context
-            .rigid_bodies
-            .get(rigid_body.handle)
-            .expect("Unable to get RigidBody");
-        let (_, source_position_in_stage) = decompose_isometry(rigid_body.position());
-        let source_velocity_in_stage: Vec3 = rigid_body.linvel().data.0[0].into();
+        let (_, _, source_position_in_stage) = global_transform.to_scale_rotation_translation();
+        let source_velocity_in_stage = rigid_body.linear_velocity;
 
         // Compute relative position and velocity
         let relative_position_in_stage =
@@ -73,10 +65,6 @@ fn audio_system_inner(
         // Determine what we should do with the audio source
         match (sound_emitter.current_state(), &sound_emitter.next_state) {
             (SoundState::Stopped, Some(SoundState::Playing)) => {
-                println!(
-                    "[HOTHAM_AUDIO] - Playing sound effect at {:?}, {:?} from {:?}!. Original position: {:?}",
-                    relative_position_in_stage, source_velocity_in_stage, listener_position_in_stage, rigid_body.translation()
-                );
                 audio_context.play_audio(
                     sound_emitter,
                     relative_position_in_stage,
@@ -119,11 +107,10 @@ mod tests {
         time::{Duration, Instant},
     };
 
-    use rapier3d::prelude::{RigidBodyBuilder, RigidBodyType};
     const DURATION_SECS: u32 = 3;
 
     use crate::{
-        contexts::{audio_context::MusicTrack, XrContext},
+        contexts::{audio_context::MusicTrack, PhysicsContext, XrContext},
         HothamError, VIEW_TYPE,
     };
 
@@ -147,12 +134,10 @@ mod tests {
 
         // Create rigid body for the test entity
         let sound_effect = include_bytes!("../../../test_assets/ice_crash.mp3").to_vec();
-        let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
-            .linvel([0.5, 0., 0.].into())
-            .translation([-2., 0., 0.].into())
-            .build();
-        let handle = physics_context.rigid_bodies.insert(rigid_body);
-        let rigid_body = RigidBody { handle };
+        let rigid_body = RigidBody {
+            linear_velocity: [0.5, 0., 0.].into(),
+            ..Default::default()
+        };
         let sound_emitter = audio_context.create_sound_emitter(sound_effect);
 
         // Create world
@@ -203,7 +188,7 @@ mod tests {
         );
         physics_context.update();
         xr_context.end_frame().unwrap();
-        audio_system_inner(world, audio_context, physics_context, xr_context);
+        audio_system_inner(world, audio_context, xr_context);
     }
 
     fn update_xr(xr_context: &mut XrContext) {

@@ -1,10 +1,6 @@
-use anyhow::{anyhow, Result};
 use crossbeam::channel::Receiver;
-use hecs::{Entity, World};
 use rapier3d::na::Matrix3x1;
 use rapier3d::prelude::*;
-
-use crate::components::{Collider as ColliderComponent, RigidBody as RigidBodyComponent};
 
 pub const DEFAULT_COLLISION_GROUP: u32 = 0b01;
 pub const PANEL_COLLISION_GROUP: u32 = 0b10;
@@ -87,57 +83,5 @@ impl PhysicsContext {
 
         self.query_pipeline
             .update(&self.island_manager, &self.rigid_bodies, &self.colliders);
-    }
-
-    pub fn create_rigid_body_and_collider(
-        &mut self,
-        entity: Entity,
-        rigid_body: RigidBody,
-        mut collider: Collider,
-    ) -> (RigidBodyComponent, ColliderComponent) {
-        collider.user_data = entity.to_bits().get() as _;
-        let rigid_body_handle = self.rigid_bodies.insert(rigid_body);
-
-        // TODO: Users may wish to pass in their own interaction groups.
-        collider.set_collision_groups(InteractionGroups::new(
-            DEFAULT_COLLISION_GROUP,
-            DEFAULT_COLLISION_GROUP,
-        ));
-
-        let a_collider_handle =
-            self.colliders
-                .insert_with_parent(collider, rigid_body_handle, &mut self.rigid_bodies);
-
-        let collider_component = ColliderComponent {
-            collisions_this_frame: vec![],
-            handle: a_collider_handle,
-        };
-        let rigid_body_component = RigidBodyComponent {
-            handle: rigid_body_handle,
-        };
-
-        (rigid_body_component, collider_component)
-    }
-
-    pub fn get_rigid_body<'a>(
-        &'a mut self,
-        world: &World,
-        entity: Entity,
-    ) -> Result<&'a mut RigidBody> {
-        let rigid_body_handle = world.get::<&RigidBodyComponent>(entity)?.handle;
-        self.rigid_bodies
-            .get_mut(rigid_body_handle)
-            .ok_or_else(|| anyhow!("Unable to get Rigid Body for handle!"))
-    }
-
-    pub fn get_collider<'a>(
-        &'a mut self,
-        world: &World,
-        entity: Entity,
-    ) -> Result<&'a mut Collider> {
-        let collider_handle = world.get::<&ColliderComponent>(entity)?.handle;
-        self.colliders
-            .get_mut(collider_handle)
-            .ok_or_else(|| anyhow!("Unable to get Collider for handle!"))
     }
 }

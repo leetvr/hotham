@@ -199,7 +199,7 @@ impl Texture {
         #[cfg(target_os = "android")]
         println!("[HOTHAM_TEXTURE] - @@ WARNING: Non-optimal image format detected. For best performance, compress your images into ktx2 using Squisher: https://github.com/leetvr/squisher. @@");
 
-        print!("[HOTHAM_TEXTURE] - Decompressing image. This may take some time..");
+        println!("[HOTHAM_TEXTURE] - Decompressing image. This may take some time..");
         let decompressed_format = get_format_from_mime_type(mime_type);
         let asset = Cursor::new(data);
         let mut image = ImageReader::new(asset);
@@ -216,7 +216,7 @@ impl Texture {
             _ => vk::Format::R8G8B8A8_UNORM,
         };
 
-        println!(" ..done!");
+        println!("[HOTHAM_TEXTURE] ..done!");
 
         Texture::new(
             name,

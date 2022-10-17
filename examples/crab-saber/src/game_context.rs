@@ -7,18 +7,13 @@ use std::{
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{
-        hand::Handedness, ui_panel::add_ui_panel_to_world, Collider, PhysicsControlled, Pointer,
-        RigidBody, SoundEmitter, Visible,
+        hand::Handedness,
+        physics::{ActiveCollisionTypes, BodyType, SharedShape},
+        ui_panel::add_ui_panel_to_world,
+        Collider, GlobalTransform, LocalTransform, Pointer, RigidBody, SoundEmitter, Visible,
     },
-    contexts::{
-        audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext,
-        PhysicsContext,
-    },
+    contexts::{audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext},
     hecs::{Entity, World},
-    rapier3d::prelude::{
-        ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder,
-        RigidBodyType,
-    },
     vk, Engine,
 };
 use rand::prelude::*;
@@ -57,36 +52,30 @@ impl GameContext {
     pub fn new(engine: &mut Engine) -> Self {
         let render_context = &mut engine.render_context;
         let vulkan_context = &engine.vulkan_context;
-        let physics_context = &mut engine.physics_context;
         let gui_context = &engine.gui_context;
         let world = &mut engine.world;
 
         let glb_buffers: Vec<&[u8]> = vec![include_bytes!("../assets/crab_saber.glb")];
-        let models = asset_importer::load_models_from_glb(
-            &glb_buffers,
-            vulkan_context,
-            render_context,
-            physics_context,
-        )
-        .expect("Unable to load models!");
+        let models =
+            asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)
+                .expect("Unable to load models!");
 
         // Add the environment models
-        add_environment(&models, world, physics_context);
+        add_environment(&models, world);
 
         // Add sabers
-        let sabers = [Color::Blue, Color::Red]
-            .map(|color| add_saber(color, &models, world, physics_context));
+        let sabers = [Color::Blue, Color::Red].map(|color| add_saber(color, &models, world));
 
         // Spawn cubes
         for _ in 0..20 {
-            pre_spawn_cube(world, &models, physics_context);
+            pre_spawn_cube(world, &models);
         }
 
         // Add a pointer to let the player interact with the UI
-        let pointer = add_pointer(&models, world, physics_context);
+        let pointer = add_pointer(&models, world);
 
         // Add a "backstop" collider to detect when a cube was missed
-        let backstop = add_backstop(world, physics_context);
+        let backstop = add_backstop(world);
 
         // Add UI panels
         let main_menu_panel = add_ui_panel_to_world(
@@ -101,7 +90,6 @@ impl GameContext {
             vulkan_context,
             render_context,
             gui_context,
-            physics_context,
             world,
         );
 
@@ -118,7 +106,6 @@ impl GameContext {
             vulkan_context,
             render_context,
             gui_context,
-            physics_context,
             world,
         );
 
@@ -194,31 +181,21 @@ impl GameContext {
     }
 }
 
-fn add_backstop(
-    world: &mut World,
-    physics_context: &mut hotham::contexts::PhysicsContext,
-) -> Entity {
-    let collider = ColliderBuilder::cuboid(1., 1., 0.1)
-        .translation([0., 1., 1.].into())
-        .sensor(true)
-        .collision_groups(InteractionGroups::new(
-            DEFAULT_COLLISION_GROUP,
-            DEFAULT_COLLISION_GROUP,
-        ))
-        .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::COLLISION_EVENTS)
-        .build();
+fn add_backstop(world: &mut World) -> Entity {
+    let collider = Collider {
+        shape: SharedShape::cuboid(1., 1., 0.1),
+        sensor: true,
+        collision_groups: DEFAULT_COLLISION_GROUP,
+        collision_filter: DEFAULT_COLLISION_GROUP,
+        active_collision_types: ActiveCollisionTypes::all(),
+        ..Default::default()
+    };
 
-    let handle = physics_context.colliders.insert(collider);
-    world.spawn((Collider::new(handle),))
+    world.spawn((collider,))
 }
 
-fn add_pointer(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-) -> Entity {
-    let pointer = add_model_to_world("Blue Pointer", models, world, physics_context, None).unwrap();
+fn add_pointer(models: &std::collections::HashMap<String, World>, world: &mut World) -> Entity {
+    let pointer = add_model_to_world("Blue Pointer", models, world, None).unwrap();
 
     world
         .insert_one(
@@ -233,20 +210,12 @@ fn add_pointer(
     pointer
 }
 
-fn add_environment(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-) {
-    add_model_to_world("Environment", models, world, physics_context, None);
-    add_model_to_world("Ramp", models, world, physics_context, None);
+fn add_environment(models: &std::collections::HashMap<String, World>, world: &mut World) {
+    add_model_to_world("Environment", models, world, None);
+    add_model_to_world("Ramp", models, world, None);
 }
 
-pub fn pre_spawn_cube(
-    world: &mut World,
-    models: &HashMap<String, World>,
-    physics_context: &mut PhysicsContext,
-) {
+pub fn pre_spawn_cube(world: &mut World, models: &HashMap<String, World>) {
     // Set the color randomly
     let color = if random() { Color::Red } else { Color::Blue };
     let model_name = match color {
@@ -254,18 +223,35 @@ pub fn pre_spawn_cube(
         Color::Blue => "Blue Cube",
     };
 
-    let cube = add_model_to_world(model_name, models, world, physics_context, None).unwrap();
-
-    let rigid_body = RigidBodyBuilder::new(RigidBodyType::Dynamic)
-        .lock_rotations()
-        .build();
-    let handle = physics_context.rigid_bodies.insert(rigid_body);
+    let cube = add_model_to_world(model_name, models, world, None).unwrap();
+    let local_transform = LocalTransform {
+        translation: [0., -100., 0.].into(),
+        ..Default::default()
+    };
 
     world.remove_one::<Visible>(cube).unwrap();
     world
         .insert(
             cube,
-            (Cube {}, color, RigidBody { handle }, PhysicsControlled {}),
+            (
+                Cube {},
+                color,
+                RigidBody {
+                    body_type: BodyType::KinematicVelocityBased,
+                    lock_rotations: true,
+                    linear_velocity: [0., 0., 0.].into(),
+                    ..Default::default()
+                },
+                Collider {
+                    sensor: true,
+                    active_collision_types: ActiveCollisionTypes::all(),
+                    shape: SharedShape::cuboid(0.2, 0.2, 0.2),
+                    offset_from_parent: [0., 0.2, 0.].into(),
+                    ..Default::default()
+                },
+                local_transform,
+                GlobalTransform::from(local_transform),
+            ),
         )
         .unwrap();
 }

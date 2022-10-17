@@ -56,18 +56,3 @@ fn haptics_system_inner(xr_context: &mut XrContext, haptic_context: &mut HapticC
         haptic_context.right_hand_amplitude_this_frame = 0.;
     }
 }
-
-#[cfg(target_os = "windows")]
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Simple smoke test.
-    #[test]
-    pub fn apply_haptic_feedback_test() {
-        let (mut xr_context, _) = XrContext::testing();
-        let mut haptic_context = HapticContext::default();
-
-        haptics_system_inner(&mut xr_context, &mut haptic_context);
-    }
-}

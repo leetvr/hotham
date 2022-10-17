@@ -1,5 +1,5 @@
 use hotham::{
-    components::LocalTransform,
+    components::{Collider, Hand, LocalTransform},
     contexts::InputContext,
     glam::{Affine3A, Vec3},
     hecs::{self, World},
@@ -9,7 +9,7 @@ use hotham::{
 use crate::State;
 
 /// Navigation system
-/// Allows the player to navigate by manipulating the stage transform
+/// Allows the player to navigate by grabbing empty space with their hands.
 pub fn navigation_system(engine: &mut Engine, state: &mut State) {
     let world = &mut engine.world;
     let input_context = &mut engine.input_context;
@@ -22,6 +22,18 @@ fn navigation_system_inner(
     stage_entity: hecs::Entity,
     state: &mut State,
 ) {
+    // First, check to see if either of the hands have collided with anything.
+    let hands_have_collisions = world
+        .query::<&Collider>()
+        .with::<&Hand>()
+        .iter()
+        .any(|(_, collider)| !collider.collisions_this_frame.is_empty());
+
+    // If they have, then just return.
+    if hands_have_collisions {
+        return;
+    }
+
     // Get the stage transform.
     let mut stage_transform = world.get::<&mut LocalTransform>(stage_entity).unwrap();
     let global_from_stage = stage_transform.to_affine();

@@ -7,14 +7,12 @@ use crate::{
 
 use hotham::{
     components::{
-        hand::Handedness, sound_emitter::SoundState, ui_panel::UIPanelButton, Collider, Info,
-        RigidBody, UIPanel, Visible,
+        hand::Handedness, physics::Teleport, sound_emitter::SoundState, ui_panel::UIPanelButton,
+        Collider, LocalTransform, RigidBody, UIPanel, Visible,
     },
-    contexts::{
-        physics_context::DEFAULT_COLLISION_GROUP, AudioContext, HapticContext, PhysicsContext,
-    },
+    contexts::{AudioContext, HapticContext},
+    glam,
     hecs::{Entity, With, World},
-    rapier3d::prelude::{ActiveCollisionTypes, ActiveEvents, ColliderBuilder, InteractionGroups},
     Engine,
 };
 use rand::prelude::*;
@@ -28,7 +26,6 @@ pub fn game_system(engine: &mut Engine, game_context: &mut GameContext) {
         game_context,
         &mut engine.world,
         &mut engine.audio_context,
-        &mut engine.physics_context,
         &mut engine.haptic_context,
     )
 }
@@ -37,25 +34,12 @@ fn game_system_inner(
     game_context: &mut GameContext,
     world: &mut World,
     audio_context: &mut AudioContext,
-    physics_context: &mut PhysicsContext,
     haptic_context: &mut HapticContext,
 ) {
     // Get next state
-    if let Some(next_state) = run(
-        world,
-        game_context,
-        audio_context,
-        physics_context,
-        haptic_context,
-    ) {
+    if let Some(next_state) = run(world, game_context, audio_context, haptic_context) {
         // If state has changed, transition
-        transition(
-            world,
-            game_context,
-            audio_context,
-            physics_context,
-            next_state,
-        );
+        transition(world, game_context, audio_context, next_state);
     };
 }
 
@@ -63,7 +47,6 @@ fn transition(
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
-    physics_context: &mut PhysicsContext,
     next_state: GameState,
 ) {
     let current_state = &game_context.state;
@@ -145,7 +128,7 @@ fn transition(
                 .iter()
                 .map(|(e, _)| e)
                 .collect::<Vec<_>>();
-            dispose_of_cubes(live_cubes, world, physics_context);
+            dispose_of_cubes(live_cubes, world);
 
             // Switch tracks
             let song = game_context.songs.get("Game Over").unwrap();
@@ -177,7 +160,6 @@ fn run(
     world: &mut World,
     game_context: &mut GameContext,
     audio_context: &mut AudioContext,
-    physics_context: &mut PhysicsContext,
     haptic_context: &mut HapticContext,
 ) -> Option<GameState> {
     match &mut game_context.state {
@@ -190,14 +172,9 @@ fn run(
             }
         }
         GameState::Playing(song) => {
-            spawn_cube(
-                world,
-                physics_context,
-                song,
-                &mut game_context.last_spawn_time,
-            );
+            spawn_cube(world, song, &mut game_context.last_spawn_time);
 
-            check_for_hits(world, game_context, physics_context, haptic_context);
+            check_for_hits(world, game_context, haptic_context);
             update_panel_text(world, game_context);
 
             if game_context.current_score < 0
@@ -221,12 +198,7 @@ fn run(
     None
 }
 
-fn spawn_cube(
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-    song: &mut Song,
-    last_spawn_time: &mut Instant,
-) {
+fn spawn_cube(world: &mut World, song: &mut Song, last_spawn_time: &mut Instant) {
     if !should_spawn_cube(*last_spawn_time, song.beat_length) {
         return;
     }
@@ -239,7 +211,7 @@ fn spawn_cube(
         .into_iter()
         .find_map(|(e, c)| if c == &color { Some(e) } else { None })
         .unwrap();
-    revive_cube(dead_cube, world, physics_context, song);
+    revive_cube(dead_cube, world, song);
     *last_spawn_time = Instant::now();
 }
 
@@ -253,7 +225,6 @@ fn update_panel_text(world: &mut World, game_context: &mut GameContext) {
 fn check_for_hits(
     world: &mut World,
     game_context: &mut GameContext,
-    physics_context: &mut PhysicsContext,
     haptic_context: &mut HapticContext,
 ) {
     let mut pending_sound_effects = Vec::new();
@@ -278,6 +249,7 @@ fn check_for_hits(
                     }
                 }
                 haptic_context.request_haptic_feedback(1., Handedness::Right);
+                println!("Hit BLUE: Adding cube to dispose list: {:?}", c);
                 cubes_to_dispose.push(*c);
             }
         }
@@ -285,7 +257,9 @@ fn check_for_hits(
         let red_saber_collider = world.get::<&Collider>(game_context.red_saber).unwrap();
         for c in &red_saber_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
-            if !is_cube(e) {
+
+            // If .. somehow, we hit this cube already this frame, just ignore it
+            if !is_cube(e) || cubes_to_dispose.contains(c) {
                 continue;
             };
             if let Some(color) = e.get::<&Color>() {
@@ -300,6 +274,7 @@ fn check_for_hits(
                     }
                 }
                 haptic_context.request_haptic_feedback(1., Handedness::Left);
+                println!("Hit RED: Adding cube to dispose list: {:?}", c);
                 cubes_to_dispose.push(*c);
             }
         }
@@ -307,47 +282,33 @@ fn check_for_hits(
         let backstop_collider = world.get::<&Collider>(game_context.backstop).unwrap();
         for c in &backstop_collider.collisions_this_frame {
             let e = world.entity(*c).unwrap();
-            if !is_cube(e) {
+
+            // If .. somehow, we hit this cube already this frame, don't treat it as missed.
+            if !is_cube(e) || cubes_to_dispose.contains(c) {
                 continue;
             };
             if e.get::<&Cube>().is_some() {
                 game_context.current_score -= 1;
                 pending_sound_effects.push((*c, "Miss"));
+                println!("MISSED: Adding cube to dispose list: {:?}", c);
                 cubes_to_dispose.push(*c);
             }
         }
     }
 
     play_sound_effects(pending_sound_effects, world, game_context);
-    dispose_of_cubes(cubes_to_dispose, world, physics_context);
+    dispose_of_cubes(cubes_to_dispose, world);
 }
 
 fn is_cube(e: hotham::hecs::EntityRef) -> bool {
     e.has::<Cube>() && e.has::<Visible>() && e.has::<Collider>() && e.has::<RigidBody>()
 }
 
-fn dispose_of_cubes(
-    cubes_to_dispose: Vec<Entity>,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-) {
+fn dispose_of_cubes(cubes_to_dispose: Vec<Entity>, world: &mut World) {
     for e in cubes_to_dispose.into_iter() {
-        match world.get::<&Collider>(e) {
-            Ok(c) => {
-                let handle = c.handle;
-                physics_context.colliders.remove(
-                    handle,
-                    &mut physics_context.island_manager,
-                    &mut physics_context.rigid_bodies,
-                    false,
-                );
-            }
-            Err(_) => {
-                let info = world.get::<&Info>(e).unwrap();
-                println!("Unable to find collider for entity {:?} - {:?}", e, *info);
-            }
-        }
-        drop(world.remove::<(Collider, Visible)>(e));
+        println!("Removing visibilty of cube: {:?}", e);
+        world.remove_one::<Visible>(e).unwrap();
+        world.get::<&mut RigidBody>(e).unwrap().linear_velocity = glam::Vec3::ZERO;
     }
 }
 
@@ -368,43 +329,25 @@ fn should_spawn_cube(last_spawn_time: Instant, beat_length: Duration) -> bool {
     delta > beat_length
 }
 
-fn revive_cube(
-    cube_entity: Entity,
-    world: &mut World,
-    physics_context: &mut PhysicsContext,
-    song: &Song,
-) {
-    let mut rng = thread_rng();
-    let translation_x = CUBE_X_OFFSETS[rng.gen_range(0..4)];
-    let z_linvel = -CUBE_Z / (song.beat_length.as_secs_f32() * 4.); // distance / time for 4 beats
+fn revive_cube(cube_entity: Entity, world: &mut World, song: &Song) {
+    // Update its position and velocity
+    {
+        let (local_transform, rigid_body) = world
+            .query_one_mut::<(&mut LocalTransform, &mut RigidBody)>(cube_entity)
+            .unwrap();
+        let translation = &mut local_transform.translation;
 
-    // Update the Rigid Body
-    let rigid_body_handle = world.get::<&RigidBody>(cube_entity).unwrap().handle;
-    let rigid_body = &mut physics_context.rigid_bodies[rigid_body_handle];
-    rigid_body.set_translation([translation_x, CUBE_Y, CUBE_Z].into(), true);
-    rigid_body.set_linvel([0., 0., z_linvel].into(), true);
+        let mut rng = thread_rng();
+        translation.x = CUBE_X_OFFSETS[rng.gen_range(0..4)];
+        translation.z = CUBE_Z;
+        translation.y = CUBE_Y;
 
-    // Create a new collider
-    let collider = ColliderBuilder::cuboid(0.2, 0.2, 0.2)
-        .translation([0., 0.2, 0.].into()) // Offset the collider slightly
-        .active_collision_types(ActiveCollisionTypes::all())
-        .active_events(ActiveEvents::COLLISION_EVENTS)
-        .collision_groups(InteractionGroups::new(
-            DEFAULT_COLLISION_GROUP,
-            DEFAULT_COLLISION_GROUP,
-        ))
-        .user_data(cube_entity.id() as _)
-        .build();
-
-    // Attach it to the rigid body
-    let collider_handle = physics_context.colliders.insert_with_parent(
-        collider,
-        rigid_body_handle,
-        &mut physics_context.rigid_bodies,
-    );
+        // distance / time for 4 beats
+        rigid_body.linear_velocity.z = -CUBE_Z / (song.beat_length.as_secs_f32() * 4.);
+    }
 
     world
-        .insert(cube_entity, (Visible {}, Collider::new(collider_handle)))
+        .insert(cube_entity, (Visible {}, Teleport {}))
         .unwrap();
 }
 
@@ -418,10 +361,6 @@ mod tests {
         components::{Collider, RigidBody, SoundEmitter},
         contexts::HapticContext,
         hecs::Entity,
-        rapier3d::{
-            na,
-            prelude::{RigidBodyBuilder, RigidBodyType},
-        },
         Engine,
     };
 
@@ -431,12 +370,10 @@ mod tests {
     #[test]
     pub fn game_system_test() {
         let mut engine = Engine::new();
-        let mut world = World::new();
         let mut game_context = GameContext::new(&mut engine);
         let audio_context = &mut engine.audio_context;
-        let physics_context = &mut engine.physics_context;
         let haptic_context = &mut engine.haptic_context;
-        let world = &mut world;
+        let world = &mut engine.world;
         let game_context = &mut game_context;
 
         let main_menu_music = audio_context.dummy_track();
@@ -476,13 +413,7 @@ mod tests {
             .insert("Miss".to_string(), audio_context.dummy_sound_emitter());
 
         // INIT -> MAIN_MENU
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         assert_eq!(game_context.state, GameState::MainMenu);
         assert!(is_visible(world, game_context.pointer));
         assert!(is_visible(world, game_context.main_menu_panel));
@@ -501,13 +432,7 @@ mod tests {
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         assert_eq!(game_context.state, GameState::Playing(beside_you.clone()));
         assert_eq!(audio_context.current_music_track, Some(beside_you.track));
         assert!(!is_visible(world, game_context.pointer));
@@ -517,80 +442,59 @@ mod tests {
         assert!(is_visible(world, game_context.score_panel));
 
         // PLAYING - TICK ONE
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
 
         {
-            let mut q = world.query::<With<(&Color, &RigidBody, &Collider), (&Visible, &Cube)>>();
+            assert_score_is(world, game_context, 0);
+
+            let mut q = world
+                .query::<(&Color, &RigidBody, &LocalTransform, &Collider)>()
+                .with::<(&Visible, &Cube)>();
             let mut i = q.iter();
             assert_eq!(i.len(), 1);
-            let (_, (_, rigid_body, _)) = i.next().unwrap();
-            let rigid_body = &physics_context.rigid_bodies[rigid_body.handle];
-            drop(q);
+            let (_, (_, rigid_body, local_transform, _)) = i.next().unwrap();
 
-            let t = rigid_body.translation();
+            let t = local_transform.translation;
             assert!(
-                t[0] == CUBE_X_OFFSETS[0]
-                    || t[0] == CUBE_X_OFFSETS[1]
-                    || t[0] == CUBE_X_OFFSETS[2]
-                    || t[0] == CUBE_X_OFFSETS[3]
+                t.x == CUBE_X_OFFSETS[0]
+                    || t.x == CUBE_X_OFFSETS[1]
+                    || t.x == CUBE_X_OFFSETS[2]
+                    || t.x == CUBE_X_OFFSETS[3],
+                "Cube transform.x invalid: {}!",
+                t.x
             );
-            assert_eq!(t[1], CUBE_Y);
-            assert_eq!(t[2], CUBE_Z);
+            assert_eq!(t.y, 1.1);
+            assert_eq!(t.z, CUBE_Z);
 
-            assert_eq!(rigid_body.linvel(), &na::Vector3::new(0., 0., 5.));
-            assert_score_is(world, game_context, 0);
+            assert_eq!(rigid_body.linear_velocity, [0., 0., 5.].into());
         }
 
         // PLAYING - TICK TWO
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
 
         {
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 0);
 
             // Simulate blue saber hitting blue cube - increase score
-            hit_cube(game_context.blue_saber, Color::Blue, world, physics_context);
+            hit_cube(game_context.blue_saber, Color::Blue, world);
         }
 
         // PLAYING - TICK THREE
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         {
             assert_cube_processed(world, game_context.blue_saber, haptic_context);
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 1);
             // Simulate blue saber hitting red cube - decrease score
-            hit_cube(game_context.blue_saber, Color::Red, world, physics_context);
+            hit_cube(game_context.blue_saber, Color::Red, world);
             // Reset spawn timer.
             game_context.last_spawn_time =
                 Instant::now() - beside_you.beat_length - Duration::from_millis(1);
         }
 
         // PLAYING - TICK FOUR
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         {
             assert_cube_processed(world, game_context.blue_saber, haptic_context);
             reset(world, game_context, haptic_context);
@@ -598,85 +502,55 @@ mod tests {
             assert_eq!(num_cubes(world), 2);
 
             // Simulate blue saber hitting blue cube - increase score
-            hit_cube(game_context.blue_saber, Color::Blue, world, physics_context);
+            hit_cube(game_context.blue_saber, Color::Blue, world);
 
             // Make the sabers collide
             collide_sabers(game_context, world);
         }
 
         // PLAYING - TICK FIVE
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         {
             assert_cube_processed(world, game_context.blue_saber, haptic_context);
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 1);
             // Simulate blue cube hitting the backstop - decrease score
-            hit_cube(game_context.backstop, Color::Blue, world, physics_context);
+            hit_cube(game_context.backstop, Color::Blue, world);
         }
 
         // PLAYING - TICK SIX
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         {
             assert_cube_processed(world, game_context.backstop, haptic_context);
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 0);
 
             // Add a red cube to the red saber - increase score
-            hit_cube(game_context.red_saber, Color::Red, world, physics_context);
+            hit_cube(game_context.red_saber, Color::Red, world);
         }
 
         // PLAYING - TICK SEVEN
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         {
             assert_cube_processed(world, game_context.red_saber, haptic_context);
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 1);
             // Add a blue cube to the red saber - decrease score
-            hit_cube(game_context.red_saber, Color::Blue, world, physics_context);
+            hit_cube(game_context.red_saber, Color::Blue, world);
         }
 
         // PLAYING - TICK EIGHT
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         {
             assert_cube_processed(world, game_context.red_saber, haptic_context);
             reset(world, game_context, haptic_context);
             assert_score_is(world, game_context, 0);
             // Add a blue cube to the red saber - decrease score
-            hit_cube(game_context.red_saber, Color::Blue, world, physics_context);
+            hit_cube(game_context.red_saber, Color::Blue, world);
         }
 
         // PLAYING - TICK NINE -> GAME OVER
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         {
             assert_eq!(game_context.state, GameState::GameOver);
             assert!(is_visible(world, game_context.pointer));
@@ -699,13 +573,7 @@ mod tests {
         }
 
         // GAME_OVER -> MAIN_MENU
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         {
             assert_eq!(game_context.state, GameState::MainMenu);
             assert!(is_visible(world, game_context.pointer));
@@ -741,13 +609,7 @@ mod tests {
                 .unwrap();
             panel.buttons[0].clicked_this_frame = true;
         }
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         reset(world, game_context, haptic_context);
         assert_eq!(game_context.current_score, 0);
         assert_eq!(game_context.state, GameState::Playing(beside_you.clone()));
@@ -759,13 +621,7 @@ mod tests {
         assert!(is_visible(world, game_context.score_panel));
 
         // PLAYING - TICK ONE
-        game_system_inner(
-            game_context,
-            world,
-            audio_context,
-            physics_context,
-            haptic_context,
-        );
+        game_system_inner(game_context, world, audio_context, haptic_context);
         assert_eq!(num_cubes(world), 1);
     }
 
@@ -789,24 +645,13 @@ mod tests {
             .len()
     }
 
-    fn hit_cube(
-        saber: Entity,
-        color: Color,
-        world: &mut World,
-        physics_context: &mut PhysicsContext,
-    ) {
-        let rigid_body = physics_context
-            .rigid_bodies
-            .insert(RigidBodyBuilder::new(RigidBodyType::Dynamic).build());
-        let collider = physics_context
-            .colliders
-            .insert(ColliderBuilder::cuboid(0., 0., 0.).build());
+    fn hit_cube(saber: Entity, color: Color, world: &mut World) {
         let cube = world.spawn((
             color,
             Cube {},
             Visible {},
-            RigidBody { handle: rigid_body },
-            Collider::new(collider),
+            RigidBody::default(),
+            Collider::default(),
         ));
         world
             .get::<&mut Collider>(saber)
@@ -818,10 +663,13 @@ mod tests {
     fn assert_cube_processed(world: &mut World, saber: Entity, haptic_context: &mut HapticContext) {
         let hit_cube = world.get::<&Collider>(saber).unwrap().collisions_this_frame[0];
         let hit_cube = world.entity(hit_cube).unwrap();
+        assert_eq!(
+            hit_cube.get::<&RigidBody>().unwrap().linear_velocity,
+            glam::Vec3::ZERO
+        );
         assert!(hit_cube.has::<SoundEmitter>());
-        assert!(hit_cube.has::<RigidBody>()); // Necessary to play a sound
+        assert!(hit_cube.has::<Collider>());
         assert!(!hit_cube.has::<Visible>());
-        assert!(!hit_cube.has::<Collider>());
 
         if let Ok(c) = world.get::<&Color>(saber) {
             match *c {
