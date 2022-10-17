@@ -98,11 +98,11 @@ impl RenderContext {
         // Pipeline, render pass
         let render_pass = create_render_pass(vulkan_context)?;
         let swapchain = Swapchain::new(swapchain_info, vulkan_context, render_pass);
-        let pipeline_layout =
+        let graphics_pipeline_layout =
             create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.graphics_layout))?;
         let (triangles_pipeline, quadrics_pipeline) = create_pipelines(
             vulkan_context,
-            pipeline_layout,
+            graphics_pipeline_layout,
             &swapchain.render_area,
             render_pass,
         )?;
@@ -128,7 +128,7 @@ impl RenderContext {
             frame_index: 0,
             swapchain,
             compute_pipeline,
-            graphics_pipeline_layout: pipeline_layout,
+            graphics_pipeline_layout,
             triangles_pipeline,
             quadrics_pipeline,
             compute_pipeline_layout,
