@@ -1,4 +1,6 @@
-use crate::hologram::Hologram;
+use std::slice;
+
+use crate::{custom_render_context::CustomRenderContext, hologram::Hologram};
 use hotham::{
     components::{skin::NO_SKIN, stage, GlobalTransform, Mesh, Skin, Visible},
     contexts::{
@@ -13,11 +15,13 @@ use hotham::{
     vk, xr, Engine,
 };
 
-/// Rendering system
-/// Walks through each Mesh that is Visible and renders it.
-///
-/// Advanced users may instead call [`begin`], [`draw_world`], and [`end`] manually.
-pub fn custom_rendering_system(engine: &mut Engine, swapchain_image_index: usize) {
+/// Custom rendering system
+/// This is run instead of the built-in rendering system in order to add rendering of Holograms/quadrics.
+pub fn custom_rendering_system(
+    engine: &mut Engine,
+    custom_render_context: &mut CustomRenderContext,
+    swapchain_image_index: usize,
+) {
     let world = &mut engine.world;
     let vulkan_context = &mut engine.vulkan_context;
     let render_context = &mut engine.render_context;
@@ -29,6 +33,7 @@ pub fn custom_rendering_system(engine: &mut Engine, swapchain_image_index: usize
         world,
         vulkan_context,
         render_context,
+        custom_render_context,
         views,
         swapchain_image_index,
     );
@@ -38,6 +43,7 @@ pub(crate) fn custom_rendering_system_inner(
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
+    custom_render_context: &mut CustomRenderContext,
     views: &[xr::View],
     swapchain_image_index: usize,
 ) {
@@ -49,7 +55,7 @@ pub(crate) fn custom_rendering_system_inner(
             views,
             swapchain_image_index,
         );
-        draw_world(vulkan_context, render_context);
+        draw_world(vulkan_context, render_context, custom_render_context);
         end(vulkan_context, render_context);
     }
 }
@@ -202,14 +208,18 @@ pub unsafe fn begin(
 /// # Safety
 ///
 /// Must be between [`begin`] and [`end`]
-pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
+pub unsafe fn draw_world(
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+    custom_render_context: &mut CustomRenderContext,
+) {
     // Parse through the cull buffer and record commands. This is a bit complex.
     let device = &vulkan_context.device;
     let frame = &mut render_context.frames[render_context.frame_index];
     let command_buffer = frame.command_buffer;
     let draw_data_buffer = &mut frame.draw_data_buffer;
     draw_data_buffer.clear();
-    let quadrics_data_buffer = &mut frame.quadric_data_buffer;
+    let quadrics_data_buffer = &mut custom_render_context.quadrics_data_buffer;
     quadrics_data_buffer.clear();
 
     let mut current_shader = Default::default();
@@ -278,8 +288,24 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                 vulkan_context.device.cmd_bind_pipeline(
                     command_buffer,
                     vk::PipelineBindPoint::GRAPHICS,
-                    render_context.quadrics_pipeline,
-                )
+                    custom_render_context.quadrics_pipeline,
+                );
+                vulkan_context.device.cmd_bind_descriptor_sets(
+                    frame.command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    custom_render_context.quadrics_pipeline_layout,
+                    0,
+                    slice::from_ref(&render_context.descriptors.sets[render_context.frame_index]),
+                    &[],
+                );
+                vulkan_context.device.cmd_bind_descriptor_sets(
+                    frame.command_buffer,
+                    vk::PipelineBindPoint::GRAPHICS,
+                    custom_render_context.quadrics_pipeline_layout,
+                    1,
+                    slice::from_ref(&custom_render_context.quadrics_descriptor_set),
+                    &[],
+                );
             }
         }
 

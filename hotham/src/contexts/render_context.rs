@@ -40,8 +40,6 @@ use vk_shader_macros::include_glsl;
 static CULLING_COMP: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
 static TRIANGLE_VERT: &[u32] = include_glsl!("src/shaders/pbr.vert", target: vulkan1_1);
 static TRIANGLE_FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag", target: vulkan1_1);
-static QUADRIC_VERT: &[u32] = include_glsl!("src/shaders/quadric.vert", target: vulkan1_1);
-static QUADRIC_FRAG: &[u32] = include_glsl!("src/shaders/quadric.frag", target: vulkan1_1);
 
 // TODO: Is this a good idea?
 pub const PIPELINE_DEPTH: usize = 2;
@@ -51,7 +49,6 @@ pub struct RenderContext {
     pub frame_index: usize,
     pub compute_pipeline: vk::Pipeline,
     pub triangles_pipeline: vk::Pipeline,
-    pub quadrics_pipeline: vk::Pipeline,
     pub compute_pipeline_layout: vk::PipelineLayout,
     pub graphics_pipeline_layout: vk::PipelineLayout,
     pub render_pass: vk::RenderPass,
@@ -98,11 +95,11 @@ impl RenderContext {
         // Pipeline, render pass
         let render_pass = create_render_pass(vulkan_context)?;
         let swapchain = Swapchain::new(swapchain_info, vulkan_context, render_pass);
-        let pipeline_layout =
+        let graphics_pipeline_layout =
             create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.graphics_layout))?;
-        let (triangles_pipeline, quadrics_pipeline) = create_pipelines(
+        let triangles_pipeline = create_pipeline(
             vulkan_context,
-            pipeline_layout,
+            graphics_pipeline_layout,
             &swapchain.render_area,
             render_pass,
         )?;
@@ -128,9 +125,8 @@ impl RenderContext {
             frame_index: 0,
             swapchain,
             compute_pipeline,
-            graphics_pipeline_layout: pipeline_layout,
+            graphics_pipeline_layout,
             triangles_pipeline,
-            quadrics_pipeline,
             compute_pipeline_layout,
             render_pass,
             cameras: vec![Default::default(); 2],
@@ -593,12 +589,12 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
     Ok(render_pass)
 }
 
-fn create_pipelines(
+fn create_pipeline(
     vulkan_context: &VulkanContext,
     pipeline_layout: vk::PipelineLayout,
     render_area: &vk::Rect2D,
     render_pass: vk::RenderPass,
-) -> Result<(vk::Pipeline, vk::Pipeline)> {
+) -> Result<vk::Pipeline> {
     // Build up the state of the pipeline
 
     // Triangle vertex shader stage
@@ -613,16 +609,6 @@ fn create_pipelines(
     )?;
 
     let triangle_stages = [triangle_vertex_stage, triangle_fragment_stage];
-
-    // Quadric vertex shader stage
-    let (quadric_vertex_shader, quadric_vertex_stage) =
-        create_shader(QUADRIC_VERT, vk::ShaderStageFlags::VERTEX, vulkan_context)?;
-
-    // Quadric fragment shader stage
-    let (quadric_fragment_shader, quadric_fragment_stage) =
-        create_shader(QUADRIC_FRAG, vk::ShaderStageFlags::FRAGMENT, vulkan_context)?;
-
-    let quadric_stages = [quadric_vertex_stage, quadric_fragment_stage];
 
     // Vertex input state
     let vertex_binding_description = vk::VertexInputBindingDescription::builder()
@@ -717,21 +703,7 @@ fn create_pipelines(
         .subpass(0)
         .build();
 
-    let quadric_create_info = vk::GraphicsPipelineCreateInfo::builder()
-        .stages(&quadric_stages)
-        .vertex_input_state(&vertex_input_state)
-        .input_assembly_state(&input_assembly_state)
-        .viewport_state(&viewport_state)
-        .rasterization_state(&rasterization_state)
-        .multisample_state(&multisample_state)
-        .depth_stencil_state(&depth_stencil_state)
-        .color_blend_state(&color_blend_state)
-        .layout(pipeline_layout)
-        .render_pass(render_pass)
-        .subpass(0)
-        .build();
-
-    let create_infos = [triangle_create_info, quadric_create_info];
+    let create_infos = [triangle_create_info];
 
     let pipelines = unsafe {
         vulkan_context.device.create_graphics_pipelines(
@@ -749,15 +721,9 @@ fn create_pipelines(
         vulkan_context
             .device
             .destroy_shader_module(triangle_fragment_shader, None);
-        vulkan_context
-            .device
-            .destroy_shader_module(quadric_vertex_shader, None);
-        vulkan_context
-            .device
-            .destroy_shader_module(quadric_fragment_shader, None);
     }
 
-    Ok((pipelines[0], pipelines[1]))
+    Ok(pipelines[0])
 }
 
 pub fn create_shader(

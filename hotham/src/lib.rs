@@ -12,6 +12,7 @@
 //! # Sponsoring
 //! Hotham's development is only possible thanks to the support of the community. It's currently being developed on full time by [@kanerogers](https://github.com/kanerogers) If you'd like to help make VR development in Rust possible, please [consider becoming a donor](https://github.com/sponsors/leetvr). 💗
 
+pub use ash;
 pub use ash::vk;
 pub use openxr as xr;
 

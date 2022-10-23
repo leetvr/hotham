@@ -12,7 +12,9 @@ name = "hotham_complex_scene_example"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0"
 hotham = {path = "../../hotham"}
+vk-shader-macros = "0.2.8"
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.6"

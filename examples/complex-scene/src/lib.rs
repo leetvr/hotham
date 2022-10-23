@@ -1,7 +1,9 @@
+mod custom_render_context;
 mod custom_rendering;
 mod hologram;
 mod navigation;
 
+use custom_render_context::CustomRenderContext;
 use custom_rendering::custom_rendering_system;
 use hologram::{Hologram, HologramData};
 use hotham::{
@@ -37,18 +39,29 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
+    let mut custom_render_context = CustomRenderContext::new(&mut engine);
     let mut state = Default::default();
     init(&mut engine)?;
 
     while let Ok(tick_data) = engine.update() {
-        tick(tick_data, &mut engine, &mut state);
+        tick(
+            tick_data,
+            &mut engine,
+            &mut custom_render_context,
+            &mut state,
+        );
         engine.finish()?;
     }
 
     Ok(())
 }
 
-fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
+fn tick(
+    tick_data: TickData,
+    engine: &mut Engine,
+    custom_render_context: &mut CustomRenderContext,
+    state: &mut State,
+) {
     if tick_data.current_state == xr::SessionState::FOCUSED {
         hands_system(engine);
         grabbing_system(engine);
@@ -61,7 +74,11 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         debug_system(engine);
     }
 
-    custom_rendering_system(engine, tick_data.swapchain_image_index);
+    custom_rendering_system(
+        engine,
+        custom_render_context,
+        tick_data.swapchain_image_index,
+    );
 }
 
 fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {

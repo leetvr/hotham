@@ -9,7 +9,6 @@ pub const SKINS_BINDING: u32 = 2;
 pub const SCENE_DATA_BINDING: u32 = 3;
 pub const TEXTURE_BINDING: u32 = 4;
 pub const CUBE_TEXTURE_BINDING: u32 = 5;
-pub const QUADRIC_DATA_BINDING: u32 = 6;
 
 pub const PRIMITIVE_CULL_DATA_BINDING: u32 = 0;
 pub const CULL_PARAMS_BINDING: u32 = 1;
@@ -197,14 +196,6 @@ unsafe fn create_descriptor_layouts(
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 2,
-            ..Default::default()
-        },
-        // Quadric Data
-        vk::DescriptorSetLayoutBinding {
-            binding: QUADRIC_DATA_BINDING,
-            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-            stage_flags: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-            descriptor_count: 1,
             ..Default::default()
         },
     ];

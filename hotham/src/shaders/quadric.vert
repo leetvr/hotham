@@ -10,7 +10,7 @@ layout (location = 2) out vec4 outSurfaceQTimesRayOrigin;
 layout (location = 3) out vec4 outSurfaceQTimesRayDir;
 layout (location = 4) out flat uint outInstanceIndex;
 
-layout (std430, set = 0, binding = 6) readonly buffer QuadricDataBuffer {
+layout (std430, set = 1, binding = 0) readonly buffer QuadricDataBuffer {
     QuadricData data[];
 } quadricDataBuffer;
 
