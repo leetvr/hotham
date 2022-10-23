@@ -3,7 +3,7 @@ use hotham::{
     ash,
     contexts::{render_context::create_shader, VulkanContext},
     glam::{Affine3A, Mat4, Vec4},
-    rendering::{buffer::Buffer, primitive::Primitive, resources::QuadricData, vertex::Vertex},
+    rendering::{buffer::Buffer, primitive::Primitive, vertex::Vertex},
     vk, Engine,
 };
 use std::{collections::HashMap, mem::size_of, slice};
@@ -29,6 +29,22 @@ pub struct QuadricInstance {
     pub surface_q_in_local: Mat4,
     pub bounds_q_in_local: Mat4,
     pub uv_from_local: Mat4,
+}
+
+/// Instructions on how to draw this quadric
+#[derive(Debug, Default, Clone)]
+#[repr(C, align(16))]
+pub struct QuadricData {
+    /// The transform of the parent mesh
+    pub gos_from_local: Mat4,
+    /// The quadric surface to render, x'Qx = 0
+    pub surface_q: Mat4,
+    /// The quadric bounds to limit the surface, x'Qx ≤ 0
+    pub bounds_q: Mat4,
+    /// Projects positions in globally oriented stage space into uv space for texturing
+    pub uv_from_gos: Mat4,
+    /// The ID of the material to use.
+    pub material_id: u32,
 }
 
 pub struct CustomRenderContext {

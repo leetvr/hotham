@@ -1,7 +1,9 @@
 use std::slice;
 
 use crate::{
-    custom_render_context::{CustomRenderContext, InstancedQuadricPrimitive, QuadricInstance},
+    custom_render_context::{
+        CustomRenderContext, InstancedQuadricPrimitive, QuadricData, QuadricInstance,
+    },
     hologram::Hologram,
 };
 use hotham::{
@@ -12,7 +14,7 @@ use hotham::{
     },
     glam::{Affine3A, Mat4},
     hecs::{With, World},
-    rendering::resources::{DrawData, PrimitiveCullData, QuadricData, ShaderIndex},
+    rendering::resources::{DrawData, PrimitiveCullData, ShaderIndex},
     vk, xr, Engine,
 };
 

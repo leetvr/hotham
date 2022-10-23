@@ -211,22 +211,6 @@ pub struct DrawData {
     pub skin_id: u32,
 }
 
-/// Instructions on how to draw this quadric
-#[derive(Debug, Default, Clone)]
-#[repr(C, align(16))]
-pub struct QuadricData {
-    /// The transform of the parent mesh
-    pub gos_from_local: Mat4,
-    /// The quadric surface to render, x'Qx = 0
-    pub surface_q: Mat4,
-    /// The quadric bounds to limit the surface, x'Qx ≤ 0
-    pub bounds_q: Mat4,
-    /// Projects positions in globally oriented stage space into uv space for texturing
-    pub uv_from_gos: Mat4,
-    /// The ID of the material to use.
-    pub material_id: u32,
-}
-
 /// Shader index is used for selecting the correct pipeline to render with
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
