@@ -9,10 +9,8 @@ use hotham::{
 use std::{collections::HashMap, mem::size_of, slice};
 use vk_shader_macros::include_glsl;
 
-static QUADRIC_VERT: &[u32] =
-    include_glsl!("../../hotham/src/shaders/quadric.vert", target: vulkan1_1);
-static QUADRIC_FRAG: &[u32] =
-    include_glsl!("../../hotham/src/shaders/quadric.frag", target: vulkan1_1);
+static QUADRIC_VERT: &[u32] = include_glsl!("src/shaders/quadric.vert", target: vulkan1_1);
+static QUADRIC_FRAG: &[u32] = include_glsl!("src/shaders/quadric.frag", target: vulkan1_1);
 
 // TODO: Ensure that this index doesn't collide with hotham engine internals.
 pub const QUADRIC_DATA_BINDING: u32 = 0;

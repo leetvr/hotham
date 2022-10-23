@@ -1,6 +1,6 @@
 #version 460
 
-#include "common.glsl"
+#include "../../../../hotham/src/shaders/common.glsl"
 
 layout (location = 0) in vec3 inPos;
 
@@ -10,9 +10,7 @@ layout (location = 2) out vec4 outSurfaceQTimesRayOrigin;
 layout (location = 3) out vec4 outSurfaceQTimesRayDir;
 layout (location = 4) out flat uint outInstanceIndex;
 
-layout (std430, set = 1, binding = 0) readonly buffer QuadricDataBuffer {
-    QuadricData data[];
-} quadricDataBuffer;
+#include "quadric.glsl"
 
 out gl_PerVertex {
     vec4 gl_Position;

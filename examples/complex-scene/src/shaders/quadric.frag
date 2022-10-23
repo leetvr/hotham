@@ -1,13 +1,13 @@
 #version 460
-#include "common.glsl"
-#include "lights.glsl"
-#include "brdf.glsl"
+#include "../../../../hotham/src/shaders/common.glsl"
+#include "../../../../hotham/src/shaders/lights.glsl"
+#include "../../../../hotham/src/shaders/brdf.glsl"
 
 // Textures
 layout (set = 0, binding = 4) uniform sampler2D textures[];
 layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
-#include "pbr.glsl"
+#include "../../../../hotham/src/shaders/pbr.glsl"
 
 // Inputs
 layout (location = 0) in vec4 inRayOrigin;
@@ -16,9 +16,7 @@ layout (location = 2) in vec4 inSurfaceQTimesRayOrigin;
 layout (location = 3) in vec4 inSurfaceQTimesRayDir;
 layout (location = 4) in flat uint inInstanceIndex;
 
-layout (std430, set = 1, binding = 0) readonly buffer QuadricDataBuffer {
-    QuadricData data[];
-} quadricDataBuffer;
+#include "quadric.glsl"
 
 layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
     Material materials[];
