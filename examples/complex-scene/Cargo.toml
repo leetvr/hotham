@@ -12,6 +12,7 @@ name = "hotham_complex_scene_example"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0"
 hotham = {path = "../../hotham"}
 
 [target.'cfg(target_os = "android")'.dependencies]

@@ -168,8 +168,6 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
     let command_buffer = frame.command_buffer;
     let draw_data_buffer = &mut frame.draw_data_buffer;
     draw_data_buffer.clear();
-    let quadrics_data_buffer = &mut frame.quadric_data_buffer;
-    quadrics_data_buffer.clear();
 
     let mut instance_offset = 0;
     let mut current_primitive_id = u32::MAX;

@@ -13,10 +13,8 @@ use hotham::{
     vk, xr, Engine,
 };
 
-/// Rendering system
-/// Walks through each Mesh that is Visible and renders it.
-///
-/// Advanced users may instead call [`begin`], [`draw_world`], and [`end`] manually.
+/// Custom rendering system
+/// This is run instead of the built-in rendering system in order to add rendering of Holograms/quadrics.
 pub fn custom_rendering_system(engine: &mut Engine, swapchain_image_index: usize) {
     let world = &mut engine.world;
     let vulkan_context = &mut engine.vulkan_context;

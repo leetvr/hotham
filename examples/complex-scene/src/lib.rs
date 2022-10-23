@@ -1,7 +1,9 @@
+mod custom_render_context;
 mod custom_rendering;
 mod hologram;
 mod navigation;
 
+use custom_render_context::CustomRenderContext;
 use custom_rendering::custom_rendering_system;
 use hologram::{Hologram, HologramData};
 use hotham::{
@@ -37,6 +39,7 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
+    let mut custom_rendering = CustomRenderContext::new(engine);
     let mut state = Default::default();
     init(&mut engine)?;
 

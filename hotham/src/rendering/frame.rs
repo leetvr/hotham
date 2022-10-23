@@ -7,15 +7,14 @@ use super::{
     buffer::Buffer,
     descriptors::{
         Descriptors, CULL_PARAMS_BINDING, DRAW_DATA_BINDING, PRIMITIVE_CULL_DATA_BINDING,
-        QUADRIC_DATA_BINDING, SCENE_DATA_BINDING,
+        SCENE_DATA_BINDING,
     },
-    resources::{DrawData, PrimitiveCullData, QuadricData},
+    resources::{DrawData, PrimitiveCullData},
     scene_data::SceneData,
 };
 
 // We *can* draw this many objects, but.. seriously?
 static DRAW_DATA_BUFFER_SIZE: usize = 100_000;
-static QUADRIC_DATA_BUFFER_SIZE: usize = 100_000;
 
 /// A container for all the resources necessary to render a single frame.
 #[derive(Debug, Clone)]
@@ -30,8 +29,6 @@ pub struct Frame {
     pub compute_command_buffer: vk::CommandBuffer,
     /// Data for the regular primitives that will be drawn this frame, indexed by gl_InstanceId
     pub draw_data_buffer: Buffer<DrawData>,
-    /// Data for the holographic primitives that will be drawn this frame, indexed by gl_InstanceId
-    pub quadric_data_buffer: Buffer<QuadricData>,
     /// The actual draw calls for this frame.
     pub primitive_cull_data_buffer: Buffer<PrimitiveCullData>,
     /// Shared data used in a scene
@@ -87,13 +84,6 @@ impl Frame {
             unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
         let cull_params_buffer =
             unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
-        let quadric_data_buffer = unsafe {
-            Buffer::new(
-                vulkan_context,
-                vk::BufferUsageFlags::STORAGE_BUFFER,
-                QUADRIC_DATA_BUFFER_SIZE,
-            )
-        };
 
         // Update the descriptor sets for this frame.
         unsafe {
@@ -107,11 +97,6 @@ impl Frame {
                 &vulkan_context.device,
                 descriptors.sets[index],
                 SCENE_DATA_BINDING,
-            );
-            quadric_data_buffer.update_descriptor_set(
-                &vulkan_context.device,
-                descriptors.sets[index],
-                QUADRIC_DATA_BINDING,
             );
 
             // Compute
@@ -136,7 +121,6 @@ impl Frame {
             command_buffer,
             compute_command_buffer,
             draw_data_buffer,
-            quadric_data_buffer,
             primitive_cull_data_buffer,
             scene_data_buffer,
             cull_params_buffer,
