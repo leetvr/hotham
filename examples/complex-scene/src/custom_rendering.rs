@@ -1,12 +1,13 @@
 use std::slice;
 
-use crate::{custom_render_context::CustomRenderContext, hologram::Hologram};
+use crate::{
+    custom_render_context::{CustomRenderContext, InstancedQuadricPrimitive, QuadricInstance},
+    hologram::Hologram,
+};
 use hotham::{
     components::{skin::NO_SKIN, stage, GlobalTransform, Mesh, Skin, Visible},
     contexts::{
-        render_context::{
-            Instance, InstancedPrimitive, InstancedQuadricPrimitive, QuadricInstance,
-        },
+        render_context::{Instance, InstancedPrimitive},
         RenderContext, VulkanContext,
     },
     glam::{Affine3A, Mat4},
@@ -52,11 +53,12 @@ pub(crate) fn custom_rendering_system_inner(
             world,
             vulkan_context,
             render_context,
+            custom_render_context,
             views,
             swapchain_image_index,
         );
         draw_world(vulkan_context, render_context, custom_render_context);
-        end(vulkan_context, render_context);
+        end(vulkan_context, render_context, custom_render_context);
     }
 }
 
@@ -72,6 +74,7 @@ pub unsafe fn begin(
     world: &mut World,
     vulkan_context: &VulkanContext,
     render_context: &mut RenderContext,
+    custom_render_context: &mut CustomRenderContext,
     views: &[xr::View],
     swapchain_image_index: usize,
 ) {
@@ -128,7 +131,7 @@ pub unsafe fn begin(
             // Create a transform from this primitive's local space into gos space.
             let gos_from_local = gos_from_global * global_transform.0;
 
-            render_context
+            custom_render_context
                 .quadrics_primitive_map
                 .entry(key)
                 .or_insert(InstancedQuadricPrimitive {
@@ -178,7 +181,7 @@ pub unsafe fn begin(
             });
         }
     }
-    for instanced_primitive in render_context.quadrics_primitive_map.values() {
+    for instanced_primitive in custom_render_context.quadrics_primitive_map.values() {
         let primitive = &instanced_primitive.primitive;
         for (instance, i) in instanced_primitive.instances.iter().zip(0u32..) {
             cull_data.push(&PrimitiveCullData {
@@ -257,7 +260,7 @@ pub unsafe fn draw_world(
                         );
                     }
                     ShaderIndex::Quadric => {
-                        let primitive = &render_context
+                        let primitive = &custom_render_context
                             .quadrics_primitive_map
                             .get(&current_primitive_id)
                             .unwrap()
@@ -329,7 +332,7 @@ pub unsafe fn draw_world(
                     instance_count += 1;
                 }
                 ShaderIndex::Quadric => {
-                    let instanced_primitive = render_context
+                    let instanced_primitive = custom_render_context
                         .quadrics_primitive_map
                         .get(&cull_result.index_offset)
                         .unwrap();
@@ -375,7 +378,7 @@ pub unsafe fn draw_world(
                 );
             }
             ShaderIndex::Quadric => {
-                let primitive = &render_context
+                let primitive = &custom_render_context
                     .quadrics_primitive_map
                     .get(&current_primitive_id)
                     .unwrap()
@@ -398,9 +401,13 @@ pub unsafe fn draw_world(
 /// # Safety
 ///
 /// Must be called after `begin`
-pub fn end(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
+pub fn end(
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+    custom_render_context: &mut CustomRenderContext,
+) {
     // OK. We're all done!
     render_context.triangles_primitive_map.clear();
-    render_context.quadrics_primitive_map.clear();
+    custom_render_context.quadrics_primitive_map.clear();
     render_context.end_pbr_render_pass(vulkan_context);
 }

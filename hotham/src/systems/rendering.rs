@@ -250,7 +250,6 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
 pub fn end(vulkan_context: &VulkanContext, render_context: &mut RenderContext) {
     // OK. We're all done!
     render_context.triangles_primitive_map.clear();
-    render_context.quadrics_primitive_map.clear();
     render_context.end_pbr_render_pass(vulkan_context);
 }
 

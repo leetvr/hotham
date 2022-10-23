@@ -2,10 +2,11 @@ use anyhow::Result;
 use hotham::{
     ash,
     contexts::{render_context::create_shader, VulkanContext},
-    rendering::{buffer::Buffer, resources::QuadricData, vertex::Vertex},
+    glam::{Affine3A, Mat4, Vec4},
+    rendering::{buffer::Buffer, primitive::Primitive, resources::QuadricData, vertex::Vertex},
     vk, Engine,
 };
-use std::{mem::size_of, slice};
+use std::{collections::HashMap, mem::size_of, slice};
 use vk_shader_macros::include_glsl;
 
 static QUADRIC_VERT: &[u32] =
@@ -17,6 +18,19 @@ static QUADRIC_FRAG: &[u32] =
 pub const QUADRIC_DATA_BINDING: u32 = 0;
 static QUADRIC_DATA_BUFFER_SIZE: usize = 100_000;
 
+pub struct InstancedQuadricPrimitive {
+    pub primitive: Primitive,
+    pub instances: Vec<QuadricInstance>,
+}
+
+pub struct QuadricInstance {
+    pub gos_from_local: Affine3A,
+    pub bounding_sphere: Vec4,
+    pub surface_q_in_local: Mat4,
+    pub bounds_q_in_local: Mat4,
+    pub uv_from_local: Mat4,
+}
+
 pub struct CustomRenderContext {
     /// Pipeline for drawing quadrics
     pub quadrics_pipeline: vk::Pipeline,
@@ -26,6 +40,8 @@ pub struct CustomRenderContext {
     /// Descriptors for quadrics pipeline
     pub quadrics_descriptor_set_layout: vk::DescriptorSetLayout,
     pub quadrics_descriptor_set: vk::DescriptorSet,
+
+    pub quadrics_primitive_map: HashMap<u32, InstancedQuadricPrimitive>,
 }
 
 impl CustomRenderContext {
@@ -78,6 +94,7 @@ impl CustomRenderContext {
             quadrics_data_buffer,
             quadrics_descriptor_set_layout,
             quadrics_descriptor_set,
+            quadrics_primitive_map: HashMap::default(),
         }
     }
 }
