@@ -211,17 +211,6 @@ pub struct DrawData {
     pub skin_id: u32,
 }
 
-/// Shader index is used for selecting the correct pipeline to render with
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum ShaderIndex {
-    /// Normal PBR flat triangles.
-    #[default]
-    Triangle = 0,
-    /// Holographic material with a quadric surface.
-    Quadric = 1,
-}
-
 /// Information for the culling shader on how to cull this primitive.
 #[derive(Debug, Default, Clone)]
 #[repr(C, align(16))]
@@ -230,10 +219,8 @@ pub struct PrimitiveCullData {
     pub bounding_sphere: Vec4,
     /// Index of this instance among the instances of the same primitive.
     pub index_instance: u32,
-    /// Index into the vertex buffer - used as an ID for the primitive.
-    pub index_offset: u32,
-    /// Index of the shader - used for selecting the correct shader.
-    pub index_shader: ShaderIndex,
+    /// ID for the primitive - index into the vertex buffer is currently used for this.
+    pub primitive_id: u32,
     /// The result of culling test. True if the bounding sphere is intersecting with any camera frustum.
     pub visible: bool,
 }

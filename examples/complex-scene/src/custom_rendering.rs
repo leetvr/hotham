@@ -14,9 +14,23 @@ use hotham::{
     },
     glam::{Affine3A, Mat4},
     hecs::{With, World},
-    rendering::resources::{DrawData, PrimitiveCullData, ShaderIndex},
+    rendering::resources::{DrawData, PrimitiveCullData},
     vk, xr, Engine,
 };
+
+/// Shader index is used for selecting the correct pipeline to render with
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum ShaderIndex {
+    /// Normal PBR flat triangles.
+    #[default]
+    Triangle = 0,
+    /// Holographic material with a quadric surface.
+    Quadric = 1,
+}
+
+/// The shader index is encoded in the most significant bits of the primitive id.
+const QUADRIC_FLAG: u32 = 1 << 31;
 
 /// Custom rendering system
 /// This is run instead of the built-in rendering system in order to add rendering of Holograms/quadrics.
@@ -128,7 +142,7 @@ pub unsafe fn begin(
     {
         let mesh_data = meshes.get(hologram.mesh_data_handle).unwrap();
         for primitive in &mesh_data.primitives {
-            let key = primitive.index_buffer_offset;
+            let key = primitive.index_buffer_offset | QUADRIC_FLAG;
 
             // Create a transform from this primitive's local space into gos space.
             let gos_from_local = gos_from_global * global_transform.0;
@@ -177,8 +191,7 @@ pub unsafe fn begin(
             cull_data.push(&PrimitiveCullData {
                 bounding_sphere: instance.bounding_sphere,
                 index_instance: i,
-                index_offset: primitive.index_buffer_offset,
-                index_shader: ShaderIndex::Triangle,
+                primitive_id: primitive.index_buffer_offset,
                 visible: false,
             });
         }
@@ -189,8 +202,7 @@ pub unsafe fn begin(
             cull_data.push(&PrimitiveCullData {
                 bounding_sphere: instance.bounding_sphere,
                 index_instance: i,
-                index_offset: primitive.index_buffer_offset,
-                index_shader: ShaderIndex::Quadric,
+                primitive_id: primitive.index_buffer_offset | QUADRIC_FLAG,
                 visible: false,
             });
         }
@@ -234,15 +246,18 @@ pub unsafe fn draw_world(
     let cull_data = frame.primitive_cull_data_buffer.as_slice();
 
     for cull_result in cull_data {
+        let index_shader = if cull_result.primitive_id & QUADRIC_FLAG == 0 {
+            ShaderIndex::Triangle
+        } else {
+            ShaderIndex::Quadric
+        };
         // If we haven't yet set our primitive ID, set it now.
         if current_primitive_id == u32::MAX {
-            current_primitive_id = cull_result.index_offset;
+            current_primitive_id = cull_result.primitive_id;
         }
 
         // We're finished with this primitive. Record the command and increase our offset.
-        if cull_result.index_offset != current_primitive_id
-            || cull_result.index_shader != current_shader
-        {
+        if cull_result.primitive_id != current_primitive_id || index_shader != current_shader {
             // Don't record commands for primitives which have no instances, eg. have been culled.
             if instance_count > 0 {
                 match current_shader {
@@ -279,17 +294,17 @@ pub unsafe fn draw_world(
                 };
             }
 
-            current_primitive_id = cull_result.index_offset;
+            current_primitive_id = cull_result.primitive_id;
             instance_offset += instance_count;
             instance_count = 0;
         }
 
-        if cull_result.index_shader != current_shader {
-            current_shader = cull_result.index_shader;
+        if index_shader != current_shader {
+            current_shader = index_shader;
             instance_offset = 0;
 
             // Change pipeline when we start to encounter holograms
-            if let ShaderIndex::Quadric = cull_result.index_shader {
+            if let ShaderIndex::Quadric = index_shader {
                 vulkan_context.device.cmd_bind_pipeline(
                     command_buffer,
                     vk::PipelineBindPoint::GRAPHICS,
@@ -320,7 +335,7 @@ pub unsafe fn draw_world(
                 ShaderIndex::Triangle => {
                     let instanced_primitive = render_context
                         .triangles_primitive_map
-                        .get(&cull_result.index_offset)
+                        .get(&cull_result.primitive_id)
                         .unwrap();
                     let instance =
                         &instanced_primitive.instances[cull_result.index_instance as usize];
@@ -336,7 +351,7 @@ pub unsafe fn draw_world(
                 ShaderIndex::Quadric => {
                     let instanced_primitive = custom_render_context
                         .quadrics_primitive_map
-                        .get(&cull_result.index_offset)
+                        .get(&cull_result.primitive_id)
                         .unwrap();
                     let instance =
                         &instanced_primitive.instances[cull_result.index_instance as usize];
