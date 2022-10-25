@@ -2,6 +2,7 @@
 // https://github.com/KhronosGroup/glTF-WebGL-PBR
 
 #version 460
+#extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "lights.glsl"
 #include "brdf.glsl"
@@ -61,28 +62,33 @@ void main() {
 
     // Debugging
     // Shader inputs debug visualization
-    // "none", "Base Color Texture", "Normal Texture", "Occlusion Texture", "Emissive Texture", "Metallic (?)", "Roughness (?)"
     if (sceneData.params.z > 0.0) {
         int index = int(sceneData.params.z);
         switch (index) {
+            // Base Color Texture
             case 1:
                 outColor.rgba = baseColor;
                 break;
+            // Normal
             case 2:
                 vec3 n = getNormal(material.normalTextureID);
                 outColor.rgb = n * 0.5 + 0.5;
                 break;
+            // Occlusion
             case 3:
-                outColor.rgb = (material.occlusionTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.occlusionTextureID], inUV).ggg;
+                outColor.rgb = (material.occlusionTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.occlusionTextureID], inUV).rrr;
                 break;
+            // Emission
             case 4:
                 outColor.rgb = (material.emissiveTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.emissiveTextureID], inUV).rgb;
                 break;
+            // Roughness
             case 5:
-                outColor.rgb = (material.physicalDescriptorTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.physicalDescriptorTextureID], inUV).ggg;
+                outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], inUV).ggg;
                 break;
+            // Metallic
             case 6:
-                outColor.rgb = (material.physicalDescriptorTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.physicalDescriptorTextureID], inUV).aaa;
+                outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], inUV).bbb;
                 break;
         }
         outColor = outColor;

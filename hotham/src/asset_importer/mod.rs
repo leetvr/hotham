@@ -645,7 +645,7 @@ mod tests {
                     assert_eq!(
                         (
                             material.base_color_texture_set,
-                            material.physical_descriptor_texture_id,
+                            material.metallic_roughness_texture_id,
                             material.normal_texture_set,
                             material.occlusion_texture_set
                         ),
