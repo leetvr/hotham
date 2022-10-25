@@ -41,6 +41,7 @@ pub mod util;
 
 /// Functionality used by the rendering engine
 pub mod rendering;
+mod workers;
 
 /// Hotham result type
 pub type HothamResult<T> = std::result::Result<T, HothamError>;

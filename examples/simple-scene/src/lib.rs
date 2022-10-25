@@ -59,6 +59,10 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
     ];
+    let models =
+        asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    add_hand(&models, Handedness::Left, world);
+    add_hand(&models, Handedness::Right, world);
 
     #[cfg(target_os = "android")]
     glb_buffers.push(include_bytes!(
@@ -71,8 +75,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_helmet(&models, world);
-    add_hand(&models, Handedness::Left, world);
-    add_hand(&models, Handedness::Right, world);
+    add_model_to_world("Cube", &models, world, None);
 
     Ok(())
 }
