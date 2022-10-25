@@ -1,9 +1,11 @@
 use crate::{
-    components::{GlobalTransform, LocalTransform, Parent, Stage, HMD},
+    asset_importer::{self, add_model_to_world},
+    components::{GlobalTransform, Info, LocalTransform, Parent, Stage, HMD},
     contexts::{
         AudioContext, GuiContext, HapticContext, InputContext, PhysicsContext, RenderContext,
         VulkanContext, XrContext, XrContextBuilder,
     },
+    workers::Workers,
     HothamError, HothamResult, VIEW_TYPE,
 };
 use openxr as xr;
@@ -14,7 +16,7 @@ use std::{
         Arc,
     },
     thread::sleep,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use xr::{EventDataBuffer, SessionState};
@@ -105,6 +107,7 @@ impl<'a> EngineBuilder<'a> {
             physics_context: Default::default(),
             stage_entity,
             hmd_entity,
+            workers: Default::default(),
         }
     }
 }
@@ -155,6 +158,8 @@ pub struct Engine {
     pub stage_entity: hecs::Entity,
     /// HMD entity
     pub hmd_entity: hecs::Entity,
+    /// Workers
+    workers: Workers,
 }
 
 /// The result of calling `update()` on Engine.
@@ -234,6 +239,9 @@ impl Engine {
                 _ => {}
             }
 
+            // Check to see if there are any messages from our workers:
+            self.check_for_worker_messages();
+
             let vulkan_context = &self.vulkan_context;
             let render_context = &mut self.render_context;
 
@@ -262,6 +270,70 @@ impl Engine {
             render_context.end_frame(vulkan_context);
         }
         self.xr_context.end_frame()
+    }
+
+    fn check_for_worker_messages(&mut self) -> () {
+        for message in self.workers.receiver.try_iter() {
+            match message {
+                crate::workers::WorkerMessage::AssetUpdated(asset_updated) => {
+                    let tick = Instant::now();
+                    let vulkan_context = &self.vulkan_context;
+                    let render_context = &mut self.render_context;
+                    let world = &mut self.world;
+
+                    // First, load the asset in
+                    let asset = asset_updated.asset_data;
+                    let mut scene =
+                        asset_importer::load_scene_from_glb(&asset, vulkan_context, render_context)
+                            .unwrap();
+
+                    let models = &scene.models;
+
+                    // First, then remove the existing assets:
+                    let mut command_buffer = hecs::CommandBuffer::default();
+                    for (e, info) in world.query::<&Info>().iter() {
+                        if !models.contains_key(&info.name) {
+                            continue;
+                        }
+
+                        command_buffer.despawn(e);
+                        despawn_children(world, e, &mut command_buffer);
+                    }
+                    command_buffer.run_on(world);
+
+                    // Add the models back
+                    for name in models.keys() {
+                        add_model_to_world(name, &models, world, None);
+                    }
+
+                    // Clear out the lights
+                    for (i, light) in scene.lights.drain(..).enumerate() {
+                        render_context.scene_data.lights[i] = light;
+                    }
+
+                    println!(
+                        "[HOTHAM_ASSET_HOT_RELOAD] Asset reload took {:.2} seconds",
+                        Instant::now().duration_since(tick).as_secs_f32()
+                    );
+                }
+                crate::workers::WorkerMessage::Error(e) => {
+                    panic!("[HOTHAM_ENGINE] Worker enountered error: {:?}", e);
+                }
+            }
+        }
+    }
+}
+
+fn despawn_children(
+    world: &hecs::World,
+    parent: hecs::Entity,
+    command_buffer: &mut hecs::CommandBuffer,
+) {
+    for (child, p) in world.query::<&Parent>().iter() {
+        if p.0 == parent {
+            command_buffer.despawn(child);
+            despawn_children(world, child, command_buffer);
+        }
     }
 }
 
