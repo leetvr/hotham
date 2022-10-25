@@ -39,7 +39,7 @@
 			"label": "Run a specific test",
 			"group": {
 				"kind": "test",
-				"isDefault": true
+				"isDefault": false
 			}
 		},
 		{
@@ -81,6 +81,25 @@
 				"kind": "test",
 				"isDefault": false,
 			}
-		}
+		},
+		{
+			"type": "cargo",
+			"command": "run",
+			"args": [
+				"--bin",
+				"hotham_asset_server",
+			],
+			"env": {
+				"RUST_BACKTRACE": "1"
+			},
+			"problemMatcher": [
+				"$rustc"
+			],
+			"label": "Run Hotham simple scene on the simulator",
+			"group": {
+				"kind": "test",
+				"isDefault": true,
+			}
+		},
 	]
 }
