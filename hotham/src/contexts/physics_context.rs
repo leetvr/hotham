@@ -1,4 +1,3 @@
-use crossbeam::channel::Receiver;
 use rapier3d::na::Matrix3x1;
 use rapier3d::prelude::*;
 
@@ -20,9 +19,9 @@ pub struct PhysicsContext {
     pub narrow_phase: NarrowPhase,
     pub rigid_bodies: RigidBodySet,
     pub island_manager: IslandManager,
-    pub collision_recv: Receiver<CollisionEvent>,
-    pub contact_force_recv: Receiver<ContactForceEvent>,
-    pub event_handler: ChannelEventCollector,
+    // pub collision_recv: Receiver<CollisionEvent>,
+    // pub contact_force_recv: Receiver<ContactForceEvent>,
+    // pub event_handler: ChannelEventCollector,
     pub integration_parameters: IntegrationParameters,
     pub impulse_joints: ImpulseJointSet,
     pub multibody_joints: MultibodyJointSet,
@@ -31,9 +30,7 @@ pub struct PhysicsContext {
 
 impl Default for PhysicsContext {
     fn default() -> Self {
-        let (collision_send, collision_recv) = crossbeam::channel::unbounded();
-        let (contact_force_send, contact_force_recv) = crossbeam::channel::unbounded();
-        let event_handler = ChannelEventCollector::new(collision_send, contact_force_send);
+        // let event_handler = ChannelEventCollector::new(collision_send, contact_force_send);
         let integration_parameters = IntegrationParameters {
             dt: DELTA_TIME,
             ..Default::default()
@@ -53,9 +50,9 @@ impl Default for PhysicsContext {
             narrow_phase: NarrowPhase::new(),
             rigid_bodies: RigidBodySet::new(),
             island_manager: IslandManager::new(),
-            collision_recv,
-            contact_force_recv,
-            event_handler,
+            // collision_recv,
+            // contact_force_recv,
+            // event_handler,
             integration_parameters,
             impulse_joints,
             multibody_joints,
@@ -78,7 +75,7 @@ impl PhysicsContext {
             &mut self.multibody_joints,
             &mut self.ccd_solver,
             &(),
-            &self.event_handler,
+            &(),
         );
 
         self.query_pipeline
