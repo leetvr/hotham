@@ -32,9 +32,9 @@ pub struct State {
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
-    println!("[HOTHAM_COMPLEX_SCENE] MAIN!");
+    println!("[HOTHAM_CUSTOM_RENDERING_EXAMPLE] MAIN!");
     real_main().expect("Error running app!");
-    println!("[HOTHAM_COMPLEX_SCENE] FINISHED! Goodbye!");
+    println!("[HOTHAM_CUSTOM_RENDERING_EXAMPLE] FINISHED! Goodbye!");
 }
 
 pub fn real_main() -> HothamResult<()> {

@@ -1,14 +1,14 @@
 [package]
 edition = "2018"
 license = "MIT OR Apache-2.0"
-name = "complex-scene-example"
+name = "custom-rendering-example"
 version = "0.2.0"
 
 [lib]
 crate-type = ["lib", "cdylib"]
 
 [[bin]]
-name = "hotham_complex_scene_example"
+name = "hotham_custom_rendering_example"
 path = "src/main.rs"
 
 [dependencies]
@@ -18,14 +18,14 @@ hotham = {path = "../../hotham"}
 ndk-glue = "0.6"
 
 [package.metadata.android]
-apk_label = "Hotham Complex Scene Example"
+apk_label = "Hotham Custom Rendering Example"
 fullscreen = true
 runtime_libs = "../common_lib"
 target_sdk_version = 29
 
 [package.metadata.android.application]
 debuggable = true
-label = "Hotham Complex Scene Example"
+label = "Hotham Custom Rendering Example"
 theme = "@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
 
 [package.metadata.android.application.activity]
