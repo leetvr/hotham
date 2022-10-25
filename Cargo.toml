@@ -1,13 +1,15 @@
 [workspace]
 members = [
-    "hotham",
-    "hotham-simulator",
-    "examples/shared",
-    "examples/simple-scene",
-    "examples/complex-scene",
-    "examples/custom-rendering",
-    "examples/crab-saber",
-    "benchmarks/stress-test",
+  "hotham",
+  "hotham-simulator",
+  "examples/shared",
+  "examples/complex-scene",
+  "examples/simple-scene",
+  "examples/complex-scene",
+  "examples/crab-saber",
+  "benchmarks/stress-test",
+  "hotham-asset-server",
+  "hotham-asset-client",
 ]
 
 # Make performance critical packages compile with optimizations
