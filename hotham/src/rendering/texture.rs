@@ -30,10 +30,8 @@ pub enum TextureUsage {
     Normal,
     /// The color and intensity of the light being emitted by the material
     Emission,
-    /// The metalness and roughness of the material
-    MetallicRoughness,
-    /// Indicates areas that receive less less indirect light from ambient sources
-    Occlusion,
+    /// The occlusion (red) roughness (green) and metalness (blue) of the material
+    MetallicRoughnessOcclusion,
     /// Indicates this texture is used for Image Based Lighting (IBL)
     IBL,
     /// A non PBR texture
@@ -303,18 +301,6 @@ fn get_component_mapping(
             g: vk::ComponentSwizzle::R,
             b: vk::ComponentSwizzle::ZERO,
             a: vk::ComponentSwizzle::G,
-        },
-        (true, TextureUsage::MetallicRoughness) => vk::ComponentMapping {
-            r: vk::ComponentSwizzle::ZERO,
-            g: vk::ComponentSwizzle::G,
-            b: vk::ComponentSwizzle::ZERO,
-            a: vk::ComponentSwizzle::B,
-        },
-        (true, TextureUsage::Occlusion) => vk::ComponentMapping {
-            r: vk::ComponentSwizzle::ZERO,
-            g: vk::ComponentSwizzle::R,
-            b: vk::ComponentSwizzle::ZERO,
-            a: vk::ComponentSwizzle::ZERO,
         },
         _ => DEFAULT_COMPONENT_MAPPING,
     }

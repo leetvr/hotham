@@ -11,7 +11,7 @@ struct Material {
     vec4 baseColorFactor;
     uint workflow;
     uint baseColorTextureID;
-    uint physicalDescriptorTextureID;
+    uint metallicRoughnessTextureID;
     uint normalTextureID;
     uint occlusionTextureID;
     uint emissiveTextureID;
@@ -152,26 +152,28 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     float perceptualRoughness = material.roughnessFactor;
     float metalness = material.metallicFactor;
 
-    if (material.physicalDescriptorTextureID == NOT_PRESENT) {
+    if (material.metallicRoughnessTextureID == NOT_PRESENT) {
         perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
         metalness = clamp(metalness, 0., 1.0);
     } else {
-        // Roughness is stored in the 'g' channel, metallic is stored in the 'a' channel, as per
-        // https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
-        vec4 mrSample = texture(textures[material.physicalDescriptorTextureID], inUV);
+        // As per the glTF spec:
+        // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
+        // Its green channel contains roughness values and its blue channel contains metalness values.
+        vec4 mrSample = texture(textures[material.metallicRoughnessTextureID], inUV);
 
-        // Roughness is authored as perceptual roughness; as is convention,
-        // convert to material roughness by squaring the perceptual roughness [2].
-        perceptualRoughness = mrSample.g * perceptualRoughness;
-        metalness = mrSample.a * metalness;
+        perceptualRoughness = clamp(mrSample.g * perceptualRoughness, 0.0, 1.0);
+        metalness = clamp(mrSample.b * metalness, 0.0, 1.0);
     }
 
-    // Get the diffuse colour
+    // Get the diffuse color
     vec3 f0 = mix(vec3(0.4), baseColor.rgb, metalness);
     vec3 diffuseColor = mix(baseColor.rgb, vec3(0.), metalness);
 
-    // Roughness, specular color
+    // Roughness is authored as perceptual roughness; as is convention,
+    // convert to material roughness by squaring the perceptual roughness
     float alphaRoughness = perceptualRoughness * perceptualRoughness;
+
+    // Get specular color
     vec3 specularColor = mix(f0, baseColor.rgb, metalness);
 
     // Get the view vector - from surface point to camera
@@ -198,9 +200,8 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
 
     // Apply ambient occlusion, if present.
     if (material.occlusionTextureID != NOT_PRESENT) {
-        // Occlusion is stored in the 'g' channel as per:
-        // https://github.com/ARM-software/astc-encoder/blob/main/Docs/Encoding.md#encoding-1-4-component-data
-        float ao = texture(textures[material.occlusionTextureID], inUV).g;
+        // Occlusion is stored in the 'r' channel as per the glTF spec
+        float ao = texture(textures[material.occlusionTextureID], inUV).r;
         color = color * ao;
     }
 
