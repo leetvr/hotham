@@ -1,0 +1,16 @@
+[package]
+edition = "2021"
+name = "hotham-asset-client"
+version = "0.1.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0"
+futures-util = {version = "0.3.11", default-features = false}
+quinn = {version = "0.8.5", features = ["tls-rustls"]}
+rustls = {version = "0.20.3", features = ["dangerous_configuration", "quic"]}
+tokio = {version = "1.0.1", default-features = false, features = ["sync"]}
+
+[dev-dependencies]
+tokio = {version = "1.0.1", default-features = false, features = ["rt"]}
