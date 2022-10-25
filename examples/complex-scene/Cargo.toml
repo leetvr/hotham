@@ -13,7 +13,6 @@ path = "src/main.rs"
 
 [dependencies]
 hotham = {path = "../../hotham"}
-vk-shader-macros = "0.2.8"
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.6"

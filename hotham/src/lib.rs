@@ -16,6 +16,7 @@ pub use ash;
 pub use anyhow;
 pub use ash::vk;
 pub use openxr as xr;
+pub use vk_shader_macros;
 
 pub use engine::{Engine, EngineBuilder, TickData};
 pub use glam;
