@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 hotham = {path = "../../hotham"}
+hotham-examples = {path = "../shared"}
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.6"

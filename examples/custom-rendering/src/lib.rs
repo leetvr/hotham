@@ -1,5 +1,3 @@
-pub mod navigation;
-
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{hand::Handedness, physics::SharedShape, Collider, Grabbable, LocalTransform},
@@ -12,15 +10,7 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
-use navigation::navigation_system;
-
-#[derive(Clone, Debug, Default)]
-/// The state is used for manipulating the stage transform
-pub struct State {
-    global_from_left_grip: Option<glam::Affine3A>,
-    global_from_right_grip: Option<glam::Affine3A>,
-    scale: Option<f32>,
-}
+use hotham_examples::navigation::{navigation_system, State};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
