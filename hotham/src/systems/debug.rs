@@ -27,7 +27,7 @@ pub fn debug_system(engine: &mut Engine) {
 
     if input_context.right.a_button_just_pressed() {
         let params = &mut render_context.scene_data.params;
-        params.x = ((params.x - 0.1) % 5.) as f32;
+        params.x = ((params.x + 5. - 0.1) % 5.) as f32;
         println!("[HOTHAM_DEBUG] params.x is now {}", params.x);
     }
 }
