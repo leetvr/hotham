@@ -7,10 +7,12 @@
 
 // The following equation models the Fresnel reflectance term of the spec equation (aka F())
 // Implementation of fresnel from [4], Equation 15
-
 const float M_PI = 3.141592653589793;
 
-vec3 F_Schlick(vec3 f0, vec3 f90, float VdotH) {
+// Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th edition on page 325.
+const vec3 f90 = vec3(1.0);
+
+vec3 F_Schlick(vec3 f0, float VdotH) {
     return f0 + (f90 - f0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
 }
 
@@ -42,14 +44,14 @@ float D_GGX(float NdotH, float alphaRoughness) {
 }
 
 //https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-vec3 BRDF_lambertian(vec3 f0, vec3 f90, vec3 diffuseColor, float VdotH) {
+vec3 BRDF_lambertian(vec3 f0, vec3 diffuseColor, float VdotH) {
     // see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
-    return (1.0 - F_Schlick(f0, f90, VdotH)) * (diffuseColor / M_PI);
+    return (1.0 - F_Schlick(f0, VdotH)) * (diffuseColor / M_PI);
 }
 
 //  https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-vec3 BRDF_specularGGX(vec3 f0, vec3 f90, float alphaRoughness, float VdotH, float NdotL, float NdotV, float NdotH) {
-    vec3 F = F_Schlick(f0, f90, VdotH);
+vec3 BRDF_specularGGX(vec3 f0, float alphaRoughness, float VdotH, float NdotL, float NdotV, float NdotH) {
+    vec3 F = F_Schlick(f0, VdotH);
     float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
     float D = D_GGX(NdotH, alphaRoughness);
 

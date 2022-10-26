@@ -21,12 +21,12 @@ pub static NO_MATERIAL: usize = 0;
 pub struct Material {
     /// The base color of the material
     pub base_color_factor: Vec4,
-    /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for Specular Glossiness / 2.0 for unlit
+    /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
     pub workflow: u32,
     /// The base color texture.
     pub base_color_texture_set: u32,
     /// The metallic-roughness texture.
-    pub physical_descriptor_texture_id: u32,
+    pub metallic_roughness_texture_id: u32,
     /// Normal texture
     pub normal_texture_set: u32,
     /// Occlusion texture set
@@ -64,7 +64,13 @@ impl Material {
         // Metallic Roughness
         let metallic_roughness_texture_info = pbr_metallic_roughness.metallic_roughness_texture();
         let metallic_roughness_texture_set = metallic_roughness_texture_info
-            .map(|i| Texture::load(i.texture(), TextureUsage::MetallicRoughness, import_context))
+            .map(|i| {
+                Texture::load(
+                    i.texture(),
+                    TextureUsage::MetallicRoughnessOcclusion,
+                    import_context,
+                )
+            })
             .unwrap_or(NO_TEXTURE);
 
         // Normal map
@@ -74,10 +80,34 @@ impl Material {
             .unwrap_or(NO_TEXTURE);
 
         // Occlusion
-        let occlusion_texture_info = material.occlusion_texture();
-        let occlusion_texture_set = occlusion_texture_info
-            .map(|i| Texture::load(i.texture(), TextureUsage::Occlusion, import_context))
-            .unwrap_or(NO_TEXTURE);
+
+        // This is a little tricky. The common case is that occlusion is packed into the red channel of the metallic roughness texture,
+        // but we need to allow for the (unlikely, but still possible) case where it has its own texture.
+        //
+        // see: https://github.com/leetvr/hotham/issues/395
+        let occlusion_texture_set = if let Some(occlusion_texture_info) =
+            material.occlusion_texture()
+        {
+            // This is.. quite ugly.
+            if Some(occlusion_texture_info.texture().source().index())
+                == material
+                    .pbr_metallic_roughness()
+                    .metallic_roughness_texture()
+                    .map(|t| t.texture().source().index())
+            {
+                metallic_roughness_texture_set
+            } else {
+                // This is pretty suboptimal. Warn the developer.
+                println!("[HOTHAM_TEXTURE] It looks like you're storing occlusion in a separate image. For best performance, combine it with the MetallicRoughness image");
+                Texture::load(
+                    occlusion_texture_info.texture(),
+                    TextureUsage::MetallicRoughnessOcclusion,
+                    import_context,
+                )
+            }
+        } else {
+            NO_TEXTURE
+        };
 
         // Emission
         let emissive_texture_info = material.emissive_texture();
@@ -109,7 +139,7 @@ impl Material {
             base_color_factor,
             workflow,
             base_color_texture_set,
-            physical_descriptor_texture_id: metallic_roughness_texture_set,
+            metallic_roughness_texture_id: metallic_roughness_texture_set,
             normal_texture_set,
             occlusion_texture_set,
             emissive_texture_set,
@@ -144,7 +174,7 @@ impl Material {
             base_color_factor: [1., 1., 1., 1.].into(),
             workflow: METALLIC_ROUGHNESS_WORKFLOW,
             base_color_texture_set: NO_TEXTURE,
-            physical_descriptor_texture_id: NO_TEXTURE,
+            metallic_roughness_texture_id: NO_TEXTURE,
             normal_texture_set: NO_TEXTURE,
             occlusion_texture_set: NO_TEXTURE,
             emissive_texture_set: NO_TEXTURE,

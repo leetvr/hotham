@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use super::light::{Light, MAX_LIGHTS};
 
 /// The amount of Image Based Lighting (IBL) to show in the scene
-pub const DEFAULT_IBL_INTENSITY: f32 = 0.4;
+pub const DEFAULT_IBL_INTENSITY: f32 = 1.0;
 
 /// Data about the current scene. Sent to the vertex and fragment shaders
 #[derive(Deserialize, Serialize, Clone, Debug, Copy)]
