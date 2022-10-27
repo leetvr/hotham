@@ -13,7 +13,7 @@ use std::{collections::HashMap, mem::size_of, slice};
 static QUADRIC_VERT: &[u32] = include_glsl!("src/shaders/quadric.vert", target: vulkan1_1);
 static QUADRIC_FRAG: &[u32] = include_glsl!("src/shaders/quadric.frag", target: vulkan1_1);
 
-// TODO: Ensure that this index doesn't collide with hotham engine internals.
+// This index doesn't collide with hotham engine internals because it points into a new descriptor set.
 pub const QUADRIC_DATA_BINDING: u32 = 0;
 static QUADRIC_DATA_BUFFER_SIZE: usize = 100_000;
 
