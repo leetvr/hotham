@@ -8,7 +8,7 @@
 layout (set = 0, binding = 4) uniform sampler2D textures[];
 layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
-#include "../../../../hotham/src/shaders/pbr.glsl"
+#include "pbr.glsl"
 
 // Inputs
 layout (location = 0) in vec4 inRayOrigin;
