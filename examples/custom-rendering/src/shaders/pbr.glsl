@@ -1,10 +1,9 @@
-#define DEFAULT_EXPOSURE 1.0
 #define DEFAULT_IBL_SCALE 0.4
 #define DEFAULT_CUBE_MIPMAP_LEVELS 10
 #define BRDF_LUT_TEXTURE_ID 0
 #define SAMPLER_IRRADIANCE_TEXTURE_ID 0
 #define ENVIRONMENT_MAP_TEXTURE_ID 1
-#define ERROR_MAGENTA vec4(1., 0., 1., 1.)
+#define ERROR_MAGENTA f16vec4(1., 0., 1., 1.)
 
 struct Material {
     vec4 baseColorFactor;
@@ -28,74 +27,68 @@ const vec3 DEFAULT_F0 = vec3(0.04);
 
 // Fast approximation of ACES tonemap
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-vec3 toneMapACES_Narkowicz(vec3 color) {
-    const float A = 2.51;
-    const float B = 0.03;
-    const float C = 2.43;
-    const float D = 0.59;
-    const float E = 0.14;
-    return clamp((color * (A * color + B)) / (color * (C * color + D) + E), 0.0, 1.0);
-}
-
-vec3 tonemap(vec3 color) {
-    color *= DEFAULT_EXPOSURE;
-    color = toneMapACES_Narkowicz(color.rgb);
-    return color;
+f16vec3 tonemap(f16vec3 color) {
+    const float16_t A = float16_t(2.51);
+    const float16_t B = float16_t(0.03);
+    const float16_t C = float16_t(2.43);
+    const float16_t D = float16_t(0.59);
+    const float16_t E = float16_t(0.14);
+    return clamp((color * (A * color + B)) / (color * (C * color + D) + E), float16_t(0.0), float16_t(1.0));
 }
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
-vec3 getIBLContribution(vec3 F0, float perceptualRoughness, vec3 diffuseColor, vec3 reflection, float NdotV) {
-    float lod = perceptualRoughness * float(DEFAULT_CUBE_MIPMAP_LEVELS - 1);
+f16vec3 getIBLContribution(f16vec3 F0, float16_t perceptualRoughness, f16vec3 diffuseColor, f16vec3 reflection, float16_t NdotV) {
+    float16_t lod = perceptualRoughness * float16_t(DEFAULT_CUBE_MIPMAP_LEVELS - 1);
 
-    vec2 brdfSamplePoint = clamp(vec2(NdotV, perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-    vec2 f_ab = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rg;
+    f16vec2 brdfSamplePoint = clamp(f16vec2(NdotV, perceptualRoughness), f16vec2(0.0, 0.0), f16vec2(1.0, 1.0));
+    f16vec2 f_ab = f16vec2(texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rg);
 
-    vec3 specularLight = textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb;
+    f16vec3 specularLight = f16vec3(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb);
 
     // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
     // Roughness dependent fresnel, from Fdez-Aguera
-    vec3 Fr = max(vec3(1.0 - perceptualRoughness), F0) - F0;
-    vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
-    vec3 FssEss = k_S * f_ab.x + f_ab.y;
+    f16vec3 Fr = max(f16vec3(1.0 - perceptualRoughness), F0) - F0;
+    f16vec3 k_S = F0 + Fr * pow(float16_t(1.0) - NdotV, float16_t(5.0));
+    f16vec3 FssEss = k_S * f_ab.x + f_ab.y;
 
-    vec3 specular = specularLight * FssEss;
+    f16vec3 specular = specularLight * FssEss;
 
     // Multiple scattering, from Fdez-Aguera
-    vec3 diffuseLight = textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).rgb;
-    float Ems = (1.0 - (f_ab.x + f_ab.y));
-    vec3 F_avg = F0 + (1.0 - F0) / 21.0;
-    vec3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
-    vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms); // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
+    f16vec3 diffuseLight = f16vec3(textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).rgb);
+    float16_t Ems = (float16_t(1.0) - (f_ab.x + f_ab.y));
+    f16vec3 F_avg = F0 + (float16_t(1.0) - F0) / float16_t(21.0);
+    f16vec3 FmsEms = Ems * FssEss * F_avg / (float16_t(1.0) - F_avg * Ems);
+    f16vec3 k_D = diffuseColor * (float16_t(1.0) - FssEss + FmsEms); // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
 
-    vec3 diffuse = (FmsEms + k_D) * diffuseLight;
+    f16vec3 diffuse = (FmsEms + k_D) * diffuseLight;
 
     return diffuse + specular;
 }
 
-vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3 p, vec3 n, vec3 v, float NdotV, Light light) {
+f16vec3 getLightContribution(f16vec3 F0, float16_t alphaRoughness, f16vec3 diffuseColor, f16vec3 p, f16vec3 n, f16vec3 v, float16_t NdotV, Light light) {
     // Get a vector between this point and the light.
-    vec3 pointToLight;
+    f16vec3 pointToLight;
     if (light.type != LightType_Directional) {
-        pointToLight = light.position - p;
+        pointToLight = f16vec3(light.position - p);
     } else {
-        pointToLight = -light.direction;
+        pointToLight = -f16vec3(light.direction);
     }
 
-    vec3 l = normalize(pointToLight);
-    vec3 h = normalize(l + v);  // Half vector between both l and v
+    f16vec3 l = normalize(pointToLight);
+    f16vec3 h = normalize(l + v);  // Half vector between both l and v
 
-    float NdotL = clamp(dot(n, l), 0.0, 1.0);
-    float NdotH = clamp(dot(n, h), 0.0, 1.0);
-    float VdotH = clamp(dot(v, h), 0.0, 1.0);
+    float16_t NdotL = clamp(dot(n, l), float16_t(0.0), float16_t(1.0));
+    float16_t NdotH = clamp(dot(n, h), float16_t(0.0), float16_t(1.0));
+    float16_t VdotH = clamp(dot(v, h), float16_t(0.0), float16_t(1.0));
 
-    vec3 color;
+    f16vec3 color;
 
     if (NdotL > 0. || NdotV > 0.) {
-        vec3 intensity = getLightIntensity(light, pointToLight);
+        f16vec3 intensity = getLightIntensity(light, pointToLight);
 
         // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-        vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(F0, diffuseColor, VdotH);
-        vec3 specContrib = intensity * NdotL * BRDF_specularGGX(F0, alphaRoughness, VdotH, NdotL, NdotV, NdotH);
+        f16vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(F0, diffuseColor, VdotH);
+        f16vec3 specContrib = intensity * NdotL * BRDF_specularGGX(F0, alphaRoughness, VdotH, NdotL, NdotV, NdotH);
 
         // Finally, combine the diffuse and specular contributions
         color = diffuseContrib + specContrib;
@@ -104,56 +97,56 @@ vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3
     return color;
 }
 
-vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor, vec3 p, vec3 n, vec2 uv) {
-
+f16vec3 getPBRMetallicRoughnessColor(Material material, f16vec4 baseColor, f16vec3 p, f16vec3 n, f16vec2 uv) {
     // Metallic and Roughness material properties are packed together
     // In glTF, these factors can be specified by fixed scalar values
     // or from a metallic-roughness map
-    float perceptualRoughness = material.roughnessFactor;
-    float metalness = material.metallicFactor;
+    float16_t perceptualRoughness = float16_t(material.roughnessFactor);
+    float16_t metalness = float16_t(material.metallicFactor);
 
     if (material.metallicRoughnessTextureID == NOT_PRESENT) {
-        perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
-        metalness = clamp(metalness, 0., 1.0);
+        perceptualRoughness = clamp(perceptualRoughness, float16_t(0.), float16_t(1.0));
+        metalness = clamp(metalness, float16_t(0.), float16_t(1.0));
     } else {
         // As per the glTF spec:
         // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
         // Its green channel contains roughness values and its blue channel contains metalness values.
-        vec4 mrSample = texture(textures[material.metallicRoughnessTextureID], uv);
+        // TODO: Use f16vec2 for this since only red and green is used.
+        f16vec4 mrSample = f16vec4(texture(textures[material.metallicRoughnessTextureID], uv));
 
-        perceptualRoughness = clamp(mrSample.g * perceptualRoughness, 0.0, 1.0);
-        metalness = clamp(mrSample.b * metalness, 0.0, 1.0);
+        perceptualRoughness = clamp(mrSample.g * perceptualRoughness, float16_t(0.0), float16_t(1.0));
+        metalness = clamp(mrSample.b * metalness, float16_t(0.0), float16_t(1.0));
     }
 
     // Get this material's f0
-    vec3 f0 = mix(vec3(DEFAULT_F0), baseColor.rgb, metalness);
+    f16vec3 f0 = mix(f16vec3(DEFAULT_F0), baseColor.rgb, metalness);
 
     // Get the diffuse color
-    vec3 diffuseColor = mix(baseColor.rgb, vec3(0.), metalness);
+    f16vec3 diffuseColor = mix(baseColor.rgb, f16vec3(0.), metalness);
 
     // Roughness is authored as perceptual roughness; as is convention,
     // convert to material roughness by squaring the perceptual roughness
-    float alphaRoughness = perceptualRoughness * perceptualRoughness;
+    float16_t alphaRoughness = perceptualRoughness * perceptualRoughness;
 
     // Get the view vector - from surface point to camera
-    vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - p);
+    f16vec3 v = normalize(f16vec3(sceneData.cameraPosition[gl_ViewIndex].xyz - p));
 
     // Get NdotV and reflection
-    float NdotV = clamp(abs(dot(n, v)), 0., 1.0);
-    vec3 reflection = normalize(reflect(-v, n));
+    float16_t NdotV = clamp(abs(dot(n, v)), float16_t(0.), float16_t(1.0));
+    f16vec3 reflection = normalize(reflect(-v, n));
 
     // Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
-    vec3 color;
+    f16vec3 color;
     if (sceneData.params.x > 0.) {
-        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * sceneData.params.x;
+        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * float16_t(sceneData.params.x);
     } else {
-        color = vec3(0.);
+        color = f16vec3(0.);
     }
 
     // Apply ambient occlusion, if present.
     if (material.occlusionTextureID != NOT_PRESENT) {
         // Occlusion is stored in the 'r' channel as per the glTF spec
-        float ao = texture(textures[material.occlusionTextureID], uv).r;
+        float16_t ao = float16_t(texture(textures[material.occlusionTextureID], uv).r);
         color = color * ao;
     }
 
@@ -175,8 +168,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor, vec3 p, vec
 
     // Add emission, if present
     if (material.emissiveTextureID != NOT_PRESENT) {
-        vec3 emissive = texture(textures[material.emissiveTextureID], uv).rgb;
-        color += emissive;
+        color += f16vec3(texture(textures[material.emissiveTextureID], uv).rgb);
     }
 
     return color;

@@ -2,6 +2,7 @@
 // https://github.com/KhronosGroup/glTF-WebGL-PBR
 
 #version 460
+
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "lights.glsl"
@@ -28,18 +29,18 @@ layout (location = 0) out vec4 outColor;
 
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
-    outColor = ERROR_MAGENTA;
+    f16vec4 color = ERROR_MAGENTA;
 
     // Retrieve the material from the buffer.
     Material material = materialBuffer.materials[inMaterialID];
 
     // Determine the base color
-    vec4 baseColor;
+    f16vec4 baseColor;
 
     if (material.baseColorTextureID == NOT_PRESENT) {
-        baseColor = material.baseColorFactor;
+        baseColor = f16vec4(material.baseColorFactor);
     } else {
-        baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
+        baseColor = f16vec4(texture(textures[material.baseColorTextureID], inUV)) * f16vec4(material.baseColorFactor);
     }
 
     // Handle transparency
@@ -52,13 +53,13 @@ void main() {
 
     // Choose the correct workflow for this material
     if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor);
+        color.rgb = getPBRMetallicRoughnessColor(material, baseColor);
     } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
-        outColor = baseColor;
+        color = baseColor;
     }
 
     // Finally, tonemap the color.
-    outColor.rgb = tonemap(outColor.rgb);
+    outColor.rgb = vec3(tonemap(color.rgb));
 
     // Debugging
     // Shader inputs debug visualization
@@ -71,8 +72,7 @@ void main() {
                 break;
             // Normal
             case 2:
-                vec3 n = getNormal(material.normalTextureID);
-                outColor.rgb = n * 0.5 + 0.5;
+                outColor.rgb = vec3(getNormal(material.normalTextureID)) * 0.5 + 0.5;
                 break;
             // Occlusion
             case 3:
@@ -91,6 +91,5 @@ void main() {
                 outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], inUV).bbb;
                 break;
         }
-        outColor = outColor;
     }
 }

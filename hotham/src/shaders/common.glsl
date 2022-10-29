@@ -2,6 +2,12 @@
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_multiview : enable
 
+// // Allows us to use float16_t for arithmetic purposes.
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+
+// // Allows us to use int16_t, uint16_t and float16_t for buffers.
+#extension GL_EXT_shader_16bit_storage : require
+
 #define NOT_PRESENT 4294967295
 #define MAX_JOINTS 64
 

@@ -7,13 +7,13 @@
 
 // The following equation models the Fresnel reflectance term of the spec equation (aka F())
 // Implementation of fresnel from [4], Equation 15
-const float M_PI = 3.141592653589793;
+const float16_t M_PI = float16_t(3.141592653589793);
 
 // Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th edition on page 325.
-const vec3 f90 = vec3(1.0);
+const f16vec3 f90 = f16vec3(1.0);
 
-vec3 F_Schlick(vec3 f0, float VdotH) {
-    return f0 + (f90 - f0) * pow(clamp(1.0 - VdotH, 0.0, 1.0), 5.0);
+f16vec3 F_Schlick(f16vec3 f0, float16_t VdotH) {
+    return f0 + (f90 - f0) * pow(clamp(float16_t(1.0) - VdotH, float16_t(0.0), float16_t(1.0)), float16_t(5.0));
 }
 
 // Smith Joint GGX
@@ -21,39 +21,39 @@ vec3 F_Schlick(vec3 f0, float VdotH) {
 // see Eric Heitz. 2014. Understanding the Masking-Shadowing Function in Microfacet-Based BRDFs. Journal of Computer Graphics Techniques, 3
 // see Real-Time Rendering. Page 331 to 336.
 // see https://google.github.io/filament/Filament.md.html#materialsystem/specularbrdf/geometricshadowing(specularg)
-float V_GGX(float NdotL, float NdotV, float alphaRoughness) {
-    float alphaRoughnessSq = alphaRoughness * alphaRoughness;
+float16_t V_GGX(float16_t NdotL, float16_t NdotV, float16_t alphaRoughness) {
+    float16_t alphaRoughnessSq = alphaRoughness * alphaRoughness;
 
-    float GGXV = NdotL * sqrt(NdotV * NdotV * (1.0 - alphaRoughnessSq) + alphaRoughnessSq);
-    float GGXL = NdotV * sqrt(NdotL * NdotL * (1.0 - alphaRoughnessSq) + alphaRoughnessSq);
+    float16_t GGXV = NdotL * sqrt(NdotV * NdotV * (float16_t(1.0) - alphaRoughnessSq) + alphaRoughnessSq);
+    float16_t GGXL = NdotV * sqrt(NdotL * NdotL * (float16_t(1.0) - alphaRoughnessSq) + alphaRoughnessSq);
 
-    float GGX = GGXV + GGXL;
+    float16_t GGX = GGXV + GGXL;
     if (GGX > 0.0) {
-        return 0.5 / GGX;
+        return float16_t(0.5) / GGX;
     }
-    return 0.0;
+    return float16_t(0.0);
 }
 
 // The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
 // Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
 // Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
-float D_GGX(float NdotH, float alphaRoughness) {
-    float alphaRoughnessSq = alphaRoughness * alphaRoughness;
-    float f = (NdotH * NdotH) * (alphaRoughnessSq - 1.0) + 1.0;
+float16_t D_GGX(float16_t NdotH, float16_t alphaRoughness) {
+    float16_t alphaRoughnessSq = alphaRoughness * alphaRoughness;
+    float16_t f = (NdotH * NdotH) * (alphaRoughnessSq - float16_t(1.0)) + float16_t(1.0);
     return alphaRoughnessSq / (M_PI * f * f);
 }
 
 //https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-vec3 BRDF_lambertian(vec3 f0, vec3 diffuseColor, float VdotH) {
+f16vec3 BRDF_lambertian(f16vec3 f0, f16vec3 diffuseColor, float16_t VdotH) {
     // see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
-    return (1.0 - F_Schlick(f0, VdotH)) * (diffuseColor / M_PI);
+    return (float16_t(1.0) - F_Schlick(f0, VdotH)) * (diffuseColor / M_PI);
 }
 
 //  https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-vec3 BRDF_specularGGX(vec3 f0, float alphaRoughness, float VdotH, float NdotL, float NdotV, float NdotH) {
-    vec3 F = F_Schlick(f0, VdotH);
-    float Vis = V_GGX(NdotL, NdotV, alphaRoughness);
-    float D = D_GGX(NdotH, alphaRoughness);
+f16vec3 BRDF_specularGGX(f16vec3 f0, float16_t alphaRoughness, float16_t VdotH, float16_t NdotL, float16_t NdotV, float16_t NdotH) {
+    f16vec3 F = F_Schlick(f0, VdotH);
+    float16_t Vis = V_GGX(NdotL, NdotV, alphaRoughness);
+    float16_t D = D_GGX(NdotH, alphaRoughness);
 
     return F * Vis * D;
 }

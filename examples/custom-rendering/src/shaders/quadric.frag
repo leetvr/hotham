@@ -28,9 +28,6 @@ layout (location = 0) out vec4 outColor;
 layout (depth_less) out float gl_FragDepth;
 
 void main() {
-    // Start by setting the output color to a familiar "error" magenta.
-    outColor = ERROR_MAGENTA;
-
     // Retrieve draw data
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
@@ -97,12 +94,12 @@ void main() {
     Material material = materialBuffer.materials[d.materialID];
 
     // Determine the base color
-    vec4 baseColor;
+    f16vec4 baseColor;
 
     if (material.baseColorTextureID == NOT_PRESENT) {
-        baseColor = material.baseColorFactor;
+        baseColor = f16vec4(material.baseColorFactor);
     } else {
-        baseColor = texture(textures[material.baseColorTextureID], uv) * material.baseColorFactor;
+        baseColor = f16vec4(texture(textures[material.baseColorTextureID], uv) * material.baseColorFactor);
     }
 
     // Handle transparency
@@ -113,15 +110,18 @@ void main() {
         }
     }
 
+    // Start by setting the output color to a familiar "error" magenta.
+    f16vec4 color = ERROR_MAGENTA;
+
     // Choose the correct workflow for this material
     if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor, hitPoint.xyz, normal, uv);
+        color.rgb = getPBRMetallicRoughnessColor(material, baseColor, f16vec3(hitPoint.xyz), f16vec3(normal), f16vec2(uv));
     } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
-        outColor = baseColor;
+        color = baseColor;
     }
 
     // Finally, tonemap the color.
-    outColor.rgb = tonemap(outColor.rgb);
+    outColor.rgb = vec3(tonemap(color.rgb));
 
     // Debugging
     // Shader inputs debug visualization
