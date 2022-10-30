@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use crate::{
     components::{skin::NO_SKIN, stage, GlobalTransform, Mesh, Skin, Visible},
     contexts::VulkanContext,
@@ -131,11 +129,11 @@ pub unsafe fn begin(
 
     for instanced_primitive in render_context.primitive_map.values() {
         let primitive = &instanced_primitive.primitive;
-        for (i, instance) in instanced_primitive.instances.iter().enumerate() {
+        for (instance, i) in instanced_primitive.instances.iter().zip(0u32..) {
             cull_data.push(&PrimitiveCullData {
-                index_instance: i.try_into().unwrap(),
-                index_offset: primitive.index_buffer_offset,
                 bounding_sphere: instance.bounding_sphere,
+                index_instance: i,
+                primitive_id: primitive.index_buffer_offset,
                 visible: false,
             });
         }
@@ -174,19 +172,18 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
     for cull_result in cull_data {
         // If we haven't yet set our primitive ID, set it now.
         if current_primitive_id == u32::MAX {
-            current_primitive_id = cull_result.index_offset;
+            current_primitive_id = cull_result.primitive_id;
         }
 
         // We're finished with this primitive. Record the command and increase our offset.
-        if cull_result.index_offset != current_primitive_id {
-            let primitive = &render_context
-                .primitive_map
-                .get(&current_primitive_id)
-                .unwrap()
-                .primitive;
-
+        if cull_result.primitive_id != current_primitive_id {
             // Don't record commands for primitives which have no instances, eg. have been culled.
             if instance_count > 0 {
+                let primitive = &render_context
+                    .primitive_map
+                    .get(&current_primitive_id)
+                    .unwrap()
+                    .primitive;
                 device.cmd_draw_indexed(
                     command_buffer,
                     primitive.indices_count,
@@ -197,7 +194,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                 );
             }
 
-            current_primitive_id = cull_result.index_offset;
+            current_primitive_id = cull_result.primitive_id;
             instance_offset += instance_count;
             instance_count = 0;
         }
@@ -206,7 +203,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
         if cull_result.visible {
             let instanced_primitive = render_context
                 .primitive_map
-                .get(&current_primitive_id)
+                .get(&cull_result.primitive_id)
                 .unwrap();
             let instance = &instanced_primitive.instances[cull_result.index_instance as usize];
             let draw_data = DrawData {

@@ -12,13 +12,17 @@
 //! # Sponsoring
 //! Hotham's development is only possible thanks to the support of the community. It's currently being developed on full time by [@kanerogers](https://github.com/kanerogers) If you'd like to help make VR development in Rust possible, please [consider becoming a donor](https://github.com/sponsors/leetvr). 💗
 
+pub use anyhow;
+pub use ash;
 pub use ash::vk;
 pub use openxr as xr;
+pub use vk_shader_macros;
 
 pub use engine::{Engine, EngineBuilder, TickData};
 pub use glam;
 pub use hecs;
 pub use hotham_error::HothamError;
+pub use id_arena;
 
 /// Components are data that are used to update the simulation and interact with the external world
 pub mod components;

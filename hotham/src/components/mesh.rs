@@ -1,7 +1,7 @@
 use crate::{
-    asset_importer::ImportContext, contexts::RenderContext, rendering::mesh_data::MeshData,
+    asset_importer::ImportContext, contexts::RenderContext, id_arena::Id,
+    rendering::mesh_data::MeshData,
 };
-use id_arena::Id;
 
 /// A handle to MeshData stored on the GPU.
 #[derive(Debug, Clone)]

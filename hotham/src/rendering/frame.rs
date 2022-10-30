@@ -18,7 +18,7 @@ static DRAW_DATA_BUFFER_SIZE: usize = 100_000;
 
 /// A container for all the resources necessary to render a single frame.
 #[derive(Debug, Clone)]
-pub(crate) struct Frame {
+pub struct Frame {
     /// The fence used to signal when the frame has completed rendering
     pub fence: vk::Fence,
     /// A command buffer used to record commands

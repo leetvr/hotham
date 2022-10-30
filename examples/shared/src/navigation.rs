@@ -6,7 +6,13 @@ use hotham::{
     Engine,
 };
 
-use crate::State;
+#[derive(Clone, Debug, Default)]
+/// This state is used for manipulating the stage transform.
+pub struct State {
+    global_from_left_grip: Option<Affine3A>,
+    global_from_right_grip: Option<Affine3A>,
+    scale: Option<f32>,
+}
 
 /// Navigation system
 /// Allows the player to navigate by grabbing empty space with their hands.
