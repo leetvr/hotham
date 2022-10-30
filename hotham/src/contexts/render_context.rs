@@ -56,12 +56,12 @@ pub struct RenderContext {
     pub cameras: Vec<Camera>,
     pub views: Vec<xr::View>,
     pub resources: Resources,
-    pub(crate) frames: [Frame; PIPELINE_DEPTH],
-    pub(crate) swapchain: Swapchain,
-    pub(crate) descriptors: Descriptors,
+    pub frames: [Frame; PIPELINE_DEPTH],
+    pub swapchain: Swapchain,
+    pub descriptors: Descriptors,
 
     // Populated only between rendering::begin and rendering::end
-    pub(crate) primitive_map: HashMap<u32, InstancedPrimitive>,
+    pub primitive_map: HashMap<u32, InstancedPrimitive>,
 }
 
 impl RenderContext {
@@ -133,6 +133,7 @@ impl RenderContext {
             scene_data,
             descriptors,
             resources,
+
             primitive_map: HashMap::default(),
         })
     }
@@ -204,7 +205,7 @@ impl RenderContext {
         )
     }
 
-    pub(crate) fn update_scene_data(
+    pub fn update_scene_data(
         &mut self,
         views: &[xr::View],
         gos_from_global: &Affine3A,
@@ -252,7 +253,7 @@ impl RenderContext {
     }
 
     /// Start rendering a frame
-    pub(crate) fn begin_frame(&self, vulkan_context: &VulkanContext) {
+    pub fn begin_frame(&self, vulkan_context: &VulkanContext) {
         // Get the values we need to start the frame..
         let device = &vulkan_context.device;
         let frame = &self.frames[self.frame_index];
@@ -272,7 +273,7 @@ impl RenderContext {
         }
     }
 
-    pub(crate) fn cull_objects(&mut self, vulkan_context: &VulkanContext) {
+    pub fn cull_objects(&mut self, vulkan_context: &VulkanContext) {
         let device = &vulkan_context.device;
         let frame_index = self.frame_index;
         let frame = &mut self.frames[self.frame_index];
@@ -331,7 +332,7 @@ impl RenderContext {
 
     /// Begin the PBR renderpass.
     /// DOES NOT BEGIN RECORDING COMMAND BUFFERS - call begin_frame first!
-    pub(crate) fn begin_pbr_render_pass(
+    pub fn begin_pbr_render_pass(
         &self,
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,
@@ -383,7 +384,7 @@ impl RenderContext {
         }
     }
 
-    pub(crate) fn end_pbr_render_pass(&mut self, vulkan_context: &VulkanContext) {
+    pub fn end_pbr_render_pass(&mut self, vulkan_context: &VulkanContext) {
         let device = &vulkan_context.device;
         let frame = &self.frames[self.frame_index];
         let command_buffer = frame.command_buffer;
@@ -458,15 +459,15 @@ impl RenderContext {
     }
 }
 
-pub(crate) struct InstancedPrimitive {
-    pub(crate) primitive: Primitive,
-    pub(crate) instances: Vec<Instance>,
+pub struct InstancedPrimitive {
+    pub primitive: Primitive,
+    pub instances: Vec<Instance>,
 }
 
-pub(crate) struct Instance {
-    pub(crate) gos_from_local: Affine3A,
-    pub(crate) bounding_sphere: Vec4,
-    pub(crate) skin_id: u32,
+pub struct Instance {
+    pub gos_from_local: Affine3A,
+    pub bounding_sphere: Vec4,
+    pub skin_id: u32,
 }
 
 pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {

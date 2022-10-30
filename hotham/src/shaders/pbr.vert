@@ -15,6 +15,14 @@ layout (location = 1) out vec2 outUV;
 layout (location = 2) flat out uint outMaterialID;
 layout (location = 3) out vec3 outNormal;
 
+layout (std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
+    DrawData data[];
+} drawDataBuffer;
+
+layout (std430, set = 0, binding = 2) readonly buffer SkinsBuffer {
+    mat4 jointMatrices[100][64]; // dynamically sized array of 64 element long arrays of mat4.
+} skinsBuffer;
+
 out gl_PerVertex {
     vec4 gl_Position;
 };

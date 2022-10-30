@@ -214,9 +214,13 @@ pub struct DrawData {
 /// Information for the culling shader on how to cull this primitive.
 #[derive(Debug, Default, Clone)]
 #[repr(C, align(16))]
-pub(crate) struct PrimitiveCullData {
+pub struct PrimitiveCullData {
+    /// Bounding sphere - used for culling.
     pub bounding_sphere: Vec4,
+    /// Index of this instance among the instances of the same primitive.
     pub index_instance: u32,
-    pub index_offset: u32,
+    /// ID for the primitive - index into the vertex buffer is currently used for this.
+    pub primitive_id: u32,
+    /// The result of culling test. True if the bounding sphere is intersecting with any camera frustum.
     pub visible: bool,
 }

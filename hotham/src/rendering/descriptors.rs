@@ -17,7 +17,7 @@ const TEXTURE_BINDING_DESCRIPTOR_COUNT: u32 = 10_000;
 
 /// A wrapper around all the various bits of descriptor functionality
 #[derive(Clone, Debug)]
-pub(crate) struct Descriptors {
+pub struct Descriptors {
     pub graphics_layout: vk::DescriptorSetLayout,
     pub compute_layout: vk::DescriptorSetLayout,
     // One descriptor set per frame
