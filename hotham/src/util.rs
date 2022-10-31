@@ -233,7 +233,7 @@ pub(crate) unsafe fn save_image_to_disk(
     let image_from_vulkan = DynamicImage::ImageRgba8(
         RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
     );
-    let output_path = format!("../test_assets/render_{}_known_good.jpg", name);
+    let output_path = format!("../test_assets/render_{}.jpg", name);
     {
         let output_path = std::path::Path::new(&output_path);
         let mut file = std::fs::File::create(output_path).unwrap();
