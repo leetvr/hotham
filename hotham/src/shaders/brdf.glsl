@@ -7,7 +7,8 @@
 
 // The following equation models the Fresnel reflectance term of the spec equation (aka F())
 // Implementation of fresnel from [4], Equation 15
-const float16_t M_PI = float16_t(3.141592653589793);
+const float16_t M_PI_F16 = float16_t(3.141592653589793);
+const float M_PI_F32 = float(3.141592653589793);
 
 // Anything less than 2% is physically impossible and is instead considered to be shadowing. Compare to "Real-Time-Rendering" 4th edition on page 325.
 const f16vec3 f90 = f16vec3(1.0);
@@ -38,15 +39,16 @@ float16_t V_GGX(float16_t NdotL, float16_t NdotV, float16_t alphaRoughness) {
 // Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
 // Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
 float16_t D_GGX(float16_t NdotH, float16_t alphaRoughness) {
-    float16_t alphaRoughnessSq = alphaRoughness * alphaRoughness;
-    float16_t f = (NdotH * NdotH) * (alphaRoughnessSq - float16_t(1.0)) + float16_t(1.0);
-    return alphaRoughnessSq / (M_PI * f * f);
+    const float alphaRoughnessSq = float(alphaRoughness) * float(alphaRoughness);
+    // f gets poor precision with float16 if alphaRoughnessSq is too small.
+    const float f = float(NdotH) * float(NdotH) * (alphaRoughnessSq - 1.0) + 1.0;
+    return float16_t(alphaRoughnessSq / (M_PI_F32 * f * f));
 }
 
 //https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
 f16vec3 BRDF_lambertian(f16vec3 f0, f16vec3 diffuseColor, float16_t VdotH) {
     // see https://seblagarde.wordpress.com/2012/01/08/pi-or-not-to-pi-in-game-lighting-equation/
-    return (float16_t(1.0) - F_Schlick(f0, VdotH)) * (diffuseColor / M_PI);
+    return (float16_t(1.0) - F_Schlick(f0, VdotH)) * (diffuseColor / M_PI_F16);
 }
 
 //  https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
