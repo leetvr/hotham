@@ -29,7 +29,7 @@ pub(crate) unsafe fn parse_raw_string(
 }
 
 #[cfg(test)]
-use hecs::World;
+use {hecs::World, lenient_bool::LenientBool, std::env};
 
 #[cfg(test)]
 use crate::{
@@ -233,6 +233,15 @@ pub(crate) unsafe fn save_image_to_disk(
     let image_from_vulkan = DynamicImage::ImageRgba8(
         RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
     );
+    let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
+    if env::var("UPDATE_IMAGES").map_or(false, |s| {
+        s.parse::<LenientBool>().map_or(false, |b| b.into())
+    }) {
+        let output_path = std::path::Path::new(&known_good_path);
+        let mut file = std::fs::File::create(output_path).unwrap();
+        let mut jpeg_encoder = JpegEncoder::new(&mut file);
+        jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
+    }
     let output_path = format!("../test_assets/render_{}.jpg", name);
     {
         let output_path = std::path::Path::new(&output_path);
@@ -241,7 +250,6 @@ pub(crate) unsafe fn save_image_to_disk(
         jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
     }
     let output_hash = hash_file(&output_path);
-    let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
     let known_good_hash = hash_file(&known_good_path);
 
     if !output_hash.is_ok() {
