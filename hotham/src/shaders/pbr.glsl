@@ -28,6 +28,7 @@ const f16vec3 DEFAULT_F0 = f16vec3(0.04);
 // Fast approximation of ACES tonemap
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
 f16vec3 tonemap(f16vec3 color) {
+    color = min(color, f16vec3(8.0)); // Protect against numerical issues with float16.
     const float16_t A = float16_t(2.51);
     const float16_t B = float16_t(0.03);
     const float16_t C = float16_t(2.43);

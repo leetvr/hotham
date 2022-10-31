@@ -268,6 +268,18 @@ mod tests {
     use glam::{Quat, Vec3};
 
     #[test]
+    pub fn test_clamped_tonemap() {
+        let color = 8.0;
+        const A: f64 = 2.51;
+        const B: f64 = 0.03;
+        const C: f64 = 2.43;
+        const D: f64 = 0.59;
+        const E: f64 = 0.14;
+        let tonemapped_color = (color * (A * color + B)) / (color * (C * color + D) + E);
+        assert!(tonemapped_color >= 1.0);
+    }
+
+    #[test]
     pub fn test_rendering_normal_tangent() {
         let (mut render_context, vulkan_context, image) = RenderContext::testing_with_image();
 
