@@ -80,6 +80,8 @@ f16vec3 getLightContribution(f16vec3 F0, float16_t alphaRoughness, f16vec3 diffu
     float16_t NdotL = clamp(dot(n, l), float16_t(0.0), float16_t(1.0));
     float16_t NdotH = clamp(dot(n, h), float16_t(0.0), float16_t(1.0));
     float16_t VdotH = clamp(dot(v, h), float16_t(0.0), float16_t(1.0));
+    f16vec3 NxH = cross(n, h);
+    float16_t NxHdotNxH = dot(NxH, NxH);
 
     f16vec3 color = f16vec3(0);
 
@@ -88,7 +90,7 @@ f16vec3 getLightContribution(f16vec3 F0, float16_t alphaRoughness, f16vec3 diffu
 
         // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
         f16vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(F0, diffuseColor, VdotH);
-        f16vec3 specContrib = intensity * NdotL * BRDF_specularGGX(F0, alphaRoughness, VdotH, NdotL, NdotV, NdotH);
+        f16vec3 specContrib = intensity * NdotL * BRDF_specularGGX(F0, alphaRoughness, VdotH, NdotL, NdotV, NdotH, NxHdotNxH);
 
         // Finally, combine the diffuse and specular contributions
         color = diffuseContrib + specContrib;

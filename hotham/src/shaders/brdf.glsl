@@ -36,13 +36,14 @@ float16_t V_GGX(float16_t NdotL, float16_t NdotV, float16_t alphaRoughness) {
 }
 
 // The following equation(s) model the distribution of microfacet normals across the area being drawn (aka D())
-// Implementation from "Average Irregularity Representation of a Roughened Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
+// Implementation from "Average Irregularity Representation of a Rough Surface for Ray Reflection" by T. S. Trowbridge, and K. P. Reitz
 // Follows the distribution function recommended in the SIGGRAPH 2013 course notes from EPIC Games [1], Equation 3.
-float16_t D_GGX(float16_t NdotH, float16_t alphaRoughness) {
-    const float alphaRoughnessSq = float(alphaRoughness) * float(alphaRoughness);
-    // f gets poor precision with float16 if alphaRoughnessSq is too small.
-    const float f = float(NdotH) * float(NdotH) * (alphaRoughnessSq - 1.0) + 1.0;
-    return float16_t(alphaRoughnessSq / (M_PI_F32 * f * f));
+float16_t D_GGX(float16_t NdotH, float16_t NxHdotNxH, float16_t roughness) {
+    float16_t a = NdotH * roughness;
+    float16_t k = roughness / (NxHdotNxH + a * a);
+    float16_t d = k * k * float16_t(1.0 / M_PI_F32);
+    // Saturate float16
+    return min(d, float16_t(65504.0));
 }
 
 //https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
@@ -52,10 +53,10 @@ f16vec3 BRDF_lambertian(f16vec3 f0, f16vec3 diffuseColor, float16_t VdotH) {
 }
 
 //  https://github.com/KhronosGroup/glTF/tree/master/specification/2.0#acknowledgments AppendixB
-f16vec3 BRDF_specularGGX(f16vec3 f0, float16_t alphaRoughness, float16_t VdotH, float16_t NdotL, float16_t NdotV, float16_t NdotH) {
+f16vec3 BRDF_specularGGX(f16vec3 f0, float16_t alphaRoughness, float16_t VdotH, float16_t NdotL, float16_t NdotV, float16_t NdotH, float16_t NxHdotNxH) {
     f16vec3 F = F_Schlick(f0, VdotH);
     float16_t Vis = V_GGX(NdotL, NdotV, alphaRoughness);
-    float16_t D = D_GGX(NdotH, alphaRoughness);
+    float16_t D = D_GGX(NdotH, NxHdotNxH, alphaRoughness);
 
     return F * Vis * D;
 }
