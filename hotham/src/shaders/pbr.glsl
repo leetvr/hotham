@@ -110,7 +110,7 @@ f16vec3 getLightContribution(f16vec3 F0, float16_t alphaRoughness, f16vec3 diffu
     float16_t NdotH = clamp(dot(n, h), float16_t(0.0), float16_t(1.0));
     float16_t VdotH = clamp(dot(v, h), float16_t(0.0), float16_t(1.0));
 
-    f16vec3 color;
+    f16vec3 color = f16vec3(0);
 
     if (NdotL > 0. || NdotV > 0.) {
         f16vec3 intensity = getLightIntensity(light, pointToLight);
