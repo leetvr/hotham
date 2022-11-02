@@ -29,7 +29,7 @@ pub(crate) unsafe fn parse_raw_string(
 }
 
 #[cfg(test)]
-use {hecs::World, lenient_bool::LenientBool, std::env};
+use {hecs::World, std::env};
 
 #[cfg(test)]
 use crate::{
@@ -235,7 +235,11 @@ pub(crate) unsafe fn save_image_to_disk(
     );
     let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
     if env::var("UPDATE_IMAGES").map_or(false, |s| {
-        s.parse::<LenientBool>().map_or(false, |b| b.into())
+        s.eq_ignore_ascii_case("true")
+            || s.eq_ignore_ascii_case("t")
+            || s.eq_ignore_ascii_case("yes")
+            || s.eq_ignore_ascii_case("y")
+            || s == "1"
     }) {
         let output_path = std::path::Path::new(&known_good_path);
         let mut file = std::fs::File::create(output_path).unwrap();
