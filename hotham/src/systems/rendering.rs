@@ -268,6 +268,129 @@ mod tests {
     use glam::{Quat, Vec3};
 
     #[test]
+    pub fn test_rendering_normal_tangent() {
+        let (mut render_context, vulkan_context, image) = RenderContext::testing_with_image();
+
+        let gltf_data: Vec<&[u8]> = vec![include_bytes!(
+            "../../../test_assets/normal_tangent_test.glb"
+        )];
+        let mut models =
+            asset_importer::load_models_from_glb(&gltf_data, &vulkan_context, &mut render_context)
+                .unwrap();
+        let (_, mut world) = models.drain().next().unwrap();
+
+        // Add stage transform
+        let stage_local_transform = LocalTransform {
+            translation: [0.1, 0.2, 0.3].into(),
+            rotation: Quat::from_scaled_axis(Vec3::Y * (std::f32::consts::TAU * 0.1)),
+            ..Default::default()
+        };
+        let global_from_stage = stage_local_transform.to_affine();
+        world.spawn((
+            Stage {},
+            stage_local_transform,
+            GlobalTransform(global_from_stage.clone()),
+        ));
+
+        // Set views
+        let position = Vector3f {
+            x: 0.0,
+            y: -0.1,
+            z: 10.0,
+        };
+        let view = openxr::View {
+            pose: openxr::Posef {
+                orientation: Quaternionf::IDENTITY,
+                position,
+            },
+            fov: Fovf {
+                angle_up: 6.5_f32.to_radians(),
+                angle_down: -6.5_f32.to_radians(),
+                angle_left: -6.5_f32.to_radians(),
+                angle_right: 6.5_f32.to_radians(),
+            },
+        };
+        let mut views = vec![view.clone(), view];
+
+        // Compensate stage transform by adjusting the views
+        for view in &mut views {
+            view.pose =
+                posef_from_affine(global_from_stage.inverse() * affine_from_posef(view.pose));
+        }
+
+        let params = vec![
+            (
+                "Normals",
+                2.0,
+                scene_data::DEFAULT_IBL_INTENSITY,
+                Light::none(),
+            ),
+            ("IBL", 0.0, scene_data::DEFAULT_IBL_INTENSITY, Light::none()),
+            (
+                "Spotlight1",
+                0.0,
+                0.0,
+                Light::new_spotlight(
+                    [0.5, -0.5, -1.].into(),
+                    10.,
+                    5.,
+                    [1., 1., 1.].into(),
+                    [-1., 1., 2.].into(),
+                    0.,
+                    0.7853892,
+                ),
+            ),
+            (
+                "Spotlight2",
+                0.0,
+                0.0,
+                Light::new_spotlight(
+                    [-0.5, -0.5, -1.].into(),
+                    10.,
+                    15.,
+                    [1., 1., 1.].into(),
+                    [1., 1., 2.].into(),
+                    0.,
+                    0.7853892,
+                ),
+            ),
+            (
+                "IBL_and_spotlight",
+                0.0,
+                scene_data::DEFAULT_IBL_INTENSITY,
+                Light::new_spotlight(
+                    [0.5, -0.5, -1.].into(),
+                    10.,
+                    5.,
+                    [1., 1., 1.].into(),
+                    [-1., 1., 2.].into(),
+                    0.,
+                    0.7853892,
+                ),
+            ),
+        ];
+
+        let errors: Vec<_> = params
+            .iter()
+            .filter_map(|(name, debug_shader_inputs, debug_ibl_intensity, light)| {
+                render_object_with_debug_data(
+                    &vulkan_context,
+                    &mut render_context,
+                    &mut world,
+                    image.clone(),
+                    &format!("normal_tangent_test_{}", name),
+                    *debug_shader_inputs,
+                    *debug_ibl_intensity,
+                    light,
+                    &views,
+                )
+                .err()
+            })
+            .collect();
+        assert!(errors.is_empty(), "{:#?}", errors);
+    }
+
+    #[test]
     pub fn test_rendering_pbr() {
         let (mut render_context, vulkan_context, image) = RenderContext::testing_with_image();
 
