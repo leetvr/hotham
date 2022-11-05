@@ -106,27 +106,22 @@ f16vec3 getLightContribution(f16vec3 F0, float16_t alphaRoughness, f16vec3 diffu
 
     f16vec3 l = normalize(pointToLight);
     f16vec3 h = normalize(l + v);  // Half vector between both l and v
-
     float16_t NdotL = clamp(dot(n, l), float16_t(0.0), float16_t(1.0));
+
+    if (NdotL <= 0. || NdotV <= 0.) {
+        return f16vec3(0);
+    }
+
     float16_t NdotH = clamp(dot(n, h), float16_t(0.0), float16_t(1.0));
     float16_t VdotH = clamp(dot(v, h), float16_t(0.0), float16_t(1.0));
     f16vec3 NxH = cross(n, h);
     float16_t NxHdotNxH = dot(NxH, NxH);
 
-    f16vec3 color = f16vec3(0);
-
-    if (NdotL > 0. || NdotV > 0.) {
-        f16vec3 intensity = getLightIntensity(light, pointToLight);
-
-        // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-        f16vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(F0, diffuseColor, VdotH);
-        f16vec3 specContrib = intensity * NdotL * BRDF_specularGGX(F0, alphaRoughness, VdotH, NdotL, NdotV, NdotH, NxHdotNxH);
-
-        // Finally, combine the diffuse and specular contributions
-        color = diffuseContrib + specContrib;
-    }
-
-    return color;
+    // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
+    // Finally, combine the diffuse and specular contributions
+    return getLightIntensity(light, pointToLight) * NdotL * (
+        BRDF_lambertian(F0, diffuseColor, VdotH) +
+        BRDF_specularGGX(F0, alphaRoughness, VdotH, NdotL, NdotV, NdotH, NxHdotNxH));
 }
 
 f16vec3 getPBRMetallicRoughnessColor(Material material, f16vec4 baseColor) {
