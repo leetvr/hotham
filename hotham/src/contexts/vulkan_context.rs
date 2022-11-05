@@ -739,7 +739,7 @@ impl VulkanContext {
         unsafe {
             self.debug_utils.debug_utils_set_object_name(
                 self.device.handle(),
-                &*DebugUtilsObjectNameInfoEXT::builder()
+                &DebugUtilsObjectNameInfoEXT::builder()
                     .object_type(object_type)
                     .object_handle(object_handle)
                     .object_name(object_name.as_c_str()),
