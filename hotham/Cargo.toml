@@ -27,7 +27,7 @@ ktx2 = "0.3"
 memoffset = "0.6.5"
 mint = "0.5.6"
 oddio = "0.5"
-openxr = {features = ["loaded", "mint"], version = "0.16"}
+openxr = {features = ["loaded", "mint"], version = "0.17"}
 rapier3d = "0.14.0"
 ruzstd = "0.3"
 serde = {version = "1.0", features = ["derive"]}
