@@ -6,9 +6,10 @@ version = "0.2.0"
 
 [lib]
 crate-type = ["lib", "cdylib"]
+name = "hotham_complex_scene_example"
 
 [[bin]]
-name = "hotham_complex_scene_example"
+name = "hotham_complex_scene_example_desktop"
 path = "src/main.rs"
 
 [dependencies]

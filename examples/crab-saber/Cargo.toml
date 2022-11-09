@@ -6,9 +6,10 @@ version = "0.2.0"
 
 [lib]
 crate-type = ["lib", "cdylib"]
+name = "hotham_crab_saber"
 
 [[bin]]
-name = "hotham_crab_saber"
+name = "hotham_crab_saber_desktop"
 path = "src/main.rs"
 
 [dependencies]
