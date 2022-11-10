@@ -272,7 +272,7 @@ fn hash_file(file_path: &str) -> anyhow::Result<u64, ()> {
     use std::hash::Hasher;
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
 
-    let bytes = match std::fs::read(&file_path) {
+    let bytes = match std::fs::read(file_path) {
         Ok(it) => it,
         Err(_) => return Err(()),
     };
