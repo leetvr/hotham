@@ -27,18 +27,18 @@ layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
 layout (location = 0) out vec4 outColor;
 layout (depth_less) out float gl_FragDepth;
 
+// These values are from https://registry.khronos.org/vulkan/specs/1.2-extensions/html/chap27.html#primrast-samplelocations
+const vec2 offsetSample0 = vec2(0.375 - 0.5, 0.125 - 0.5);
+const vec2 offsetSample1 = vec2(0.875 - 0.5, 0.375 - 0.5);
+const vec2 offsetSample2 = vec2(0.125 - 0.5, 0.625 - 0.5);
+const vec2 offsetSample3 = vec2(0.625 - 0.5, 0.875 - 0.5);
+
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
     outColor = ERROR_MAGENTA;
 
     // Retrieve draw data
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
-
-    // These values are from https://registry.khronos.org/vulkan/specs/1.2-extensions/html/chap27.html#primrast-samplelocations
-    vec2 offsetSample0 = vec2(0.375 - 0.5, 0.125 - 0.5);
-    vec2 offsetSample1 = vec2(0.875 - 0.5, 0.375 - 0.5);
-    vec2 offsetSample2 = vec2(0.125 - 0.5, 0.625 - 0.5);
-    vec2 offsetSample3 = vec2(0.625 - 0.5, 0.875 - 0.5);
 
     // Find ray-quadric intersection, if any
     float a = dot(inRayDir, inSurfaceQTimesRayDir);
