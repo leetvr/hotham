@@ -12,10 +12,7 @@ layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
 // Inputs
 layout (location = 0) in vec4 inRayOrigin;
-layout (location = 1) in vec4 inRayDir;
-layout (location = 2) in vec4 inSurfaceQTimesRayOrigin;
-layout (location = 3) in vec4 inSurfaceQTimesRayDir;
-layout (location = 4) in flat uint inInstanceIndex;
+layout (location = 1) in flat uint inInstanceIndex;
 
 #include "quadric.glsl"
 
@@ -41,9 +38,15 @@ void main() {
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
     // Find ray-quadric intersection, if any
-    float a = dot(inRayDir, inSurfaceQTimesRayDir);
-    float b = dot(inRayOrigin, inSurfaceQTimesRayDir) + dot(inRayDir, inSurfaceQTimesRayOrigin);
-    float c = dot(inRayOrigin, inSurfaceQTimesRayOrigin);
+    vec4 rayOrigin = inRayOrigin / inRayOrigin.w;
+    vec4 rayDir = vec4(normalize(rayOrigin.xyz - sceneData.cameraPosition[gl_ViewIndex].xyz), 0.0);
+
+    vec4 surfaceQTimesRayOrigin = d.surfaceQ * rayOrigin;
+    vec4 surfaceQTimesRayDir = d.surfaceQ * rayDir;
+
+    float a = dot(rayDir, surfaceQTimesRayDir);
+    float b = dot(rayOrigin, surfaceQTimesRayDir) + dot(rayDir, surfaceQTimesRayOrigin);
+    float c = dot(rayOrigin, surfaceQTimesRayOrigin);
     // Discriminant from quadratic formula
     // b^2 - 4ac
     float discriminant = b * b - 4.0 * a * c;
@@ -65,7 +68,7 @@ void main() {
         gl_SampleMask[0] = 0;
     }
 
-    vec4 hitPoint = inRayOrigin + inRayDir * t.x;
+    vec4 hitPoint = rayOrigin + rayDir * t;
     float boundsValue = 0.0001 - dot(hitPoint, d.boundsQ * hitPoint);
     vec2 gradientOfBoundsValue = vec2(dFdx(boundsValue), dFdy(boundsValue));
     gl_SampleMask[0] &= int(
