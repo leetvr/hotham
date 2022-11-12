@@ -68,6 +68,7 @@ void main() {
         gl_SampleMask[0] = 0;
     }
 
+    // hitPoint.w = 1 because rayOrigin.w = 1 and rayDir.w = 0.
     vec4 hitPoint = rayOrigin + rayDir * t;
     float boundsValue = 0.0001 - dot(hitPoint, d.boundsQ * hitPoint);
     vec2 gradientOfBoundsValue = vec2(dFdx(boundsValue), dFdy(boundsValue));
@@ -81,9 +82,6 @@ void main() {
     if (gl_SampleMask[0] == 0) {
         discard;
     }
-
-    // We divide with w here because hitPoint is used without w further down.
-    hitPoint /= hitPoint.w;
 
     // Compute depth
     vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * hitPoint;
