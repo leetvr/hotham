@@ -83,8 +83,7 @@ void main() {
 
     // Compute depth
     vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * hitPoint;
-    float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
-    gl_FragDepth = f_ndc_depth;
+    gl_FragDepth = v_clip_coord.z / v_clip_coord.w;
 
     // Compute normal from gradient of surface quadric
     vec3 normal = normalize((d.surfaceQ * hitPoint).xyz);
