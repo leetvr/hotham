@@ -45,23 +45,21 @@ void main() {
     vec4 surfaceQTimesRayDir = d.surfaceQ * rayDir;
 
     float a = dot(rayDir, surfaceQTimesRayDir);
-    float b = dot(rayOrigin, surfaceQTimesRayDir) + dot(rayDir, surfaceQTimesRayOrigin);
+    float b = dot(rayOrigin, surfaceQTimesRayDir);
     float c = dot(rayOrigin, surfaceQTimesRayOrigin);
-    // Discriminant from quadratic formula
+    // Discriminant from quadratic formula is
     // b^2 - 4ac
-    float discriminant = b * b - 4.0 * a * c;
+    // but we are able to simplify it by substituting b with b/2.
+    float discriminant = b * b - a * c;
     vec2 gradientOfDiscriminant = vec2(dFdx(discriminant), dFdy(discriminant));
     gl_SampleMask[0] = int(
         step(0.0, discriminant + dot(offsetSample0, gradientOfDiscriminant)) +
         step(0.0, discriminant + dot(offsetSample1, gradientOfDiscriminant)) * 2 +
         step(0.0, discriminant + dot(offsetSample2, gradientOfDiscriminant)) * 4 +
         step(0.0, discriminant + dot(offsetSample3, gradientOfDiscriminant)) * 8);
-    if (discriminant < 0.0) {
-        discriminant = 0.0;
-    }
 
     // Pick the solution that is facing us
-    float t = (b + sqrt(discriminant)) * -0.5 / a;
+    float t = -(b + sqrt(max(0.0, discriminant))) / a;
 
     if (t < -0.0001) {
         t = 0.0;
