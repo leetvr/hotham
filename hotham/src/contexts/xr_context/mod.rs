@@ -350,9 +350,9 @@ pub(crate) fn create_xr_instance(
     required_extensions: Option<&xr::ExtensionSet>,
 ) -> anyhow::Result<(xr::Instance, xr::SystemId)> {
     let xr_entry = if let Some(path) = path {
-        xr::Entry::load_from(path)?
+        unsafe { xr::Entry::load_from(path)? }
     } else {
-        xr::Entry::load()?
+        unsafe { xr::Entry::load()? }
     };
     let xr_app_info = openxr::ApplicationInfo {
         application_name,

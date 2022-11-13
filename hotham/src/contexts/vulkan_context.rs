@@ -87,9 +87,11 @@ impl VulkanContext {
             )
         };
 
-        let physical_device = vk::PhysicalDevice::from_raw(
-            xr_instance.vulkan_graphics_device(system, instance_handle)? as _,
-        );
+        let physical_device = unsafe {
+            vk::PhysicalDevice::from_raw(
+                xr_instance.vulkan_graphics_device(system, instance_handle)? as _,
+            )
+        };
 
         let queue_family_index = unsafe {
             instance
@@ -180,11 +182,13 @@ impl VulkanContext {
 
         let (vulkan_instance, vulkan_entry) =
             vulkan_init_legacy(xr_instance, system, application_name, application_version)?;
-        let physical_device = vk::PhysicalDevice::from_raw(
-            xr_instance
-                .vulkan_graphics_device(system, vulkan_instance.handle().as_raw() as _)
-                .unwrap() as _,
-        );
+        let physical_device = unsafe {
+            vk::PhysicalDevice::from_raw(
+                xr_instance
+                    .vulkan_graphics_device(system, vulkan_instance.handle().as_raw() as _)
+                    .unwrap() as _,
+            )
+        };
         let (device, graphics_queue, queue_family_index) =
             create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device)?;
 
@@ -739,7 +743,7 @@ impl VulkanContext {
         unsafe {
             self.debug_utils.debug_utils_set_object_name(
                 self.device.handle(),
-                &*DebugUtilsObjectNameInfoEXT::builder()
+                &DebugUtilsObjectNameInfoEXT::builder()
                     .object_type(object_type)
                     .object_handle(object_handle)
                     .object_name(object_name.as_c_str()),
