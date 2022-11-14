@@ -12,10 +12,7 @@ layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
 // Inputs
 layout (location = 0) in vec4 inRayOrigin;
-layout (location = 1) in vec4 inRayDir;
-layout (location = 2) in vec4 inSurfaceQTimesRayOrigin;
-layout (location = 3) in vec4 inSurfaceQTimesRayDir;
-layout (location = 4) in flat uint inInstanceIndex;
+layout (location = 1) in flat uint inInstanceIndex;
 
 #include "quadric.glsl"
 
@@ -27,62 +24,63 @@ layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
 layout (location = 0) out vec4 outColor;
 layout (depth_less) out float gl_FragDepth;
 
+// These values are from https://registry.khronos.org/vulkan/specs/1.2-extensions/html/chap27.html#primrast-samplelocations
+const vec2 offsetSample0 = vec2(0.375 - 0.5, 0.125 - 0.5);
+const vec2 offsetSample1 = vec2(0.875 - 0.5, 0.375 - 0.5);
+const vec2 offsetSample2 = vec2(0.125 - 0.5, 0.625 - 0.5);
+const vec2 offsetSample3 = vec2(0.625 - 0.5, 0.875 - 0.5);
+
 void main() {
     // Retrieve draw data
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
-    // These values are from https://registry.khronos.org/vulkan/specs/1.2-extensions/html/chap27.html#primrast-samplelocations
-    vec2 offsetSample0 = vec2(0.375 - 0.5, 0.125 - 0.5);
-    vec2 offsetSample1 = vec2(0.875 - 0.5, 0.375 - 0.5);
-    vec2 offsetSample2 = vec2(0.125 - 0.5, 0.625 - 0.5);
-    vec2 offsetSample3 = vec2(0.625 - 0.5, 0.875 - 0.5);
-
     // Find ray-quadric intersection, if any
-    float a = dot(inRayDir, inSurfaceQTimesRayDir);
-    float b = dot(inRayOrigin, inSurfaceQTimesRayDir) + dot(inRayDir, inSurfaceQTimesRayOrigin);
-    float c = dot(inRayOrigin, inSurfaceQTimesRayOrigin);
-    // Discriminant from quadratic formula
+    vec4 rayOrigin = inRayOrigin / inRayOrigin.w;
+    vec4 rayDir = vec4(normalize(rayOrigin.xyz - sceneData.cameraPosition[gl_ViewIndex].xyz), 0.0);
+
+    vec4 surfaceQTimesRayOrigin = d.surfaceQ * rayOrigin;
+    vec4 surfaceQTimesRayDir = d.surfaceQ * rayDir;
+
+    float a = dot(rayDir, surfaceQTimesRayDir);
+    float b = dot(rayOrigin, surfaceQTimesRayDir);
+    float c = dot(rayOrigin, surfaceQTimesRayOrigin);
+    // Discriminant from quadratic formula is
     // b^2 - 4ac
-    float discriminant = b * b - 4.0 * a * c;
+    // but we are able to simplify it by substituting b with b/2.
+    float discriminant = b * b - a * c;
     vec2 gradientOfDiscriminant = vec2(dFdx(discriminant), dFdy(discriminant));
-    gl_SampleMask[0] =
-        int(step(0.0, discriminant + dot(offsetSample0, gradientOfDiscriminant))) * 1 +
-        int(step(0.0, discriminant + dot(offsetSample1, gradientOfDiscriminant))) * 2 +
-        int(step(0.0, discriminant + dot(offsetSample2, gradientOfDiscriminant))) * 4 +
-        int(step(0.0, discriminant + dot(offsetSample3, gradientOfDiscriminant))) * 8;
-    if (discriminant < 0.0) {
-        discriminant = 0.0;
-    }
+    gl_SampleMask[0] = int(
+        step(0.0, discriminant + dot(offsetSample0, gradientOfDiscriminant)) +
+        step(0.0, discriminant + dot(offsetSample1, gradientOfDiscriminant)) * 2 +
+        step(0.0, discriminant + dot(offsetSample2, gradientOfDiscriminant)) * 4 +
+        step(0.0, discriminant + dot(offsetSample3, gradientOfDiscriminant)) * 8);
 
     // Pick the solution that is facing us
-    float t = (b + sqrt(discriminant)) * -0.5 / a;
+    float t = -(b + sqrt(max(0.0, discriminant))) / a;
 
     if (t < -0.0001) {
         t = 0.0;
         gl_SampleMask[0] = 0;
     }
 
-    vec4 hitPoint = inRayOrigin + inRayDir * t.x;
+    // hitPoint.w = 1 because rayOrigin.w = 1 and rayDir.w = 0.
+    vec4 hitPoint = rayOrigin + rayDir * t;
     float boundsValue = 0.0001 - dot(hitPoint, d.boundsQ * hitPoint);
     vec2 gradientOfBoundsValue = vec2(dFdx(boundsValue), dFdy(boundsValue));
-    gl_SampleMask[0] &=
-        int(step(0.0, boundsValue + dot(offsetSample0, gradientOfBoundsValue))) * 1 +
-        int(step(0.0, boundsValue + dot(offsetSample1, gradientOfBoundsValue))) * 2 +
-        int(step(0.0, boundsValue + dot(offsetSample2, gradientOfBoundsValue))) * 4 +
-        int(step(0.0, boundsValue + dot(offsetSample3, gradientOfBoundsValue))) * 8;
+    gl_SampleMask[0] &= int(
+        step(0.0, boundsValue + dot(offsetSample0, gradientOfBoundsValue)) +
+        step(0.0, boundsValue + dot(offsetSample1, gradientOfBoundsValue)) * 2 +
+        step(0.0, boundsValue + dot(offsetSample2, gradientOfBoundsValue)) * 4 +
+        step(0.0, boundsValue + dot(offsetSample3, gradientOfBoundsValue)) * 8);
 
     // Discarding is postponed until here to make sure the derivatives above are valid.
     if (gl_SampleMask[0] == 0) {
         discard;
     }
 
-    // We divide with w here because hitPoint is used without w further down.
-    hitPoint /= hitPoint.w;
-
     // Compute depth
     vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * hitPoint;
-    float f_ndc_depth = v_clip_coord.z / v_clip_coord.w;
-    gl_FragDepth = f_ndc_depth;
+    gl_FragDepth = v_clip_coord.z / v_clip_coord.w;
 
     // Compute normal from gradient of surface quadric
     vec3 normal = normalize((d.surfaceQ * hitPoint).xyz);
