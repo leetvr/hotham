@@ -101,6 +101,7 @@ impl XrContext {
     ) -> Result<(XrContext, VulkanContext)> {
         let vulkan_context =
             create_vulkan_context(&instance, system, application_name, application_version)?;
+
         let (session, frame_waiter, frame_stream) =
             create_xr_session(&instance, system, &vulkan_context)?;
         let stage_space =
@@ -254,14 +255,14 @@ impl XrContext {
     }
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(target_os = "android")]
 pub(crate) fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
     application_name: &str,
     application_version: u32,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
-    let vulkan_context = VulkanContext::create_from_xr_instance_legacy(
+    let vulkan_context = VulkanContext::create_from_xr_instance(
         xr_instance,
         system,
         application_name,
@@ -271,13 +272,14 @@ pub(crate) fn create_vulkan_context(
     Ok(vulkan_context)
 }
 
-#[cfg(target_os = "android")]
+#[cfg(not(target_os = "android"))]
 fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
     application_name: &str,
     application_version: u32,
 ) -> Result<VulkanContext, crate::hotham_error::HothamError> {
+    #[allow(deprecated)]
     let vulkan_context = VulkanContext::create_from_xr_instance_legacy(
         xr_instance,
         system,
@@ -360,24 +362,29 @@ pub(crate) fn create_xr_instance(
         engine_name: "Hotham",
         engine_version: 1,
     };
+
     let mut required_extensions = required_extensions.cloned().unwrap_or_default();
-    // required_extensions.khr_vulkan_enable2 = true; // TODO: Should we use enable 2 for the simulator..?
-    required_extensions.khr_vulkan_enable = true; // TODO: Should we use enable 2 for the simulator..?
+    enable_xr_extensions(&mut required_extensions);
 
     #[cfg(target_os = "android")]
     {
-        required_extensions.khr_android_create_instance = true;
         xr_entry.initialize_android_loader()?;
     }
-
-    println!(
-        "Available extensions: {:?}",
-        xr_entry.enumerate_extensions()?
-    );
 
     let instance = xr_entry.create_instance(&xr_app_info, &required_extensions, &[])?;
     let system = instance.system(xr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
     Ok((instance, system))
+}
+
+#[cfg(target_os = "android")]
+fn enable_xr_extensions(required_extensions: &mut xr::ExtensionSet) {
+    required_extensions.khr_android_create_instance = true;
+    required_extensions.khr_vulkan_enable2 = true;
+}
+
+#[cfg(not(target_os = "android"))]
+fn enable_xr_extensions(required_extensions: &mut xr::ExtensionSet) {
+    required_extensions.khr_vulkan_enable = true;
 }
 
 #[cfg(target_os = "windows")]

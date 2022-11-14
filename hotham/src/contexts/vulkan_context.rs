@@ -37,8 +37,6 @@ pub struct VulkanContext {
 }
 
 impl VulkanContext {
-    #[cfg(not(target_os = "android"))]
-    #[allow(unused)]
     pub fn create_from_xr_instance(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
@@ -46,7 +44,7 @@ impl VulkanContext {
         application_version: u32,
     ) -> Result<Self> {
         println!("[HOTHAM_VULKAN] Creating VulkanContext..");
-        let vk_target_version_xr = xr::Version::new(1, 2, 0);
+        let vk_target_version_xr = xr::Version::new(1, 2, 128);
 
         let requirements = xr_instance.graphics_requirements::<XrVulkan>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
@@ -62,7 +60,7 @@ impl VulkanContext {
         let app_name = CString::new(application_name)?;
         let engine_name = CString::new("Hotham")?;
         let app_info = vk::ApplicationInfo::builder()
-            .api_version(vk::make_api_version(0, 1, 2, 0))
+            .api_version(vk::make_api_version(0, 1, 2, 128))
             .application_name(&app_name)
             .application_version(application_version)
             .engine_name(&engine_name)
@@ -112,20 +110,34 @@ impl VulkanContext {
             .queue_family_index(queue_family_index)
             .queue_priorities(&[1.0])
             .build();
-        let queue_create_infos = [graphics_queue_create_info];
-        let multiview = &mut vk::PhysicalDeviceVulkan11Features {
-            multiview: vk::TRUE,
-            ..Default::default()
-        };
-        let separate_depth_stencil_layouts = &mut vk::PhysicalDeviceVulkan12Features {
-            separate_depth_stencil_layouts: vk::TRUE,
-            ..Default::default()
-        };
+
+        // We use a *whole bunch* of different features, and somewhat annoyingly they're all enabled in different ways.
+        let enabled_features = vk::PhysicalDeviceFeatures::builder()
+            .multi_draw_indirect(true)
+            .sampler_anisotropy(true)
+            .build();
+
+        let mut physical_device_features = vk::PhysicalDeviceVulkan11Features::builder()
+            .multiview(true)
+            .shader_draw_parameters(true);
+
+        let mut descriptor_indexing_features =
+            vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
+                .shader_sampled_image_array_non_uniform_indexing(true)
+                .descriptor_binding_partially_bound(true)
+                .descriptor_binding_variable_descriptor_count(true)
+                .descriptor_binding_sampled_image_update_after_bind(true)
+                .runtime_descriptor_array(true);
+
+        let mut robust_features =
+            vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
 
         let device_create_info = vk::DeviceCreateInfo::builder()
-            .queue_create_infos(&queue_create_infos)
-            .push_next(separate_depth_stencil_layouts)
-            .push_next(multiview);
+            .queue_create_infos(slice_from_ref(&graphics_queue_create_info))
+            .enabled_features(&enabled_features)
+            .push_next(&mut descriptor_indexing_features)
+            .push_next(&mut robust_features)
+            .push_next(&mut physical_device_features);
 
         let device_handle = unsafe {
             xr_instance.create_vulkan_device(
@@ -165,6 +177,7 @@ impl VulkanContext {
         })
     }
 
+    #[cfg(not(target_os = "android"))]
     pub fn create_from_xr_instance_legacy(
         xr_instance: &xr::Instance,
         system: xr::SystemId,
@@ -882,6 +895,7 @@ impl Debug for VulkanContext {
     }
 }
 
+#[cfg(not(target_os = "android"))]
 fn vulkan_init_legacy(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
@@ -894,12 +908,7 @@ fn vulkan_init_legacy(
     unsafe {
         let entry = Entry::new()?;
 
-        #[cfg(debug_assertions)]
-        let layers = vec!["VK_LAYER_KHRONOS_validation\0"];
-
-        #[cfg(not(debug_assertions))]
         let layers = vec![];
-
         println!("[HOTHAM_VULKAN] Requesting layers: {:?}", layers);
 
         let layer_names = get_raw_strings(layers);
