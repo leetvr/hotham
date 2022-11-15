@@ -34,6 +34,7 @@ impl<T: Sized> Buffer<T> {
         let device = &vulkan_context.device;
 
         let size = (std::mem::size_of::<T>() * max_len) as _;
+        println!("[HOTHAM_VULKAN] Creating {size} buffer with flags {usage:?}..");
 
         let buffer = device
             .create_buffer(
@@ -43,7 +44,7 @@ impl<T: Sized> Buffer<T> {
             .unwrap();
 
         let memory_requirements = device.get_buffer_memory_requirements(buffer);
-        let flags = vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT;
+        let flags = vk::MemoryPropertyFlags::HOST_VISIBLE;
         let device_memory = allocate_memory(vulkan_context, memory_requirements, flags);
 
         // Bind memory

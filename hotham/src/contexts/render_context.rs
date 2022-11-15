@@ -15,6 +15,7 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 ];
 
 const CULLING_TIMEOUT: u64 = u64::MAX;
+pub const USE_MSAA: bool = true;
 
 use crate::{
     contexts::{VulkanContext, XrContext},
@@ -23,6 +24,7 @@ use crate::{
         descriptors::Descriptors,
         frame::Frame,
         image::Image,
+        material::Material,
         primitive::Primitive,
         resources::Resources,
         scene_data::SceneData,
@@ -247,7 +249,7 @@ impl RenderContext {
             scene_data.camera_position = self.scene_data.camera_position;
             scene_data.view_projection = self.scene_data.view_projection;
             scene_data.params = self.scene_data.params;
-            scene_data.lights = self.scene_data.lights;
+            scene_data.lights = self.scene_data.lights.clone();
             for light in &mut scene_data.lights {
                 light.position = gos_from_global.transform_point3(light.position);
                 light.direction = gos_from_global.transform_vector3(light.direction);
@@ -473,17 +475,23 @@ pub struct Instance {
     pub skin_id: u32,
 }
 
-pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(p as *const T as *const u8, size_of::<T>()) }
+// TODO: use bytemuck instead
+pub fn create_push_constant<T: 'static>(p: &T) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(p as *const T as *const u8, std::mem::size_of::<T>()) }
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     // Attachment used for MSAA
+    let color_store_op = if USE_MSAA {
+        vk::AttachmentStoreOp::DONT_CARE
+    } else {
+        vk::AttachmentStoreOp::STORE
+    };
     let color_attachment = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
-        .samples(vk::SampleCountFlags::TYPE_4)
+        .samples(SAMPLES)
         .load_op(vk::AttachmentLoadOp::CLEAR)
-        .store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .store_op(color_store_op)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
@@ -502,7 +510,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
 
     let depth_attachment = vk::AttachmentDescription::builder()
         .format(DEPTH_FORMAT)
-        .samples(vk::SampleCountFlags::TYPE_4)
+        .samples(SAMPLES)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::DONT_CARE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -529,11 +537,18 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
 
     let color_attachment_resolve_reference = [color_attachment_resolve_reference];
 
-    let subpass = vk::SubpassDescription::builder()
-        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-        .color_attachments(&color_attachment_reference)
-        .resolve_attachments(&color_attachment_resolve_reference)
-        .depth_stencil_attachment(&depth_stencil_reference);
+    let subpass = if USE_MSAA {
+        vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(&color_attachment_reference)
+            .resolve_attachments(&color_attachment_resolve_reference)
+            .depth_stencil_attachment(&depth_stencil_reference)
+    } else {
+        vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(&color_attachment_reference)
+            .depth_stencil_attachment(&depth_stencil_reference)
+    };
 
     let dependency = vk::SubpassDependency::builder()
         .src_subpass(vk::SUBPASS_EXTERNAL)
@@ -557,21 +572,30 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .view_masks(&view_masks)
         .correlation_masks(&view_masks);
 
-    let attachments = [
-        *color_attachment,
-        *depth_attachment,
-        *color_attachment_resolve,
-    ];
-
     let render_pass = unsafe {
-        vulkan_context.device.create_render_pass(
-            &vk::RenderPassCreateInfo::builder()
-                .attachments(&attachments)
-                .subpasses(&[*subpass])
-                .dependencies(&[*dependency])
-                .push_next(&mut multiview),
-            None,
-        )
+        if USE_MSAA {
+            vulkan_context.device.create_render_pass(
+                &vk::RenderPassCreateInfo::builder()
+                    .attachments(&[
+                        *color_attachment,
+                        *depth_attachment,
+                        *color_attachment_resolve,
+                    ])
+                    .subpasses(&[*subpass])
+                    .dependencies(&[*dependency])
+                    .push_next(&mut multiview),
+                None,
+            )
+        } else {
+            vulkan_context.device.create_render_pass(
+                &vk::RenderPassCreateInfo::builder()
+                    .attachments(&[*color_attachment, *depth_attachment])
+                    .subpasses(&[*subpass])
+                    .dependencies(&[*dependency])
+                    .push_next(&mut multiview),
+                None,
+            )
+        }
     }?;
 
     Ok(render_pass)
@@ -644,8 +668,11 @@ fn create_pipeline(
         .line_width(1.0);
 
     // Multisample state
-    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
-        .rasterization_samples(vk::SampleCountFlags::TYPE_4);
+    let multisample_state = if USE_MSAA {
+        vk::PipelineMultisampleStateCreateInfo::builder().rasterization_samples(SAMPLES)
+    } else {
+        vk::PipelineMultisampleStateCreateInfo::builder()
+    };
 
     // Depth stencil state
     let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
@@ -738,7 +765,15 @@ fn create_pipeline_layout(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout> {
-    let create_info = &vk::PipelineLayoutCreateInfo::builder().set_layouts(set_layouts);
+    let push_constant_range = vk::PushConstantRange::builder()
+        .offset(0)
+        .size(std::mem::size_of::<Material>() as _)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+
+    let create_info = &vk::PipelineLayoutCreateInfo::builder()
+        .set_layouts(set_layouts)
+        .push_constant_ranges(slice_from_ref(&push_constant_range));
+
     unsafe {
         vulkan_context
             .device
