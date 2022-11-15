@@ -39,7 +39,7 @@ use openxr as xr;
 use vk_shader_macros::include_glsl;
 
 static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert", target: vulkan1_1);
-static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag", target: vulkan1_1);
+static FRAG: &[u32] = include_glsl!("src/shaders/all_textures.frag", target: vulkan1_1);
 static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
 
 // TODO: Is this a good idea?
