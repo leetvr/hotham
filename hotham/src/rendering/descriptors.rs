@@ -20,6 +20,7 @@ const TEXTURE_BINDING_DESCRIPTOR_COUNT: u32 = 10_000;
 pub struct Descriptors {
     pub graphics_layout: vk::DescriptorSetLayout,
     pub compute_layout: vk::DescriptorSetLayout,
+    pub texture_layout: vk::DescriptorSetLayout,
     // One descriptor set per frame
     pub sets: [vk::DescriptorSet; PIPELINE_DEPTH],
     // One descriptor set per frame
@@ -34,7 +35,8 @@ impl Descriptors {
         let pool = create_descriptor_pool(&vulkan_context.device);
 
         // Then create a layout.
-        let (graphics_layout, compute_layout) = create_descriptor_layouts(&vulkan_context.device);
+        let (graphics_layout, compute_layout, texture_layout) =
+            create_descriptor_layouts(&vulkan_context.device);
 
         // Finally, allocate the shared descriptor set.
         let sets = allocate_descriptor_sets(vulkan_context, pool, graphics_layout);
@@ -46,6 +48,7 @@ impl Descriptors {
             pool,
             compute_layout,
             compute_sets,
+            texture_layout,
         }
     }
 
@@ -148,7 +151,11 @@ unsafe fn allocate_compute_descriptor_sets(
 
 unsafe fn create_descriptor_layouts(
     device: &ash::Device,
-) -> (vk::DescriptorSetLayout, vk::DescriptorSetLayout) {
+) -> (
+    vk::DescriptorSetLayout,
+    vk::DescriptorSetLayout,
+    vk::DescriptorSetLayout,
+) {
     let graphics_bindings = [
         // Draw Data
         vk::DescriptorSetLayoutBinding {
@@ -161,7 +168,7 @@ unsafe fn create_descriptor_layouts(
         // Materials
         vk::DescriptorSetLayoutBinding {
             binding: MATERIALS_BINDING,
-            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1,
             ..Default::default()
@@ -219,8 +226,18 @@ unsafe fn create_descriptor_layouts(
         },
     ];
 
-    let flags =
-        vk::DescriptorBindingFlags::PARTIALLY_BOUND | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
+    let texture_bindings = [
+        // Textures
+        vk::DescriptorSetLayoutBinding {
+            binding: 0,
+            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
+            stage_flags: vk::ShaderStageFlags::FRAGMENT,
+            descriptor_count: TEXTURE_BINDING_DESCRIPTOR_COUNT,
+            ..Default::default()
+        },
+    ];
+
+    let flags = vk::DescriptorBindingFlags::PARTIALLY_BOUND;
 
     let descriptor_flags = [
         vk::DescriptorBindingFlags::empty(),
@@ -237,8 +254,7 @@ unsafe fn create_descriptor_layouts(
         .create_descriptor_set_layout(
             &vk::DescriptorSetLayoutCreateInfo::builder()
                 .bindings(&graphics_bindings)
-                .push_next(&mut binding_flags)
-                .flags(vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL),
+                .push_next(&mut binding_flags),
             None,
         )
         .unwrap();
@@ -250,7 +266,14 @@ unsafe fn create_descriptor_layouts(
         )
         .unwrap();
 
-    (graphics_layout, compute_layout)
+    let texture_layout = device
+        .create_descriptor_set_layout(
+            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&texture_bindings),
+            None,
+        )
+        .unwrap();
+
+    (graphics_layout, compute_layout, texture_layout)
 }
 
 unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
@@ -272,8 +295,7 @@ unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
         .create_descriptor_pool(
             &vk::DescriptorPoolCreateInfo::builder()
                 .pool_sizes(&pool_sizes)
-                .max_sets(1000)
-                .flags(vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND),
+                .max_sets(1000),
             None,
         )
         .unwrap()
