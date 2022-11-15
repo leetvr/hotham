@@ -83,7 +83,7 @@ fn create_panel_mesh(
 
 fn add_material(output_texture: &Texture, render_context: &mut RenderContext) -> u32 {
     let mut material = Material::unlit_white();
-    material.base_color_texture_set = output_texture.index;
+    material.base_texture_id = output_texture.index as _;
     unsafe { render_context.resources.materials_buffer.push(&material) }
 }
 
