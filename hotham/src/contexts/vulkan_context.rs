@@ -27,6 +27,8 @@ type XrVulkan = xr::Vulkan;
 #[cfg(debug_assertions)]
 use ash::vk::DebugUtilsObjectNameInfoEXT;
 
+use super::render_context::SAMPLES;
+
 #[derive(Clone)]
 pub struct VulkanContext {
     pub entry: Entry,
@@ -342,7 +344,7 @@ impl VulkanContext {
 
         // TODO: This indicates that it's MSAA.. but do we need MSAA for depth?
         let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT) {
-            vk::SampleCountFlags::TYPE_4
+            SAMPLES
         } else {
             vk::SampleCountFlags::TYPE_1
         };
