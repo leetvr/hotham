@@ -6,22 +6,16 @@
 #define ENVIRONMENT_MAP_TEXTURE_ID 1
 #define ERROR_MAGENTA vec4(1., 0., 1., 1.)
 
-struct Material {
-    vec4 baseColorFactor;
-    uint workflow;
-    uint baseColorTextureID;
-    uint metallicRoughnessTextureID;
-    uint normalTextureID;
-    uint occlusionTextureID;
-    uint emissiveTextureID;
-    float metallicFactor;
-    float roughnessFactor;
-    float alphaMask;
-    float alphaMaskCutoff;
-};
+#define TEXTURE_FLAG_HAS_PBR_TEXTURES 1
+#define TEXTURE_FLAG_HAS_NORMAL_MAP 2
+#define TEXTURE_FLAG_HAS_AO_TEXTURE 4
+#define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 8
 
-const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
-const float PBR_WORKFLOW_UNLIT = 1.0;
+layout( push_constant ) uniform constants
+{
+    uint textureFlags;
+    uint baseTextureID;
+} material;
 
 // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance (eg. f0) of 0.04
 const vec3 DEFAULT_F0 = vec3(0.04);
@@ -44,14 +38,14 @@ vec3 tonemap(vec3 color) {
 }
 
 // Get normal, tangent and bitangent vectors.
-vec3 getNormal(uint normalTextureID) {
+vec3 getNormal() {
     vec3 N = normalize(inNormal);
-    if (normalTextureID == NOT_PRESENT) {
+    if ((material.textureFlags & TEXTURE_FLAG_HAS_NORMAL_MAP) == 0) {
         return N;
     }
 
     vec3 textureNormal;
-    textureNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
+    textureNormal.xy = texture(textures[material.baseTextureID + 2], inUV).ga * 2.0 - 1.0;
     textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
 
     // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
@@ -132,22 +126,22 @@ vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3
     return color;
 }
 
-vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
+vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
 
     // Metallic and Roughness material properties are packed together
     // In glTF, these factors can be specified by fixed scalar values
     // or from a metallic-roughness map
-    float perceptualRoughness = material.roughnessFactor;
-    float metalness = material.metallicFactor;
+    float perceptualRoughness = 1.0;
+    float metalness = 1.0;
 
-    if (material.metallicRoughnessTextureID == NOT_PRESENT) {
+    if ((material.textureFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
         perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
         metalness = clamp(metalness, 0., 1.0);
     } else {
         // As per the glTF spec:
         // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
         // Its green channel contains roughness values and its blue channel contains metalness values.
-        vec4 mrSample = texture(textures[material.metallicRoughnessTextureID], inUV);
+        vec4 mrSample = texture(textures[material.baseTextureID + 1], inUV);
 
         perceptualRoughness = clamp(mrSample.g * perceptualRoughness, 0.0, 1.0);
         metalness = clamp(mrSample.b * metalness, 0.0, 1.0);
@@ -167,7 +161,7 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
 
     // Get the normal
-    vec3 n = getNormal(material.normalTextureID);
+    vec3 n = getNormal();
 
     // Get NdotV and reflection
     float NdotV = clamp(abs(dot(n, v)), 0., 1.0);
@@ -182,9 +176,9 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     }
 
     // Apply ambient occlusion, if present.
-    if (material.occlusionTextureID != NOT_PRESENT) {
+    if ((material.textureFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) {
         // Occlusion is stored in the 'r' channel as per the glTF spec
-        float ao = texture(textures[material.occlusionTextureID], inUV).r;
+        float ao = texture(textures[material.baseTextureID + 1], inUV).r;
         color = color * ao;
     }
 
@@ -205,10 +199,8 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     }
 
     // Add emission, if present
-    if (material.emissiveTextureID != NOT_PRESENT) {
-        vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
-        color += emissive;
+    if ((material.textureFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) > 0) {
+        color += texture(textures[material.baseTextureID + 3], inUV).rgb;
     }
-
     return color;
 }

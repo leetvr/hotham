@@ -6,41 +6,55 @@ use crate::{
     rendering::texture::{Texture, TextureUsage, NO_TEXTURE},
 };
 
-/// Tells the fragment shader to use the PBR Metallic Roughness workflow
-pub static METALLIC_ROUGHNESS_WORKFLOW: u32 = 0;
-/// Tells the fragment shader to use the unlit workflow
-pub static UNLIT_WORKFLOW: u32 = 1;
+use bitflags::bitflags;
+
+bitflags! {
+        /// Flags used by the shader to do shit
+    pub struct TextureFlags: u32 {
+        /// Do we have base color and metallic roughness textures?
+        const HAS_PBR_TEXTURES = 0b00000001;
+        /// Do we have a normal map?
+        const HAS_NORMAL_MAP = 0b00000010;
+        /// Do we have an AO texture?
+        const HAS_AO_TEXTURE = 0b00000100;
+        /// Do we have an emission texture?
+        const HAS_EMISSION_TEXTURE = 0b00001000;
+    }
+}
 
 /// Material index into the default material
 pub static NO_MATERIAL: usize = 0;
 
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
-#[repr(C, align(16))]
+#[repr(C)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
-    /// The base color of the material
-    pub base_color_factor: Vec4,
-    /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
-    pub workflow: u32,
-    /// The base color texture.
-    pub base_color_texture_set: u32,
-    /// The metallic-roughness texture.
-    pub metallic_roughness_texture_id: u32,
-    /// Normal texture
-    pub normal_texture_set: u32,
-    /// Occlusion texture set
-    pub occlusion_texture_set: u32,
-    /// Emissive texture set
-    pub emissive_texture_set: u32,
-    /// The factor for the metalness of the material.
-    pub metallic_factor: f32,
-    /// The factor for the roughness of the material.
-    pub roughness_factor: f32,
-    /// Alpha mask - see fragment shader
-    pub alpha_mask: f32,
-    /// Alpha mask cutoff - see fragment shader
-    pub alpha_mask_cutoff: f32,
+    /// Bitflags, baby
+    pub texture_flags: TextureFlags,
+    /// The first texture ID used
+    pub base_texture_id: u32, // stupid that this is so huge but we don't have device support for u16 in push constants
+                              // /// The base color of the material
+                              // pub base_color_factor: Vec4,
+                              // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
+                              // pub workflow: u32,
+                              // pub base_color_texture_set: u32,
+                              // /// The metallic-roughness texture.
+                              // pub metallic_roughness_texture_id: u32,
+                              // /// Normal texture
+                              // pub normal_texture_set: u32,
+                              // /// Occlusion texture set
+                              // // pub occlusion_texture_set: u32,
+                              // /// Emissive texture set
+                              // pub emissive_texture_set: u32,
+                              // /// The factor for the metalness of the material.
+                              // pub metallic_factor: f32,
+                              // /// The factor for the roughness of the material.
+                              // pub roughness_factor: f32,
+                              // /// Alpha mask - see fragment shader
+                              // pub alpha_mask: f32,
+                              // /// Alpha mask cutoff - see fragment shader
+                              // pub alpha_mask_cutoff: f32,
 }
 
 impl Default for Material {
@@ -59,7 +73,6 @@ impl Material {
         let base_color_texture_set = base_color_texture_info
             .map(|i| Texture::load(i.texture(), TextureUsage::BaseColor, import_context))
             .unwrap_or(NO_TEXTURE);
-        let base_color_factor = Vec4::from(pbr_metallic_roughness.base_color_factor());
 
         // Metallic Roughness
         let metallic_roughness_texture_info = pbr_metallic_roughness.metallic_roughness_texture();
@@ -79,13 +92,10 @@ impl Material {
             .map(|i| Texture::load(i.texture(), TextureUsage::Normal, import_context))
             .unwrap_or(NO_TEXTURE);
 
-        // Occlusion
-
-        // This is a little tricky. The common case is that occlusion is packed into the red channel of the metallic roughness texture,
-        // but we need to allow for the (unlikely, but still possible) case where it has its own texture.
+        // For performance, we don't allow unpacked AO textures.
         //
         // see: https://github.com/leetvr/hotham/issues/395
-        let occlusion_texture_set = if let Some(occlusion_texture_info) =
+        let has_occlusion_texture = if let Some(occlusion_texture_info) =
             material.occlusion_texture()
         {
             // This is.. quite ugly.
@@ -95,18 +105,14 @@ impl Material {
                     .metallic_roughness_texture()
                     .map(|t| t.texture().source().index())
             {
-                metallic_roughness_texture_set
+                true
             } else {
-                // This is pretty suboptimal. Warn the developer.
-                println!("[HOTHAM_TEXTURE] It looks like you're storing occlusion in a separate image. For best performance, combine it with the MetallicRoughness image");
-                Texture::load(
-                    occlusion_texture_info.texture(),
-                    TextureUsage::MetallicRoughnessOcclusion,
-                    import_context,
-                )
+                // Attempting to use unpacked AO texture. Warn the developer.
+                println!("[HOTHAM_TEXTURE] WARNING: It looks like you're storing occlusion in a separate image! This is not supported by Hotham and will be ignored.");
+                false
             }
         } else {
-            NO_TEXTURE
+            false
         };
 
         // Emission
@@ -115,38 +121,42 @@ impl Material {
             .map(|i| Texture::load(i.texture(), TextureUsage::Emission, import_context))
             .unwrap_or(NO_TEXTURE);
 
-        // Factors
-        let metallic_factor = pbr_metallic_roughness.metallic_factor();
-        let roughness_factor = pbr_metallic_roughness.roughness_factor();
+        let mut texture_flags = TextureFlags::empty();
+        if base_color_texture_set != NO_TEXTURE && metallic_roughness_texture_set != NO_TEXTURE {
+            texture_flags.toggle(TextureFlags::HAS_PBR_TEXTURES);
+        }
 
-        // Alpha
-        let (alpha_mask, alpha_mask_cutoff) = match (material.alpha_mode(), material.alpha_cutoff())
-        {
-            (gltf::material::AlphaMode::Mask, _) => (1., 0.5),
-            (_, Some(alpha_cutoff)) => (1., alpha_cutoff),
-            _ => (0., 1.),
-        };
+        if normal_texture_set != NO_TEXTURE {
+            texture_flags.toggle(TextureFlags::HAS_NORMAL_MAP);
+        }
 
-        // Workflow
-        let workflow = if material.unlit() {
-            UNLIT_WORKFLOW
-        } else {
-            METALLIC_ROUGHNESS_WORKFLOW
-        };
+        if emissive_texture_set != NO_TEXTURE {
+            texture_flags.toggle(TextureFlags::HAS_EMISSION_TEXTURE);
+        }
+
+        if has_occlusion_texture {
+            texture_flags.toggle(TextureFlags::HAS_AO_TEXTURE);
+        }
+
+        // Don't allow non-sensical flags
+        assert_ne!(texture_flags, TextureFlags::HAS_EMISSION_TEXTURE);
+        assert_ne!(texture_flags, TextureFlags::HAS_AO_TEXTURE);
+        assert_ne!(
+            texture_flags,
+            TextureFlags::HAS_AO_TEXTURE | TextureFlags::HAS_EMISSION_TEXTURE
+        );
 
         // Collect the material properties.
         let material = Material {
-            base_color_factor,
-            workflow,
-            base_color_texture_set,
-            metallic_roughness_texture_id: metallic_roughness_texture_set,
-            normal_texture_set,
-            occlusion_texture_set,
-            emissive_texture_set,
-            metallic_factor,
-            roughness_factor,
-            alpha_mask,
-            alpha_mask_cutoff,
+            texture_flags,
+            base_texture_id: base_color_texture_set as _,
+            // base_color_factor,
+            // workflow,
+            // occlusion_texture_set,
+            // metallic_factor,
+            // roughness_factor,
+            // alpha_mask,
+            // alpha_mask_cutoff,
         };
 
         // Then push it into the materials buffer
@@ -162,7 +172,7 @@ impl Material {
     /// Create a simple, unlit, white coloured material.
     pub fn unlit_white() -> Material {
         Material {
-            workflow: UNLIT_WORKFLOW,
+            // workflow: UNLIT_WORKFLOW,
             ..Default::default()
         }
     }
@@ -171,17 +181,19 @@ impl Material {
     /// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material-pbrmetallicroughness
     pub fn gltf_default() -> Self {
         Self {
-            base_color_factor: [1., 1., 1., 1.].into(),
-            workflow: METALLIC_ROUGHNESS_WORKFLOW,
-            base_color_texture_set: NO_TEXTURE,
-            metallic_roughness_texture_id: NO_TEXTURE,
-            normal_texture_set: NO_TEXTURE,
-            occlusion_texture_set: NO_TEXTURE,
-            emissive_texture_set: NO_TEXTURE,
-            metallic_factor: 1.0,
-            roughness_factor: 1.0,
-            alpha_mask: Default::default(),
-            alpha_mask_cutoff: Default::default(),
+            texture_flags: TextureFlags::empty(),
+            base_texture_id: NO_TEXTURE as _,
+            // base_color_factor: [1., 1., 1., 1.].into(),
+            // workflow: METALLIC_ROUGHNESS_WORKFLOW,
+            // base_color_texture_set: NO_TEXTURE,
+            // metallic_roughness_texture_id: NO_TEXTURE,
+            // normal_texture_set: NO_TEXTURE,
+            // occlusion_texture_set: NO_TEXTURE,
+            // emissive_texture_set: NO_TEXTURE,
+            // metallic_factor: 1.0,
+            // roughness_factor: 1.0,
+            // alpha_mask: Default::default(),
+            // alpha_mask_cutoff: Default::default(),
         }
     }
 }
