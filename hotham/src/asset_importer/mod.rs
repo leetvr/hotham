@@ -642,15 +642,7 @@ mod tests {
                 unsafe {
                     let material = &render_context.resources.materials_buffer.as_slice()
                         [primitive.material_id as usize];
-                    assert_eq!(
-                        (
-                            material.base_color_texture_set,
-                            material.metallic_roughness_texture_id,
-                            material.normal_texture_set,
-                            material.occlusion_texture_set
-                        ),
-                        (1, 2, 3, 4)
-                    );
+                    assert_eq!(material.base_texture_id, 1);
                 }
             }
 
