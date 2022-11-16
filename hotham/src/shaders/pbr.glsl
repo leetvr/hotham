@@ -77,7 +77,6 @@ vec3 getIBLContribution(vec3 F0, float perceptualRoughness, vec3 diffuseColor, v
 
     vec2 brdfSamplePoint = clamp(vec2(NdotV, perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
     vec2 f_ab = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rg;
-
     vec3 specularLight = textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb;
 
     // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
