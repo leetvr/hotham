@@ -14,12 +14,20 @@ use ash::{
     Device, Entry, Instance as AshInstance,
 };
 use openxr as xr;
-use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy, slice::from_ref as slice_from_ref};
+use std::{
+    cmp::max,
+    ffi::{c_char, CString},
+    fmt::Debug,
+    ptr::copy,
+    slice::from_ref as slice_from_ref,
+};
 
 type XrVulkan = xr::Vulkan;
 
 #[cfg(debug_assertions)]
 use ash::vk::DebugUtilsObjectNameInfoEXT;
+
+use super::render_context::SAMPLES;
 
 #[derive(Clone)]
 pub struct VulkanContext {
@@ -91,6 +99,10 @@ impl VulkanContext {
             )
         };
 
+        // Seems fine.
+        let enabled_extensions = ["VK_EXT_astc_decode_mode", "VK_EXT_descriptor_indexing"]
+            .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
+
         let queue_family_index = unsafe {
             instance
                 .get_physical_device_queue_family_properties(physical_device)
@@ -133,6 +145,7 @@ impl VulkanContext {
             vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
 
         let device_create_info = vk::DeviceCreateInfo::builder()
+            .enabled_extension_names(&enabled_extensions)
             .queue_create_infos(slice_from_ref(&graphics_queue_create_info))
             .enabled_features(&enabled_features)
             .push_next(&mut descriptor_indexing_features)
@@ -265,7 +278,10 @@ impl VulkanContext {
         component_mapping: vk::ComponentMapping,
     ) -> Result<vk::ImageView> {
         let aspect_mask = get_aspect_mask(format);
-        let create_info = vk::ImageViewCreateInfo::builder()
+        let mut astc_decode_mode =
+            vk::ImageViewASTCDecodeModeEXT::builder().decode_mode(vk::Format::R8G8B8A8_UNORM);
+
+        let mut create_info = vk::ImageViewCreateInfo::builder()
             .view_type(view_type)
             .format(format)
             .subresource_range(vk::ImageSubresourceRange {
@@ -277,6 +293,15 @@ impl VulkanContext {
             })
             .components(component_mapping)
             .image(*image);
+
+        // push_next takes ownership of the builder so we have to return it again.
+        create_info = if format == vk::Format::ASTC_8X8_UNORM_BLOCK {
+            println!("[HOTHAM_VULKAN] Using ASTC decode mode for image!");
+            create_info.push_next(&mut astc_decode_mode)
+        } else {
+            create_info
+        };
+
         unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
     }
 
@@ -325,7 +350,7 @@ impl VulkanContext {
 
         // TODO: This indicates that it's MSAA.. but do we need MSAA for depth?
         let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT) {
-            vk::SampleCountFlags::TYPE_4
+            SAMPLES
         } else {
             vk::SampleCountFlags::TYPE_1
         };
@@ -620,8 +645,8 @@ impl VulkanContext {
             vk::BorderColor::FLOAT_TRANSPARENT_BLACK
         };
         let create_info = vk::SamplerCreateInfo::builder()
-            .mag_filter(vk::Filter::LINEAR)
-            .min_filter(vk::Filter::LINEAR)
+            .mag_filter(vk::Filter::NEAREST)
+            .min_filter(vk::Filter::NEAREST)
             .address_mode_u(address_mode)
             .address_mode_v(address_mode)
             .address_mode_w(address_mode)
