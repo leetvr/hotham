@@ -1,6 +1,9 @@
 #version 460
 #extension GL_EXT_nonuniform_qualifier:enable
 #extension GL_ARB_separate_shader_objects : enable
+#define BRDF_LUT_TEXTURE_ID 0
+#define SAMPLER_IRRADIANCE_TEXTURE_ID 0
+#define ENVIRONMENT_MAP_TEXTURE_ID 1
 
 // Inputs
 layout (location = 0) in vec3 inGosPos;
@@ -42,5 +45,8 @@ void main() {
     outColor = texture(textures[material.baseColorTextureID], inUV) +
         texture(textures[material.metallicRoughnessTextureID], inUV) +
         texture(textures[material.normalTextureID], inUV) +
-        texture(textures[material.emissiveTextureID], inUV);
+        texture(textures[material.emissiveTextureID], inUV) +
+        texture(textures[BRDF_LUT_TEXTURE_ID], inUV) +
+        textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], inUV.xyy, 1) +
+        textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], inUV.xyy, 1);
 }

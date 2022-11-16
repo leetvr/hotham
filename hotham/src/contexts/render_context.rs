@@ -15,6 +15,7 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 ];
 
 const CULLING_TIMEOUT: u64 = u64::MAX;
+pub const USE_MSAA: bool = false;
 
 use crate::{
     contexts::{VulkanContext, XrContext},
@@ -38,12 +39,12 @@ use openxr as xr;
 use vk_shader_macros::include_glsl;
 
 static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert", target: vulkan1_1);
-static FRAG: &[u32] = include_glsl!("src/shaders/all_textures.frag", target: vulkan1_1);
+static FRAG: &[u32] = include_glsl!("src/shaders/all_textures_no_ibl.frag", target: vulkan1_1);
 static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
 
 // TODO: Is this a good idea?
 pub const PIPELINE_DEPTH: usize = 2;
-pub const SAMPLES: vk::SampleCountFlags = vk::SampleCountFlags::TYPE_4;
+pub const SAMPLES: vk::SampleCountFlags = vk::SampleCountFlags::TYPE_1;
 
 pub struct RenderContext {
     pub frame_index: usize,
@@ -476,11 +477,16 @@ pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     // Attachment used for MSAA
+    let color_store_op = if USE_MSAA {
+        vk::AttachmentStoreOp::DONT_CARE
+    } else {
+        vk::AttachmentStoreOp::STORE
+    };
     let color_attachment = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
-        .samples(vk::SampleCountFlags::TYPE_4)
+        .samples(SAMPLES)
         .load_op(vk::AttachmentLoadOp::CLEAR)
-        .store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .store_op(color_store_op)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
@@ -499,7 +505,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
 
     let depth_attachment = vk::AttachmentDescription::builder()
         .format(DEPTH_FORMAT)
-        .samples(vk::SampleCountFlags::TYPE_4)
+        .samples(SAMPLES)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::DONT_CARE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -526,11 +532,18 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
 
     let color_attachment_resolve_reference = [color_attachment_resolve_reference];
 
-    let subpass = vk::SubpassDescription::builder()
-        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-        .color_attachments(&color_attachment_reference)
-        .resolve_attachments(&color_attachment_resolve_reference)
-        .depth_stencil_attachment(&depth_stencil_reference);
+    let subpass = if USE_MSAA {
+        vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(&color_attachment_reference)
+            .resolve_attachments(&color_attachment_resolve_reference)
+            .depth_stencil_attachment(&depth_stencil_reference)
+    } else {
+        vk::SubpassDescription::builder()
+            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+            .color_attachments(&color_attachment_reference)
+            .depth_stencil_attachment(&depth_stencil_reference)
+    };
 
     let dependency = vk::SubpassDependency::builder()
         .src_subpass(vk::SUBPASS_EXTERNAL)
@@ -554,21 +567,30 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .view_masks(&view_masks)
         .correlation_masks(&view_masks);
 
-    let attachments = [
-        *color_attachment,
-        *depth_attachment,
-        *color_attachment_resolve,
-    ];
-
     let render_pass = unsafe {
-        vulkan_context.device.create_render_pass(
-            &vk::RenderPassCreateInfo::builder()
-                .attachments(&attachments)
-                .subpasses(&[*subpass])
-                .dependencies(&[*dependency])
-                .push_next(&mut multiview),
-            None,
-        )
+        if USE_MSAA {
+            vulkan_context.device.create_render_pass(
+                &vk::RenderPassCreateInfo::builder()
+                    .attachments(&[
+                        *color_attachment,
+                        *depth_attachment,
+                        *color_attachment_resolve,
+                    ])
+                    .subpasses(&[*subpass])
+                    .dependencies(&[*dependency])
+                    .push_next(&mut multiview),
+                None,
+            )
+        } else {
+            vulkan_context.device.create_render_pass(
+                &vk::RenderPassCreateInfo::builder()
+                    .attachments(&[*color_attachment, *depth_attachment])
+                    .subpasses(&[*subpass])
+                    .dependencies(&[*dependency])
+                    .push_next(&mut multiview),
+                None,
+            )
+        }
     }?;
 
     Ok(render_pass)
@@ -641,8 +663,11 @@ fn create_pipeline(
         .line_width(1.0);
 
     // Multisample state
-    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
-        .rasterization_samples(vk::SampleCountFlags::TYPE_4);
+    let multisample_state = if USE_MSAA {
+        vk::PipelineMultisampleStateCreateInfo::builder().rasterization_samples(SAMPLES)
+    } else {
+        vk::PipelineMultisampleStateCreateInfo::builder()
+    };
 
     // Depth stencil state
     let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()

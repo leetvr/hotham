@@ -3,7 +3,10 @@ use ash::vk::{self, Handle};
 use openxr::{Swapchain as SwapchainHandle, Vulkan};
 use vulkan_context::VulkanContext;
 
-use crate::{contexts::vulkan_context, COLOR_FORMAT, DEPTH_FORMAT};
+use crate::{
+    contexts::{render_context::USE_MSAA, vulkan_context},
+    COLOR_FORMAT, DEPTH_FORMAT,
+};
 
 use super::texture::DEFAULT_COMPONENT_MAPPING;
 
@@ -88,14 +91,24 @@ impl Swapchain {
                 )
             })
             .map(|swapchain_image_view| {
-                let attachments = [color_image.view, depth_image.view, swapchain_image_view];
+                let msaa_attachments = [color_image.view, depth_image.view, swapchain_image_view];
+                let non_msaa_attachments = [swapchain_image_view, depth_image.view];
 
-                let frame_buffer_create_info = vk::FramebufferCreateInfo::builder()
-                    .render_pass(render_pass)
-                    .attachments(&attachments)
-                    .width(swapchain_info.resolution.width)
-                    .height(swapchain_info.resolution.height)
-                    .layers(1); // NOTE: multiview takes care of layers.
+                let frame_buffer_create_info = if USE_MSAA {
+                    vk::FramebufferCreateInfo::builder()
+                        .render_pass(render_pass)
+                        .attachments(&msaa_attachments)
+                        .width(swapchain_info.resolution.width)
+                        .height(swapchain_info.resolution.height)
+                        .layers(1) // NOTE: multiview takes care of layers.
+                } else {
+                    vk::FramebufferCreateInfo::builder()
+                        .render_pass(render_pass)
+                        .attachments(&non_msaa_attachments)
+                        .width(swapchain_info.resolution.width)
+                        .height(swapchain_info.resolution.height)
+                        .layers(1) // NOTE: multiview takes care of layers.
+                };
 
                 unsafe {
                     vulkan_context
