@@ -15,7 +15,7 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 ];
 
 const CULLING_TIMEOUT: u64 = u64::MAX;
-pub const USE_MSAA: bool = false;
+pub const USE_MSAA: bool = true;
 
 use crate::{
     contexts::{VulkanContext, XrContext},
@@ -40,12 +40,12 @@ use openxr as xr;
 use vk_shader_macros::include_glsl;
 
 static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert", target: vulkan1_1);
-static FRAG: &[u32] = include_glsl!("src/shaders/all_textures_no_ibl.frag", target: vulkan1_1);
+static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag", target: vulkan1_1);
 static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
 
 // TODO: Is this a good idea?
 pub const PIPELINE_DEPTH: usize = 2;
-pub const SAMPLES: vk::SampleCountFlags = vk::SampleCountFlags::TYPE_1;
+pub const SAMPLES: vk::SampleCountFlags = vk::SampleCountFlags::TYPE_4;
 
 pub struct RenderContext {
     pub frame_index: usize,
@@ -763,7 +763,15 @@ fn create_pipeline_layout(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout> {
-    let create_info = &vk::PipelineLayoutCreateInfo::builder().set_layouts(set_layouts);
+    let push_constant_range = vk::PushConstantRange::builder()
+        .offset(0)
+        .size(std::mem::size_of::<u32>() as _)
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT);
+
+    let create_info = &vk::PipelineLayoutCreateInfo::builder()
+        .set_layouts(set_layouts)
+        .push_constant_ranges(slice_from_ref(&push_constant_range));
+
     unsafe {
         vulkan_context
             .device

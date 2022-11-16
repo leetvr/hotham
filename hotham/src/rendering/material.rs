@@ -19,28 +19,29 @@ pub static NO_MATERIAL: usize = 0;
 #[repr(C, align(16))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
-    /// The base color of the material
-    pub base_color_factor: Vec4,
-    /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
-    pub workflow: u32,
-    /// The base color texture.
-    pub base_color_texture_set: u32,
-    /// The metallic-roughness texture.
-    pub metallic_roughness_texture_id: u32,
-    /// Normal texture
-    pub normal_texture_set: u32,
-    /// Occlusion texture set
-    pub occlusion_texture_set: u32,
-    /// Emissive texture set
-    pub emissive_texture_set: u32,
-    /// The factor for the metalness of the material.
-    pub metallic_factor: f32,
-    /// The factor for the roughness of the material.
-    pub roughness_factor: f32,
-    /// Alpha mask - see fragment shader
-    pub alpha_mask: f32,
-    /// Alpha mask cutoff - see fragment shader
-    pub alpha_mask_cutoff: f32,
+    /// fuck you
+    pub textures: Vec4,
+    // /// The base color of the material
+    // pub base_color_factor: Vec4,
+    // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
+    // pub workflow: u32,
+    // pub base_color_texture_set: u32,
+    // /// The metallic-roughness texture.
+    // pub metallic_roughness_texture_id: u32,
+    // /// Normal texture
+    // pub normal_texture_set: u32,
+    // /// Occlusion texture set
+    // // pub occlusion_texture_set: u32,
+    // /// Emissive texture set
+    // pub emissive_texture_set: u32,
+    // /// The factor for the metalness of the material.
+    // pub metallic_factor: f32,
+    // /// The factor for the roughness of the material.
+    // pub roughness_factor: f32,
+    // /// Alpha mask - see fragment shader
+    // pub alpha_mask: f32,
+    // /// Alpha mask cutoff - see fragment shader
+    // pub alpha_mask_cutoff: f32,
 }
 
 impl Default for Material {
@@ -136,17 +137,20 @@ impl Material {
 
         // Collect the material properties.
         let material = Material {
-            base_color_factor,
-            workflow,
-            base_color_texture_set,
-            metallic_roughness_texture_id: metallic_roughness_texture_set,
-            normal_texture_set,
-            occlusion_texture_set,
-            emissive_texture_set,
-            metallic_factor,
-            roughness_factor,
-            alpha_mask,
-            alpha_mask_cutoff,
+            textures: [
+                base_color_texture_set as f32,
+                metallic_roughness_texture_set as f32,
+                normal_texture_set as f32,
+                emissive_texture_set as f32,
+            ]
+            .into(),
+            // base_color_factor,
+            // workflow,
+            // occlusion_texture_set,
+            // metallic_factor,
+            // roughness_factor,
+            // alpha_mask,
+            // alpha_mask_cutoff,
         };
 
         // Then push it into the materials buffer
@@ -162,7 +166,7 @@ impl Material {
     /// Create a simple, unlit, white coloured material.
     pub fn unlit_white() -> Material {
         Material {
-            workflow: UNLIT_WORKFLOW,
+            // workflow: UNLIT_WORKFLOW,
             ..Default::default()
         }
     }
@@ -171,17 +175,18 @@ impl Material {
     /// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material-pbrmetallicroughness
     pub fn gltf_default() -> Self {
         Self {
-            base_color_factor: [1., 1., 1., 1.].into(),
-            workflow: METALLIC_ROUGHNESS_WORKFLOW,
-            base_color_texture_set: NO_TEXTURE,
-            metallic_roughness_texture_id: NO_TEXTURE,
-            normal_texture_set: NO_TEXTURE,
-            occlusion_texture_set: NO_TEXTURE,
-            emissive_texture_set: NO_TEXTURE,
-            metallic_factor: 1.0,
-            roughness_factor: 1.0,
-            alpha_mask: Default::default(),
-            alpha_mask_cutoff: Default::default(),
+            textures: Default::default(),
+            // base_color_factor: [1., 1., 1., 1.].into(),
+            // workflow: METALLIC_ROUGHNESS_WORKFLOW,
+            // base_color_texture_set: NO_TEXTURE,
+            // metallic_roughness_texture_id: NO_TEXTURE,
+            // normal_texture_set: NO_TEXTURE,
+            // occlusion_texture_set: NO_TEXTURE,
+            // emissive_texture_set: NO_TEXTURE,
+            // metallic_factor: 1.0,
+            // roughness_factor: 1.0,
+            // alpha_mask: Default::default(),
+            // alpha_mask_cutoff: Default::default(),
         }
     }
 }
