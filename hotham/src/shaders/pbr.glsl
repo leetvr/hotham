@@ -6,22 +6,10 @@
 #define ENVIRONMENT_MAP_TEXTURE_ID 1
 #define ERROR_MAGENTA vec4(1., 0., 1., 1.)
 
-struct Material {
-    vec4 baseColorFactor;
-    uint workflow;
-    uint baseColorTextureID;
-    uint metallicRoughnessTextureID;
-    uint normalTextureID;
-    uint occlusionTextureID;
-    uint emissiveTextureID;
-    float metallicFactor;
-    float roughnessFactor;
-    float alphaMask;
-    float alphaMaskCutoff;
-};
-
-const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
-const float PBR_WORKFLOW_UNLIT = 1.0;
+layout( push_constant ) uniform constants
+{
+    uint baseTextureID;
+} pc;
 
 // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance (eg. f0) of 0.04
 const vec3 DEFAULT_F0 = vec3(0.04);
@@ -131,26 +119,15 @@ vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3
     return color;
 }
 
-vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
+vec3 getPBRMetallicRoughnessColor() {
+    vec3 baseColor = texture(textures[pc.baseTextureID, inUV]).rgb;
+    // As per the glTF spec:
+    // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
+    // Its green channel contains roughness values and its blue channel contains metalness values.
+    vec4 amrSample = texture(textures[pc.baseTextureID + 1], inUV);
 
-    // Metallic and Roughness material properties are packed together
-    // In glTF, these factors can be specified by fixed scalar values
-    // or from a metallic-roughness map
-    float perceptualRoughness = material.roughnessFactor;
-    float metalness = material.metallicFactor;
-
-    if (material.metallicRoughnessTextureID == NOT_PRESENT) {
-        perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
-        metalness = clamp(metalness, 0., 1.0);
-    } else {
-        // As per the glTF spec:
-        // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
-        // Its green channel contains roughness values and its blue channel contains metalness values.
-        vec4 mrSample = texture(textures[material.metallicRoughnessTextureID], inUV);
-
-        perceptualRoughness = clamp(mrSample.g * perceptualRoughness, 0.0, 1.0);
-        metalness = clamp(mrSample.b * metalness, 0.0, 1.0);
-    }
+    perceptualRoughness = clamp(mrSample.g * perceptualRoughness, 0.0, 1.0);
+    metalness = clamp(mrSample.b * metalness, 0.0, 1.0);
 
     // Get this material's f0
     vec3 f0 = mix(vec3(DEFAULT_F0), baseColor.rgb, metalness);

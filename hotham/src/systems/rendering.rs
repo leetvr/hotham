@@ -1,6 +1,6 @@
 use crate::{
     components::{skin::NO_SKIN, stage, GlobalTransform, Mesh, Skin, Visible},
-    contexts::VulkanContext,
+    contexts::{render_context::create_push_constant, VulkanContext},
     contexts::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
@@ -184,6 +184,14 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                     .get(&current_primitive_id)
                     .unwrap()
                     .primitive;
+                let constants = create_push_constant(&4);
+                device.cmd_push_constants(
+                    command_buffer,
+                    render_context.pipeline_layout,
+                    ash::vk::ShaderStageFlags::FRAGMENT,
+                    0,
+                    constants,
+                );
                 device.cmd_draw_indexed(
                     command_buffer,
                     primitive.indices_count,
@@ -226,6 +234,15 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
             .get(&current_primitive_id)
             .unwrap()
             .primitive;
+
+        let constants = create_push_constant(&4);
+        device.cmd_push_constants(
+            command_buffer,
+            render_context.pipeline_layout,
+            ash::vk::ShaderStageFlags::FRAGMENT,
+            0,
+            constants,
+        );
         device.cmd_draw_indexed(
             command_buffer,
             primitive.indices_count,
