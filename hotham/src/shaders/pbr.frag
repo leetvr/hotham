@@ -146,7 +146,7 @@ vec3 getPBRMetallicRoughnessColor() {
     float metalness = clamp(amrSample.b, 0.0, 1.0);
 
     // Get this material's f0
-    vec3 f0 = mix(vec3(DEFAULT_F0), baseColor.rgb, metalness);
+    vec3 f0 = mix(DEFAULT_F0, baseColor.rgb, metalness);
 
     // Get the diffuse color
     vec3 diffuseColor = mix(baseColor.rgb, vec3(0.), metalness);
@@ -156,7 +156,8 @@ vec3 getPBRMetallicRoughnessColor() {
     float alphaRoughness = perceptualRoughness * perceptualRoughness;
 
     // Get the view vector - from surface point to camera
-    vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
+    // vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
+    vec3 v = normalize(vec3(0, 0.5, 0) - inGosPos);
 
     // Get the normal
     vec3 n = getNormal();
@@ -167,11 +168,11 @@ vec3 getPBRMetallicRoughnessColor() {
 
     // Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
     vec3 color;
-    if (sceneData.params.x > 0.) {
-        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * sceneData.params.x;
-    } else {
-        color = vec3(0.);
-    }
+    // if (sceneData.params.x > 0.) {
+        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV);
+    // } else {
+    //     color = vec3(0.);
+    // }
 
     // Occlusion is stored in the 'r' channel as per the glTF spec
     float ao = amrSample.r;
@@ -180,18 +181,23 @@ vec3 getPBRMetallicRoughnessColor() {
     // Walk through each light and add its color contribution.
     // Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
     // Since these values are uniform, they shouldn't have too high of a penalty.
-    if (sceneData.lights[0].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[0]);
-    }
-    if (sceneData.lights[1].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[1]);
-    }
-    if (sceneData.lights[2].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[2]);
-    }
-    if (sceneData.lights[3].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[3]);
-    }
+    Light light = Light(vec3(0.1612209, -0.7077924, 0.68777746), 0, vec3(1.), 10., vec3(0.), 0, 0, 0);
+    color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, light);
+    color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, light);
+    color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, light);
+    color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, light);
+    // if (sceneData.lights[0].type != NOT_PRESENT) {
+    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[0]);
+    // }
+    // if (sceneData.lights[1].type != NOT_PRESENT) {
+    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[1]);
+    // }
+    // if (sceneData.lights[2].type != NOT_PRESENT) {
+    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[2]);
+    // }
+    // if (sceneData.lights[3].type != NOT_PRESENT) {
+    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[3]);
+    // }
 
     // Add emission, if present
     vec3 emissive = texture(textures[pc.baseTextureID + 3], inUV).rgb;
