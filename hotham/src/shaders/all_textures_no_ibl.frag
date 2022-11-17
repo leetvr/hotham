@@ -12,15 +12,6 @@ layout (location = 3) in vec3 inNormal;
 layout (set = 0, binding = 4) uniform sampler2D textures[];
 layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
-struct Material {
-    uint baseColorTextureID;
-    uint metallicRoughnessTextureID;
-    uint normalTextureID;
-    uint emissiveTextureID;
-};
-
-// layout (set = 1, binding = 0) uniform sampler2D baseColorTexture;
-
 layout( push_constant ) uniform constants
 {
     uint baseColorTextureID;
@@ -29,25 +20,37 @@ layout( push_constant ) uniform constants
 // Outputs
 layout (location = 0) out vec4 outColor;
 
+struct Light {
+    vec3 direction;
+    float range;
+
+    vec3 color;
+    float intensity;
+
+    vec3 position;
+    float innerConeCos;
+
+    float outerConeCos;
+    uint type;
+};
+
+const uint LightType_Directional = 0;
+const uint LightType_Point = 1;
+const uint LightType_Spot = 2;
+
+layout (set = 0, binding = 3) readonly uniform SceneData {
+    mat4 viewProjection[2];
+    vec4 cameraPosition[2];
+    vec4 params;
+    Light lights[4];
+} sceneData;
+
+
 // The world's worst shader (TM).
 //
 // Takes all the textures and blends them into a slurry. Gives no fucks whether the texture is actually there.
 void main() {
-    // Retrieve the material from the buffer.
-    // Material material = materialBuffer.materials[inMaterialID];
-    // vec4 textureID = materialBuffer.textureIDs[inMaterialID];
-    uint start = PushConstants.baseColorTextureID;
-    vec4 baseColor = texture(textures[start], inUV);
-    vec4 mr = texture(textures[start + 1], inUV);
-    vec4 normal =   texture(textures[start + 2], inUV);
-    vec4 emissive = texture(textures[start + 3], inUV);
-    // vec4 baseColor = texture(textures[4], inUV);
-    // vec4 mr = texture(textures[5], inUV);
-    // vec4 normal =   texture(textures[6], inUV);
-    // vec4 emissive = texture(textures[7], inUV);
-    // outColor = textureID;
-    // outColor = texture(baseColorTexture, inUV);
-    // vec4 baseColor = texture(textures[PushConstants.baseColorTextureID], inUV);
-    // outColor = baseColor;
-    outColor = baseColor + mr + normal + emissive;
+    // outColor = sceneData.params * sceneData.viewProjection[0] * sceneData.viewProjection[1] * sceneData.lights[0].range * sceneData.lights[1].range;
+    outColor = vec4(1.0);
+
 }
