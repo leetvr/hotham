@@ -19,8 +19,8 @@ pub static NO_MATERIAL: usize = 0;
 #[repr(C, align(16))]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
-    /// fuck you
-    pub textures: Vec4,
+    /// The first texture ID used
+    pub base_texture_id: u16,
     // /// The base color of the material
     // pub base_color_factor: Vec4,
     // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
@@ -137,13 +137,7 @@ impl Material {
 
         // Collect the material properties.
         let material = Material {
-            textures: [
-                base_color_texture_set as f32,
-                metallic_roughness_texture_set as f32,
-                normal_texture_set as f32,
-                emissive_texture_set as f32,
-            ]
-            .into(),
+            base_texture_id: base_color_texture_set as _,
             // base_color_factor,
             // workflow,
             // occlusion_texture_set,
@@ -175,7 +169,7 @@ impl Material {
     /// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material-pbrmetallicroughness
     pub fn gltf_default() -> Self {
         Self {
-            textures: Default::default(),
+            base_texture_id: NO_TEXTURE as _,
             // base_color_factor: [1., 1., 1., 1.].into(),
             // workflow: METALLIC_ROUGHNESS_WORKFLOW,
             // base_color_texture_set: NO_TEXTURE,
