@@ -1,9 +1,19 @@
 #extension GL_EXT_nonuniform_qualifier:enable
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_multiview : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_EXT_shader_16bit_storage : require
 
 #define NOT_PRESENT 4294967295
 #define MAX_JOINTS 64
+
+#define PI                 F16(3.14159265359)
+#define HALF_PI            F16(1.570796327)
+#define MEDIUMP_FLT_MAX    F16(65504.0)
+#define MEDIUMP_FLT_MIN    F16(0.00006103515625)
+#define saturateMediump(x) min(x, MEDIUMP_FLT_MAX)
+#define F16(x)             float16_t(x)                    
+#define V16(x)             f16vec3(x) 
 
 struct DrawData {
     mat4 gosFromLocal;
@@ -14,6 +24,7 @@ struct DrawData {
 
 // Representation of a light in a scene, based on the KHR_lights_punctual extension:
 // https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_lights_punctual
+// TODO: make these f16
 struct Light {
     vec3 direction;
     float range;
