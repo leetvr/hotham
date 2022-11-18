@@ -14,6 +14,7 @@
 #define saturateMediump(x) min(x, MEDIUMP_FLT_MAX)
 #define F16(x)             float16_t(x)                    
 #define V16(x)             f16vec3(x) 
+#define saturate(x)        clamp(x, F16(0), F16(1))
 
 struct DrawData {
     mat4 gosFromLocal;
@@ -27,15 +28,15 @@ struct DrawData {
 // TODO: make these f16
 struct Light {
     vec3 direction;
-    float range;
+    float falloff;
 
     vec3 color;
     float intensity;
 
     vec3 position;
-    float innerConeCos;
+    float lightAngleScale;
 
-    float outerConeCos;
+    float lightAngleOffset;
     uint type;
 };
 
