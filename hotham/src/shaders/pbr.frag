@@ -106,7 +106,7 @@ vec3 getNormal() {
 //     return diffuse + specular;
 // }
 
-f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffuseColor, f16vec3 n, vec3 v, float16_t NdotV, Light light) {
+f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffuseColor, vec3 n, vec3 v, float16_t NdotV, Light light) {
     // Get a vector between this point and the light.
     vec3 pointToLight;
     if (light.type != LightType_Directional) {
@@ -115,31 +115,30 @@ f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffu
         pointToLight = -light.direction;
     }
 
-    f16vec3 l = V16(normalize(pointToLight));
-    f16vec3 h = normalize(l + V16(v));  // Half vector between both l and v
+    vec3 l = normalize(pointToLight);
+    vec3 h = normalize(l + v);  // Half vector between both l and v
 
-    float16_t NdotL = F16(clamp(dot(n, l), F16(0), F16(1)));
-    float16_t NdotH = F16(clamp(dot(n, h), F16(0), F16(1)));
-    float16_t LdotH = F16(clamp(dot(l, h), F16(0), F16(1)));
+    float16_t NdotL = F16(clamp(dot(n, l), 0, 1));
+    float16_t NdotH = F16(clamp(dot(n, h), 0, 1));
+    float16_t LdotH = F16(clamp(dot(l, h), 0, 1));
 
     f16vec3 color;
 
     if (NdotL > 0. || NdotV > 0.) {
-        // vec3 intensity = getLightIntensity(light, pointToLight);
-        f16vec3 intensity = V16(1);
+        float16_t attenuation = getLightAttenuation(light, pointToLight, v);
 
-        f16vec3 diffuseContrib = intensity * diffuseColor * BRDF_LAMBERTIAN;
-        f16vec3 specContrib = intensity * NdotL * BRDF_specular(f0, alphaRoughness, h, n, NdotV, NdotL, NdotH, LdotH);
+        f16vec3 diffuseContrib = diffuseColor * BRDF_LAMBERTIAN;
+        f16vec3 specContrib = BRDF_specular(f0, alphaRoughness, V16(h), V16(n), NdotV, NdotL, NdotH, LdotH);
 
         // Finally, combine the diffuse and specular contributions
-        color = diffuseContrib + specContrib;
+        color = (diffuseContrib + specContrib) * (attenuation * NdotL);
     }
 
     return color;
 }
 
 vec3 getPBRMetallicRoughnessColor() {
-    f16vec3 baseColor = V16(texture(textures[pc.baseTextureID], inUV).rgb);
+    f16vec3 baseColor = V16(texture(textures[pc.baseTextureID], inUV));
     // As per the glTF spec:
     // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
     // Its green channel contains roughness values and its blue channel contains metalness values.
@@ -163,13 +162,11 @@ vec3 getPBRMetallicRoughnessColor() {
     vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
 
     // Get the normal
-    vec3 n = V16(getNormal());
+    vec3 n = getNormal();
 
     // Get NdotV and reflection
-    float16_t NdotV = F16(clamp(abs(dot(n, v)), 0., 1.0));
+    float16_t NdotV = saturate(F16(abs(dot(n, v))));
     // vec3 reflection = normalize(reflect(V16(-v), n));
-
-    f16vec3 f16n = V16(n);
 
     // Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
     vec3 color;
@@ -187,21 +184,20 @@ vec3 getPBRMetallicRoughnessColor() {
     // Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
     // Since these values are uniform, they shouldn't have too high of a penalty.
     if (sceneData.lights[0].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[0]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[0]);
     }
     if (sceneData.lights[1].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[1]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[1]);
     }
     if (sceneData.lights[2].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[2]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[2]);
     }
-    if (sceneData.lights[3].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[3]);
-    }
+    // if (sceneData.lights[3].type != NOT_PRESENT) {
+    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[3]);
+    // }
 
     // Add emission, if present
-    // vec3 emissive = texture(textures[pc.baseTextureID + 3], inUV).rgb;
-    // color += emissive;
+    color += texture(textures[pc.baseTextureID + 3], inUV).rgb;
 
     return color;
 }
