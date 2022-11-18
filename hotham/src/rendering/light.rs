@@ -20,7 +20,7 @@ pub struct Light {
     /// The direction the light is facing.
     pub direction: Vec3,
     /// The range of the light. -1 indicates infinite range.
-    pub range: f32,
+    pub falloff: f32,
 
     /// RGB value for the color of the light in linear space.
     pub color: Vec3,
@@ -31,11 +31,12 @@ pub struct Light {
 
     /// The position of the light
     pub position: Vec3,
-    /// Cosine of the angle, in radians, from center of spotlight where falloff begins.
-    pub inner_cone_cos: f32,
 
-    /// Cosine of the angle, in radians, from center of spotlight where falloff ends.
-    pub outer_cone_cos: f32,
+    /// Pre-computed value for spotlights
+    pub light_angle_scale: f32,
+
+    /// Pre-computed value for spotlights
+    pub light_angle_offset: f32,
     /// The type of the light. LIGHT_TYPE_NONE indicates to the fragment shader that this light is empty.
     pub light_type: u32,
 }
@@ -59,14 +60,18 @@ impl Light {
         inner_cone_angle: f32,
         outer_cone_angle: f32,
     ) -> Self {
+        let (scale, offset) = get_offet_and_scale(inner_cone_angle, outer_cone_angle);
+
+        let falloff = get_falloff(range);
+
         Self {
             direction,
-            range,
+            falloff,
             color,
             intensity,
             position,
-            inner_cone_cos: inner_cone_angle.cos(),
-            outer_cone_cos: outer_cone_angle.cos(),
+            light_angle_scale: scale,
+            light_angle_offset: offset,
             light_type: LIGHT_TYPE_SPOT,
         }
     }
@@ -86,7 +91,7 @@ impl Light {
     pub fn new_point(position: Vec3, range: f32, intensity: f32, color: Vec3) -> Self {
         Self {
             position,
-            range,
+            falloff: get_falloff(range),
             color,
             intensity,
             light_type: LIGHT_TYPE_POINT,
@@ -124,5 +129,29 @@ impl Light {
                 outer_cone_angle,
             ),
         }
+    }
+}
+
+fn get_offet_and_scale(inner_cone_angle: f32, outer_cone_angle: f32) -> (f32, f32) {
+    let inner_cone_angle = inner_cone_angle
+        .abs()
+        .clamp(0.5_f32.to_radians(), std::f32::consts::FRAC_PI_2);
+    let outer_cone_angle = outer_cone_angle
+        .abs()
+        .clamp(0.5_f32.to_radians(), std::f32::consts::FRAC_PI_2);
+    let inner_cone_angle = inner_cone_angle.min(outer_cone_angle);
+    let cos_inner = inner_cone_angle.cos();
+    let cos_outer = outer_cone_angle.cos();
+    let scale = 1.0 / f32::max(1.0 / 1024.0, cos_inner - cos_outer);
+    let offset = -cos_outer * scale;
+    (scale, offset)
+}
+
+fn get_falloff(range: f32) -> f32 {
+    let squared = range * range;
+    if squared > 0.0 {
+        1. / squared
+    } else {
+        0.0
     }
 }
