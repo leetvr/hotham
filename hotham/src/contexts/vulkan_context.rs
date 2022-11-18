@@ -100,8 +100,12 @@ impl VulkanContext {
         };
 
         // Seems fine.
-        let enabled_extensions = ["VK_EXT_astc_decode_mode", "VK_EXT_descriptor_indexing"]
-            .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
+        let enabled_extensions = [
+            "VK_EXT_astc_decode_mode",
+            "VK_EXT_descriptor_indexing",
+            "VK_KHR_shader_float16_int8",
+        ]
+        .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
 
         let queue_family_index = unsafe {
             instance

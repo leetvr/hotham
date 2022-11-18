@@ -2,10 +2,13 @@
 // https://github.com/KhronosGroup/glTF-WebGL-PBR
 
 #version 460
+
 #extension GL_GOOGLE_include_directive : require
+
 #include "common.glsl"
 #include "lights.glsl"
 #include "brdf.glsl"
+
 
 // Inputs
 layout (location = 0) in vec3 inGosPos;
@@ -31,22 +34,22 @@ layout( push_constant ) uniform constants
 } pc;
 
 // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance (eg. f0) of 0.04
-const vec3 DEFAULT_F0 = vec3(0.04);
+#define DEFAULT_F0 V16(0.04)
 
 // Fast approximation of ACES tonemap
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-vec3 toneMapACES_Narkowicz(vec3 color) {
-    const float A = 2.51;
-    const float B = 0.03;
-    const float C = 2.43;
-    const float D = 0.59;
-    const float E = 0.14;
-    return clamp((color * (A * color + B)) / (color * (C * color + D) + E), 0.0, 1.0);
-}
+// vec3 toneMapACES_Narkowicz(vec3 color) {
+//     const float16_t A = F16(2.51);
+//     const float16_t B = F160.03;
+//     const float16_t C = 2.43;
+//     const float16_t D = 0.59;
+//     const float16_t E = 0.14;
+//     return clamp((color * (A * color + B)) / (color * (C * color + D) + E), 0.0, 1.0);
+// }
 
 vec3 tonemap(vec3 color) {
     color *= DEFAULT_EXPOSURE;
-    color = toneMapACES_Narkowicz(color.rgb);
+    // color = toneMapACES_Narkowicz(color.rgb);
     return color;
 }
 
@@ -76,34 +79,34 @@ vec3 getNormal() {
 }
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
-vec3 getIBLContribution(vec3 F0, float perceptualRoughness, vec3 diffuseColor, vec3 reflection, float NdotV) {
-    float lod = perceptualRoughness * float(DEFAULT_CUBE_MIPMAP_LEVELS - 1);
+// vec3 getIBLContribution(vec3 F0, float16_t perceptualRoughness, vec3 diffuseColor, vec3 reflection, float16_t NdotV) {
+//     float16_tlod = perceptualRoughness * float(DEFAULT_CUBE_MIPMAP_LEVELS - 1);
 
-    vec2 brdfSamplePoint = clamp(vec2(NdotV, perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-    vec2 f_ab = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rg;
-    vec3 specularLight = textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb;
+//     vec2 brdfSamplePoint = clamp(vec2(NdotV, perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
+//     vec2 f_ab = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rg;
+//     vec3 specularLight = textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb;
 
-    // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
-    // Roughness dependent fresnel, from Fdez-Aguera
-    vec3 Fr = max(vec3(1.0 - perceptualRoughness), F0) - F0;
-    vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
-    vec3 FssEss = k_S * f_ab.x + f_ab.y;
+//     // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
+//     // Roughness dependent fresnel, from Fdez-Aguera
+//     vec3 Fr = max(vec3(1.0 - perceptualRoughness), F0) - F0;
+//     vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
+//     vec3 FssEss = k_S * f_ab.x + f_ab.y;
 
-    vec3 specular = specularLight * FssEss;
+//     vec3 specular = specularLight * FssEss;
 
-    // Multiple scattering, from Fdez-Aguera
-    vec3 diffuseLight = textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).rgb;
-    float Ems = (1.0 - (f_ab.x + f_ab.y));
-    vec3 F_avg = F0 + (1.0 - F0) / 21.0;
-    vec3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
-    vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms); // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
+//     // Multiple scattering, from Fdez-Aguera
+//     vec3 diffuseLight = textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).rgb;
+//     float16_tEms = (1.0 - (f_ab.x + f_ab.y));
+//     vec3 F_avg = F0 + (1.0 - F0) / 21.0;
+//     vec3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
+//     vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms); // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
 
-    vec3 diffuse = (FmsEms + k_D) * diffuseLight;
+//     vec3 diffuse = (FmsEms + k_D) * diffuseLight;
 
-    return diffuse + specular;
-}
+//     return diffuse + specular;
+// }
 
-vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3 n, vec3 v, float NdotV, Light light) {
+f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffuseColor, f16vec3 n, vec3 v, float16_t NdotV, Light light) {
     // Get a vector between this point and the light.
     vec3 pointToLight;
     if (light.type != LightType_Directional) {
@@ -112,21 +115,21 @@ vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3
         pointToLight = -light.direction;
     }
 
-    vec3 l = normalize(pointToLight);
-    vec3 h = normalize(l + v);  // Half vector between both l and v
+    f16vec3 l = V16(normalize(pointToLight));
+    f16vec3 h = normalize(l + V16(v));  // Half vector between both l and v
 
-    float NdotL = clamp(dot(n, l), 0.0, 1.0);
-    float NdotH = clamp(dot(n, h), 0.0, 1.0);
-    float VdotH = clamp(dot(v, h), 0.0, 1.0);
+    float16_t NdotL = F16(clamp(dot(n, l), F16(0), F16(1)));
+    float16_t NdotH = F16(clamp(dot(n, h), F16(0), F16(1)));
+    float16_t LdotH = F16(clamp(dot(l, h), F16(0), F16(1)));
 
-    vec3 color;
+    f16vec3 color;
 
     if (NdotL > 0. || NdotV > 0.) {
-        vec3 intensity = getLightIntensity(light, pointToLight);
+        // vec3 intensity = getLightIntensity(light, pointToLight);
+        f16vec3 intensity = V16(1);
 
-        // Obtain final intensity as reflectance (BRDF) scaled by the energy of the light (cosine law)
-        vec3 diffuseContrib = intensity * NdotL * BRDF_lambertian(F0, diffuseColor, VdotH);
-        vec3 specContrib = intensity * NdotL * BRDF_specularGGX(F0, alphaRoughness, VdotH, NdotL, NdotV, NdotH);
+        f16vec3 diffuseContrib = intensity * diffuseColor * BRDF_LAMBERTIAN;
+        f16vec3 specContrib = intensity * NdotL * BRDF_specular(f0, alphaRoughness, h, n, NdotV, NdotL, NdotH, LdotH);
 
         // Finally, combine the diffuse and specular contributions
         color = diffuseContrib + specContrib;
@@ -136,72 +139,69 @@ vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3
 }
 
 vec3 getPBRMetallicRoughnessColor() {
-    vec3 baseColor = texture(textures[pc.baseTextureID], inUV).rgb;
+    f16vec3 baseColor = V16(texture(textures[pc.baseTextureID], inUV).rgb);
     // As per the glTF spec:
     // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
     // Its green channel contains roughness values and its blue channel contains metalness values.
-    vec4 amrSample = texture(textures[pc.baseTextureID + 1], inUV);
+    f16vec3 amrSample = V16(texture(textures[pc.baseTextureID + 1], inUV));
 
-    float perceptualRoughness = clamp(amrSample.g, 0.0, 1.0);
-    float metalness = clamp(amrSample.b, 0.0, 1.0);
+    float16_t perceptualRoughness = clamp(amrSample.g, MEDIUMP_FLT_MIN, F16(1.0));
+    float16_t metalness = clamp(amrSample.b, MEDIUMP_FLT_MIN, F16(1.0));
 
     // Get this material's f0
-    vec3 f0 = mix(DEFAULT_F0, baseColor.rgb, metalness);
+    f16vec3 f0 = mix(DEFAULT_F0, baseColor.rgb, metalness);
 
     // Get the diffuse color
-    vec3 diffuseColor = mix(baseColor.rgb, vec3(0.), metalness);
+    f16vec3 diffuseColor = mix(baseColor.rgb, V16(0.), metalness);
 
     // Roughness is authored as perceptual roughness; as is convention,
     // convert to material roughness by squaring the perceptual roughness
-    float alphaRoughness = perceptualRoughness * perceptualRoughness;
+    float16_t alphaRoughness = perceptualRoughness * perceptualRoughness;
 
     // Get the view vector - from surface point to camera
-    // vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
-    vec3 v = normalize(vec3(0, 0.5, 0) - inGosPos);
+    // IMPORTANT: Keep this as 32bit precision
+    vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
 
     // Get the normal
-    vec3 n = getNormal();
+    vec3 n = V16(getNormal());
 
     // Get NdotV and reflection
-    float NdotV = clamp(abs(dot(n, v)), 0., 1.0);
-    vec3 reflection = normalize(reflect(-v, n));
+    float16_t NdotV = F16(clamp(abs(dot(n, v)), 0., 1.0));
+    // vec3 reflection = normalize(reflect(V16(-v), n));
+
+    f16vec3 f16n = V16(n);
 
     // Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
     vec3 color;
     // if (sceneData.params.x > 0.) {
-        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV);
+        // color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV);
     // } else {
     //     color = vec3(0.);
     // }
 
     // Occlusion is stored in the 'r' channel as per the glTF spec
-    float ao = amrSample.r;
-    color = color * ao;
+    // float16_tao = amrSample.r;
+    // color = color * ao;
 
     // Walk through each light and add its color contribution.
     // Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
     // Since these values are uniform, they shouldn't have too high of a penalty.
-    Light light = Light(vec3(0.1612209, -0.7077924, 0.68777746), 0, vec3(1.), 10., vec3(0.), 0, 0, 0);
-    color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, light);
-    color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, light);
-    color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, light);
-    color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, light);
-    // if (sceneData.lights[0].type != NOT_PRESENT) {
-    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[0]);
-    // }
-    // if (sceneData.lights[1].type != NOT_PRESENT) {
-    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[1]);
-    // }
-    // if (sceneData.lights[2].type != NOT_PRESENT) {
-    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[2]);
-    // }
-    // if (sceneData.lights[3].type != NOT_PRESENT) {
-    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[3]);
-    // }
+    if (sceneData.lights[0].type != NOT_PRESENT) {
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[0]);
+    }
+    if (sceneData.lights[1].type != NOT_PRESENT) {
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[1]);
+    }
+    if (sceneData.lights[2].type != NOT_PRESENT) {
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[2]);
+    }
+    if (sceneData.lights[3].type != NOT_PRESENT) {
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[3]);
+    }
 
     // Add emission, if present
-    vec3 emissive = texture(textures[pc.baseTextureID + 3], inUV).rgb;
-    color += emissive;
+    // vec3 emissive = texture(textures[pc.baseTextureID + 3], inUV).rgb;
+    // color += emissive;
 
     return color;
 }
@@ -218,5 +218,5 @@ void main() {
     outColor.rgb = getPBRMetallicRoughnessColor();
 
     // Finally, tonemap the color.
-    outColor.rgb = tonemap(outColor.rgb);
+    outColor.rgb = outColor.rgb;
 }
