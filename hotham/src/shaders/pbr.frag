@@ -106,7 +106,7 @@ vec3 getNormal() {
 //     return diffuse + specular;
 // }
 
-f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffuseColor, vec3 n, vec3 v, float16_t NdotV, Light light) {
+f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffuseColor, vec3 n, vec3 v, float16_t NdotV, Light light, float16_t ao) {
     // Get a vector between this point and the light.
     vec3 pointToLight;
     if (light.type != LightType_Directional) {
@@ -125,33 +125,33 @@ f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffu
     f16vec3 color;
 
     if (NdotL > 0. || NdotV > 0.) {
-        float16_t attenuation = getLightAttenuation(light, pointToLight, v);
+        float16_t attenuation = getLightAttenuation(light, pointToLight, l);
 
         f16vec3 diffuseContrib = diffuseColor * BRDF_LAMBERTIAN;
         f16vec3 specContrib = BRDF_specular(f0, alphaRoughness, V16(h), V16(n), NdotV, NdotL, NdotH, LdotH);
 
         // Finally, combine the diffuse and specular contributions
-        color = (diffuseContrib + specContrib) * (attenuation * NdotL);
+        color = (diffuseContrib + specContrib) * (F16(light.intensity) * attenuation * NdotL * ao);
     }
 
     return color;
 }
 
 vec3 getPBRMetallicRoughnessColor() {
-    f16vec3 baseColor = V16(texture(textures[pc.baseTextureID], inUV));
+    f16vec3 baseColor = V16(texture(textures[pc.baseTextureID], inUV).rgb);
     // As per the glTF spec:
     // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
     // Its green channel contains roughness values and its blue channel contains metalness values.
-    f16vec3 amrSample = V16(texture(textures[pc.baseTextureID + 1], inUV));
+    f16vec3 amrSample = V16(texture(textures[pc.baseTextureID + 1], inUV).rgb);
 
     float16_t perceptualRoughness = clamp(amrSample.g, MEDIUMP_FLT_MIN, F16(1.0));
-    float16_t metalness = clamp(amrSample.b, MEDIUMP_FLT_MIN, F16(1.0));
+    float16_t metalness = amrSample.b;
 
     // Get this material's f0
-    f16vec3 f0 = mix(DEFAULT_F0, baseColor.rgb, metalness);
+    f16vec3 f0 = mix(DEFAULT_F0, baseColor, metalness);
 
     // Get the diffuse color
-    f16vec3 diffuseColor = mix(baseColor.rgb, V16(0.), metalness);
+    f16vec3 diffuseColor = baseColor * (F16(1.0) - metalness);
 
     // Roughness is authored as perceptual roughness; as is convention,
     // convert to material roughness by squaring the perceptual roughness
@@ -177,20 +177,20 @@ vec3 getPBRMetallicRoughnessColor() {
     // }
 
     // Occlusion is stored in the 'r' channel as per the glTF spec
-    // float16_tao = amrSample.r;
+    float16_t ao = amrSample.r;
     // color = color * ao;
 
     // Walk through each light and add its color contribution.
     // Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
     // Since these values are uniform, they shouldn't have too high of a penalty.
     if (sceneData.lights[0].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[0]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[0], ao);
     }
     if (sceneData.lights[1].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[1]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[1], ao);
     }
     if (sceneData.lights[2].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[2]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[2], ao);
     }
     // if (sceneData.lights[3].type != NOT_PRESENT) {
     //     color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[3]);

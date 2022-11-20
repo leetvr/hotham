@@ -142,11 +142,12 @@ fn get_offet_and_scale(inner_cone_angle: f32, outer_cone_angle: f32) -> (f32, f3
     let inner_cone_angle = inner_cone_angle.min(outer_cone_angle);
     let cos_inner = inner_cone_angle.cos();
     let cos_outer = outer_cone_angle.cos();
-    let scale = 1.0 / f32::max(1.0 / 1024.0, cos_inner - cos_outer);
+    let scale = 1.0 / f32::max(0.001, cos_inner - cos_outer);
     let offset = -cos_outer * scale;
     (scale, offset)
 }
 
+// TODO: is this correct? Filament's glTF importer just does this
 fn get_falloff(range: f32) -> f32 {
     let squared = range * range;
     if squared > 0.0 {
