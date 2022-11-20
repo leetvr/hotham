@@ -6,8 +6,8 @@ float16_t getSquareFalloffAttenuation(float16_t distanceSquare, float16_t fallof
     return smoothFactor * smoothFactor;
 }
 
-float16_t getRangeAttenuation(const vec3 posToLight, float16_t falloff) {
-    float16_t distanceSquare = F16(dot(posToLight, posToLight));
+float16_t getRangeAttenuation(const vec3 pointToLight, float16_t falloff) {
+    float16_t distanceSquare = F16(dot(pointToLight, pointToLight));
     float16_t attenuation = getSquareFalloffAttenuation(distanceSquare, falloff);
     // Assume a punctual light occupies a volume of 1cm to avoid a division by 0
     return attenuation / max(distanceSquare, F16(1e-4));
@@ -30,7 +30,7 @@ float16_t getLightAttenuation(Light light, vec3 pointToLight, vec3 l) {
     }
 
     if (light.type == LightType_Spot) {
-        spotAttenuation = getSpotAttenuation(l, light.direction, F16(light.lightAngleScale), F16(light.lightAngleOffset));
+        spotAttenuation = getSpotAttenuation(l, -light.direction, F16(light.lightAngleScale), F16(light.lightAngleOffset));
     }
 
     return rangeAttenuation * spotAttenuation;

@@ -248,7 +248,7 @@ impl RenderContext {
             scene_data.camera_position = self.scene_data.camera_position;
             scene_data.view_projection = self.scene_data.view_projection;
             scene_data.params = self.scene_data.params;
-            scene_data.lights = self.scene_data.lights;
+            scene_data.lights = self.scene_data.lights.clone();
             for light in &mut scene_data.lights {
                 light.position = gos_from_global.transform_point3(light.position);
                 light.direction = gos_from_global.transform_vector3(light.direction);
