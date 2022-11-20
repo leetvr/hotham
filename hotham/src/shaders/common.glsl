@@ -12,8 +12,8 @@
 #define MEDIUMP_FLT_MAX    F16(65504.0)
 #define MEDIUMP_FLT_MIN    F16(0.00006103515625)
 #define saturateMediump(x) min(x, MEDIUMP_FLT_MAX)
-#define F16(x)             float16_t(x)                    
-#define V16(x)             f16vec3(x) 
+#define F16(x)             float16_t(x)
+#define V16(x)             f16vec3(x)
 #define saturate(x)        clamp(x, F16(0), F16(1))
 
 struct DrawData {
