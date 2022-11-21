@@ -138,9 +138,12 @@ pub unsafe fn begin(
             });
         }
     }
+    render_context.render_pass_timer.start();
 
     // This is the VERY LATEST we can possibly update our views, as the compute shader will need them.
     render_context.update_scene_data(views, &gos_from_global, &gos_from_stage);
+
+    render_context.render_pass_timer.end();
 
     // Execute the culling shader on the GPU.
     render_context.cull_objects(vulkan_context);
