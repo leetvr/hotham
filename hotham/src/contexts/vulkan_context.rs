@@ -104,6 +104,7 @@ impl VulkanContext {
             "VK_EXT_astc_decode_mode",
             "VK_EXT_descriptor_indexing",
             "VK_KHR_shader_float16_int8",
+            "VK_KHR_16bit_storage",
         ]
         .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
 
@@ -127,12 +128,6 @@ impl VulkanContext {
             .queue_priorities(&[1.0])
             .build();
 
-        // We use a *whole bunch* of different features, and somewhat annoyingly they're all enabled in different ways.
-        let enabled_features = vk::PhysicalDeviceFeatures::builder()
-            .multi_draw_indirect(true)
-            .sampler_anisotropy(true)
-            .build();
-
         let mut physical_device_features = vk::PhysicalDeviceVulkan11Features::builder()
             .multiview(true)
             .shader_draw_parameters(true);
@@ -140,9 +135,7 @@ impl VulkanContext {
         let mut descriptor_indexing_features =
             vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
                 .shader_sampled_image_array_non_uniform_indexing(true)
-                .descriptor_binding_partially_bound(true)
                 .descriptor_binding_variable_descriptor_count(true)
-                .descriptor_binding_sampled_image_update_after_bind(true)
                 .runtime_descriptor_array(true);
 
         let mut robust_features =
@@ -151,7 +144,6 @@ impl VulkanContext {
         let device_create_info = vk::DeviceCreateInfo::builder()
             .enabled_extension_names(&enabled_extensions)
             .queue_create_infos(slice_from_ref(&graphics_queue_create_info))
-            .enabled_features(&enabled_features)
             .push_next(&mut descriptor_indexing_features)
             .push_next(&mut robust_features)
             .push_next(&mut physical_device_features);
@@ -177,8 +169,6 @@ impl VulkanContext {
         let debug_utils = DebugUtils::new(&entry, &instance);
         let physical_device_properties =
             unsafe { instance.get_physical_device_properties(physical_device) };
-
-        println!(" ..done!");
 
         Ok(Self {
             entry,
