@@ -5,7 +5,11 @@ use crate::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
     },
-    rendering::resources::{DrawData, PrimitiveCullData},
+    rendering::{
+        buffer::Buffer,
+        material::Material,
+        resources::{DrawData, PrimitiveCullData},
+    },
     Engine,
 };
 use glam::Affine3A;
@@ -165,6 +169,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
     let frame = &mut render_context.frames[render_context.frame_index];
     let command_buffer = frame.command_buffer;
     let draw_data_buffer = &mut frame.draw_data_buffer;
+    let material_buffer = &mut render_context.resources.materials_buffer;
     draw_data_buffer.clear();
 
     let mut instance_offset = 0;
@@ -187,20 +192,13 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                     .get(&current_primitive_id)
                     .unwrap()
                     .primitive;
-                let constants = create_push_constant(&4);
-                device.cmd_push_constants(
-                    command_buffer,
+                draw_primitive(
+                    material_buffer,
                     render_context.pipeline_layout,
-                    ash::vk::ShaderStageFlags::FRAGMENT,
-                    0,
-                    constants,
-                );
-                device.cmd_draw_indexed(
+                    primitive,
+                    device,
                     command_buffer,
-                    primitive.indices_count,
                     instance_count,
-                    primitive.index_buffer_offset,
-                    primitive.vertex_buffer_offset as _,
                     instance_offset,
                 );
             }
@@ -238,23 +236,45 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
             .unwrap()
             .primitive;
 
-        let constants = create_push_constant(&4);
-        device.cmd_push_constants(
-            command_buffer,
+        draw_primitive(
+            material_buffer,
             render_context.pipeline_layout,
-            ash::vk::ShaderStageFlags::FRAGMENT,
-            0,
-            constants,
-        );
-        device.cmd_draw_indexed(
+            primitive,
+            device,
             command_buffer,
-            primitive.indices_count,
             instance_count,
-            primitive.index_buffer_offset,
-            primitive.vertex_buffer_offset as _,
             instance_offset,
         );
     }
+}
+
+// TODO: Just push this into `RenderContext`
+unsafe fn draw_primitive(
+    materials_buffer: &Buffer<Material>,
+    pipeline_layout: ash::vk::PipelineLayout,
+    primitive: &crate::rendering::primitive::Primitive,
+    device: &ash::Device,
+    command_buffer: ash::vk::CommandBuffer,
+    instance_count: u32,
+    instance_offset: u32,
+) {
+    let material = &materials_buffer.as_slice()[primitive.material_id as usize];
+    let constants = create_push_constant(material);
+    device.cmd_push_constants(
+        command_buffer,
+        pipeline_layout,
+        ash::vk::ShaderStageFlags::FRAGMENT,
+        0,
+        constants,
+    );
+    device.cmd_draw_indexed(
+        command_buffer,
+        primitive.indices_count,
+        instance_count,
+        primitive.index_buffer_offset,
+        primitive.vertex_buffer_offset as _,
+        instance_offset,
+    );
 }
 
 /// Finish drawing
