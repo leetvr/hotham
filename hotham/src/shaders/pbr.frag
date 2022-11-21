@@ -27,7 +27,7 @@ layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 #define BRDF_LUT_TEXTURE_ID 0
 #define SAMPLER_IRRADIANCE_TEXTURE_ID 0
 #define ENVIRONMENT_MAP_TEXTURE_ID 1
-#define ERROR_MAGENTA vec4(1., 0., 1., 1.)
+#define ERROR_MAGENTA f16vec3(1, 0, 1)
 
 #define TEXTURE_FLAG_HAS_TEXTURES 1
 #define TEXTURE_FLAG_HAS_AO_TEXTURE 2
@@ -44,19 +44,17 @@ layout( push_constant ) uniform constants
 
 // Fast approximation of ACES tonemap
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-// vec3 toneMapACES_Narkowicz(vec3 color) {
-//     const float16_t A = F16(2.51);
-//     const float16_t B = F160.03;
-//     const float16_t C = 2.43;
-//     const float16_t D = 0.59;
-//     const float16_t E = 0.14;
-//     return clamp((color * (A * color + B)) / (color * (C * color + D) + E), 0.0, 1.0);
-// }
+f16vec3 toneMapACES_Narkowicz(f16vec3 color) {
+    const float16_t A = F16(2.51);
+    const float16_t B = F16(0.03);
+    const float16_t C = F16(2.43);
+    const float16_t D = F16(0.59);
+    const float16_t E = F16(0.14);
+    return clamp((color * (A * color + B)) / (color * (C * color + D) + E), F16(0), F16(1));
+}
 
-vec3 tonemap(vec3 color) {
-    color *= DEFAULT_EXPOSURE;
-    // color = toneMapACES_Narkowicz(color.rgb);
-    return color;
+f16vec3 tonemap(const f16vec3 color) {
+    return toneMapACES_Narkowicz(color);
 }
 
 // Get normal, tangent and bitangent vectors.
@@ -85,29 +83,25 @@ vec3 getNormal() {
 }
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
-vec3 getIBLContribution(vec3 F0, float16_t perceptualRoughness, vec3 diffuseColor, vec3 reflection, float16_t NdotV) {
+f16vec3 getIBLContribution(f16vec3 F0, float16_t perceptualRoughness, f16vec3 diffuseColor, f16vec3 reflection, float16_t NdotV) {
     float16_t lod = perceptualRoughness * DEFAULT_CUBE_MIPMAP_LEVELS - F16(1);
 
-    vec2 brdfSamplePoint = clamp(vec2(NdotV, perceptualRoughness), vec2(0.0, 0.0), vec2(1.0, 1.0));
-    vec2 f_ab = texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint).rg;
-    vec3 specularLight = textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).rgb;
+    f16vec2 brdfSamplePoint = clamp(f16vec2(NdotV, perceptualRoughness), f16vec2(0), f16vec2(1.0));
+    f16vec2 f_ab = f16vec2(texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint)).rg;
+    f16vec3 specularLight = V16(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).r);
 
     // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
     // Roughness dependent fresnel, from Fdez-Aguera
-    vec3 Fr = max(vec3(1.0 - perceptualRoughness), F0) - F0;
-    vec3 k_S = F0 + Fr * pow(1.0 - NdotV, 5.0);
-    vec3 FssEss = k_S * f_ab.x + f_ab.y;
+    f16vec3 Fr = max(f16vec3(1.0 - perceptualRoughness), F0) - F0;
+    f16vec3 k_S = F0 + Fr * pow(F16(1.0) - NdotV, F16(5.0));
+    f16vec3 FssEss = k_S * f_ab.x + f_ab.y;
 
-    vec3 specular = specularLight * FssEss;
+    f16vec3 specular = specularLight * FssEss;
 
     // Multiple scattering, from Fdez-Aguera
-    vec3 diffuseLight = textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).rgb;
-    float Ems = (1.0 - (f_ab.x + f_ab.y));
-    vec3 F_avg = F0 + (1.0 - F0) / 21.0;
-    vec3 FmsEms = Ems * FssEss * F_avg / (1.0 - F_avg * Ems);
-    vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms); // we use +FmsEms as indicated by the formula in the blog post (might be a typo in the implementation)
+    f16vec3 diffuseLight = V16(textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).rgb);
 
-    vec3 diffuse = (FmsEms + k_D) * diffuseLight;
+    f16vec3 diffuse = diffuseLight * diffuseColor * BRDF_LAMBERTIAN;
 
     return diffuse + specular;
 }
@@ -143,14 +137,10 @@ f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffu
     return color;
 }
 
-vec3 getPBRMetallicRoughnessColor() {
-    f16vec3 baseColor; 
+f16vec3 getPBRMetallicRoughnessColor() {
+    f16vec3 baseColor;
     f16vec3 amrSample;
     vec3 normal;
-
-    if (material.textureFlags == 0) {
-        return vec3(1);
-    }
 
     if ((material.textureFlags & TEXTURE_FLAG_HAS_TEXTURES) != 0) {
         baseColor = V16(texture(textures[material.baseTextureID], inUV).rgb);
@@ -161,7 +151,7 @@ vec3 getPBRMetallicRoughnessColor() {
         amrSample = V16(texture(textures[material.baseTextureID + 1], inUV).rgb);
     } else {
         baseColor = f16vec3(1);
-        amrSample = f16vec3(1);
+        amrSample = f16vec3(1, 0.5, 0.5);
         normal = inNormal;
     }
 
@@ -185,17 +175,16 @@ vec3 getPBRMetallicRoughnessColor() {
     // Get NdotV and reflection
     float16_t NdotV = saturate(F16(abs(dot(normal, v))));
 
-    // Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
-    vec3 color;
-    if (sceneData.params.x > 0.) {
-        vec3 reflection = normalize(reflect(-v, normal));
-        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV);
-    } else {
-        color = vec3(0.);
-    }
-
     // Occlusion is stored in the 'r' channel as per the glTF spec
     float16_t ao = amrSample.r;
+
+    // Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
+    f16vec3 color;
+    if (sceneData.params.x > 0.) {
+        f16vec3 reflection = normalize(reflect(V16(-v), V16(normal)));
+        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
+    }
+
 
     // Walk through each light and add its color contribution.
     // Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
@@ -215,7 +204,7 @@ vec3 getPBRMetallicRoughnessColor() {
 
     // Add emission, if present
     if ((material.textureFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) > 0) {
-        color += texture(textures[material.baseTextureID + 3], inUV).rgb;
+        color += V16(texture(textures[material.baseTextureID + 3], inUV)).rgb;
     }
 
     return color;
@@ -227,11 +216,9 @@ vec3 getPBRMetallicRoughnessColor() {
 layout (location = 0) out vec4 outColor;
 
 void main() {
-    // Start by setting the output color to a familiar "error" magenta.
-    outColor = ERROR_MAGENTA;
-
-    outColor.rgb = getPBRMetallicRoughnessColor();
+    f16vec3 color = getPBRMetallicRoughnessColor();
 
     // Finally, tonemap the color.
-    outColor.rgb = outColor.rgb;
+    outColor.rgb = tonemap(color);
+    outColor.a = 1;
 }
