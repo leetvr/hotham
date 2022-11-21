@@ -24,6 +24,7 @@ use crate::{
         descriptors::Descriptors,
         frame::Frame,
         image::Image,
+        material::Material,
         primitive::Primitive,
         resources::Resources,
         scene_data::SceneData,
@@ -471,8 +472,9 @@ pub struct Instance {
     pub skin_id: u32,
 }
 
-pub fn create_push_constant<T: Sized>(p: &T) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(p as *const T as *const u8, size_of::<T>()) }
+// TODO: use bytemuck instead
+pub fn create_push_constant<T: 'static>(p: &T) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(p as *const T as *const u8, std::mem::size_of::<T>()) }
 }
 
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
@@ -762,7 +764,7 @@ fn create_pipeline_layout(
 ) -> Result<vk::PipelineLayout> {
     let push_constant_range = vk::PushConstantRange::builder()
         .offset(0)
-        .size(std::mem::size_of::<u32>() as _)
+        .size(std::mem::size_of::<Material>() as _)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT);
 
     let create_info = &vk::PipelineLayoutCreateInfo::builder()
