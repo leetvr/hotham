@@ -29,6 +29,7 @@ use crate::{
         swapchain::{Swapchain, SwapchainInfo},
         vertex::Vertex,
     },
+    util::PerformanceTimer,
     COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
@@ -59,6 +60,7 @@ pub struct RenderContext {
     pub frames: [Frame; PIPELINE_DEPTH],
     pub swapchain: Swapchain,
     pub descriptors: Descriptors,
+    pub render_pass_timer: PerformanceTimer,
 
     // Populated only between rendering::begin and rendering::end
     pub primitive_map: HashMap<u32, InstancedPrimitive>,
@@ -135,6 +137,7 @@ impl RenderContext {
             resources,
 
             primitive_map: HashMap::default(),
+            render_pass_timer: PerformanceTimer::new("PBR Renderpass"),
         })
     }
 

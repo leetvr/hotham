@@ -4,6 +4,7 @@ use crate::{
         AudioContext, GuiContext, HapticContext, InputContext, PhysicsContext, RenderContext,
         VulkanContext, XrContext, XrContextBuilder,
     },
+    util::PerformanceTimer,
     HothamError, HothamResult, VIEW_TYPE,
 };
 use openxr as xr;
@@ -105,6 +106,7 @@ impl<'a> EngineBuilder<'a> {
             physics_context: Default::default(),
             stage_entity,
             hmd_entity,
+            performance_timer: PerformanceTimer::new("total_frame"),
         }
     }
 }
@@ -155,6 +157,8 @@ pub struct Engine {
     pub stage_entity: hecs::Entity,
     /// HMD entity
     pub hmd_entity: hecs::Entity,
+    /// Performance timers
+    pub performance_timer: PerformanceTimer,
 }
 
 /// The result of calling `update()` on Engine.
@@ -261,7 +265,9 @@ impl Engine {
         if self.xr_context.frame_state.should_render {
             render_context.end_frame(vulkan_context);
         }
-        self.xr_context.end_frame()
+        let result = self.xr_context.end_frame();
+
+        result
     }
 }
 
