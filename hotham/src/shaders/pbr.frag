@@ -29,9 +29,10 @@ layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 #define ENVIRONMENT_MAP_TEXTURE_ID 1
 #define ERROR_MAGENTA f16vec3(1, 0, 1)
 
-#define TEXTURE_FLAG_HAS_TEXTURES 1
-#define TEXTURE_FLAG_HAS_AO_TEXTURE 2
-#define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 4
+#define TEXTURE_FLAG_HAS_PBR_TEXTURES 1
+#define TEXTURE_FLAG_HAS_NORMAL_MAP 2
+#define TEXTURE_FLAG_HAS_AO_TEXTURE 4
+#define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 8
 
 layout( push_constant ) uniform constants
 {
@@ -58,12 +59,12 @@ f16vec3 tonemap(const f16vec3 color) {
 }
 
 // Get normal, tangent and bitangent vectors.
-vec3 getNormal() {
+f16vec3 getNormal() {
     vec3 N = normalize(inNormal);
 
-    vec3 textureNormal;
-    textureNormal.xy = texture(textures[material.baseTextureID + 2], inUV).ga * 2.0 - 1.0;
-    textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
+    f16vec3 textureNormal;
+    textureNormal.xy = f16vec2(texture(textures[material.baseTextureID + 2], inUV).ga) * F16(2) - F16(1);
+    textureNormal.z = sqrt(F16(1) - dot(textureNormal.xy, textureNormal.xy));
 
     // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
     // See http://www.thetenthplanet.de/archives/1180 for an explanation of how this works
@@ -79,7 +80,7 @@ vec3 getNormal() {
     vec3 B = normalize(cross(N, T));
     mat3 TBN = mat3(T, B, N);
 
-    return normalize(TBN * textureNormal);
+    return V16(normalize(TBN * textureNormal));
 }
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
@@ -140,19 +141,23 @@ f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffu
 f16vec3 getPBRMetallicRoughnessColor() {
     f16vec3 baseColor;
     f16vec3 amrSample;
-    vec3 normal;
+    f16vec3 normal;
 
-    if ((material.textureFlags & TEXTURE_FLAG_HAS_TEXTURES) != 0) {
+    if ((material.textureFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) {
         baseColor = V16(texture(textures[material.baseTextureID], inUV).rgb);
-        normal = getNormal();
-        // As per the glTF spec:
-        // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
-        // Its green channel contains roughness values and its blue channel contains metalness values.
         amrSample = V16(texture(textures[material.baseTextureID + 1], inUV).rgb);
     } else {
         baseColor = f16vec3(1);
         amrSample = f16vec3(1, 0.5, 0.5);
-        normal = inNormal;
+    }
+
+    if ((material.textureFlags & TEXTURE_FLAG_HAS_NORMAL_MAP) != 0) {
+        normal = getNormal();
+    } else {
+        // As per the glTF spec:
+        // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
+        // Its green channel contains roughness values and its blue channel contains metalness values.
+        normal = normalize(V16(inNormal));
     }
 
     float16_t perceptualRoughness = clamp(amrSample.g, MEDIUMP_FLT_MIN, F16(1.0));
@@ -173,7 +178,7 @@ f16vec3 getPBRMetallicRoughnessColor() {
     vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
 
     // Get NdotV and reflection
-    float16_t NdotV = saturate(F16(abs(dot(normal, v))));
+    float16_t NdotV = saturate(F16(abs(dot(normal, V16(v)))));
 
     // Occlusion is stored in the 'r' channel as per the glTF spec
     float16_t ao = amrSample.r;
