@@ -11,12 +11,14 @@ use bitflags::bitflags;
 bitflags! {
         /// Flags used by the shader to do shit
     pub struct TextureFlags: u32 {
-        /// Do we have base color, normal textures and metallic roughness textures?
-        const HAS_TEXTURES = 0b00000001;
+        /// Do we have base color and metallic roughness textures?
+        const HAS_PBR_TEXTURES = 0b00000001;
+        /// Do we have a normal map?
+        const HAS_NORMAL_MAP = 0b00000010;
         /// Do we have an AO texture?
-        const HAS_AO_TEXTURE = 0b00000010;
+        const HAS_AO_TEXTURE = 0b00000100;
         /// Do we have an emission texture?
-        const HAS_EMISSION_TEXTURE = 0b00000100;
+        const HAS_EMISSION_TEXTURE = 0b00001000;
     }
 }
 
@@ -120,11 +122,12 @@ impl Material {
             .unwrap_or(NO_TEXTURE);
 
         let mut texture_flags = TextureFlags::empty();
-        if base_color_texture_set != NO_TEXTURE
-            && normal_texture_set != NO_TEXTURE
-            && metallic_roughness_texture_set != NO_TEXTURE
-        {
-            texture_flags.toggle(TextureFlags::HAS_TEXTURES);
+        if base_color_texture_set != NO_TEXTURE && metallic_roughness_texture_set != NO_TEXTURE {
+            texture_flags.toggle(TextureFlags::HAS_PBR_TEXTURES);
+        }
+
+        if normal_texture_set != NO_TEXTURE {
+            texture_flags.toggle(TextureFlags::HAS_NORMAL_MAP);
         }
 
         if emissive_texture_set != NO_TEXTURE {
