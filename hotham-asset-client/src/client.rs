@@ -36,12 +36,12 @@ async fn run_client(
 
     let _ = asset_names
         .drain(..)
-        .map(|file| initial_fetch(connection.clone(), file, sender.clone()))
+        .map(|file| ask_for_watch(connection.clone(), file))
         .collect::<futures_util::stream::FuturesUnordered<_>>()
         .try_collect::<Vec<_>>()
         .await?;
 
-    watch_file(bi_streams, connection.clone(), sender)
+    wait_for_updates(bi_streams, connection.clone(), sender)
         .await
         .context("Watching file")?;
 
@@ -53,7 +53,7 @@ async fn run_client(
     Ok(())
 }
 
-async fn watch_file(
+async fn wait_for_updates(
     mut bi_streams: quinn::IncomingBiStreams,
     connection: quinn::Connection,
     sender: Sender<AssetUpdatedMessage>,
@@ -75,35 +75,18 @@ async fn watch_file(
     Ok(())
 }
 
-async fn initial_fetch(
-    connection: quinn::Connection,
-    asset_name: String,
-    sender: Sender<AssetUpdatedMessage>,
-) -> Result<()> {
+async fn ask_for_watch(connection: quinn::Connection, asset_name: String) -> Result<()> {
     let (mut send, mut recv) = connection.open_bi().await?;
 
-    println!(
-        "[CLIENT] Connection established! Sending get request for asset.. {}",
-        asset_name
-    );
-    Message::GetAsset(&asset_name).write_all(&mut send).await?;
-    println!("[CLIENT] Done! Waiting for asset..");
+    println!("[CLIENT] Sending watch request for {asset_name}..",);
+    Message::WatchAsset(&asset_name)
+        .write_all(&mut send)
+        .await?;
+    println!("[CLIENT] Done! Waiting for OK..");
     let mut buffer = vec![0; BUFFER_SIZE];
 
     loop {
         match Message::read(&mut recv, &mut buffer).await? {
-            Message::Asset(buf) => {
-                println!("[CLIENT] Asset received! Sending watch request and waiting for OK",);
-                sender
-                    .send(AssetUpdatedMessage {
-                        asset_id: asset_name.clone(),
-                        asset_data: Arc::new(buf.into()),
-                    })
-                    .await?;
-                Message::WatchAsset(&asset_name)
-                    .write_all(&mut send)
-                    .await?;
-            }
             Message::OK => {
                 println!("[CLIENT] OK received! {} is now being watched", asset_name);
                 return Ok(());
