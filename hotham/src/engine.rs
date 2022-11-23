@@ -2,8 +2,8 @@ use crate::{
     asset_importer::{self, add_model_to_world},
     components::{GlobalTransform, Info, LocalTransform, Parent, Stage, HMD},
     contexts::{
-        AudioContext, GuiContext, HapticContext, InputContext, PhysicsContext, RenderContext,
-        VulkanContext, XrContext, XrContextBuilder,
+        render_context::create_pipeline, AudioContext, GuiContext, HapticContext, InputContext,
+        PhysicsContext, RenderContext, VulkanContext, XrContext, XrContextBuilder,
     },
     workers::Workers,
     HothamError, HothamResult, VIEW_TYPE,
@@ -325,36 +325,22 @@ impl Engine {
                     let render_context = &mut self.render_context;
                     let world = &mut self.world;
 
-                    // First, load the asset in
-                    let asset = asset_updated.asset_data;
-                    let mut scene =
-                        asset_importer::load_scene_from_glb(&asset, vulkan_context, render_context)
-                            .unwrap();
-
-                    let models = &scene.models;
-
-                    // First, then remove the existing assets:
-                    let mut command_buffer = hecs::CommandBuffer::default();
-                    for (e, info) in world.query::<&Info>().iter() {
-                        if !models.contains_key(&info.name) {
-                            continue;
-                        }
-
-                        command_buffer.despawn(e);
-                        despawn_children(world, e, &mut command_buffer);
+                    let file_type = asset_updated.asset_id.split(".").last().unwrap();
+                    match file_type {
+                        "glb" => update_models(
+                            vulkan_context,
+                            render_context,
+                            world,
+                            asset_updated.asset_data,
+                        ),
+                        "spv" => update_shader(
+                            vulkan_context,
+                            render_context,
+                            &asset_updated.asset_id,
+                            asset_updated.asset_data,
+                        ),
+                        _ => {}
                     }
-                    command_buffer.run_on(world);
-
-                    // Add the models back
-                    for name in models.keys() {
-                        add_model_to_world(name, &models, world, None);
-                    }
-
-                    // Clear out the lights
-                    for (i, light) in scene.lights.drain(..).enumerate() {
-                        render_context.scene_data.lights[i] = light;
-                    }
-
                     println!(
                         "[HOTHAM_ASSET_HOT_RELOAD] Asset reload took {:.2} seconds",
                         Instant::now().duration_since(tick).as_secs_f32()
@@ -366,6 +352,83 @@ impl Engine {
             }
         }
     }
+}
+
+fn update_models(
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+    world: &mut hecs::World,
+    asset: Arc<Vec<u8>>,
+) {
+    // First, load the asset in
+    let scene =
+        asset_importer::load_scene_from_glb(&asset, vulkan_context, render_context).unwrap();
+
+    let models = &scene.models;
+
+    // First, then remove the existing assets:
+    let mut command_buffer = hecs::CommandBuffer::default();
+    for (e, info) in world.query::<&Info>().iter() {
+        if !models.contains_key(&info.name) {
+            continue;
+        }
+
+        command_buffer.despawn(e);
+        despawn_children(world, e, &mut command_buffer);
+    }
+    command_buffer.run_on(world);
+
+    // Add the models back
+    for name in models.keys() {
+        add_model_to_world(name, &models, world, None);
+    }
+}
+
+fn update_shader(
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+    shader_name: &str,
+    asset_data: Arc<Vec<u8>>,
+) {
+    println!(
+        "[HOTHAM_ASSET_HOT_RELOAD] STAND BACK - HOT RELOADING SHADER {shader_name} MOTHERFUCKER"
+    );
+
+    {
+        let shaders = &mut render_context.shaders;
+        let shader = u8_to_u32(asset_data);
+        if shader_name.contains("vert") {
+            shaders.vertex_shader = shader;
+        } else {
+            shaders.fragment_shader = shader;
+        }
+    }
+
+    unsafe {
+        vulkan_context.device.device_wait_idle().unwrap();
+        render_context.pipeline = create_pipeline(
+            vulkan_context,
+            render_context.pipeline_layout,
+            &render_context.render_area(),
+            render_context.render_pass,
+            &render_context.shaders,
+        )
+        .unwrap();
+    }
+}
+
+// shout out to wgpu to for this:
+fn u8_to_u32(asset_data: Arc<Vec<u8>>) -> Vec<u32> {
+    let mut words = vec![0u32; asset_data.len() / std::mem::size_of::<u32>()];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            asset_data.as_ptr(),
+            words.as_mut_ptr() as *mut u8,
+            asset_data.len(),
+        );
+    }
+
+    words
 }
 
 fn despawn_children(

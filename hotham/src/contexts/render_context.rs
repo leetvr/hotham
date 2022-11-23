@@ -26,7 +26,7 @@ use crate::{
         image::Image,
         material::Material,
         primitive::Primitive,
-        resources::Resources,
+        resources::{DrawData, Resources},
         scene_data::SceneData,
         swapchain::{Swapchain, SwapchainInfo},
         vertex::Vertex,
@@ -61,9 +61,40 @@ pub struct RenderContext {
     pub frames: [Frame; PIPELINE_DEPTH],
     pub swapchain: Swapchain,
     pub descriptors: Descriptors,
+    pub shaders: Shaders,
 
     // Populated only between rendering::begin and rendering::end
     pub primitive_map: HashMap<u32, InstancedPrimitive>,
+}
+
+pub struct Shaders {
+    pub vertex_shader: Vec<u32>,
+    pub fragment_shader: Vec<u32>,
+    pub compute_shader: Vec<u32>,
+}
+
+impl Default for Shaders {
+    fn default() -> Self {
+        Self {
+            vertex_shader: VERT.into(),
+            fragment_shader: FRAG.into(),
+            compute_shader: COMPUTE.into(),
+        }
+    }
+}
+
+impl Shaders {
+    pub fn new(
+        vertex_shader: Vec<u32>,
+        fragment_shader: Vec<u32>,
+        compute_shader: Vec<u32>,
+    ) -> Self {
+        Self {
+            vertex_shader,
+            fragment_shader,
+            compute_shader,
+        }
+    }
 }
 
 impl RenderContext {
@@ -98,12 +129,17 @@ impl RenderContext {
         let swapchain = Swapchain::new(swapchain_info, vulkan_context, render_pass);
         let pipeline_layout =
             create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.graphics_layout))?;
+
+        let shaders = Default::default();
+
         let pipeline = create_pipeline(
             vulkan_context,
             pipeline_layout,
             &swapchain.render_area,
             render_pass,
+            &shaders,
         )?;
+
         let (compute_pipeline, compute_pipeline_layout) = create_compute_pipeline(
             &vulkan_context.device,
             slice_from_ref(&descriptors.compute_layout),
@@ -135,7 +171,7 @@ impl RenderContext {
             scene_data,
             descriptors,
             resources,
-
+            shaders,
             primitive_map: HashMap::default(),
         })
     }
@@ -598,21 +634,28 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
     Ok(render_pass)
 }
 
-fn create_pipeline(
+pub(crate) fn create_pipeline(
     vulkan_context: &VulkanContext,
     pipeline_layout: vk::PipelineLayout,
     render_area: &vk::Rect2D,
     render_pass: vk::RenderPass,
+    shaders: &Shaders,
 ) -> Result<vk::Pipeline> {
     // Build up the state of the pipeline
 
     // Vertex shader stage
-    let (vertex_shader, vertex_stage) =
-        create_shader(VERT, vk::ShaderStageFlags::VERTEX, vulkan_context)?;
+    let (vertex_shader, vertex_stage) = create_shader(
+        &shaders.vertex_shader,
+        vk::ShaderStageFlags::VERTEX,
+        vulkan_context,
+    )?;
 
     // Fragment shader stage
-    let (fragment_shader, fragment_stage) =
-        create_shader(FRAG, vk::ShaderStageFlags::FRAGMENT, vulkan_context)?;
+    let (fragment_shader, fragment_stage) = create_shader(
+        &shaders.fragment_shader,
+        vk::ShaderStageFlags::FRAGMENT,
+        vulkan_context,
+    )?;
 
     let stages = [vertex_stage, fragment_stage];
 
