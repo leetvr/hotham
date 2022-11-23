@@ -14,8 +14,7 @@
 // Inputs
 layout (location = 0) in vec3 inGosPos;
 layout (location = 1) in vec2 inUV;
-layout (location = 2) flat in uint inMaterialID;
-layout (location = 3) in vec3 inNormal;
+layout (location = 2) in vec3 inNormal;
 
 // Textures
 layout (set = 0, binding = 4) uniform sampler2D textures[];
@@ -221,9 +220,10 @@ f16vec3 getPBRMetallicRoughnessColor() {
 layout (location = 0) out vec4 outColor;
 
 void main() {
-    f16vec3 color = getPBRMetallicRoughnessColor();
+    // f16vec3 color = getPBRMetallicRoughnessColor();
 
     // Finally, tonemap the color.
-    outColor.rgb = tonemap(color);
-    outColor.a = 1;
+    // outColor.rgb = tonemap(color);
+    // outColor.a = 1;
+    outColor = vec4(1, 0, 0, 1);
 }
