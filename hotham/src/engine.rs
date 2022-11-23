@@ -108,7 +108,7 @@ impl<'a> EngineBuilder<'a> {
             stage_entity,
             hmd_entity,
             performance_timers: Default::default(),
-            workers: Default::default(),
+            workers: Workers::new(Default::default()),
         }
     }
 }
@@ -136,7 +136,6 @@ pub struct Engine {
     #[allow(dead_code)]
     resumed: bool,
     event_data_buffer: EventDataBuffer,
-
     /// World
     pub world: hecs::World,
     /// OpenXR context
@@ -310,6 +309,11 @@ impl Engine {
             render_context.end_frame(vulkan_context);
         }
         self.xr_context.end_frame()
+    }
+
+    /// Watch some assets, just for fun.
+    pub fn watch_assets(&mut self, asset_list: Vec<String>) {
+        self.workers = Workers::new(asset_list);
     }
 
     fn check_for_worker_messages(&mut self) -> () {
