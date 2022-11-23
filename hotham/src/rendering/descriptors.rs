@@ -4,11 +4,10 @@ use crate::contexts::{render_context::PIPELINE_DEPTH, VulkanContext};
 use ash::vk;
 
 pub const DRAW_DATA_BINDING: u32 = 0;
-pub const MATERIALS_BINDING: u32 = 1;
-pub const SKINS_BINDING: u32 = 2;
-pub const SCENE_DATA_BINDING: u32 = 3;
-pub const TEXTURE_BINDING: u32 = 4;
-pub const CUBE_TEXTURE_BINDING: u32 = 5;
+pub const SKINS_BINDING: u32 = 1;
+pub const SCENE_DATA_BINDING: u32 = 2;
+pub const TEXTURE_BINDING: u32 = 3;
+pub const CUBE_TEXTURE_BINDING: u32 = 4;
 
 pub const PRIMITIVE_CULL_DATA_BINDING: u32 = 0;
 pub const CULL_PARAMS_BINDING: u32 = 1;
@@ -162,14 +161,6 @@ unsafe fn create_descriptor_layouts(
             binding: DRAW_DATA_BINDING,
             descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
             stage_flags: vk::ShaderStageFlags::VERTEX,
-            descriptor_count: 1,
-            ..Default::default()
-        },
-        // Materials
-        vk::DescriptorSetLayoutBinding {
-            binding: MATERIALS_BINDING,
-            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
-            stage_flags: vk::ShaderStageFlags::FRAGMENT,
             descriptor_count: 1,
             ..Default::default()
         },
