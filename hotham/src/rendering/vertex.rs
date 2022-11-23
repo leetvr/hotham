@@ -11,10 +11,10 @@ pub struct Vertex {
     pub normal: Vec3,
     /// First set of texture coordinates
     pub texture_coords: Vec2,
-    /// Joint indices (for skinning), one byte per index.
-    pub joint_indices: u32,
-    /// Joint weights (for skinning), one byte per weight.
-    pub joint_weights: u32,
+    // /// Joint indices (for skinning), one byte per index.
+    // pub joint_indices: u32,
+    // /// Joint weights (for skinning), one byte per weight.
+    // pub joint_weights: u32,
 }
 
 impl Vertex {
@@ -30,8 +30,8 @@ impl Vertex {
             position,
             normal,
             texture_coords,
-            joint_indices,
-            joint_weights,
+            // joint_indices,
+            // joint_weights,
         }
     }
 
@@ -84,26 +84,26 @@ impl Vertex {
             .offset(memoffset::offset_of!(Vertex, texture_coords) as _)
             .build();
 
-        let joint_indices = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(3)
-            .format(vk::Format::R32_UINT)
-            .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
-            .build();
+        // let joint_indices = vk::VertexInputAttributeDescription::builder()
+        //     .binding(0)
+        //     .location(3)
+        //     .format(vk::Format::R32_UINT)
+        //     .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
+        //     .build();
 
-        let joint_weights = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(4)
-            .format(vk::Format::R32_UINT)
-            .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
-            .build();
+        // let joint_weights = vk::VertexInputAttributeDescription::builder()
+        //     .binding(0)
+        //     .location(4)
+        //     .format(vk::Format::R32_UINT)
+        //     .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
+        //     .build();
 
         vec![
             position,
             normal,
             texture_coords,
-            joint_indices,
-            joint_weights,
+            // joint_indices,
+            // joint_weights,
         ]
     }
 }
