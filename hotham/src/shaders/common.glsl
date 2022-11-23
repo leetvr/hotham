@@ -31,7 +31,7 @@ const uint LightType_Directional = 0;
 const uint LightType_Point = 1;
 const uint LightType_Spot = 2;
 
-layout (set = 0, binding = 3) readonly uniform SceneData {
+layout (set = 0, binding = 2) readonly uniform SceneData {
     mat4 viewProjection[2];
     vec4 cameraPosition[2];
     vec4 params;

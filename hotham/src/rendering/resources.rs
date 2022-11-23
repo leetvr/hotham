@@ -7,7 +7,7 @@ use crate::contexts::vulkan_context;
 
 use super::{
     buffer::Buffer,
-    descriptors::{Descriptors, MATERIALS_BINDING, SKINS_BINDING},
+    descriptors::{Descriptors, SKINS_BINDING},
     image::Image,
     material::Material,
     mesh_data::MeshData,
@@ -16,8 +16,7 @@ use super::{
 };
 
 static VERTEX_BUFFER_SIZE: usize = 2_000_000; // TODO
-static MATERIAL_BUFFER_SIZE: usize = 10_000; // TODO
-static SKINS_BUFFER_SIZE: usize = 100; // TODO
+static SKINS_BUFFER_SIZE: usize = 4; // TODO
 
 pub(crate) const MAX_JOINTS: usize = 64;
 
@@ -63,14 +62,9 @@ impl Resources {
             VERTEX_BUFFER_SIZE,
         );
 
-        let mut materials_buffer = Buffer::new(
-            vulkan_context,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
-            MATERIAL_BUFFER_SIZE,
-        );
-        for set in descriptors.sets {
-            materials_buffer.update_descriptor_set(&vulkan_context.device, set, MATERIALS_BINDING);
-        }
+        // TOOD: unused
+        let mut materials_buffer =
+            Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 10000);
 
         // RESERVE index 0 for the default material, available as the material::NO_MATERIAL constant.
         materials_buffer.push(&Material::default());
