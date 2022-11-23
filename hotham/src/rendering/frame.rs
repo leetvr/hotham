@@ -14,7 +14,10 @@ use super::{
 };
 
 // We *can* draw this many objects, but.. seriously?
-static DRAW_DATA_BUFFER_SIZE: usize = 100_000;
+static DRAW_DATA_BUFFER_SIZE: usize = 500;
+
+// We *can* draw this many objects, but.. seriously?
+static PRIMITIVE_CULL_DATA_BUFFER_SIZE: usize = 100_000;
 
 /// A container for all the resources necessary to render a single frame.
 #[derive(Debug, Clone)]
@@ -69,7 +72,7 @@ impl Frame {
         let draw_data_buffer = unsafe {
             Buffer::new(
                 vulkan_context,
-                vk::BufferUsageFlags::STORAGE_BUFFER,
+                vk::BufferUsageFlags::UNIFORM_BUFFER,
                 DRAW_DATA_BUFFER_SIZE,
             )
         };
@@ -77,7 +80,7 @@ impl Frame {
             Buffer::new(
                 vulkan_context,
                 vk::BufferUsageFlags::STORAGE_BUFFER,
-                DRAW_DATA_BUFFER_SIZE,
+                PRIMITIVE_CULL_DATA_BUFFER_SIZE,
             )
         };
         let mut scene_data_buffer =
