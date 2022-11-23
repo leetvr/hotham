@@ -16,7 +16,7 @@ async fn run_client(
     mut asset_names: Vec<String>,
     sender: Sender<AssetUpdatedMessage>,
 ) -> Result<()> {
-    let server_addr = "192.168.1.114:5000".parse().unwrap();
+    let server_addr = "192.168.1.124:5000".parse().unwrap();
     let client_cfg = configure_client();
     let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap())?;
     endpoint.set_default_client_config(client_cfg);
