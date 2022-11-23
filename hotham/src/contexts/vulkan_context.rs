@@ -675,6 +675,8 @@ impl VulkanContext {
         let mut regions = Vec::new();
 
         let mut offset = 0;
+
+        // KR: https://bit.ly/3ABKTFc
         for (mip_level, offset_increment) in offsets.iter().enumerate() {
             let image_subresource = vk::ImageSubresourceLayers::builder()
                 .aspect_mask(vk::ImageAspectFlags::COLOR)
