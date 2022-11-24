@@ -128,25 +128,33 @@ impl VulkanContext {
             .queue_priorities(&[1.0])
             .build();
 
-        let mut physical_device_features = vk::PhysicalDeviceVulkan11Features::builder()
-            .multiview(true)
-            .shader_draw_parameters(true);
-
         let mut descriptor_indexing_features =
             vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
                 .shader_sampled_image_array_non_uniform_indexing(true)
                 .descriptor_binding_variable_descriptor_count(true)
+                .descriptor_binding_partially_bound(true)
                 .runtime_descriptor_array(true);
+
+        let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::builder().multiview(true);
 
         let mut robust_features =
             vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
+
+        let mut f16_storage =
+            vk::PhysicalDevice16BitStorageFeatures::builder().storage_buffer16_bit_access(true);
+
+        let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::builder()
+            .shader_float16(true)
+            .shader_int8(true);
 
         let device_create_info = vk::DeviceCreateInfo::builder()
             .enabled_extension_names(&enabled_extensions)
             .queue_create_infos(slice_from_ref(&graphics_queue_create_info))
             .push_next(&mut descriptor_indexing_features)
             .push_next(&mut robust_features)
-            .push_next(&mut physical_device_features);
+            .push_next(&mut multiview_features)
+            .push_next(&mut f16_storage)
+            .push_next(&mut f16_arithmetic);
 
         let device_handle = unsafe {
             xr_instance.create_vulkan_device(
