@@ -159,7 +159,7 @@ unsafe fn create_descriptor_layouts(
         // Draw Data
         vk::DescriptorSetLayoutBinding {
             binding: DRAW_DATA_BINDING,
-            descriptor_type: vk::DescriptorType::UNIFORM_BUFFER,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
             stage_flags: vk::ShaderStageFlags::VERTEX,
             descriptor_count: 1,
             ..Default::default()

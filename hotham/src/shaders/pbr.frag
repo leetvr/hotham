@@ -179,13 +179,18 @@ f16vec3 getPBRMetallicRoughnessColor() {
     float16_t NdotV = saturate(F16(abs(dot(normal, V16(v)))));
 
     // Occlusion is stored in the 'r' channel as per the glTF spec
-    float16_t ao = amrSample.r;
+    float16_t ao;
+    if ((material.textureFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) {
+        ao  = amrSample.r;
+    } else {
+        ao = F16(1);
+    }
 
     // Calculate lighting contribution from image based lighting source (IBL), scaled by a scene data parameter.
     f16vec3 color;
     if (sceneData.params.x > 0.) {
         f16vec3 reflection = normalize(reflect(V16(-v), V16(normal)));
-        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
+        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV);
     }
 
 
@@ -219,10 +224,9 @@ f16vec3 getPBRMetallicRoughnessColor() {
 layout (location = 0) out vec4 outColor;
 
 void main() {
-    // f16vec3 color = getPBRMetallicRoughnessColor();
+    f16vec3 color = getPBRMetallicRoughnessColor();
 
     // Finally, tonemap the color.
-    // outColor.rgb = tonemap(color);
-    // outColor.a = 1;
-    outColor = vec4(1, 0, 0, 1);
+    outColor.rgb = tonemap(color);
+    outColor.a = 1;
 }
