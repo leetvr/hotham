@@ -26,7 +26,7 @@ use crate::{
         image::Image,
         material::Material,
         primitive::Primitive,
-        resources::{DrawData, Resources},
+        resources::Resources,
         scene_data::SceneData,
         swapchain::{Swapchain, SwapchainInfo},
         vertex::Vertex,
