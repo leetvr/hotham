@@ -74,6 +74,7 @@ impl Texture {
                 vulkan_context,
                 image_buf,
                 mip_count,
+                1, // note: use from_ktx2 if you want to import cubemaps
                 vec![image_buf.len() as u64 / array_layers as u64],
                 &image,
             )
@@ -146,7 +147,7 @@ impl Texture {
             )
             .unwrap();
         let index = render_context
-            .create_texture_image("Empty Texture", vulkan_context, &[], 1, vec![0], &image)
+            .create_texture_image("Empty Texture", vulkan_context, &[], 1, 1, vec![0], &image)
             .unwrap();
 
         Texture {
@@ -196,6 +197,7 @@ impl Texture {
                 vulkan_context,
                 &ktx2_image.image_buf,
                 ktx2_image.mip_levels,
+                ktx2_image.faces,
                 ktx2_image.offsets,
                 &image,
             )
@@ -256,19 +258,27 @@ impl Texture {
     }
 }
 
-// Thin wrapper containing the information we need from a KTX2 file.
+/// Thin wrapper containing the information we need from a KTX2 file.
 #[derive(Debug, Clone)]
-pub(crate) struct KTX2Image {
+pub struct KTX2Image {
+    /// Image format
     pub format: vk::Format,
+    /// Image extents
     pub extent: vk::Extent2D,
+    /// Image buffer
     pub image_buf: Vec<u8>,
+    /// Offsets into the image buffer
     pub offsets: Vec<vk::DeviceSize>,
+    /// Number of mip levels
     pub mip_levels: u32,
+    /// Number of array layers
     pub array_layers: u32,
+    /// Number of faces
     pub faces: u32,
 }
 
-pub(crate) fn parse_ktx2(ktx2_data: &[u8]) -> KTX2Image {
+/// Parse some ktx2 data
+pub fn parse_ktx2(ktx2_data: &[u8]) -> KTX2Image {
     let ktx2_reader = ktx2::Reader::new(ktx2_data).unwrap();
     let header = ktx2_reader.header();
     let extent = vk::Extent2D {
