@@ -5,6 +5,9 @@
 
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_multiview : enable
 
 #include "common.glsl"
 #include "lights.glsl"
@@ -16,8 +19,8 @@ layout (location = 1) in vec2 inUV;
 // layout (location = 2) in vec3 inNormal;
 
 // Textures
-layout (set = 0, binding = 3) uniform sampler2D textures[];
-layout (set = 0, binding = 4) uniform samplerCube cubeTextures[2];
+layout (set = 0, binding = 3) uniform sampler2D textures[10000];
+layout (set = 0, binding = 4) uniform samplerCube cubeTextures[100];
 
 #define DEFAULT_EXPOSURE 1.0
 #define DEFAULT_IBL_SCALE 0.4
@@ -61,7 +64,7 @@ f16vec3 getNormal() {
     vec3 N = normalize(vec3(1));
 
     f16vec3 textureNormal;
-    textureNormal.xy = f16vec2(texture(textures[material.baseTextureID + 2], inUV).ga) * F16(2) - F16(1);
+    textureNormal.xy = f16vec2(texture(textures[material.baseTextureID], inUV).ga) * F16(2) - F16(1);
     textureNormal.z = sqrt(F16(1) - dot(textureNormal.xy, textureNormal.xy));
 
     // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
