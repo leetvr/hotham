@@ -19,7 +19,6 @@ const TEXTURE_BINDING_DESCRIPTOR_COUNT: u32 = 10_000;
 pub struct Descriptors {
     pub graphics_layout: vk::DescriptorSetLayout,
     pub compute_layout: vk::DescriptorSetLayout,
-    pub texture_layout: vk::DescriptorSetLayout,
     // One descriptor set per frame
     pub sets: [vk::DescriptorSet; PIPELINE_DEPTH],
     // One descriptor set per frame
@@ -34,8 +33,7 @@ impl Descriptors {
         let pool = create_descriptor_pool(&vulkan_context.device);
 
         // Then create a layout.
-        let (graphics_layout, compute_layout, texture_layout) =
-            create_descriptor_layouts(&vulkan_context.device);
+        let (graphics_layout, compute_layout) = create_descriptor_layouts(&vulkan_context.device);
 
         // Finally, allocate the shared descriptor set.
         let sets = allocate_descriptor_sets(vulkan_context, pool, graphics_layout);
@@ -47,7 +45,6 @@ impl Descriptors {
             pool,
             compute_layout,
             compute_sets,
-            texture_layout,
         }
     }
 
@@ -150,11 +147,7 @@ unsafe fn allocate_compute_descriptor_sets(
 
 unsafe fn create_descriptor_layouts(
     device: &ash::Device,
-) -> (
-    vk::DescriptorSetLayout,
-    vk::DescriptorSetLayout,
-    vk::DescriptorSetLayout,
-) {
+) -> (vk::DescriptorSetLayout, vk::DescriptorSetLayout) {
     let graphics_bindings = [
         // Draw Data
         vk::DescriptorSetLayoutBinding {
@@ -193,7 +186,7 @@ unsafe fn create_descriptor_layouts(
             binding: CUBE_TEXTURE_BINDING,
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
-            descriptor_count: 2,
+            descriptor_count: 100,
             ..Default::default()
         },
     ];
@@ -217,26 +210,14 @@ unsafe fn create_descriptor_layouts(
         },
     ];
 
-    let texture_bindings = [
-        // Textures
-        vk::DescriptorSetLayoutBinding {
-            binding: 0,
-            descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
-            stage_flags: vk::ShaderStageFlags::FRAGMENT,
-            descriptor_count: TEXTURE_BINDING_DESCRIPTOR_COUNT,
-            ..Default::default()
-        },
-    ];
-
     let flags = vk::DescriptorBindingFlags::PARTIALLY_BOUND;
 
     let descriptor_flags = [
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
-        vk::DescriptorBindingFlags::empty(),
         flags,
-        vk::DescriptorBindingFlags::empty(),
+        flags,
     ];
     let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
         .binding_flags(&descriptor_flags);
@@ -257,14 +238,7 @@ unsafe fn create_descriptor_layouts(
         )
         .unwrap();
 
-    let texture_layout = device
-        .create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&texture_bindings),
-            None,
-        )
-        .unwrap();
-
-    (graphics_layout, compute_layout, texture_layout)
+    (graphics_layout, compute_layout)
 }
 
 unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
