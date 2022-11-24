@@ -472,6 +472,7 @@ impl RenderContext {
         vulkan_context: &VulkanContext,
         image_buf: &[u8],
         mip_count: u32,
+        faces: u32,
         offsets: Vec<vk::DeviceSize>,
         texture_image: &Image,
     ) -> Result<u32> {
@@ -487,8 +488,21 @@ impl RenderContext {
         }
 
         let texture_index = unsafe {
-            self.resources
-                .write_texture_to_array(vulkan_context, &self.descriptors, texture_image)
+            if faces == 1 {
+                self.resources.write_texture_to_array(
+                    vulkan_context,
+                    &self.descriptors,
+                    texture_image,
+                )
+            } else if faces == 6 {
+                self.resources.write_cube_texture_to_array(
+                    vulkan_context,
+                    &self.descriptors,
+                    texture_image,
+                )
+            } else {
+                panic!("Image {name} has an invalid number of faces: {faces}");
+            }
         };
 
         println!(
