@@ -17,7 +17,7 @@ layout (location = 1) in vec2 inUV;
 
 // Textures
 layout (set = 0, binding = 3) uniform sampler2D textures[];
-layout (set = 0, binding = 4) uniform samplerCube cubeTextures[];
+layout (set = 0, binding = 4) uniform samplerCube cubeTextures[2];
 
 #define DEFAULT_EXPOSURE 1.0
 #define DEFAULT_IBL_SCALE 0.4
