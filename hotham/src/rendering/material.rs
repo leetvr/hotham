@@ -1,4 +1,3 @@
-use glam::Vec4;
 use gltf::Material as MaterialData;
 
 use crate::{
