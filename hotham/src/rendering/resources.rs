@@ -45,6 +45,7 @@ pub struct Resources {
 
     /// Texture descriptor information
     texture_count: u32,
+    cube_texture_count: u32,
 }
 
 impl Resources {
@@ -96,6 +97,7 @@ impl Resources {
             skins_buffer,
             mesh_data: Default::default(),
             texture_count: 1, // IMPORTANT! Because we stashed the BRDF Lut texture in here, make sure we increment the count accordingly
+            cube_texture_count: 2, // IMPORTANT! We stashed the IBL textures in here, so increment the count
             texture_sampler,
             cube_sampler,
         }
@@ -107,12 +109,27 @@ impl Resources {
         descriptors: &Descriptors,
         image: &Image,
     ) -> u32 {
-        // There doesn't seem any reason to add support for dynamic cube maps yet as there isn't any user facing way of loading them.
         let sampler = self.texture_sampler;
 
         let index = self.texture_count;
         descriptors.write_texture_descriptor(vulkan_context, image.view, sampler, index);
         self.texture_count += 1;
+
+        index
+    }
+
+    pub(crate) unsafe fn write_cube_texture_to_array(
+        &mut self,
+        vulkan_context: &VulkanContext,
+        descriptors: &Descriptors,
+        image: &Image,
+    ) -> u32 {
+        // There doesn't seem any reason to add support for dynamic cube maps yet as there isn't any user facing way of loading them.
+        let sampler = self.texture_sampler;
+
+        let index = self.cube_texture_count;
+        descriptors.write_cube_texture_descriptor(vulkan_context, image.view, sampler, index);
+        self.cube_texture_count += 1;
 
         index
     }
