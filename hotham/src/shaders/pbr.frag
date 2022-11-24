@@ -13,8 +13,8 @@ layout (location = 1) in vec2 inUV;
 layout (location = 2) in vec3 inNormal;
 
 // Textures
-layout (set = 0, binding = 3) uniform sampler2D textures[];
-layout (set = 0, binding = 4) uniform samplerCube cubeTextures[];
+layout (set = 0, binding = 3) uniform sampler2D textures[10000];
+layout (set = 0, binding = 4) uniform samplerCube cubeTextures[100];
 
 #include "pbr.glsl"
 

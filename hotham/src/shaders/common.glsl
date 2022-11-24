@@ -1,15 +1,8 @@
-#extension GL_EXT_nonuniform_qualifier:enable
 #extension GL_ARB_separate_shader_objects : enable
 #extension GL_EXT_multiview : enable
 
 #define NOT_PRESENT 4294967295
 #define MAX_JOINTS 64
-
-struct DrawData {
-    mat4 gosFromLocal;
-    mat4 localFromGos;
-    uint skinID;
-};
 
 // Representation of a light in a scene, based on the KHR_lights_punctual extension:
 // https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_lights_punctual

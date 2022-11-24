@@ -5,8 +5,8 @@
 #include "../../../../hotham/src/shaders/brdf.glsl"
 
 // Textures
-layout (set = 0, binding = 3) uniform sampler2D textures[];
-layout (set = 0, binding = 4) uniform samplerCube cubeTextures[];
+layout (set = 0, binding = 3) uniform sampler2D textures[10000];
+layout (set = 0, binding = 4) uniform samplerCube cubeTextures[100];
 
 #include "../../../../hotham/src/shaders/pbr.glsl"
 

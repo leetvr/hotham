@@ -14,6 +14,12 @@ layout (location = 0) out vec4 outGosPos;
 layout (location = 1) out vec2 outUV;
 layout (location = 2) out vec3 outNormal;
 
+struct DrawData {
+    mat4 gosFromLocal;
+    mat4 localFromGos;
+    uint skinID;
+};
+
 layout (set = 0, binding = 0) readonly buffer DrawDataBuffer {
     DrawData data[5000];
 } drawDataBuffer;
@@ -27,24 +33,26 @@ out gl_PerVertex {
 };
 
 void main() {
-    DrawData d = drawDataBuffer.data[gl_InstanceIndex];
+    uint skinID = drawDataBuffer.data[gl_InstanceIndex].skinID;
+    mat4 gosFromLocal = drawDataBuffer.data[gl_InstanceIndex].gosFromLocal;
+    mat4 localFromGos = drawDataBuffer.data[gl_InstanceIndex].localFromGos;
 
-    if (d.skinID == NOT_PRESENT) {
+    if (skinID == NOT_PRESENT) {
         // Mesh has no skin
-        outGosPos = d.gosFromLocal * vec4(inPos, 1.0);
-        outNormal = normalize(inNormal * mat3(d.localFromGos));
+        outGosPos = gosFromLocal * vec4(inPos, 1.0);
+        outNormal = normalize(inNormal * mat3(localFromGos));
     } else {
         // Mesh is skinned
         // Shift and mask to unpack the individual indices and weights.
         // There is no need to divide with the sum of weights because we are using homogenous coordinates.
         mat4 skinMatrix =
-            ((inWeight) & 255)       * skinsBuffer.jointMatrices[d.skinID][(inJoint) & 255] +
-            ((inWeight >> 8) & 255)  * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 8) & 255] +
-            ((inWeight >> 16) & 255) * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 16) & 255] +
-            ((inWeight >> 24) & 255) * skinsBuffer.jointMatrices[d.skinID][(inJoint >> 24) & 255];
+            ((inWeight) & 255)       * skinsBuffer.jointMatrices[skinID][(inJoint) & 255] +
+            ((inWeight >> 8) & 255)  * skinsBuffer.jointMatrices[skinID][(inJoint >> 8) & 255] +
+            ((inWeight >> 16) & 255) * skinsBuffer.jointMatrices[skinID][(inJoint >> 16) & 255] +
+            ((inWeight >> 24) & 255) * skinsBuffer.jointMatrices[skinID][(inJoint >> 24) & 255];
 
-        outGosPos = d.gosFromLocal * skinMatrix * vec4(inPos, 1.0);
-        outNormal = normalize(mat3(skinMatrix) * inNormal * mat3(d.localFromGos));
+        outGosPos = gosFromLocal * skinMatrix * vec4(inPos, 1.0);
+        outNormal = normalize(mat3(skinMatrix) * inNormal * mat3(localFromGos));
     }
 
     outUV = inUV;
