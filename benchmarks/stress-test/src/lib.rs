@@ -431,9 +431,6 @@ fn update_mesh(
     );
 }
 
-fn vertex(x: f32, y: f32) -> Vertex {
-    Vertex {
-        position: [x, y, -1.0].into(),
-        ..Default::default()
-    }
+fn vertex(x: f32, y: f32) -> Vec3 {
+    [x, y, -1.0].into()
 }
