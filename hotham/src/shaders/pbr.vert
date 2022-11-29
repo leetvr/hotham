@@ -6,10 +6,10 @@
 #include "common.glsl"
 
 layout (location = 0) in vec3 inPos;
-// layout (location = 1) in vec3 inNormal;
-// layout (location = 2) in vec2 inUV;
-// layout (location = 3) in uint inJoint;
-// layout (location = 4) in uint inWeight;
+layout (location = 1) in vec3 inNormal;
+layout (location = 2) in vec2 inUV;
+layout (location = 3) in uint inJoint;
+layout (location = 4) in uint inWeight;
 
 layout (location = 0) out vec4 outGosPos;
 layout (location = 1) out vec2 outUV;
@@ -35,30 +35,30 @@ out gl_PerVertex {
 };
 
 void main() {
-    // uint skinID = drawDataBuffer.data[gl_InstanceIndex].skinID;
-    // mat4 gosFromLocal = drawDataBuffer.data[gl_InstanceIndex].gosFromLocal;
-    // mat4 localFromGos = drawDataBuffer.data[gl_InstanceIndex].localFromGos;
+    uint skinID = drawDataBuffer.data[gl_InstanceIndex].skinID;
+    mat4 gosFromLocal = drawDataBuffer.data[gl_InstanceIndex].gosFromLocal;
+    mat4 localFromGos = drawDataBuffer.data[gl_InstanceIndex].localFromGos;
 
-    // if (skinID == NOT_PRESENT) {
-        // Mesh has no skin
-        // outGosPos = gosFromLocal * vec4(inPos, 1.0);
-        // outNormal = normalize(inNormal * mat3(localFromGos));
-    // } else {
-    //     // Mesh is skinned
-    //     // Shift and mask to unpack the individual indices and weights.
-    //     // There is no need to divide with the sum of weights because we are using homogenous coordinates.
-    //     mat4 skinMatrix =
-    //         ((inWeight) & 255)       * skinsBuffer.jointMatrices[skinID][(inJoint) & 255] +
-    //         ((inWeight >> 8) & 255)  * skinsBuffer.jointMatrices[skinID][(inJoint >> 8) & 255] +
-    //         ((inWeight >> 16) & 255) * skinsBuffer.jointMatrices[skinID][(inJoint >> 16) & 255] +
-    //         ((inWeight >> 24) & 255) * skinsBuffer.jointMatrices[skinID][(inJoint >> 24) & 255];
+    if (skinID == NOT_PRESENT) {
+    //     // Mesh has no skin
+        outGosPos = gosFromLocal * vec4(inPos, 1.0);
+        outNormal = normalize(inNormal * mat3(localFromGos));
+    } else {
+        // Mesh is skinned
+        // Shift and mask to unpack the individual indices and weights.
+        // There is no need to divide with the sum of weights because we are using homogenous coordinates.
+        mat4 skinMatrix =
+            ((inWeight) & 255)       * skinsBuffer.jointMatrices[skinID][(inJoint) & 255] +
+            ((inWeight >> 8) & 255)  * skinsBuffer.jointMatrices[skinID][(inJoint >> 8) & 255] +
+            ((inWeight >> 16) & 255) * skinsBuffer.jointMatrices[skinID][(inJoint >> 16) & 255] +
+            ((inWeight >> 24) & 255) * skinsBuffer.jointMatrices[skinID][(inJoint >> 24) & 255];
 
-    //     outGosPos = gosFromLocal * skinMatrix * vec4(inPos, 1.0);
-    //     outNormal = normalize(mat3(skinMatrix) * inNormal * mat3(localFromGos));
-    // }
+        outGosPos = gosFromLocal * skinMatrix * vec4(inPos, 1.0);
+        outNormal = normalize(mat3(skinMatrix) * inNormal * mat3(localFromGos));
+    }
 
-    // outUV = inUV;
-    // gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGosPos;
-    gl_Position = sceneData.viewProjection[gl_ViewIndex] * vec4(inPos, 1);
+    outUV = inUV;
+    gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGosPos;
+    // gl_Position = sceneData.viewProjection[gl_ViewIndex] * vec4(inPos, 1);
     // gl_Position = mat4(1.0) * vec4(inPos, 1);
 }
