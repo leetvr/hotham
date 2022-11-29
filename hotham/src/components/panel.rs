@@ -61,7 +61,7 @@ fn create_panel_mesh(
         [half_width, half_height, 0.].into(),   // v2
         [-half_width, -half_height, 0.].into(), // v3
     ];
-    let tex_coords_0 = [
+    let tex_coords_0: [glam::Vec2; 4] = [
         [0., 0.].into(), // v0
         [1., 1.].into(), // v1
         [1., 0.].into(), // v2
@@ -71,7 +71,7 @@ fn create_panel_mesh(
         .into_iter()
         .map(|(p, t)| Vertex {
             position: p,
-            texture_coords: t,
+            // texture_coords: t,
             ..Default::default()
         })
         .collect();
