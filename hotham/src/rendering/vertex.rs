@@ -7,14 +7,14 @@ use glam::{Vec2, Vec3, Vec4};
 pub struct Vertex {
     /// Position in model space
     pub position: Vec3,
-    /// Normal in model space
-    pub normal: Vec3,
-    /// First set of texture coordinates
-    pub texture_coords: Vec2,
-    /// Joint indices (for skinning), one byte per index.
-    pub joint_indices: u32,
-    /// Joint weights (for skinning), one byte per weight.
-    pub joint_weights: u32,
+    // /// Normal in model space
+    // pub normal: Vec3,
+    // /// First set of texture coordinates
+    // pub texture_coords: Vec2,
+    // /// Joint indices (for skinning), one byte per index.
+    // pub joint_indices: u32,
+    // /// Joint weights (for skinning), one byte per weight.
+    // pub joint_weights: u32,
 }
 
 impl Vertex {
@@ -28,10 +28,10 @@ impl Vertex {
     ) -> Self {
         Self {
             position,
-            normal,
-            texture_coords,
-            joint_indices,
-            joint_weights,
+            // normal,
+            // texture_coords,
+            // joint_indices,
+            // joint_weights,
         }
     }
 
@@ -70,40 +70,40 @@ impl Vertex {
             .offset(memoffset::offset_of!(Vertex, position) as _)
             .build();
 
-        let normal = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(1)
-            .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, normal) as _)
-            .build();
+        // let normal = vk::VertexInputAttributeDescription::builder()
+        //     .binding(0)
+        //     .location(1)
+        //     .format(vk::Format::R32G32B32_SFLOAT)
+        //     .offset(memoffset::offset_of!(Vertex, normal) as _)
+        //     .build();
 
-        let texture_coords = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(2)
-            .format(vk::Format::R32G32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, texture_coords) as _)
-            .build();
+        // let texture_coords = vk::VertexInputAttributeDescription::builder()
+        //     .binding(0)
+        //     .location(2)
+        //     .format(vk::Format::R32G32_SFLOAT)
+        //     .offset(memoffset::offset_of!(Vertex, texture_coords) as _)
+        //     .build();
 
-        let joint_indices = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(3)
-            .format(vk::Format::R32_UINT)
-            .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
-            .build();
+        // let joint_indices = vk::VertexInputAttributeDescription::builder()
+        //     .binding(0)
+        //     .location(3)
+        //     .format(vk::Format::R32_UINT)
+        //     .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
+        //     .build();
 
-        let joint_weights = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
-            .location(4)
-            .format(vk::Format::R32_UINT)
-            .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
-            .build();
+        // let joint_weights = vk::VertexInputAttributeDescription::builder()
+        //     .binding(0)
+        //     .location(4)
+        //     .format(vk::Format::R32_UINT)
+        //     .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
+        //     .build();
 
         vec![
             position,
-            normal,
-            texture_coords,
-            joint_indices,
-            joint_weights,
+            // normal,
+            // texture_coords,
+            // joint_indices,
+            // joint_weights,
         ]
     }
 }

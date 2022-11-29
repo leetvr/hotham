@@ -144,7 +144,7 @@ pub unsafe fn begin(
     }
 
     // This is the VERY LATEST we can possibly update our views, as the compute shader will need them.
-    render_context.update_scene_data(views, &gos_from_global, &gos_from_stage);
+    render_context.update_scene_data(vulkan_context, views, &gos_from_global, &gos_from_stage);
 
     // Execute the culling shader on the GPU.
     render_context.cull_objects(vulkan_context);
@@ -167,6 +167,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
     let command_buffer = frame.command_buffer;
     let draw_data_buffer = &mut frame.draw_data_buffer;
     let material_buffer = &mut render_context.resources.materials_buffer;
+    let staging_buffer = &render_context.resources.staging_buffer;
     draw_data_buffer.clear();
 
     let mut instance_offset = 0;
@@ -189,6 +190,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                     .get(&current_primitive_id)
                     .unwrap()
                     .primitive;
+                draw_data_buffer.upload(vulkan_context, staging_buffer);
                 draw_primitive(
                     material_buffer,
                     render_context.pipeline_layout,
@@ -232,6 +234,8 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
             .get(&current_primitive_id)
             .unwrap()
             .primitive;
+
+        draw_data_buffer.upload(vulkan_context, staging_buffer);
 
         draw_primitive(
             material_buffer,

@@ -16,7 +16,7 @@ use ash::{
 use openxr as xr;
 use std::{
     cmp::max,
-    ffi::{c_char, CString},
+    ffi::{c_char, c_void, CString},
     fmt::Debug,
     ptr::copy,
     slice::from_ref as slice_from_ref,
@@ -108,26 +108,6 @@ impl VulkanContext {
         ]
         .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
 
-        let queue_family_index = unsafe {
-            instance
-                .get_physical_device_queue_family_properties(physical_device)
-                .into_iter()
-                .enumerate()
-                .find_map(|(queue_family_index, info)| {
-                    if info.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
-                        Some(queue_family_index as u32)
-                    } else {
-                        None
-                    }
-                })
-                .ok_or(HothamError::EmptyListError)?
-        };
-
-        let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
-            .queue_family_index(queue_family_index)
-            .queue_priorities(&[1.0])
-            .build();
-
         let mut descriptor_indexing_features =
             vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
                 .shader_sampled_image_array_non_uniform_indexing(true)
@@ -146,6 +126,26 @@ impl VulkanContext {
         let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::builder()
             .shader_float16(true)
             .shader_int8(true);
+
+        let queue_family_index = unsafe {
+            instance
+                .get_physical_device_queue_family_properties(physical_device)
+                .into_iter()
+                .enumerate()
+                .find_map(|(queue_family_index, info)| {
+                    if info.queue_flags.contains(vk::QueueFlags::GRAPHICS) {
+                        Some(queue_family_index as u32)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap()
+        };
+
+        let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
+            .queue_family_index(queue_family_index)
+            .queue_priorities(&[1.0])
+            .build();
 
         let device_create_info = vk::DeviceCreateInfo::builder()
             .enabled_extension_names(&enabled_extensions)
@@ -169,27 +169,13 @@ impl VulkanContext {
         let device =
             unsafe { Device::load(instance.fp_v1_0(), vk::Device::from_raw(device_handle as _)) };
 
-        let graphics_queue = unsafe { device.get_device_queue(queue_family_index, 0) };
-
-        let command_pool = create_command_pool(&device, queue_family_index)?;
-
-        let descriptor_pool = create_descriptor_pool(&device)?;
-        let debug_utils = DebugUtils::new(&entry, &instance);
-        let physical_device_properties =
-            unsafe { instance.get_physical_device_properties(physical_device) };
-
-        Ok(Self {
-            entry,
+        Ok(Self::new(
             instance,
+            entry,
             device,
             physical_device,
-            command_pool,
             queue_family_index,
-            graphics_queue,
-            descriptor_pool,
-            debug_utils,
-            physical_device_properties,
-        })
+        ))
     }
 
     #[cfg(not(target_os = "android"))]
@@ -227,18 +213,42 @@ impl VulkanContext {
         let physical_device_properties =
             unsafe { vulkan_instance.get_physical_device_properties(physical_device) };
 
-        Ok(Self {
-            entry: vulkan_entry,
-            instance: vulkan_instance,
+        Ok(Self::new(
+            vulkan_instance,
+            vulkan_entry,
+            device,
+            physical_device,
+            queue_family_index,
+        ))
+    }
+
+    fn new(
+        instance: ash::Instance,
+        entry: ash::Entry,
+        device: ash::Device,
+        physical_device: vk::PhysicalDevice,
+        queue_family_index: u32,
+    ) -> Self {
+        let graphics_queue = unsafe { device.get_device_queue(queue_family_index, 0) };
+        let command_pool = create_command_pool(&device, queue_family_index).unwrap();
+        let descriptor_pool = create_descriptor_pool(&device).unwrap();
+
+        let debug_utils = DebugUtils::new(&entry, &instance);
+        let physical_device_properties =
+            unsafe { instance.get_physical_device_properties(physical_device) };
+
+        Self {
+            entry,
+            instance,
             physical_device,
             device,
-            graphics_queue,
-            queue_family_index,
             command_pool,
+            queue_family_index,
+            graphics_queue,
             descriptor_pool,
             debug_utils,
             physical_device_properties,
-        })
+        }
     }
 
     pub fn testing() -> Result<Self> {
@@ -247,27 +257,16 @@ impl VulkanContext {
         let mut extension_names = Vec::new();
         add_device_extension_names(&mut extension_names);
 
-        let (device, graphics_queue, queue_family_index) =
+        let (device, _, queue_family_index) =
             create_vulkan_device(&extension_names, &instance, physical_device)?;
 
-        let command_pool = create_command_pool(&device, queue_family_index)?;
-        let descriptor_pool = create_descriptor_pool(&device)?;
-        let debug_utils = DebugUtils::new(&entry, &instance);
-        let physical_device_properties =
-            unsafe { instance.get_physical_device_properties(physical_device) };
-
-        Ok(Self {
-            entry,
+        Ok(Self::new(
             instance,
-            physical_device,
+            entry,
             device,
-            graphics_queue,
+            physical_device,
             queue_family_index,
-            command_pool,
-            descriptor_pool,
-            debug_utils,
-            physical_device_properties,
-        })
+        ))
     }
 
     pub fn create_image_view(
