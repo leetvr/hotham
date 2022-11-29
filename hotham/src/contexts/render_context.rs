@@ -35,7 +35,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::vk::{self, Handle};
-use glam::{Affine3A, Mat4, Vec4};
+use glam::{Affine3A, Mat4, Vec3, Vec4};
 use openxr as xr;
 use vk_shader_macros::include_glsl;
 
@@ -427,8 +427,11 @@ impl RenderContext {
             device.cmd_bind_vertex_buffers(
                 command_buffer,
                 0,
-                slice_from_ref(&self.resources.vertex_buffer.buffer),
-                &[0],
+                &[
+                    self.resources.position_buffer.buffer,
+                    self.resources.vertex_buffer.buffer,
+                ],
+                &[0, 0],
             );
         }
     }
@@ -685,12 +688,17 @@ pub(crate) fn create_pipeline(
     let stages = [vertex_stage, fragment_stage];
 
     // Vertex input state
-    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
+    let position_binding_description = vk::VertexInputBindingDescription::builder()
         .binding(0)
+        .stride(size_of::<Vec3>() as _)
+        .input_rate(vk::VertexInputRate::VERTEX)
+        .build();
+    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
+        .binding(1)
         .stride(size_of::<Vertex>() as _)
         .input_rate(vk::VertexInputRate::VERTEX)
         .build();
-    let vertex_binding_descriptions = [vertex_binding_description];
+    let vertex_binding_descriptions = [position_binding_description, vertex_binding_description];
     let vertex_attribute_descriptions = Vertex::attribute_descriptions();
 
     let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
