@@ -181,7 +181,7 @@ where
         max_len: usize,
     ) -> Self {
         let device = &vulkan_context.device;
-        let usage = usage | vk::BufferUsageFlags::TRANSFER_DST;
+        let usage = usage | vk::BufferUsageFlags::TRANSFER_DST | vk::BufferUsageFlags::TRANSFER_SRC;
 
         let size = (std::mem::size_of::<T>() * max_len) as _;
         println!("[HOTHAM_VULKAN] Creating {size} buffer with flags {usage:?}..");
@@ -321,7 +321,6 @@ where
         let size = self.data.len() * std::mem::size_of::<T>();
 
         let command_buffer = vulkan_context.begin_single_time_commands();
-        println!("[HOTHAM_DEVICE_LOCAL_BUFFER] Copying to device buffer..");
         device.cmd_copy_buffer(
             command_buffer,
             self.buffer,

@@ -1,5 +1,5 @@
 use ash::vk;
-use glam::{Mat4, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 use id_arena::Arena;
 use vulkan_context::VulkanContext;
 
@@ -23,6 +23,9 @@ pub(crate) const MAX_JOINTS: usize = 64;
 
 /// A container that holds all of the resources required to draw a frame.
 pub struct Resources {
+    /// Position only data
+    pub position_buffer: DeviceLocalBuffer<Vec3>,
+
     /// All the vertices that will be drawn this frame.
     pub vertex_buffer: DeviceLocalBuffer<Vertex>,
 
@@ -55,6 +58,11 @@ pub struct Resources {
 impl Resources {
     /// Create all the buffers required and update the relevant descriptor sets.
     pub(crate) unsafe fn new(vulkan_context: &VulkanContext, descriptors: &Descriptors) -> Self {
+        let position_buffer = DeviceLocalBuffer::new(
+            vulkan_context,
+            vk::BufferUsageFlags::VERTEX_BUFFER,
+            VERTEX_BUFFER_SIZE,
+        );
         let vertex_buffer = DeviceLocalBuffer::new(
             vulkan_context,
             vk::BufferUsageFlags::VERTEX_BUFFER,
@@ -97,6 +105,7 @@ impl Resources {
         let staging_buffer = StagingBuffer::new(vulkan_context);
 
         Self {
+            position_buffer,
             vertex_buffer,
             index_buffer,
             materials_buffer,
