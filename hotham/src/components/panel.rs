@@ -70,14 +70,14 @@ fn create_panel_mesh(
     let vertices: Vec<Vertex> = izip!(positions, tex_coords_0)
         .into_iter()
         .map(|(p, t)| Vertex {
-            position: p,
-            // texture_coords: t,
+            // position: p,
+            texture_coords: t,
             ..Default::default()
         })
         .collect();
 
     let indices = [0, 1, 2, 0, 3, 1];
-    let primitive = Primitive::new(&vertices, &indices, material_id, render_context);
+    let primitive = Primitive::new(&positions, &vertices, &indices, material_id, render_context);
     Mesh::new(MeshData::new(vec![primitive]), render_context)
 }
 
