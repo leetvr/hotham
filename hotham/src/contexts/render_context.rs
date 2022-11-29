@@ -248,6 +248,7 @@ impl RenderContext {
 
     pub fn update_scene_data(
         &mut self,
+        vulkan_context: &VulkanContext,
         views: &[xr::View],
         gos_from_global: &Affine3A,
         gos_from_stage: &Affine3A,
@@ -278,18 +279,18 @@ impl RenderContext {
             self.cameras[1].position_in_gos(),
         ];
 
+        let scene_data_buffer = &mut self.frames[self.frame_index].scene_data_buffer;
+        let scene_data = &mut scene_data_buffer.as_slice_mut()[0];
+        scene_data.camera_position = self.scene_data.camera_position;
+        scene_data.view_projection = self.scene_data.view_projection;
+        scene_data.params = self.scene_data.params;
+        scene_data.lights = self.scene_data.lights.clone();
+        for light in &mut scene_data.lights {
+            light.position = gos_from_global.transform_point3(light.position);
+            light.direction = gos_from_global.transform_vector3(light.direction);
+        }
         unsafe {
-            let scene_data = &mut self.frames[self.frame_index]
-                .scene_data_buffer
-                .as_slice_mut()[0];
-            scene_data.camera_position = self.scene_data.camera_position;
-            scene_data.view_projection = self.scene_data.view_projection;
-            scene_data.params = self.scene_data.params;
-            scene_data.lights = self.scene_data.lights.clone();
-            for light in &mut scene_data.lights {
-                light.position = gos_from_global.transform_point3(light.position);
-                light.direction = gos_from_global.transform_vector3(light.direction);
-            }
+            scene_data_buffer.upload(vulkan_context, &self.resources.staging_buffer);
         }
     }
 
@@ -318,19 +319,26 @@ impl RenderContext {
         let device = &vulkan_context.device;
         let frame_index = self.frame_index;
         let frame = &mut self.frames[self.frame_index];
-        let primitive_cull_buffer = &frame.primitive_cull_data_buffer;
+        let primitive_cull_buffer = &mut frame.primitive_cull_data_buffer;
         let command_buffer = frame.compute_command_buffer;
         let fence = frame.compute_fence;
+        let staging_buffer = &self.resources.staging_buffer;
 
         // Create the cull parameters to pass to the compute shader
-        let cull_params =
-            CullParams::new(&self.scene_data.view_projection, primitive_cull_buffer.len);
+        let cull_params = CullParams::new(
+            &self.scene_data.view_projection,
+            primitive_cull_buffer.len(),
+        );
 
         unsafe {
             frame.cull_params_buffer.overwrite(&[cull_params]);
+            frame
+                .cull_params_buffer
+                .upload(vulkan_context, staging_buffer);
+            primitive_cull_buffer.upload(vulkan_context, staging_buffer);
         }
 
-        let group_count_x = (primitive_cull_buffer.len / 1024) + 1;
+        let group_count_x = (primitive_cull_buffer.len() / 1024) + 1;
 
         unsafe {
             device
@@ -368,6 +376,9 @@ impl RenderContext {
                 .wait_for_fences(slice_from_ref(&fence), true, CULLING_TIMEOUT)
                 .unwrap_or_else(|e| panic!("@@@ TIMEOUT WAITING FOR CULLING SHADER - {:?} @@@", e));
             device.reset_fences(slice_from_ref(&fence)).unwrap();
+
+            // Download the results back the CPU
+            primitive_cull_buffer.download(vulkan_context, staging_buffer);
         }
     }
 
