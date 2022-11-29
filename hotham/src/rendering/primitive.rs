@@ -26,6 +26,7 @@ pub struct Primitive {
 impl Primitive {
     /// Create a new primitive using a list of vertices, indices and a material ID.
     pub fn new(
+        positions: &[Vec3],
         vertices: &[Vertex],
         indices: &[u32],
         material_id: u32,
@@ -36,11 +37,12 @@ impl Primitive {
             material_id,
             index_buffer_offset: render_context.resources.index_buffer.data.len() as _,
             vertex_buffer_offset: render_context.resources.vertex_buffer.data.len() as _,
-            bounding_sphere: calculate_bounding_sphere(vertices),
+            bounding_sphere: calculate_bounding_sphere(positions),
         };
 
         unsafe {
             render_context.resources.index_buffer.append(indices);
+            render_context.resources.position_buffer.append(positions);
             render_context.resources.vertex_buffer.append(vertices);
         }
 
@@ -117,11 +119,10 @@ impl Primitive {
             }
         }
 
-        let vertices: Vec<Vertex> =
-            izip!(positions, normals, tex_coords, joint_indices, joint_weights)
-                .into_iter()
-                .map(Vertex::from_zip)
-                .collect();
+        let vertices: Vec<Vertex> = izip!(normals, tex_coords, joint_indices, joint_weights)
+            .into_iter()
+            .map(Vertex::from_zip)
+            .collect();
 
         // All the materials in this glTF file will be imported into the material buffer, so all we need
         // to do is grab the index of this material and add it to the running offset. If we don't do this,
@@ -133,6 +134,7 @@ impl Primitive {
         };
 
         Primitive::new(
+            &positions,
             &vertices,
             &indices,
             material_id,
@@ -164,15 +166,14 @@ impl Primitive {
 /// Get a bounding sphere for the primitive, used for occlusion culling
 ///
 /// This algorithm is loosely lifted from the official Vulkan examples - don't ask me how it works.
-pub fn calculate_bounding_sphere(vertices: &[Vertex]) -> Vec4 {
-    let points = vertices.iter().map(|v| v.position).collect::<Vec<_>>();
+pub fn calculate_bounding_sphere(points: &[Vec3]) -> Vec4 {
     let num_points = points.len();
     if num_points == 0 {
         return Default::default();
     }
 
     let mut center = Vec3::ZERO;
-    for p in &points {
+    for p in points {
         center += *p;
     }
 
