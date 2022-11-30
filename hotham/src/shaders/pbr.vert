@@ -59,6 +59,5 @@ void main() {
 
     outUV = inUV;
     gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGosPos;
-    // gl_Position = sceneData.viewProjection[gl_ViewIndex] * vec4(inPos, 1);
     // gl_Position = mat4(1.0) * vec4(inPos, 1);
 }
