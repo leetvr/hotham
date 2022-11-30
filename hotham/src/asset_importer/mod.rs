@@ -72,8 +72,15 @@ impl<'a> ImportContext<'a> {
         let staging_buffer = &resources.staging_buffer;
 
         unsafe {
-            resources.vertex_buffer.upload(vulkan_context, staging_buffer);
-            resources.index_buffer.upload(vulkan_context, staging_buffer);
+            resources
+                .position_buffer
+                .upload(vulkan_context, staging_buffer);
+            resources
+                .vertex_buffer
+                .upload(vulkan_context, staging_buffer);
+            resources
+                .index_buffer
+                .upload(vulkan_context, staging_buffer);
         }
     }
 }
