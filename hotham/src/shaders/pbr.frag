@@ -16,7 +16,7 @@
 // Inputs
 layout (location = 0) in vec3 inGosPos;
 layout (location = 1) in vec2 inUV;
-// layout (location = 2) in vec3 inNormal;
+layout (location = 2) in vec3 inNormal;
 
 // Textures
 layout (set = 0, binding = 3) uniform sampler2D textures[10000];
@@ -61,7 +61,7 @@ f16vec3 tonemap(const f16vec3 color) {
 
 // Get normal, tangent and bitangent vectors.
 f16vec3 getNormal() {
-    vec3 N = normalize(vec3(1));
+    vec3 N = normalize(inNormal);
 
     f16vec3 textureNormal;
     textureNormal.xy = f16vec2(texture(textures[material.baseTextureID], inUV).ga) * F16(2) - F16(1);
@@ -158,7 +158,7 @@ f16vec3 getPBRMetallicRoughnessColor() {
         // As per the glTF spec:
         // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
         // Its green channel contains roughness values and its blue channel contains metalness values.
-        normal = normalize(V16(1));
+        normal = normalize(V16(inNormal));
     }
 
     float16_t perceptualRoughness = clamp(amrSample.g, MEDIUMP_FLT_MIN, F16(1.0));
