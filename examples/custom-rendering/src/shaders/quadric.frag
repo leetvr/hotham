@@ -8,7 +8,7 @@
 layout (set = 0, binding = 4) uniform sampler2D textures[];
 layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
-#include "pbr.glsl"
+#include "../../../../hotham/src/shaders/pbr.glsl"
 
 // Inputs
 layout (location = 0) in vec4 inRayOrigin;
@@ -85,11 +85,15 @@ void main() {
     vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * hitPoint;
     gl_FragDepth = v_clip_coord.z / v_clip_coord.w;
 
+    // Set globals that are read inside functions for lighting etc.
+    p = hitPoint.xyz;
+    v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - p);
+
     // Compute normal from gradient of surface quadric
-    vec3 normal = normalize((d.surfaceQ * hitPoint).xyz);
+    n = normalize((d.surfaceQ * hitPoint).xyz);
 
     vec4 uv4 = d.uvFromGos * hitPoint;
-    vec2 uv = uv4.xy / uv4.w;
+    uv = uv4.xy / uv4.w;
 
     // Retrieve the material from the buffer.
     Material material = materialBuffer.materials[d.materialID];
@@ -113,7 +117,7 @@ void main() {
 
     // Choose the correct workflow for this material
     if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor, hitPoint.xyz, normal, uv);
+        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor);
     } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
         outColor = baseColor;
     }
@@ -132,7 +136,7 @@ void main() {
                 break;
             // Normal
             case 2:
-                outColor.rgb = normal * 0.5 + 0.5;
+                outColor.rgb = n * 0.5 + 0.5;
                 break;
             // Occlusion
             case 3:
