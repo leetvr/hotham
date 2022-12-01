@@ -19,6 +19,7 @@ egui = "0.15"
 generational-arena = "0.2.8"
 glam = {features = ["mint", "serde", "approx"], version = "0.21.3"}
 gltf = {version = "1.0", features = ["KHR_lights_punctual", "KHR_materials_unlit", "names", "utils"], default-features = false}
+half = "2.1.0"
 hecs = "0.9.0"
 hotham-asset-client = {path = "../hotham-asset-client"}
 id-arena = "2.2.1"
