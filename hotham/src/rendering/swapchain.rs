@@ -16,6 +16,8 @@ pub struct SwapchainInfo {
     pub resolution: vk::Extent2D,
     /// The images held in the swapchain
     pub images: Vec<vk::Image>,
+    /// Optional images used for fixed foveated rendering
+    pub ffr_image: Option<FFRImage>,
 }
 
 impl SwapchainInfo {
@@ -23,14 +25,86 @@ impl SwapchainInfo {
         handle: &SwapchainHandle<Vulkan>,
         resolution: vk::Extent2D,
     ) -> Result<Self> {
-        let images = handle
-            .enumerate_images()?
-            .into_iter()
-            .map(vk::Image::from_raw)
-            .collect::<Vec<_>>();
+        // let images = handle
+        //     .enumerate_images()?
+        //     .into_iter()
+        //     .map(vk::Image::from_raw)
+        //     .collect::<Vec<_>>();
 
-        Ok(Self { resolution, images })
+        let (images, ffr_image) = get_ffr_image(handle);
+
+        Ok(Self {
+            resolution,
+            images,
+            ffr_image,
+        })
     }
+}
+
+/// Image for fixed foveated rendering
+#[derive(Debug, Clone)]
+pub struct FFRImage {
+    /// Resolution of the image
+    pub resolution: vk::Extent2D,
+    /// Vulkan handle to the image
+    pub image: vk::Image,
+}
+
+fn get_ffr_image(handle: &SwapchainHandle<Vulkan>) -> (Vec<vk::Image>, Option<FFRImage>) {
+    let fp = handle.instance().fp();
+    let mut output = 0;
+
+    println!("[HOTHAM_SWAPCHAIN] Getting FFR image..");
+    let images = unsafe {
+        let result =
+            (fp.enumerate_swapchain_images)(handle.as_raw(), 0, &mut output, std::ptr::null_mut());
+        if result.into_raw() < 0 {
+            panic!("Error getting swapchain images? {result:?}");
+        }
+
+        let mut swapchain_foveation_vulkan =
+            openxr::sys::SwapchainImageFoveationVulkanFB::out(std::ptr::null_mut() as _);
+        let mut buf = vec![
+            openxr::sys::SwapchainImageVulkanKHR {
+                ty: openxr::sys::SwapchainImageVulkanKHR::TYPE,
+                next: &mut swapchain_foveation_vulkan as *mut _ as *mut std::ffi::c_void,
+                image: 0,
+            };
+            output as _
+        ];
+
+        let result = (fp.enumerate_swapchain_images)(
+            handle.as_raw(),
+            output,
+            &mut output,
+            buf.as_mut_ptr() as _,
+        );
+
+        if result.into_raw() < 0 {
+            panic!("Error getting swapchain images? {result:?}");
+        }
+
+        buf
+    };
+
+    println!("Got images: {images:?}");
+
+    let ffr_image =
+        unsafe { *(images[0].next as *mut openxr::sys::SwapchainImageFoveationVulkanFB) };
+    let ffr_image = FFRImage {
+        resolution: vk::Extent2D {
+            width: ffr_image.width,
+            height: ffr_image.height,
+        },
+        image: vk::Image::from_raw(ffr_image.image),
+    };
+
+    let images = images
+        .iter()
+        .map(|i| vk::Image::from_raw(i.image))
+        .collect();
+
+    (images, Some(ffr_image))
 }
 
 /// A thin container for OpenXR to pass the details of its Swapchain to RenderContext.
