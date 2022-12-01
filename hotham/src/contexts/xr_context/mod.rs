@@ -335,6 +335,7 @@ pub(crate) fn create_xr_swapchain(
         vertical_offset: 0.,
         dynamic: xr::FoveationDynamicFB::DISABLED,
     };
+
     let foveation_profile_handle = xr_session.create_foveation_profile(Some(foveation_profile))?;
 
     unsafe {
