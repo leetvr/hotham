@@ -1,8 +1,8 @@
 use anyhow::Result;
 use ash::vk::{self, Handle};
 use openxr::{
-    self as xr, EventDataBuffer, FrameStream, FrameWaiter, Session, SessionState, Space, Swapchain,
-    Vulkan,
+    self as xr, sys, EventDataBuffer, FrameStream, FrameWaiter, Session, SessionState, Space,
+    Swapchain, Vulkan,
 };
 use xr::{
     vulkan::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType, SwapchainCreateFlags,
@@ -309,19 +309,80 @@ pub(crate) fn create_xr_swapchain(
     resolution: &vk::Extent2D,
     array_size: u32,
 ) -> Result<Swapchain<Vulkan>> {
-    xr_session
-        .create_swapchain(&SwapchainCreateInfo {
-            create_flags: SwapchainCreateFlags::EMPTY,
-            usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
-            format: COLOR_FORMAT.as_raw() as u32,
-            sample_count: 1,
-            width: resolution.width,
-            height: resolution.height,
-            face_count: 1,
-            array_size,
-            mip_count: 1,
-        })
-        .map_err(Into::into)
+    let mut swapchain_raw = sys::Swapchain::NULL;
+    let foveation_info = sys::SwapchainCreateInfoFoveationFB {
+        ty: sys::StructureType::SWAPCHAIN_CREATE_INFO_FOVEATION_FB,
+        next: std::ptr::null_mut(),
+        flags: sys::SwapchainCreateFoveationFlagsFB::FRAGMENT_DENSITY_MAP,
+    };
+
+    let create_info = sys::SwapchainCreateInfo {
+        ty: sys::SwapchainCreateInfo::TYPE,
+        create_flags: SwapchainCreateFlags::EMPTY,
+        usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
+        format: COLOR_FORMAT.as_raw() as _,
+        sample_count: 1,
+        width: resolution.width,
+        height: resolution.height,
+        face_count: 1,
+        mip_count: 1,
+        array_size,
+        next: &foveation_info as *const _ as *const std::ffi::c_void,
+    };
+
+    let foveation_profile = xr::FoveationLevelProfile {
+        level: xr::FoveationLevelFB::HIGH,
+        vertical_offset: 0.,
+        dynamic: xr::FoveationDynamicFB::DISABLED,
+    };
+    let foveation_profile_handle = xr_session.create_foveation_profile(Some(foveation_profile))?;
+
+    unsafe {
+        let fp = xr_session.instance().fp();
+        let xr_result =
+            (fp.create_swapchain)(xr_session.as_raw(), &create_info, &mut swapchain_raw);
+
+        let swapchain = if xr_result.into_raw() >= 0 {
+            Swapchain::from_raw(xr_session.clone(), swapchain_raw)
+        } else {
+            return Err(anyhow::Error::new(xr_result));
+        };
+
+        let fp = xr_session
+            .instance()
+            .exts()
+            .fb_swapchain_update_state
+            .unwrap();
+
+        let swapchain_update_state = xr::sys::SwapchainStateFoveationFB {
+            ty: xr::sys::SwapchainStateFoveationFB::TYPE,
+            next: std::ptr::null_mut(),
+            flags: xr::SwapchainStateFoveationFlagsFB::EMPTY,
+            profile: foveation_profile_handle.as_raw(),
+        };
+
+        let result =
+            (fp.update_swapchain)(swapchain_raw, std::mem::transmute(&swapchain_update_state));
+
+        if result.into_raw() < 0 {
+            return Err(anyhow::Error::new(result));
+        }
+
+        Ok(swapchain)
+    }
+
+    // .create_swapchain(&SwapchainCreateInfo {
+    //     create_flags: SwapchainCreateFlags::EMPTY,
+    //     usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
+    //     format: COLOR_FORMAT.as_raw() as u32,
+    //     sample_count: 1,
+    //     width: resolution.width,
+    //     height: resolution.height,
+    //     face_count: 1,
+    //     array_size,
+    //     mip_count: 1,
+    // })
+    // .map_err(Into::into)
 }
 
 pub(crate) fn create_xr_session(
@@ -380,6 +441,10 @@ pub(crate) fn create_xr_instance(
 fn enable_xr_extensions(required_extensions: &mut xr::ExtensionSet) {
     required_extensions.khr_android_create_instance = true;
     required_extensions.khr_vulkan_enable2 = true;
+    required_extensions.fb_foveation = true;
+    required_extensions.fb_foveation_configuration = true;
+    required_extensions.fb_foveation_vulkan = true;
+    required_extensions.fb_swapchain_update_state = true;
 }
 
 #[cfg(not(target_os = "android"))]

@@ -1,5 +1,6 @@
 use ash::vk;
 use glam::{Vec2, Vec3, Vec4};
+const VERTEX_FORMAT: vk::Format = vk::Format::R16G16B16_SFLOAT;
 
 /// Representation of a single vertex, usually imported from a glTF file.
 #[repr(C)]
@@ -59,7 +60,7 @@ impl Vertex {
         let position = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(0)
-            .format(vk::Format::R32G32B32_SFLOAT)
+            .format(VERTEX_FORMAT)
             .offset(0)
             .build();
 
