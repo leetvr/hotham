@@ -16,7 +16,7 @@ use ash::{
 use openxr as xr;
 use std::{
     cmp::max,
-    ffi::{c_char, c_void, CString},
+    ffi::{c_char, CString},
     fmt::Debug,
     ptr::copy,
     slice::from_ref as slice_from_ref,

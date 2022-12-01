@@ -21,6 +21,9 @@ static SKINS_BUFFER_SIZE: usize = 4; // TODO
 
 pub(crate) const MAX_JOINTS: usize = 64;
 
+/// f16vec3
+pub type F16VEC3 = [u16; 3];
+
 /// A container that holds all of the resources required to draw a frame.
 pub struct Resources {
     /// Position only data
