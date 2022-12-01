@@ -204,6 +204,7 @@ impl RenderContext {
         let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
+            ffr_image: None,
         };
 
         (
@@ -237,6 +238,7 @@ impl RenderContext {
         let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
+            ffr_image: None,
         };
 
         (
