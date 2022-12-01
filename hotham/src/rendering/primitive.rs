@@ -23,6 +23,38 @@ pub struct Primitive {
     pub bounding_sphere: Vec4,
 }
 
+// fn f32_to_f16(f: f32) -> u16 {
+//     let x = f as u32;
+//     let sign: u32 = x >> 31;
+//     let mut mantissa: u32;
+//     let exp: u32;
+//     let hf: u16;
+
+//     mantissa = x & ((1 << 23) - 1);
+//     exp = x & (0xFF << 23);
+//     if exp >= 0x47800000 {
+//         // check if the original number is a NaN
+//         if (mantissa && (exp == (0xFF << 23))) {
+//         // single precision NaN
+//         mantissa = (1 << 23) - 1;
+//         } else {
+//         // half-float will be Inf
+//         mantissa = 0;
+//         }
+//         hf = (((uint16_t)sign) << 15) | (uint16_t)((0x1F << 10)) |
+//             (uint16_t)(mantissa >> 13);
+//     }
+//     // check if exponent is <= -15
+//     else if (exp <= 0x38000000) {
+//         hf = 0;  // too small to be represented
+//     } else {
+//         hf = (((uint16_t)sign) << 15) | (uint16_t)((exp - 0x38000000) >> 13) |
+//             (uint16_t)(mantissa >> 13);
+//     }
+
+//     return hf;
+// }
+
 impl Primitive {
     /// Create a new primitive using a list of vertices, indices and a material ID.
     pub fn new(
@@ -39,6 +71,11 @@ impl Primitive {
             vertex_buffer_offset: render_context.resources.vertex_buffer.data.len() as _,
             bounding_sphere: calculate_bounding_sphere(positions),
         };
+
+        // let positions = positions
+        //     .iter()
+        //     .map(|p| p.to_array().map(f32_to_f16))
+        //     .collect::<Vec<_>>();
 
         unsafe {
             render_context.resources.index_buffer.append(indices);
