@@ -201,7 +201,7 @@ impl RenderContext {
         let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
-            ffr_image: None,
+            ffr_images: None,
         };
 
         (
@@ -235,7 +235,7 @@ impl RenderContext {
         let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
-            ffr_image: None,
+            ffr_images: None,
         };
 
         (
@@ -543,6 +543,7 @@ pub fn create_push_constant<T: 'static>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(p as *const T as *const u8, std::mem::size_of::<T>()) }
 }
 
+// TODO: this will break the simulator due to FFR
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     // Attachment used for MSAA
     let color_store_op = if USE_MSAA {
@@ -581,6 +582,16 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
+    let ffr_attachment = vk::AttachmentDescription::builder()
+        .format(vk::Format::R8G8_UNORM)
+        .samples(vk::SampleCountFlags::TYPE_1)
+        .load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .initial_layout(vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT)
+        .final_layout(vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT);
+
     let color_attachment_reference = vk::AttachmentReference::builder()
         .attachment(0)
         .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
@@ -593,8 +604,12 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         .build();
 
-    let color_attachment_resolve_reference = vk::AttachmentReference::builder()
+    let ffr_attachment_reference = vk::AttachmentReference::builder()
         .attachment(2)
+        .layout(vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT);
+
+    let color_attachment_resolve_reference = vk::AttachmentReference::builder()
+        .attachment(3)
         .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
         .build();
 
@@ -635,6 +650,9 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .view_masks(&view_masks)
         .correlation_masks(&view_masks);
 
+    let mut ffr_info = vk::RenderPassFragmentDensityMapCreateInfoEXT::builder()
+        .fragment_density_map_attachment(*ffr_attachment_reference);
+
     let render_pass = unsafe {
         if USE_MSAA {
             vulkan_context.device.create_render_pass(
@@ -642,20 +660,23 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
                     .attachments(&[
                         *color_attachment,
                         *depth_attachment,
+                        *ffr_attachment,
                         *color_attachment_resolve,
                     ])
                     .subpasses(&[*subpass])
                     .dependencies(&[*dependency])
-                    .push_next(&mut multiview),
+                    .push_next(&mut multiview)
+                    .push_next(&mut ffr_info),
                 None,
             )
         } else {
             vulkan_context.device.create_render_pass(
                 &vk::RenderPassCreateInfo::builder()
-                    .attachments(&[*color_attachment, *depth_attachment])
+                    .attachments(&[*color_attachment, *depth_attachment, *ffr_attachment])
                     .subpasses(&[*subpass])
                     .dependencies(&[*dependency])
-                    .push_next(&mut multiview),
+                    .push_next(&mut multiview)
+                    .push_next(&mut ffr_info),
                 None,
             )
         }
