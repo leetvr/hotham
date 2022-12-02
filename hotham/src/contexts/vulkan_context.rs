@@ -282,9 +282,16 @@ impl VulkanContext {
         let mut astc_decode_mode =
             vk::ImageViewASTCDecodeModeEXT::builder().decode_mode(vk::Format::R8G8B8A8_UNORM);
 
+        let flags = if format == vk::Format::R8G8_UNORM {
+            vk::ImageViewCreateFlags::FRAGMENT_DENSITY_MAP_DEFERRED_EXT
+        } else {
+            vk::ImageViewCreateFlags::empty()
+        };
+
         let mut create_info = vk::ImageViewCreateInfo::builder()
             .view_type(view_type)
             .format(format)
+            .flags(flags)
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask,
                 base_mip_level: 0,
@@ -341,6 +348,11 @@ impl VulkanContext {
             (
                 vk::ImageCreateFlags::CUBE_COMPATIBLE,
                 vk::ImageViewType::CUBE,
+            )
+        } else if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT) {
+            (
+                vk::ImageCreateFlags::SUBSAMPLED_EXT,
+                vk::ImageViewType::TYPE_2D_ARRAY,
             )
         } else {
             (

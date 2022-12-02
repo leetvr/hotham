@@ -330,14 +330,6 @@ pub(crate) fn create_xr_swapchain(
         next: &foveation_info as *const _ as *const std::ffi::c_void,
     };
 
-    let foveation_profile = xr::FoveationLevelProfile {
-        level: xr::FoveationLevelFB::HIGH,
-        vertical_offset: 0.,
-        dynamic: xr::FoveationDynamicFB::DISABLED,
-    };
-
-    let foveation_profile_handle = xr_session.create_foveation_profile(Some(foveation_profile))?;
-
     unsafe {
         let fp = xr_session.instance().fp();
         let xr_result =
@@ -354,6 +346,15 @@ pub(crate) fn create_xr_swapchain(
             .exts()
             .fb_swapchain_update_state
             .unwrap();
+
+        let foveation_profile = xr::FoveationLevelProfile {
+            level: xr::FoveationLevelFB::HIGH,
+            vertical_offset: 0.,
+            dynamic: xr::FoveationDynamicFB::DISABLED,
+        };
+
+        let foveation_profile_handle =
+            xr_session.create_foveation_profile(Some(foveation_profile))?;
 
         let swapchain_update_state = xr::sys::SwapchainStateFoveationFB {
             ty: xr::sys::SwapchainStateFoveationFB::TYPE,
