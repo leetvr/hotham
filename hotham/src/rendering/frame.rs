@@ -4,7 +4,7 @@ use crate::contexts::{render_context::CullParams, VulkanContext};
 use anyhow::Result;
 
 use super::{
-    buffer::{Buffer, DeviceLocalBuffer},
+    buffer::Buffer,
     descriptors::{
         Descriptors, CULL_PARAMS_BINDING, DRAW_DATA_BINDING, PRIMITIVE_CULL_DATA_BINDING,
         SCENE_DATA_BINDING,
@@ -31,13 +31,13 @@ pub struct Frame {
     /// A command buffer used to record commands
     pub compute_command_buffer: vk::CommandBuffer,
     /// Data for the primitives that will be drawn this frame, indexed by gl_InstanceId
-    pub draw_data_buffer: DeviceLocalBuffer<DrawData>,
+    pub draw_data_buffer: Buffer<DrawData>,
     /// The actual draw calls for this frame.
-    pub primitive_cull_data_buffer: DeviceLocalBuffer<PrimitiveCullData>,
+    pub primitive_cull_data_buffer: Buffer<PrimitiveCullData>,
     /// Shared data used in a scene
-    pub scene_data_buffer: DeviceLocalBuffer<SceneData>,
+    pub scene_data_buffer: Buffer<SceneData>,
     /// Shared data used in a scene
-    pub cull_params_buffer: DeviceLocalBuffer<CullParams>,
+    pub cull_params_buffer: Buffer<CullParams>,
 }
 
 impl Frame {
@@ -70,25 +70,23 @@ impl Frame {
         let compute_command_buffer = command_buffers[1];
 
         let draw_data_buffer = unsafe {
-            DeviceLocalBuffer::new(
+            Buffer::new(
                 vulkan_context,
                 vk::BufferUsageFlags::STORAGE_BUFFER,
                 DRAW_DATA_BUFFER_SIZE,
             )
         };
         let primitive_cull_data_buffer = unsafe {
-            DeviceLocalBuffer::new(
+            Buffer::new(
                 vulkan_context,
                 vk::BufferUsageFlags::STORAGE_BUFFER,
                 PRIMITIVE_CULL_DATA_BUFFER_SIZE,
             )
         };
-        let mut scene_data_buffer = unsafe {
-            DeviceLocalBuffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1)
-        };
-        let cull_params_buffer = unsafe {
-            DeviceLocalBuffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1)
-        };
+        let mut scene_data_buffer =
+            unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
+        let cull_params_buffer =
+            unsafe { Buffer::new(vulkan_context, vk::BufferUsageFlags::UNIFORM_BUFFER, 1) };
 
         // Update the descriptor sets for this frame.
         unsafe {
