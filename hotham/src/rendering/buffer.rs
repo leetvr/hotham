@@ -127,6 +127,11 @@ impl<T: Sized> Buffer<T> {
         self.len = 0;
     }
 
+    /// The length of the buffer
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
     /// Write to the specified descriptor set
     pub unsafe fn update_descriptor_set(
         &self,
@@ -157,7 +162,7 @@ impl<T: Sized> Buffer<T> {
 
 #[derive(Debug, Clone)]
 /// A wrapper around a chunk of allocated memory on the GPU
-pub struct DeviceLocalBuffer<T> {
+struct DeviceLocalBuffer<T> {
     /// The underling data in the buffer
     pub data: Vec<T>,
     /// A handle to the underlying vk::Buffer
