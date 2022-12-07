@@ -31,6 +31,7 @@ use crate::{
         swapchain::{Swapchain, SwapchainInfo},
         vertex::Vertex,
     },
+    util::PerformanceTimer,
     COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
@@ -62,6 +63,7 @@ pub struct RenderContext {
     pub swapchain: Swapchain,
     pub descriptors: Descriptors,
     pub shaders: Shaders,
+    pub render_pass_timer: PerformanceTimer,
 
     // Populated only between rendering::begin and rendering::end
     pub primitive_map: HashMap<u32, InstancedPrimitive>,
@@ -173,6 +175,7 @@ impl RenderContext {
             resources,
             shaders,
             primitive_map: HashMap::default(),
+            render_pass_timer: PerformanceTimer::new("PBR Renderpass"),
         })
     }
 
@@ -279,17 +282,16 @@ impl RenderContext {
         ];
 
         let scene_data_buffer = &mut self.frames[self.frame_index].scene_data_buffer;
-        let scene_data = &mut scene_data_buffer.as_slice_mut()[0];
-        scene_data.camera_position = self.scene_data.camera_position;
-        scene_data.view_projection = self.scene_data.view_projection;
-        scene_data.params = self.scene_data.params;
-        scene_data.lights = self.scene_data.lights.clone();
-        for light in &mut scene_data.lights {
-            light.position = gos_from_global.transform_point3(light.position);
-            light.direction = gos_from_global.transform_vector3(light.direction);
-        }
         unsafe {
-            scene_data_buffer.upload(vulkan_context, &self.resources.staging_buffer);
+            let scene_data = &mut scene_data_buffer.as_slice_mut()[0];
+            scene_data.camera_position = self.scene_data.camera_position;
+            scene_data.view_projection = self.scene_data.view_projection;
+            scene_data.params = self.scene_data.params;
+            scene_data.lights = self.scene_data.lights.clone();
+            for light in &mut scene_data.lights {
+                light.position = gos_from_global.transform_point3(light.position);
+                light.direction = gos_from_global.transform_vector3(light.direction);
+            }
         }
     }
 
@@ -331,10 +333,6 @@ impl RenderContext {
 
         unsafe {
             frame.cull_params_buffer.overwrite(&[cull_params]);
-            frame
-                .cull_params_buffer
-                .upload(vulkan_context, staging_buffer);
-            primitive_cull_buffer.upload(vulkan_context, staging_buffer);
         }
 
         let group_count_x = (primitive_cull_buffer.len() / 1024) + 1;
@@ -375,16 +373,13 @@ impl RenderContext {
                 .wait_for_fences(slice_from_ref(&fence), true, CULLING_TIMEOUT)
                 .unwrap_or_else(|e| panic!("@@@ TIMEOUT WAITING FOR CULLING SHADER - {:?} @@@", e));
             device.reset_fences(slice_from_ref(&fence)).unwrap();
-
-            // Download the results back the CPU
-            primitive_cull_buffer.download(vulkan_context, staging_buffer);
         }
     }
 
     /// Begin the PBR renderpass.
     /// DOES NOT BEGIN RECORDING COMMAND BUFFERS - call begin_frame first!
     pub fn begin_pbr_render_pass(
-        &self,
+        &mut self,
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,
     ) {

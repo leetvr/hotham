@@ -5,7 +5,7 @@ use anyhow::Result;
 use glam::{Affine3A, Quat, Vec3};
 use openxr::{Posef, SpaceLocation, SpaceLocationFlags, ViewStateFlags};
 use rapier3d::na::Vector3;
-use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
+use std::{ffi::CStr, os::raw::c_char, str::Utf8Error, time::Instant};
 
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
     strings
@@ -305,4 +305,45 @@ pub fn lerp_slerp(a: &Affine3A, b: &Affine3A, s: f32) -> Affine3A {
         a_rotation.slerp(b_rotation, s),
         a_translation.lerp(b_translation, s),
     )
+}
+
+#[derive(Debug)]
+/// A timer to track performance
+pub struct PerformanceTimer {
+    name: String,
+    frame_start: Instant,
+    timings: Vec<usize>,
+    last_update: Instant,
+}
+
+impl PerformanceTimer {
+    /// Start tracking
+    pub fn start(&mut self) {
+        self.frame_start = Instant::now();
+    }
+
+    /// Stop tracking
+    pub fn end(&mut self) {
+        let now = Instant::now();
+        let tic_time = now - self.frame_start;
+        self.timings.push(tic_time.as_millis() as usize);
+
+        if (now - self.last_update).as_secs_f32() >= 1.0 {
+            let average = self.timings.iter().fold(0, |a, b| a + b) / self.timings.len();
+            let name = &self.name;
+            println!("[HOTHAM_PERF] {name} average tic time: {average}");
+            self.last_update = now;
+            self.timings.clear();
+        }
+    }
+
+    /// Create a new performance timer
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: name.to_string(),
+            frame_start: Instant::now(),
+            last_update: Instant::now(),
+            timings: Default::default(),
+        }
+    }
 }

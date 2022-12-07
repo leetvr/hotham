@@ -5,6 +5,7 @@ use crate::{
         render_context::create_pipeline, AudioContext, GuiContext, HapticContext, InputContext,
         PhysicsContext, RenderContext, VulkanContext, XrContext, XrContextBuilder,
     },
+    util::PerformanceTimer,
     workers::Workers,
     HothamError, HothamResult, VIEW_TYPE,
 };
@@ -107,7 +108,7 @@ impl<'a> EngineBuilder<'a> {
             physics_context: Default::default(),
             stage_entity,
             hmd_entity,
-            performance_timers: Default::default(),
+            performance_timer: PerformanceTimer::new("total_frame"),
             workers: Workers::new(Default::default()),
         }
     }
@@ -159,44 +160,9 @@ pub struct Engine {
     /// HMD entity
     pub hmd_entity: hecs::Entity,
     /// Performance timers
-    pub performance_timers: PerformanceTimers,
+    pub performance_timer: PerformanceTimer,
     /// Workers
     workers: Workers,
-}
-
-#[derive(Debug)]
-pub struct PerformanceTimers {
-    pub frame_start: Instant,
-    pub timings: Vec<usize>,
-    pub last_update: Instant,
-}
-impl PerformanceTimers {
-    fn start(&mut self) {
-        self.frame_start = Instant::now();
-    }
-
-    fn end(&mut self) {
-        let now = Instant::now();
-        let tic_time = now - self.frame_start;
-        self.timings.push(tic_time.as_millis() as usize);
-
-        if (now - self.last_update).as_secs_f32() >= 1.0 {
-            let average = self.timings.iter().fold(0, |a, b| a + b) / self.timings.len();
-            println!("[HOTHAM_PERF] Average tic time: {average}");
-            self.last_update = now;
-            self.timings.clear();
-        }
-    }
-}
-
-impl Default for PerformanceTimers {
-    fn default() -> Self {
-        Self {
-            frame_start: Instant::now(),
-            last_update: Instant::now(),
-            timings: Default::default(),
-        }
-    }
 }
 
 /// The result of calling `update()` on Engine.
@@ -286,7 +252,6 @@ impl Engine {
             match self.xr_context.begin_frame() {
                 Err(HothamError::NotRendering) => continue,
                 Ok(swapchain_image_index) => {
-                    self.performance_timers.start();
                     render_context.begin_frame(vulkan_context);
                     return Ok(TickData {
                         previous_state,
@@ -301,7 +266,6 @@ impl Engine {
 
     /// Call this after update
     pub fn finish(&mut self) -> xr::Result<()> {
-        self.performance_timers.end();
         let vulkan_context = &self.vulkan_context;
         let render_context = &mut self.render_context;
 
