@@ -413,15 +413,7 @@ fn update_mesh(
     let staging_buffer = &render_context.resources.staging_buffer;
     unsafe {
         render_context.resources.index_buffer.overwrite(&indices);
-        render_context
-            .resources
-            .index_buffer
-            .upload(vulkan_context, staging_buffer);
         render_context.resources.vertex_buffer.overwrite(&vertices);
-        render_context
-            .resources
-            .index_buffer
-            .upload(vulkan_context, staging_buffer);
     }
 
     println!(
