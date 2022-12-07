@@ -64,7 +64,7 @@ f16vec3 getNormal() {
     vec3 N = normalize(inNormal);
 
     f16vec3 textureNormal;
-    textureNormal.xy = f16vec2(texture(textures[material.baseTextureID], inUV).ga) * F16(2) - F16(1);
+    textureNormal.xy = f16vec2(texture(textures[material.baseTextureID + 2], inUV).ga) * F16(2) - F16(1);
     textureNormal.z = sqrt(F16(1) - dot(textureNormal.xy, textureNormal.xy));
 
     // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
@@ -90,7 +90,7 @@ f16vec3 getIBLContribution(f16vec3 F0, float16_t perceptualRoughness, f16vec3 di
 
     f16vec2 brdfSamplePoint = clamp(f16vec2(NdotV, perceptualRoughness), f16vec2(0), f16vec2(1.0));
     f16vec2 f_ab = f16vec2(texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint)).rg;
-    f16vec3 specularLight = V16(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod).r);
+    f16vec3 specularLight = V16(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, 5).r);
 
     // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
     // Roughness dependent fresnel, from Fdez-Aguera
@@ -101,7 +101,7 @@ f16vec3 getIBLContribution(f16vec3 F0, float16_t perceptualRoughness, f16vec3 di
     f16vec3 specular = specularLight * FssEss;
 
     // Multiple scattering, from Fdez-Aguera
-    f16vec3 diffuseLight = V16(textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).rgb);
+    f16vec3 diffuseLight = V16(textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).r);
 
     f16vec3 diffuse = diffuseLight * diffuseColor * BRDF_LAMBERTIAN;
 
@@ -193,7 +193,7 @@ f16vec3 getPBRMetallicRoughnessColor() {
     f16vec3 color;
     if (sceneData.params.x > 0.) {
         f16vec3 reflection = normalize(reflect(V16(-v), V16(normal)));
-        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV);
+        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
     }
 
 
@@ -209,9 +209,9 @@ f16vec3 getPBRMetallicRoughnessColor() {
     if (sceneData.lights[2].type != NOT_PRESENT) {
         color += getLightContribution(f0, alphaRoughness, diffuseColor, normal, v, NdotV, sceneData.lights[2], ao);
     }
-    // if (sceneData.lights[3].type != NOT_PRESENT) {
-    //     color += getLightContribution(f0, alphaRoughness, diffuseColor, f16n, v, NdotV, sceneData.lights[3]);
-    // }
+    if (sceneData.lights[3].type != NOT_PRESENT) {
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, normal, v, NdotV, sceneData.lights[3], ao);
+    }
 
     // Add emission, if present
     if ((material.textureFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) > 0) {
