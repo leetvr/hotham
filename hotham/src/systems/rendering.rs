@@ -193,7 +193,6 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                     .get(&current_primitive_id)
                     .unwrap()
                     .primitive;
-                draw_data_buffer.upload(vulkan_context, staging_buffer);
                 draw_primitive(
                     material_buffer,
                     render_context.pipeline_layout,
@@ -237,8 +236,6 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
             .get(&current_primitive_id)
             .unwrap()
             .primitive;
-
-        draw_data_buffer.upload(vulkan_context, staging_buffer);
 
         draw_primitive(
             material_buffer,

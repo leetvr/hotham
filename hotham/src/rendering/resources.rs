@@ -6,7 +6,7 @@ use vulkan_context::VulkanContext;
 use crate::contexts::vulkan_context;
 
 use super::{
-    buffer::{Buffer, DeviceLocalBuffer},
+    buffer::Buffer,
     descriptors::{Descriptors, SKINS_BINDING},
     image::Image,
     material::Material,
@@ -27,13 +27,13 @@ pub type F16VEC3 = [u16; 3];
 /// A container that holds all of the resources required to draw a frame.
 pub struct Resources {
     /// Position only data
-    pub position_buffer: DeviceLocalBuffer<Vec3>,
+    pub position_buffer: Buffer<Vec3>,
 
     /// All the vertices that will be drawn this frame.
-    pub vertex_buffer: DeviceLocalBuffer<Vertex>,
+    pub vertex_buffer: Buffer<Vertex>,
 
     /// All the indices that will be drawn this frame.
-    pub index_buffer: DeviceLocalBuffer<u32>,
+    pub index_buffer: Buffer<u32>,
 
     /// Buffer for materials, indexed by material_id in DrawData
     pub materials_buffer: Buffer<Material>,
@@ -61,18 +61,18 @@ pub struct Resources {
 impl Resources {
     /// Create all the buffers required and update the relevant descriptor sets.
     pub(crate) unsafe fn new(vulkan_context: &VulkanContext, descriptors: &Descriptors) -> Self {
-        let position_buffer = DeviceLocalBuffer::new(
+        let position_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::VERTEX_BUFFER,
             VERTEX_BUFFER_SIZE,
         );
-        let vertex_buffer = DeviceLocalBuffer::new(
+        let vertex_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::VERTEX_BUFFER,
             VERTEX_BUFFER_SIZE,
         );
 
-        let index_buffer = DeviceLocalBuffer::new(
+        let index_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::INDEX_BUFFER,
             VERTEX_BUFFER_SIZE,
