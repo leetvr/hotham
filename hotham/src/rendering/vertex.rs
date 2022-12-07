@@ -80,14 +80,14 @@ impl Vertex {
             .build();
 
         let joint_indices = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
+            .binding(1)
             .location(3)
             .format(vk::Format::R32_UINT)
             .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
             .build();
 
         let joint_weights = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
+            .binding(1)
             .location(4)
             .format(vk::Format::R32_UINT)
             .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
