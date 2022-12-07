@@ -67,8 +67,8 @@ impl Primitive {
         let primitive = Primitive {
             indices_count: indices.len() as _,
             material_id,
-            index_buffer_offset: render_context.resources.index_buffer.data.len() as _,
-            vertex_buffer_offset: render_context.resources.vertex_buffer.data.len() as _,
+            index_buffer_offset: render_context.resources.index_buffer.len() as _,
+            vertex_buffer_offset: render_context.resources.vertex_buffer.len() as _,
             bounding_sphere: calculate_bounding_sphere(positions),
         };
 
