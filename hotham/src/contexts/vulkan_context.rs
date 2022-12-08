@@ -127,6 +127,9 @@ impl VulkanContext {
             .shader_float16(true)
             .shader_int8(true);
 
+        let mut fragment_density = vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT::builder()
+            .fragment_density_map_deferred(true);
+
         let queue_family_index = unsafe {
             instance
                 .get_physical_device_queue_family_properties(physical_device)
@@ -154,7 +157,8 @@ impl VulkanContext {
             .push_next(&mut robust_features)
             .push_next(&mut multiview_features)
             .push_next(&mut f16_storage)
-            .push_next(&mut f16_arithmetic);
+            .push_next(&mut f16_arithmetic)
+            .push_next(&mut fragment_density);
 
         let device_handle = unsafe {
             xr_instance.create_vulkan_device(
