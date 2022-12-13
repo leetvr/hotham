@@ -82,6 +82,7 @@ fn create_rigid_bodies(world: &mut hecs::World, physics_context: &mut PhysicsCon
         let mut rigid_body = RigidBodyBuilder::new(r.body_type.into())
             .additional_mass(r.mass)
             .position(global_transform.to_isometry())
+            .angvel(na_vector_from_glam(r.angular_velocity))
             .linvel(na_vector_from_glam(r.linear_velocity))
             .user_data(entity.to_bits().get() as _)
             .build();
