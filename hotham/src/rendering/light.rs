@@ -148,7 +148,8 @@ fn get_offet_and_scale(inner_cone_angle: f32, outer_cone_angle: f32) -> (f32, f3
 }
 
 // TODO: is this correct? Filament's glTF importer just does this
-fn get_falloff(range: f32) -> f32 {
+/// Calculate the falloff for a light from a glTF range value
+pub fn get_falloff(range: f32) -> f32 {
     let squared = range * range;
     if squared > 0.0 {
         1. / squared
