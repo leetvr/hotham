@@ -8,7 +8,7 @@ use crate::{
     },
     contexts::{
         physics_context::{self},
-        vulkan_context, RenderContext, VulkanContext,
+        RenderContext, VulkanContext,
     },
     rendering::{light::Light, material::Material},
 };
@@ -63,24 +63,6 @@ impl<'a> ImportContext<'a> {
             document,
             buffer,
             material_buffer_offset,
-        }
-    }
-
-    fn upload(&self) {
-        let resources = &self.render_context.resources;
-        let vulkan_context = &self.vulkan_context;
-        let staging_buffer = &resources.staging_buffer;
-
-        unsafe {
-            // resources
-            //     .position_buffer
-            //     .upload(vulkan_context, staging_buffer);
-            // resources
-            //     .vertex_buffer
-            //     .upload(vulkan_context, staging_buffer);
-            // resources
-            //     .index_buffer
-            //     .upload(vulkan_context, staging_buffer);
         }
     }
 }
@@ -217,9 +199,6 @@ fn load_models_from_gltf_data(import_context: &mut ImportContext) -> Result<()> 
     world
         .insert_one(animation_controller_entity, animation_controller)
         .unwrap();
-
-    // Now upload the relevant data
-    import_context.upload();
 
     Ok(())
 }
