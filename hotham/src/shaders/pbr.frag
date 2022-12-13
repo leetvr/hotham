@@ -90,7 +90,7 @@ f16vec3 getIBLContribution(f16vec3 F0, float16_t perceptualRoughness, f16vec3 di
 
     f16vec2 brdfSamplePoint = clamp(f16vec2(NdotV, perceptualRoughness), f16vec2(0), f16vec2(1.0));
     f16vec2 f_ab = f16vec2(texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint)).rg;
-    f16vec3 specularLight = V16(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, 5).r);
+    f16vec3 specularLight = V16(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, 5));
 
     // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
     // Roughness dependent fresnel, from Fdez-Aguera
@@ -101,7 +101,7 @@ f16vec3 getIBLContribution(f16vec3 F0, float16_t perceptualRoughness, f16vec3 di
     f16vec3 specular = specularLight * FssEss;
 
     // Multiple scattering, from Fdez-Aguera
-    f16vec3 diffuseLight = V16(textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod).r);
+    f16vec3 diffuseLight = V16(textureLod(cubeTextures[SAMPLER_IRRADIANCE_TEXTURE_ID], reflection, lod));
 
     f16vec3 diffuse = diffuseLight * diffuseColor * BRDF_LAMBERTIAN;
 
