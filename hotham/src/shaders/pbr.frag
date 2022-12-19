@@ -19,10 +19,6 @@ layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
 #include "pbr.glsl"
 
-layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
-    Material materials[];
-} materialBuffer;
-
 // Outputs
 layout (location = 0) out vec4 outColor;
 
@@ -30,32 +26,16 @@ void main() {
     // Start by setting the output color to a familiar "error" magenta.
     outColor = ERROR_MAGENTA;
 
-    // Retrieve the material from the buffer.
-    Material material = materialBuffer.materials[inMaterialID];
-
     // Determine the base color
     vec4 baseColor;
 
-    if (material.baseColorTextureID == NOT_PRESENT) {
-        baseColor = material.baseColorFactor;
+    if ((material.textureFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
+        baseColor = vec4(0.5, 0.5, 0.5, 1.0);
     } else {
-        baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
+        baseColor = texture(textures[material.baseTextureID], inUV);
     }
 
-    // Handle transparency
-    if (material.alphaMask == 1.0f) {
-        if (baseColor.a < material.alphaMaskCutoff) {
-            // TODO: Apparently Adreno GPUs don't like discarding.
-            discard;
-        }
-    }
-
-    // Choose the correct workflow for this material
-    if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor);
-    } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
-        outColor = baseColor;
-    }
+    outColor.rgb = getPBRMetallicRoughnessColor(baseColor);
 
     // Finally, tonemap the color.
     outColor.rgb = tonemap(outColor.rgb);
@@ -71,24 +51,24 @@ void main() {
                 break;
             // Normal
             case 2:
-                vec3 n = getNormal(material.normalTextureID);
+                vec3 n = getNormal();
                 outColor.rgb = n * 0.5 + 0.5;
                 break;
             // Occlusion
             case 3:
-                outColor.rgb = (material.occlusionTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.occlusionTextureID], inUV).rrr;
+                outColor.rgb = ((material.textureFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[material.baseTextureID + 1], inUV).rrr;
                 break;
             // Emission
             case 4:
-                outColor.rgb = (material.emissiveTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.emissiveTextureID], inUV).rgb;
+                outColor.rgb = ((material.textureFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[material.baseTextureID + 3], inUV).rgb;
                 break;
             // Roughness
             case 5:
-                outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], inUV).ggg;
+                outColor.rgb = ((material.textureFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) ? ERROR_MAGENTA.rgb : texture(textures[material.baseTextureID + 1], inUV).ggg;
                 break;
             // Metallic
             case 6:
-                outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], inUV).bbb;
+                outColor.rgb = ((material.textureFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) ? ERROR_MAGENTA.rgb : texture(textures[material.baseTextureID + 1], inUV).bbb;
                 break;
         }
         outColor = outColor;
