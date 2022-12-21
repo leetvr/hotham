@@ -10,9 +10,10 @@
 #define TEXTURE_FLAG_HAS_NORMAL_MAP 2
 #define TEXTURE_FLAG_HAS_AO_TEXTURE 4
 #define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 8
+#define PBR_WORKFLOW_UNLIT 16
 
 struct Material {
-    uint textureFlags;
+    uint flags;
     uint baseTextureID;
 };
 
@@ -42,7 +43,7 @@ vec3 tonemap(vec3 color) {
 // Get normal, tangent and bitangent vectors.
 vec3 getNormal() {
     vec3 N = normalize(inNormal);
-    if ((material.textureFlags & TEXTURE_FLAG_HAS_NORMAL_MAP) == 0) {
+    if ((material.flags & TEXTURE_FLAG_HAS_NORMAL_MAP) == 0) {
         return N;
     }
 
@@ -136,7 +137,7 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     float perceptualRoughness = 1.0;
     float metalness = 1.0;
 
-    if ((material.textureFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
+    if ((material.flags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
         perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
         metalness = clamp(metalness, 0., 1.0);
     } else {
@@ -178,7 +179,7 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     }
 
     // Apply ambient occlusion, if present.
-    if ((material.textureFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) {
+    if ((material.flags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) {
         // Occlusion is stored in the 'r' channel as per the glTF spec
         float ao = texture(textures[material.baseTextureID + 1], inUV).r;
         color = color * ao;
@@ -201,7 +202,7 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     }
 
     // Add emission, if present
-    if ((material.textureFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) > 0) {
+    if ((material.flags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) > 0) {
         color += texture(textures[material.baseTextureID + 3], inUV).rgb;
     }
     return color;

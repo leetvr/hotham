@@ -10,7 +10,7 @@ use bitflags::bitflags;
 
 bitflags! {
         /// Flags used by the shader to do shit
-    pub struct TextureFlags: u32 {
+    pub struct MaterialFlags: u32 {
         /// Do we have base color and metallic roughness textures?
         const HAS_PBR_TEXTURES = 0b00000001;
         /// Do we have a normal map?
@@ -19,6 +19,8 @@ bitflags! {
         const HAS_AO_TEXTURE = 0b00000100;
         /// Do we have an emission texture?
         const HAS_EMISSION_TEXTURE = 0b00001000;
+        /// Are we using unlit workflow?
+        const UNLIT_WORKFLOW = 0b00010000;
     }
 }
 
@@ -31,7 +33,7 @@ pub static NO_MATERIAL: usize = 0;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
     /// Bitflags, baby
-    pub texture_flags: TextureFlags,
+    pub flags: MaterialFlags,
     /// The first texture ID used
     pub base_texture_id: u32, // stupid that this is so huge but we don't have device support for u16 in push constants
                               // /// The base color of the material
@@ -121,34 +123,38 @@ impl Material {
             .map(|i| Texture::load(i.texture(), TextureUsage::Emission, import_context))
             .unwrap_or(NO_TEXTURE);
 
-        let mut texture_flags = TextureFlags::empty();
+        let mut material_flags = MaterialFlags::empty();
         if base_color_texture_set != NO_TEXTURE && metallic_roughness_texture_set != NO_TEXTURE {
-            texture_flags.toggle(TextureFlags::HAS_PBR_TEXTURES);
+            material_flags.insert(MaterialFlags::HAS_PBR_TEXTURES);
         }
 
         if normal_texture_set != NO_TEXTURE {
-            texture_flags.toggle(TextureFlags::HAS_NORMAL_MAP);
+            material_flags.insert(MaterialFlags::HAS_NORMAL_MAP);
         }
 
         if emissive_texture_set != NO_TEXTURE {
-            texture_flags.toggle(TextureFlags::HAS_EMISSION_TEXTURE);
+            material_flags.insert(MaterialFlags::HAS_EMISSION_TEXTURE);
         }
 
         if has_occlusion_texture {
-            texture_flags.toggle(TextureFlags::HAS_AO_TEXTURE);
+            material_flags.insert(MaterialFlags::HAS_AO_TEXTURE);
+        }
+
+        if material.unlit() {
+            material_flags.insert(MaterialFlags::UNLIT_WORKFLOW);
         }
 
         // Don't allow non-sensical flags
-        assert_ne!(texture_flags, TextureFlags::HAS_EMISSION_TEXTURE);
-        assert_ne!(texture_flags, TextureFlags::HAS_AO_TEXTURE);
+        assert_ne!(material_flags, MaterialFlags::HAS_EMISSION_TEXTURE);
+        assert_ne!(material_flags, MaterialFlags::HAS_AO_TEXTURE);
         assert_ne!(
-            texture_flags,
-            TextureFlags::HAS_AO_TEXTURE | TextureFlags::HAS_EMISSION_TEXTURE
+            material_flags,
+            MaterialFlags::HAS_AO_TEXTURE | MaterialFlags::HAS_EMISSION_TEXTURE
         );
 
         // Collect the material properties.
         let material = Material {
-            texture_flags,
+            flags: material_flags,
             base_texture_id: base_color_texture_set as _,
             // base_color_factor,
             // workflow,
@@ -172,7 +178,7 @@ impl Material {
     /// Create a simple, unlit, white coloured material.
     pub fn unlit_white() -> Material {
         Material {
-            // workflow: UNLIT_WORKFLOW,
+            flags: MaterialFlags::UNLIT_WORKFLOW,
             ..Default::default()
         }
     }
@@ -181,7 +187,7 @@ impl Material {
     /// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material-pbrmetallicroughness
     pub fn gltf_default() -> Self {
         Self {
-            texture_flags: TextureFlags::empty(),
+            flags: MaterialFlags::empty(),
             base_texture_id: NO_TEXTURE as _,
             // base_color_factor: [1., 1., 1., 1.].into(),
             // workflow: METALLIC_ROUGHNESS_WORKFLOW,
