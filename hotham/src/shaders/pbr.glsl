@@ -11,13 +11,11 @@
 #define TEXTURE_FLAG_HAS_AO_TEXTURE 4
 #define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 8
 
-struct Material {
+layout( push_constant ) uniform constants
+{
     uint textureFlags;
     uint baseTextureID;
-};
-
-// Store the material in a global to avoid copying when calling functions.
-Material material;
+} material;
 
 // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance (eg. f0) of 0.04
 const vec3 DEFAULT_F0 = vec3(0.04);

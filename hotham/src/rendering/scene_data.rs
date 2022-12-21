@@ -7,7 +7,7 @@ use super::light::{Light, MAX_LIGHTS};
 pub const DEFAULT_IBL_INTENSITY: f32 = 1.0;
 
 /// Data about the current scene. Sent to the vertex and fragment shaders
-#[derive(Deserialize, Serialize, Clone, Debug, Copy)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[repr(C)]
 pub struct SceneData {
     /// View-Projection matrices (one per eye)
@@ -26,7 +26,7 @@ impl Default for SceneData {
             view_projection: [Mat4::IDENTITY, Mat4::IDENTITY],
             camera_position: [Vec4::ZERO, Vec4::ZERO],
             params: [DEFAULT_IBL_INTENSITY, 0., 0., 0.].into(),
-            lights: [Light::none(); MAX_LIGHTS],
+            lights: [Light::none(), Light::none(), Light::none(), Light::none()],
         }
     }
 }
