@@ -16,8 +16,8 @@ use super::{
 };
 
 static VERTEX_BUFFER_SIZE: usize = 2_000_000; // TODO
-static MATERIAL_BUFFER_SIZE: usize = 10_000; // TODO
-static SKINS_BUFFER_SIZE: usize = 100; // TODO
+static MATERIAL_BUFFER_SIZE: usize = 20; // TODO
+static SKINS_BUFFER_SIZE: usize = 4; // TODO
 
 pub(crate) const MAX_JOINTS: usize = 64;
 
@@ -65,7 +65,7 @@ impl Resources {
 
         let mut materials_buffer = Buffer::new(
             vulkan_context,
-            vk::BufferUsageFlags::STORAGE_BUFFER,
+            vk::BufferUsageFlags::UNIFORM_BUFFER,
             MATERIAL_BUFFER_SIZE,
         );
         for set in descriptors.sets {

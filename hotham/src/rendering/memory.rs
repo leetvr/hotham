@@ -10,10 +10,14 @@ pub(crate) unsafe fn allocate_memory(
     let device = &vulkan_context.device;
     let physical_device = vulkan_context.physical_device;
 
-    let memory_type_bits = memory_requirements.memory_type_bits;
+    let memory_type_bits_requirement = memory_requirements.memory_type_bits;
     let memory_properties = instance.get_physical_device_memory_properties(physical_device);
-    let memory_type_index =
-        find_memory_type_index(memory_properties, memory_type_bits, memory_property_flags);
+    let memory_type_index = find_memory_type_index(
+        memory_properties,
+        memory_type_bits_requirement,
+        memory_property_flags,
+    );
+    println!("[HOTHAM_VULKAN] Using memory type {memory_type_index}");
     device
         .allocate_memory(
             &vk::MemoryAllocateInfo::builder()
@@ -26,17 +30,17 @@ pub(crate) unsafe fn allocate_memory(
 
 fn find_memory_type_index(
     memory_properties: vk::PhysicalDeviceMemoryProperties,
-    memory_type_bits: u32,
+    memory_type_bits_requirement: u32,
     memory_property_flags: vk::MemoryPropertyFlags,
 ) -> usize {
     let mut memory_type_index = !0;
-    for i in 0..memory_properties.memory_type_count as usize {
-        if (memory_type_bits & (1 << i)) == 0 {
-            continue;
-        }
-        let properties = memory_properties.memory_types[i].property_flags;
-        if properties.contains(memory_property_flags) {
-            memory_type_index = i;
+    for memory_index in 0..memory_properties.memory_type_count as usize {
+        let memory_type_bits: u32 = 1 << memory_index;
+        let is_required_memory_type = (memory_type_bits_requirement & memory_type_bits) != 0;
+        let properties = memory_properties.memory_types[memory_index].property_flags;
+
+        if is_required_memory_type && properties.contains(memory_property_flags) {
+            memory_type_index = memory_index;
             break;
         }
     }
