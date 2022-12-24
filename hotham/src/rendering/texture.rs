@@ -51,7 +51,6 @@ impl Texture {
         image_buf: &[u8],
         extent: &vk::Extent2D,
         array_layers: u32,
-        mip_count: u32,
         format: vk::Format,
         texture_usage: TextureUsage,
     ) -> Self {
@@ -63,7 +62,7 @@ impl Texture {
                 extent,
                 vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
                 array_layers,
-                mip_count,
+                1,
                 component_mapping,
             )
             .unwrap();
@@ -73,7 +72,7 @@ impl Texture {
                 name,
                 vulkan_context,
                 image_buf,
-                mip_count,
+                1,
                 vec![image_buf.len() as u64 / array_layers as u64],
                 &image,
             )
@@ -169,43 +168,18 @@ impl Texture {
         ktx2_data: &[u8],
         texture_usage: TextureUsage,
     ) -> Self {
-        println!("[HOTHAM_TEXTURE] Parsing KTX2 file {name}");
         let ktx2_image = parse_ktx2(ktx2_data);
-        println!(
-            "[HOTHAM_TEXTURE] KTX2 data: mip levels {}, array_layers: {}, faces: {}",
-            ktx2_image.mip_levels, ktx2_image.array_layers, ktx2_image.faces
-        );
 
-        let component_mapping = get_component_mapping(&ktx2_image.format, &texture_usage);
-
-        // Right. Now we've got to do the array/mip count dance.
-        let image = vulkan_context
-            .create_image_with_component_mapping(
-                ktx2_image.format,
-                &ktx2_image.extent,
-                vk::ImageUsageFlags::SAMPLED | vk::ImageUsageFlags::TRANSFER_DST,
-                ktx2_image.faces,
-                ktx2_image.mip_levels,
-                component_mapping,
-            )
-            .unwrap();
-
-        let index = render_context
-            .create_texture_image(
-                name,
-                vulkan_context,
-                &ktx2_image.image_buf,
-                ktx2_image.mip_levels,
-                ktx2_image.offsets,
-                &image,
-            )
-            .unwrap();
-
-        Texture {
-            image,
-            index,
+        Texture::new(
+            name,
+            vulkan_context,
+            render_context,
+            &ktx2_image.image_buf,
+            &ktx2_image.extent,
+            ktx2_image.array_layers.max(1) * ktx2_image.faces,
+            ktx2_image.format,
             texture_usage,
-        }
+        )
     }
 
     /// Create a texture from an uncompressed image, like JPG or PNG.
@@ -249,7 +223,6 @@ impl Texture {
             &image.into_raw(),
             &extent,
             1,
-            1,
             format,
             texture_usage,
         )
@@ -279,22 +252,21 @@ pub(crate) fn parse_ktx2(ktx2_data: &[u8]) -> KTX2Image {
     let mut offsets = Vec::new();
 
     println!(
-        "[HOTHAM_TEXTURE] Importing KTX2 texture in {:?} format with {} levels.",
-        header.format,
-        ktx2_reader.header().level_count,
+        "[HOTHAM_TEXTURE] Importing KTX2 texture in {:?} format.",
+        header.format
     );
-    for mipmap_level in ktx2_reader.levels() {
+    for level in ktx2_reader.levels() {
         let len = match header.supercompression_scheme {
             // Lifted from Bevy, with Love:
             // https://github.com/bevyengine/bevy/blob/05e5008624b35f51cd6418acc745236be2cddd28/crates/bevy_render/src/texture/ktx2.rs#L62
             Some(ktx2::SupercompressionScheme::Zstandard) => {
-                let mut cursor = std::io::Cursor::new(mipmap_level.data);
+                let mut cursor = std::io::Cursor::new(level);
                 let mut decoder = ruzstd::StreamingDecoder::new(&mut cursor).unwrap();
                 decoder.read_to_end(&mut image_buf).unwrap()
             }
             None => {
-                image_buf.extend(mipmap_level.data);
-                mipmap_level.data.len()
+                image_buf.extend(level);
+                level.len()
             }
             s => panic!(
                 "Unable to parse KTX2 file, unsupported supercompression scheme: {:?}",
