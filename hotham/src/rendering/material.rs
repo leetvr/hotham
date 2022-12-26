@@ -9,7 +9,7 @@ use bitflags::bitflags;
 
 bitflags! {
         /// Flags used by the shader to do shit
-    pub struct MaterialFlags: u32 {
+    pub struct MaterialFlags: u16 {
         /// Do we have base color and metallic roughness textures?
         const HAS_PBR_TEXTURES = 0b00000001;
         /// Do we have a normal map?
@@ -31,12 +31,13 @@ pub static NO_MATERIAL: usize = 0;
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
+    // The two u16 below are interpreted as one u32 and unpacked by the shader.
     /// Bitflags, baby
     pub flags: MaterialFlags,
     /// The first texture ID used
-    pub base_texture_id: u32, // stupid that this is so huge but we don't have device support for u16 in push constants
-    // /// The base color of the material
-    // pub base_color_factor: Vec4,
+    pub base_texture_id: u16,
+    /// The base color of the material
+    pub packed_base_color_factor: u32,
     // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
     // pub workflow: u32,
     // pub base_color_texture_set: u32,
@@ -56,8 +57,6 @@ pub struct Material {
     // pub alpha_mask: f32,
     // /// Alpha mask cutoff - see fragment shader
     // pub alpha_mask_cutoff: f32,
-    /// The base color of the material
-    pub packed_base_color_factor: u32,
 }
 
 impl Default for Material {

@@ -32,16 +32,18 @@ void main() {
 
     // Retrieve the material from the buffer.
     material = materialBuffer.materials[inMaterialID];
+    materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
+    baseTextureID = material.flagsAndBaseTextureID >> 16;
 
     // Determine the base color
     vec4 baseColor = unpackUnorm4x8(material.packedBaseColor);
 
-    if ((material.flags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) {
-        baseColor *= texture(textures[material.baseTextureID], inUV);
+    if ((materialFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) {
+        baseColor *= texture(textures[baseTextureID], inUV);
     }
 
     // Choose the correct workflow for this material
-    if ((material.flags & PBR_WORKFLOW_UNLIT) == 0) {
+    if ((materialFlags & PBR_WORKFLOW_UNLIT) == 0) {
         outColor.rgb = getPBRMetallicRoughnessColor(baseColor);
     } else {
         outColor = baseColor;
@@ -66,19 +68,19 @@ void main() {
                 break;
             // Occlusion
             case 3:
-                outColor.rgb = ((material.flags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[material.baseTextureID + 1], inUV).rrr;
+                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).rrr;
                 break;
             // Emission
             case 4:
-                outColor.rgb = ((material.flags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[material.baseTextureID + 3], inUV).rgb;
+                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], inUV).rgb;
                 break;
             // Roughness
             case 5:
-                outColor.rgb = ((material.flags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) ? ERROR_MAGENTA.rgb : texture(textures[material.baseTextureID + 1], inUV).ggg;
+                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).ggg;
                 break;
             // Metallic
             case 6:
-                outColor.rgb = ((material.flags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) ? ERROR_MAGENTA.rgb : texture(textures[material.baseTextureID + 1], inUV).bbb;
+                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).bbb;
                 break;
         }
         outColor = outColor;

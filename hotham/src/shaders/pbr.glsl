@@ -13,13 +13,14 @@
 #define PBR_WORKFLOW_UNLIT 16
 
 struct Material {
-    uint flags;
-    uint baseTextureID;
+    uint flagsAndBaseTextureID;
     uint packedBaseColor;
 };
 
 // Store the material in a global to avoid copying when calling functions.
 Material material;
+uint materialFlags;
+uint baseTextureID;
 
 // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance (eg. f0) of 0.04
 const vec3 DEFAULT_F0 = vec3(0.04);
@@ -44,12 +45,12 @@ vec3 tonemap(vec3 color) {
 // Get normal, tangent and bitangent vectors.
 vec3 getNormal() {
     vec3 N = normalize(inNormal);
-    if ((material.flags & TEXTURE_FLAG_HAS_NORMAL_MAP) == 0) {
+    if ((materialFlags & TEXTURE_FLAG_HAS_NORMAL_MAP) == 0) {
         return N;
     }
 
     vec3 textureNormal;
-    textureNormal.xy = texture(textures[material.baseTextureID + 2], inUV).ga * 2.0 - 1.0;
+    textureNormal.xy = texture(textures[baseTextureID + 2], inUV).ga * 2.0 - 1.0;
     textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
 
     // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
@@ -138,14 +139,14 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     float perceptualRoughness = 1.0;
     float metalness = 1.0;
 
-    if ((material.flags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
+    if ((materialFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
         perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
         metalness = clamp(metalness, 0., 1.0);
     } else {
         // As per the glTF spec:
         // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
         // Its green channel contains roughness values and its blue channel contains metalness values.
-        vec4 mrSample = texture(textures[material.baseTextureID + 1], inUV);
+        vec4 mrSample = texture(textures[baseTextureID + 1], inUV);
 
         perceptualRoughness = clamp(mrSample.g * perceptualRoughness, 0.0, 1.0);
         metalness = clamp(mrSample.b * metalness, 0.0, 1.0);
@@ -180,9 +181,9 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     }
 
     // Apply ambient occlusion, if present.
-    if ((material.flags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) {
+    if ((materialFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) {
         // Occlusion is stored in the 'r' channel as per the glTF spec
-        float ao = texture(textures[material.baseTextureID + 1], inUV).r;
+        float ao = texture(textures[baseTextureID + 1], inUV).r;
         color = color * ao;
     }
 
@@ -203,8 +204,8 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     }
 
     // Add emission, if present
-    if ((material.flags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) {
-        color += texture(textures[material.baseTextureID + 3], inUV).rgb;
+    if ((materialFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) {
+        color += texture(textures[baseTextureID + 3], inUV).rgb;
     }
     return color;
 }
