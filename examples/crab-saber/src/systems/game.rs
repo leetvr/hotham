@@ -630,12 +630,12 @@ mod tests {
             .get::<&mut Collider>(game_context.blue_saber)
             .unwrap()
             .collisions_this_frame
-            .push(game_context.red_saber.clone());
+            .push(game_context.red_saber);
         world
             .get::<&mut Collider>(game_context.red_saber)
             .unwrap()
             .collisions_this_frame
-            .push(game_context.blue_saber.clone());
+            .push(game_context.blue_saber);
     }
 
     fn num_cubes(world: &mut World) -> usize {

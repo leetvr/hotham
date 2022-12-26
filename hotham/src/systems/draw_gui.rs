@@ -100,7 +100,7 @@ mod tests {
             mut render_context,
             mut haptic_context,
             mut gui_context,
-        ) = setup(resolution.clone());
+        ) = setup(resolution);
 
         // Begin. Use renderdoc in headless mode for debugging.
         // let mut renderdoc = begin_renderdoc();
@@ -181,7 +181,7 @@ mod tests {
         update_global_transform_with_parent_system_inner(world);
 
         // Render
-        render_context.begin_frame(&vulkan_context);
+        render_context.begin_frame(vulkan_context);
 
         // Draw the GUI
         println!("[DRAW_GUI_TEST] draw_gui_system");
@@ -219,7 +219,7 @@ mod tests {
                 angle_right: 45.0_f32.to_radians(),
             },
         };
-        vec![view.clone(), view]
+        vec![view, view]
     }
 
     fn button_was_clicked(world: &mut World) -> bool {
@@ -229,7 +229,7 @@ mod tests {
             .next()
             .unwrap()
             .1;
-        return panel.buttons[0].clicked_this_frame;
+        panel.buttons[0].clicked_this_frame
     }
 
     fn release_trigger(world: &mut World) {
