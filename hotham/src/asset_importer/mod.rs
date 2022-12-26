@@ -642,7 +642,7 @@ mod tests {
                 unsafe {
                     let material = &render_context.resources.materials_buffer.as_slice()
                         [primitive.material_id as usize];
-                    assert_eq!(material.base_texture_id, 1);
+                    assert_eq!(material.packed_flags_and_base_texture_id >> 16, 1);
                 }
             }
 

@@ -9,17 +9,19 @@ use bitflags::bitflags;
 
 bitflags! {
         /// Flags used by the shader to do shit
-    pub struct MaterialFlags: u16 {
-        /// Do we have base color and metallic roughness textures?
-        const HAS_PBR_TEXTURES = 0b00000001;
+    pub struct MaterialFlags: u32 {
+        /// Do we have base color texture?
+        const HAS_BASE_COLOR_TEXTURE = 1 << 0;
+        /// Do we have metallic roughness texture?
+        const HAS_METALLIC_ROUGHNESS_TEXTURE = 1 << 1;
         /// Do we have a normal map?
-        const HAS_NORMAL_MAP = 0b00000010;
+        const HAS_NORMAL_MAP = 1 << 2;
         /// Do we have an AO texture?
-        const HAS_AO_TEXTURE = 0b00000100;
+        const HAS_AO_TEXTURE = 1 << 3;
         /// Do we have an emission texture?
-        const HAS_EMISSION_TEXTURE = 0b00001000;
+        const HAS_EMISSION_TEXTURE = 1 << 4;
         /// Are we using unlit workflow?
-        const UNLIT_WORKFLOW = 0b00010000;
+        const UNLIT_WORKFLOW = 1 << 5;
     }
 }
 
@@ -31,11 +33,8 @@ pub static NO_MATERIAL: usize = 0;
 #[repr(C)]
 #[derive(Debug, Clone, PartialEq)]
 pub struct Material {
-    // The two u16 below are interpreted as one u32 and unpacked by the shader.
-    /// Bitflags, baby
-    pub flags: MaterialFlags,
-    /// The first texture ID used
-    pub base_texture_id: u16,
+    /// The flags and base_texture_id are stored as two u16 packed into a single u32. The flags are stored in the least significant bits.
+    pub packed_flags_and_base_texture_id: u32,
     /// The base color of the material
     pub packed_base_color_factor: u32,
     // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
@@ -124,8 +123,12 @@ impl Material {
             .unwrap_or(NO_TEXTURE);
 
         let mut material_flags = MaterialFlags::empty();
-        if base_color_texture_set != NO_TEXTURE && metallic_roughness_texture_set != NO_TEXTURE {
-            material_flags.insert(MaterialFlags::HAS_PBR_TEXTURES);
+        if base_color_texture_set != NO_TEXTURE {
+            material_flags.insert(MaterialFlags::HAS_BASE_COLOR_TEXTURE);
+        }
+
+        if metallic_roughness_texture_set != NO_TEXTURE {
+            material_flags.insert(MaterialFlags::HAS_METALLIC_ROUGHNESS_TEXTURE);
         }
 
         if normal_texture_set != NO_TEXTURE {
@@ -154,8 +157,7 @@ impl Material {
 
         // Collect the material properties.
         let material = Material {
-            flags: material_flags,
-            base_texture_id: base_color_texture_set as _,
+            packed_flags_and_base_texture_id: pack2x16(material_flags.bits, base_color_texture_set),
             packed_base_color_factor: pack_unorm4x8(&pbr_metallic_roughness.base_color_factor()),
             // base_color_factor,
             // workflow,
@@ -179,8 +181,8 @@ impl Material {
     /// Create a simple, unlit, white coloured material.
     pub fn unlit_white() -> Material {
         Material {
-            flags: MaterialFlags::UNLIT_WORKFLOW,
-            ..Default::default()
+            packed_flags_and_base_texture_id: MaterialFlags::UNLIT_WORKFLOW.bits,
+            packed_base_color_factor: u32::MAX,
         }
     }
 
@@ -188,8 +190,7 @@ impl Material {
     /// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#reference-material-pbrmetallicroughness
     pub fn gltf_default() -> Self {
         Self {
-            flags: MaterialFlags::empty(),
-            base_texture_id: NO_TEXTURE as _,
+            packed_flags_and_base_texture_id: MaterialFlags::empty().bits,
             packed_base_color_factor: u32::MAX,
             // base_color_factor: [1., 1., 1., 1.].into(),
             // workflow: METALLIC_ROUGHNESS_WORKFLOW,
@@ -223,4 +224,9 @@ fn pack_unorm4x8_test() {
     assert_eq!(pack_unorm4x8(&[0.0, 1.0, 0.0, 0.0]), 0x0000FF00);
     assert_eq!(pack_unorm4x8(&[0.0, 0.0, 1.0, 0.0]), 0x00FF0000);
     assert_eq!(pack_unorm4x8(&[0.0, 0.0, 0.0, 1.0]), 0xFF000000);
+}
+
+/// Pack the least significant 16 bits from two u32 into a single u32.
+pub fn pack2x16(lsb: u32, msb: u32) -> u32 {
+    (msb << 16) | (lsb & 0xFFFF)
 }

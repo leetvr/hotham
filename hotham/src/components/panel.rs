@@ -5,7 +5,7 @@ use itertools::izip;
 
 use crate::components::Mesh;
 use crate::hotham_error::HothamError;
-use crate::rendering::material::Material;
+use crate::rendering::material::{pack2x16, Material, MaterialFlags};
 use crate::rendering::mesh_data::MeshData;
 use crate::rendering::primitive::Primitive;
 use crate::rendering::vertex::Vertex;
@@ -83,7 +83,10 @@ fn create_panel_mesh(
 
 fn add_material(output_texture: &Texture, render_context: &mut RenderContext) -> u32 {
     let mut material = Material::unlit_white();
-    material.base_texture_id = output_texture.index as _;
+    material.packed_flags_and_base_texture_id = pack2x16(
+        (MaterialFlags::HAS_BASE_COLOR_TEXTURE | MaterialFlags::UNLIT_WORKFLOW).bits(),
+        output_texture.index,
+    );
     unsafe { render_context.resources.materials_buffer.push(&material) }
 }
 

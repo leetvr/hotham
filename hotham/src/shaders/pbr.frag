@@ -38,7 +38,7 @@ void main() {
     // Determine the base color
     vec4 baseColor = unpackUnorm4x8(material.packedBaseColor);
 
-    if ((materialFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) {
+    if ((materialFlags & HAS_BASE_COLOR_TEXTURE) != 0) {
         baseColor *= texture(textures[baseTextureID], inUV);
     }
 
@@ -76,11 +76,11 @@ void main() {
                 break;
             // Roughness
             case 5:
-                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).ggg;
+                outColor.rgb = ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).ggg;
                 break;
             // Metallic
             case 6:
-                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).bbb;
+                outColor.rgb = ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).bbb;
                 break;
         }
         outColor = outColor;

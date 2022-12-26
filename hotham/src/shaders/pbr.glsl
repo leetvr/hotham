@@ -6,11 +6,12 @@
 #define ENVIRONMENT_MAP_TEXTURE_ID 1
 #define ERROR_MAGENTA vec4(1., 0., 1., 1.)
 
-#define TEXTURE_FLAG_HAS_PBR_TEXTURES 1
-#define TEXTURE_FLAG_HAS_NORMAL_MAP 2
-#define TEXTURE_FLAG_HAS_AO_TEXTURE 4
-#define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 8
-#define PBR_WORKFLOW_UNLIT 16
+#define HAS_BASE_COLOR_TEXTURE 1
+#define HAS_METALLIC_ROUGHNESS_TEXTURE 2
+#define TEXTURE_FLAG_HAS_NORMAL_MAP 4
+#define TEXTURE_FLAG_HAS_AO_TEXTURE 8
+#define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 16
+#define PBR_WORKFLOW_UNLIT 32
 
 struct Material {
     uint flagsAndBaseTextureID;
@@ -139,7 +140,7 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     float perceptualRoughness = 1.0;
     float metalness = 1.0;
 
-    if ((materialFlags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
+    if ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) == 0) {
         perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
         metalness = clamp(metalness, 0., 1.0);
     } else {
