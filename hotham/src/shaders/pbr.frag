@@ -37,7 +37,7 @@ void main() {
     vec4 baseColor;
 
     if ((material.flags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
-        baseColor = vec4(1.0, 1.0, 1.0, 1.0);
+        baseColor = unpackUnorm4x8(material.packedBaseColor);
     } else {
         baseColor = texture(textures[material.baseTextureID], inUV);
     }

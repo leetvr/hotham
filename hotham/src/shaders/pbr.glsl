@@ -15,6 +15,7 @@
 struct Material {
     uint flags;
     uint baseTextureID;
+    uint packedBaseColor;
 };
 
 // Store the material in a global to avoid copying when calling functions.

@@ -35,27 +35,29 @@ pub struct Material {
     pub flags: MaterialFlags,
     /// The first texture ID used
     pub base_texture_id: u32, // stupid that this is so huge but we don't have device support for u16 in push constants
-                              // /// The base color of the material
-                              // pub base_color_factor: Vec4,
-                              // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
-                              // pub workflow: u32,
-                              // pub base_color_texture_set: u32,
-                              // /// The metallic-roughness texture.
-                              // pub metallic_roughness_texture_id: u32,
-                              // /// Normal texture
-                              // pub normal_texture_set: u32,
-                              // /// Occlusion texture set
-                              // // pub occlusion_texture_set: u32,
-                              // /// Emissive texture set
-                              // pub emissive_texture_set: u32,
-                              // /// The factor for the metalness of the material.
-                              // pub metallic_factor: f32,
-                              // /// The factor for the roughness of the material.
-                              // pub roughness_factor: f32,
-                              // /// Alpha mask - see fragment shader
-                              // pub alpha_mask: f32,
-                              // /// Alpha mask cutoff - see fragment shader
-                              // pub alpha_mask_cutoff: f32,
+    // /// The base color of the material
+    // pub base_color_factor: Vec4,
+    // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
+    // pub workflow: u32,
+    // pub base_color_texture_set: u32,
+    // /// The metallic-roughness texture.
+    // pub metallic_roughness_texture_id: u32,
+    // /// Normal texture
+    // pub normal_texture_set: u32,
+    // /// Occlusion texture set
+    // // pub occlusion_texture_set: u32,
+    // /// Emissive texture set
+    // pub emissive_texture_set: u32,
+    // /// The factor for the metalness of the material.
+    // pub metallic_factor: f32,
+    // /// The factor for the roughness of the material.
+    // pub roughness_factor: f32,
+    // /// Alpha mask - see fragment shader
+    // pub alpha_mask: f32,
+    // /// Alpha mask cutoff - see fragment shader
+    // pub alpha_mask_cutoff: f32,
+    /// The base color of the material
+    pub packed_base_color_factor: u32,
 }
 
 impl Default for Material {
@@ -155,6 +157,7 @@ impl Material {
         let material = Material {
             flags: material_flags,
             base_texture_id: base_color_texture_set as _,
+            packed_base_color_factor: pack_unorm4x8(&pbr_metallic_roughness.base_color_factor()),
             // base_color_factor,
             // workflow,
             // occlusion_texture_set,
@@ -188,6 +191,7 @@ impl Material {
         Self {
             flags: MaterialFlags::empty(),
             base_texture_id: NO_TEXTURE as _,
+            packed_base_color_factor: u32::MAX,
             // base_color_factor: [1., 1., 1., 1.].into(),
             // workflow: METALLIC_ROUGHNESS_WORKFLOW,
             // base_color_texture_set: NO_TEXTURE,
@@ -201,4 +205,23 @@ impl Material {
             // alpha_mask_cutoff: Default::default(),
         }
     }
+}
+
+/// Convert normalized floating-point values into 8-bit integer values and pack them into an u32.
+/// First value is stored in least significant bits. This works the same as packUnorm4x8 in GLSL.
+pub fn pack_unorm4x8(ary: &[f32; 4]) -> u32 {
+    let mut packed: u32 = 0;
+    for value in ary.iter().rev() {
+        let packed_value = (value.clamp(0.0, 1.0) * 255.0).round() as u32;
+        packed = (packed << 8) | packed_value;
+    }
+    packed
+}
+
+#[test]
+fn pack_unorm4x8_test() {
+    assert_eq!(pack_unorm4x8(&[1.0, 0.0, 0.0, 0.0]), 0x000000FF);
+    assert_eq!(pack_unorm4x8(&[0.0, 1.0, 0.0, 0.0]), 0x0000FF00);
+    assert_eq!(pack_unorm4x8(&[0.0, 0.0, 1.0, 0.0]), 0x00FF0000);
+    assert_eq!(pack_unorm4x8(&[0.0, 0.0, 0.0, 1.0]), 0xFF000000);
 }
