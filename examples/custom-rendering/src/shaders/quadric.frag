@@ -16,10 +16,6 @@ layout (location = 1) in flat uint inInstanceIndex;
 
 #include "quadric.glsl"
 
-layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
-    Material materials[];
-} materialBuffer;
-
 // Outputs
 layout (location = 0) out vec4 outColor;
 layout (depth_less) out float gl_FragDepth;
@@ -95,8 +91,7 @@ void main() {
     vec4 uv4 = d.uvFromGos * hitPoint;
     uv = uv4.xy / uv4.w;
 
-    // Retrieve the material from the buffer.
-    material = materialBuffer.materials[d.materialID];
+    // Unpack the material parameters
     materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
     baseTextureID = material.flagsAndBaseTextureID >> 16;
     metallicRoughnessAlphaMaskCutoff = unpackUnorm4x8(

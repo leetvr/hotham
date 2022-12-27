@@ -13,14 +13,14 @@
 #define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 16
 #define PBR_WORKFLOW_UNLIT 32
 
-struct Material {
+layout( push_constant ) uniform constants
+{
     uint flagsAndBaseTextureID;
     uint packedBaseColor;
     uint packedMetallicRoughnessFactorAlphaMaskCutoff;
-};
+} material;
 
-// Store the material in a global to avoid copying when calling functions.
-Material material;
+// Store the unpacked material in globals to avoid copying when calling functions.
 uint materialFlags;
 uint baseTextureID;
 vec3 metallicRoughnessAlphaMaskCutoff;

@@ -19,10 +19,6 @@ layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
 
 #include "pbr.glsl"
 
-layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
-    Material materials[];
-} materialBuffer;
-
 // Outputs
 layout (location = 0) out vec4 outColor;
 
@@ -58,13 +54,11 @@ void main() {
     // Start by setting the output color to a familiar "error" magenta.
     outColor = ERROR_MAGENTA;
 
-    // Retrieve the material from the buffer.
-    material = materialBuffer.materials[inMaterialID];
+    // Unpack the material parameters
     materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
     baseTextureID = material.flagsAndBaseTextureID >> 16;
     metallicRoughnessAlphaMaskCutoff = unpackUnorm4x8(
         material.packedMetallicRoughnessFactorAlphaMaskCutoff).xyz;
-
 
     // Determine the base color
     vec4 baseColor = unpackUnorm4x8(material.packedBaseColor);
