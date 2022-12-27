@@ -34,12 +34,23 @@ void main() {
     material = materialBuffer.materials[inMaterialID];
     materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
     baseTextureID = material.flagsAndBaseTextureID >> 16;
+    metallicRoughnessAlphaMaskCutoff = unpackUnorm4x8(
+        material.packedMetallicRoughnessFactorAlphaMaskCutoff).xyz;
+
 
     // Determine the base color
     vec4 baseColor = unpackUnorm4x8(material.packedBaseColor);
 
     if ((materialFlags & HAS_BASE_COLOR_TEXTURE) != 0) {
         baseColor *= texture(textures[baseTextureID], inUV);
+    }
+
+    // Handle transparency
+    if (metallicRoughnessAlphaMaskCutoff.z > 0.0f) {
+        if (baseColor.a < metallicRoughnessAlphaMaskCutoff.z) {
+            // TODO: Apparently Adreno GPUs don't like discarding.
+            discard;
+        }
     }
 
     // Choose the correct workflow for this material

@@ -16,13 +16,14 @@
 struct Material {
     uint flagsAndBaseTextureID;
     uint packedBaseColor;
-    uint packedMetallicRoughnessFactor;
+    uint packedMetallicRoughnessFactorAlphaMaskCutoff;
 };
 
 // Store the material in a global to avoid copying when calling functions.
 Material material;
 uint materialFlags;
 uint baseTextureID;
+vec3 metallicRoughnessAlphaMaskCutoff;
 
 // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance (eg. f0) of 0.04
 const vec3 DEFAULT_F0 = vec3(0.04);
@@ -138,9 +139,8 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     // Metallic and Roughness material properties are packed together
     // In glTF, these factors can be specified by fixed scalar values
     // or from a metallic-roughness map
-    vec2 metallicRoughness = unpackUnorm4x8(material.packedMetallicRoughnessFactor).xy;
-    float perceptualRoughness = metallicRoughness.y;
-    float metalness = metallicRoughness.x;
+    float perceptualRoughness = metallicRoughnessAlphaMaskCutoff.y;
+    float metalness = metallicRoughnessAlphaMaskCutoff.x;
 
     if ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) == 0) {
         perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
