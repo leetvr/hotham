@@ -8,6 +8,7 @@ use crate::{
     rendering::{
         buffer::Buffer,
         material::Material,
+        primitive::Primitive,
         resources::{DrawData, PrimitiveCullData},
     },
     Engine,
@@ -165,8 +166,8 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
     let device = &vulkan_context.device;
     let frame = &mut render_context.frames[render_context.frame_index];
     let command_buffer = frame.command_buffer;
-    let draw_data_buffer = &mut frame.draw_data_buffer;
     let material_buffer = &mut render_context.resources.materials_buffer;
+    let draw_data_buffer = &mut frame.draw_data_buffer;
     draw_data_buffer.clear();
 
     let mut instance_offset = 0;
@@ -215,7 +216,6 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
             let draw_data = DrawData {
                 gos_from_local: instance.gos_from_local.into(),
                 local_from_gos: instance.gos_from_local.inverse().into(),
-                material_id: instanced_primitive.primitive.material_id,
                 skin_id: instance.skin_id,
             };
             draw_data_buffer.push(&draw_data);
@@ -246,10 +246,11 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
 }
 
 // TODO: Just push this into `RenderContext`
-unsafe fn draw_primitive(
+/// Update material push constants and submit draw command.
+pub unsafe fn draw_primitive(
     materials_buffer: &Buffer<Material>,
     pipeline_layout: ash::vk::PipelineLayout,
-    primitive: &crate::rendering::primitive::Primitive,
+    primitive: &Primitive,
     device: &ash::Device,
     command_buffer: ash::vk::CommandBuffer,
     instance_count: u32,

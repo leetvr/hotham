@@ -15,6 +15,7 @@ use hotham::{
     glam::{Affine3A, Mat4},
     hecs::{With, World},
     rendering::resources::{DrawData, PrimitiveCullData},
+    systems::rendering::draw_primitive,
     vk, xr, Engine,
 };
 
@@ -234,6 +235,7 @@ pub unsafe fn draw_world(
     let device = &vulkan_context.device;
     let frame = &mut render_context.frames[render_context.frame_index];
     let command_buffer = frame.command_buffer;
+    let material_buffer = &mut render_context.resources.materials_buffer;
     let draw_data_buffer = &mut frame.draw_data_buffer;
     draw_data_buffer.clear();
     let quadrics_data_buffer = &mut custom_render_context.quadrics_data_buffer;
@@ -267,12 +269,13 @@ pub unsafe fn draw_world(
                             .get(&current_primitive_id)
                             .unwrap()
                             .primitive;
-                        device.cmd_draw_indexed(
+                        draw_primitive(
+                            material_buffer,
+                            render_context.pipeline_layout,
+                            primitive,
+                            device,
                             command_buffer,
-                            primitive.indices_count,
                             instance_count,
-                            primitive.index_buffer_offset,
-                            primitive.vertex_buffer_offset as _,
                             instance_offset,
                         );
                     }
@@ -282,12 +285,13 @@ pub unsafe fn draw_world(
                             .get(&current_primitive_id)
                             .unwrap()
                             .primitive;
-                        device.cmd_draw_indexed(
+                        draw_primitive(
+                            material_buffer,
+                            render_context.pipeline_layout,
+                            primitive,
+                            device,
                             command_buffer,
-                            primitive.indices_count,
                             instance_count,
-                            primitive.index_buffer_offset,
-                            primitive.vertex_buffer_offset as _,
                             instance_offset,
                         );
                     }
@@ -342,7 +346,6 @@ pub unsafe fn draw_world(
                     let draw_data = DrawData {
                         gos_from_local: instance.gos_from_local.into(),
                         local_from_gos: instance.gos_from_local.inverse().into(),
-                        material_id: instanced_primitive.primitive.material_id,
                         skin_id: instance.skin_id,
                     };
                     draw_data_buffer.push(&draw_data);
@@ -358,7 +361,6 @@ pub unsafe fn draw_world(
                     let local_from_gos: Mat4 = instance.gos_from_local.inverse().into();
                     let quadric_data = QuadricData {
                         gos_from_local: instance.gos_from_local.into(),
-                        material_id: instanced_primitive.primitive.material_id,
                         surface_q: local_from_gos.transpose()
                             * instance.surface_q_in_local
                             * local_from_gos,
@@ -385,12 +387,13 @@ pub unsafe fn draw_world(
                     .get(&current_primitive_id)
                     .unwrap()
                     .primitive;
-                device.cmd_draw_indexed(
+                draw_primitive(
+                    material_buffer,
+                    render_context.pipeline_layout,
+                    primitive,
+                    device,
                     command_buffer,
-                    primitive.indices_count,
                     instance_count,
-                    primitive.index_buffer_offset,
-                    primitive.vertex_buffer_offset as _,
                     instance_offset,
                 );
             }
@@ -400,12 +403,13 @@ pub unsafe fn draw_world(
                     .get(&current_primitive_id)
                     .unwrap()
                     .primitive;
-                device.cmd_draw_indexed(
+                draw_primitive(
+                    material_buffer,
+                    render_context.pipeline_layout,
+                    primitive,
+                    device,
                     command_buffer,
-                    primitive.indices_count,
                     instance_count,
-                    primitive.index_buffer_offset,
-                    primitive.vertex_buffer_offset as _,
                     instance_offset,
                 );
             }

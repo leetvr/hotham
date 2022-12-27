@@ -8,7 +8,6 @@
 struct DrawData {
     mat4 gosFromLocal;
     mat4 localFromGos;
-    uint materialID;
     uint skinID;
 };
 

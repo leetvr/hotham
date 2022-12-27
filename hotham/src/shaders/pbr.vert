@@ -12,8 +12,7 @@ layout (location = 4) in uint inWeight;
 
 layout (location = 0) out vec4 outGosPos;
 layout (location = 1) out vec2 outUV;
-layout (location = 2) flat out uint outMaterialID;
-layout (location = 3) out vec3 outNormal;
+layout (location = 2) out vec3 outNormal;
 
 layout (std430, set = 0, binding = 0) readonly buffer DrawDataBuffer {
     DrawData data[];
@@ -49,6 +48,5 @@ void main() {
     }
 
     outUV = inUV;
-    outMaterialID = d.materialID;
     gl_Position = sceneData.viewProjection[gl_ViewIndex] * outGosPos;
 }

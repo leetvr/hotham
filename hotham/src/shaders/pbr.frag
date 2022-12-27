@@ -10,8 +10,7 @@
 // Inputs
 layout (location = 0) in vec3 inGosPos;
 layout (location = 1) in vec2 inUV;
-layout (location = 2) flat in uint inMaterialID;
-layout (location = 3) in vec3 inNormal;
+layout (location = 2) in vec3 inNormal;
 
 // Textures
 layout (set = 0, binding = 4) uniform sampler2D textures[];
