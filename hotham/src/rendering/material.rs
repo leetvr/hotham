@@ -37,6 +37,8 @@ pub struct Material {
     pub packed_flags_and_base_texture_id: u32,
     /// The base color of the material
     pub packed_base_color_factor: u32,
+    /// The metallic amd roughness factors packed with packUnorm4x8.
+    pub packed_metallic_roughness_factor: u32,
     // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
     // pub workflow: u32,
     // pub base_color_texture_set: u32,
@@ -162,8 +164,12 @@ impl Material {
             // base_color_factor,
             // workflow,
             // occlusion_texture_set,
-            // metallic_factor,
-            // roughness_factor,
+            packed_metallic_roughness_factor: pack_unorm4x8(&[
+                pbr_metallic_roughness.metallic_factor(),
+                pbr_metallic_roughness.roughness_factor(),
+                0.0,
+                0.0,
+            ]),
             // alpha_mask,
             // alpha_mask_cutoff,
         };
@@ -183,6 +189,7 @@ impl Material {
         Material {
             packed_flags_and_base_texture_id: MaterialFlags::UNLIT_WORKFLOW.bits,
             packed_base_color_factor: u32::MAX,
+            packed_metallic_roughness_factor: pack_unorm4x8(&[1.0, 1.0, 0.0, 0.0]),
         }
     }
 
@@ -192,6 +199,7 @@ impl Material {
         Self {
             packed_flags_and_base_texture_id: MaterialFlags::empty().bits,
             packed_base_color_factor: u32::MAX,
+            packed_metallic_roughness_factor: pack_unorm4x8(&[1.0, 1.0, 0.0, 0.0]),
             // base_color_factor: [1., 1., 1., 1.].into(),
             // workflow: METALLIC_ROUGHNESS_WORKFLOW,
             // base_color_texture_set: NO_TEXTURE,

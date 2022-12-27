@@ -16,6 +16,7 @@
 struct Material {
     uint flagsAndBaseTextureID;
     uint packedBaseColor;
+    uint packedMetallicRoughnessFactor;
 };
 
 // Store the material in a global to avoid copying when calling functions.
@@ -137,8 +138,9 @@ vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
     // Metallic and Roughness material properties are packed together
     // In glTF, these factors can be specified by fixed scalar values
     // or from a metallic-roughness map
-    float perceptualRoughness = 1.0;
-    float metalness = 1.0;
+    vec2 metallicRoughness = unpackUnorm4x8(material.packedMetallicRoughnessFactor).xy;
+    float perceptualRoughness = metallicRoughness.y;
+    float metalness = metallicRoughness.x;
 
     if ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) == 0) {
         perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
