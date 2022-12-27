@@ -34,12 +34,10 @@ void main() {
     material = materialBuffer.materials[inMaterialID];
 
     // Determine the base color
-    vec4 baseColor;
+    vec4 baseColor = unpackUnorm4x8(material.packedBaseColor);
 
-    if ((material.flags & TEXTURE_FLAG_HAS_PBR_TEXTURES) == 0) {
-        baseColor = unpackUnorm4x8(material.packedBaseColor);
-    } else {
-        baseColor = texture(textures[material.baseTextureID], inUV);
+    if ((material.flags & TEXTURE_FLAG_HAS_PBR_TEXTURES) != 0) {
+        baseColor *= texture(textures[material.baseTextureID], inUV);
     }
 
     // Choose the correct workflow for this material
