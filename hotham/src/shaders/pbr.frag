@@ -6,17 +6,12 @@
 #include "common.glsl"
 #include "lights.glsl"
 #include "brdf.glsl"
+#include "pbr.glsl"
 
 // Inputs
 layout (location = 0) in vec3 inGosPos;
 layout (location = 1) in vec2 inUV;
 layout (location = 2) in vec3 inNormal;
-
-// Textures
-layout (set = 0, binding = 3) uniform sampler2D textures[10000];
-layout (set = 0, binding = 4) uniform samplerCube cubeTextures[100];
-
-#include "pbr.glsl"
 
 // Outputs
 layout (location = 0) out vec4 outColor;

@@ -13,6 +13,11 @@
 #define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 16
 #define PBR_WORKFLOW_UNLIT 32
 
+// Textures
+layout (set = 0, binding = 3) uniform sampler2D textures[10000];
+layout (set = 0, binding = 4) uniform samplerCube cubeTextures[100];
+
+// Material
 layout( push_constant ) uniform constants
 {
     uint flagsAndBaseTextureID;

@@ -3,11 +3,6 @@
 #include "../../../../hotham/src/shaders/common.glsl"
 #include "../../../../hotham/src/shaders/lights.glsl"
 #include "../../../../hotham/src/shaders/brdf.glsl"
-
-// Textures
-layout (set = 0, binding = 3) uniform sampler2D textures[10000];
-layout (set = 0, binding = 4) uniform samplerCube cubeTextures[100];
-
 #include "../../../../hotham/src/shaders/pbr.glsl"
 
 // Inputs
