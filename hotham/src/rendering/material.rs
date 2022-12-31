@@ -228,15 +228,20 @@ pub fn pack_unorm4x8(ary: &[f32; 4]) -> u32 {
     packed
 }
 
-#[test]
-fn pack_unorm4x8_test() {
-    assert_eq!(pack_unorm4x8(&[1.0, 0.0, 0.0, 0.0]), 0x000000FF);
-    assert_eq!(pack_unorm4x8(&[0.0, 1.0, 0.0, 0.0]), 0x0000FF00);
-    assert_eq!(pack_unorm4x8(&[0.0, 0.0, 1.0, 0.0]), 0x00FF0000);
-    assert_eq!(pack_unorm4x8(&[0.0, 0.0, 0.0, 1.0]), 0xFF000000);
-}
-
 /// Pack the least significant 16 bits from two u32 into a single u32.
 pub fn pack2x16(lsb: u32, msb: u32) -> u32 {
     (msb << 16) | (lsb & 0xFFFF)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pack_unorm4x8_test() {
+        assert_eq!(pack_unorm4x8(&[1.0, 0.0, 0.0, 0.0]), 0x000000FF);
+        assert_eq!(pack_unorm4x8(&[0.0, 1.0, 0.0, 0.0]), 0x0000FF00);
+        assert_eq!(pack_unorm4x8(&[0.0, 0.0, 1.0, 0.0]), 0x00FF0000);
+        assert_eq!(pack_unorm4x8(&[0.0, 0.0, 0.0, 1.0]), 0xFF000000);
+    }
 }
