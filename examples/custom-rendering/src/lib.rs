@@ -139,11 +139,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &models,
         "Sphere",
         world,
-        &LocalTransform {
-            translation: [1.0, 1.4, -1.5].into(),
-            rotation: Quat::IDENTITY,
-            scale: [0.5, 0.5, 0.5].into(),
-        },
+        &make_transform(-1.0, 1.4, -1.5, 0.5),
         0.5,
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
@@ -155,14 +151,10 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &models,
         "Cylinder",
         world,
-        &LocalTransform {
-            translation: [-1.0, 1.4, -1.5].into(),
-            rotation: Quat::IDENTITY,
-            scale: [0.5, 0.5, 0.5].into(),
-        },
-        0.5,
+        &make_transform(0.0, 1.4, -1.5, 0.5),
+        0.5_f32.sqrt(),
         HologramData {
-            surface_q_in_local: Mat4::from_diagonal([1.0, -0.5, 1.0, -0.25].into()),
+            surface_q_in_local: Mat4::from_diagonal([1.0, 0.0, 1.0, -1.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: Mat4::IDENTITY,
         },
@@ -171,20 +163,48 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &models,
         "Cylinder",
         world,
-        &LocalTransform {
-            translation: [0.0, 1.4, -1.5].into(),
-            rotation: Quat::IDENTITY,
-            scale: [0.5, 0.5, 0.5].into(),
-        },
-        0.5,
+        &make_transform(1.0, 1.4, -1.5, 0.5),
+        0.5_f32.sqrt(),
         HologramData {
-            surface_q_in_local: Mat4::from_diagonal([1.0, 0.0, 1.0, -1.0].into()),
+            surface_q_in_local: Mat4::from_diagonal([1.0, 0.2 - 1.0, 1.0, -(0.2 * 0.2)].into()),
+            bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
+            uv_from_local: Mat4::IDENTITY,
+        },
+    );
+    add_quadric(
+        &models,
+        "Cylinder",
+        world,
+        &make_transform(2.0, 1.4, -1.5, 0.5),
+        0.5_f32.sqrt(),
+        HologramData {
+            surface_q_in_local: Mat4::from_diagonal([1.0, -1.0, 1.0, 0.0].into()),
+            bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
+            uv_from_local: Mat4::IDENTITY,
+        },
+    );
+    add_quadric(
+        &models,
+        "Cylinder",
+        world,
+        &make_transform(3.0, 1.4, -1.5, 0.5),
+        0.5_f32.sqrt(),
+        HologramData {
+            surface_q_in_local: Mat4::from_diagonal([1.0, 0.2 - 1.0, 1.0, 0.2 * 0.2].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: Mat4::IDENTITY,
         },
     );
 
     Ok(())
+}
+
+fn make_transform(x: f32, y: f32, z: f32, scale: f32) -> LocalTransform {
+    LocalTransform {
+        translation: [x, y, z].into(),
+        rotation: Quat::IDENTITY,
+        scale: [scale, scale, scale].into(),
+    }
 }
 
 fn add_quadric(
