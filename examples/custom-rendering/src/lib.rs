@@ -135,6 +135,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_hand(&models, Handedness::Left, world);
     add_hand(&models, Handedness::Right, world);
+    let uv_from_local = Mat4::from_diagonal([1.0, 1.0, 1.0, 0.1].into());
     add_quadric(
         &models,
         "Sphere",
@@ -144,7 +145,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 0.0, 0.0, 0.0].into()),
-            uv_from_local: Mat4::IDENTITY,
+            uv_from_local,
         },
     );
     add_quadric(
@@ -156,7 +157,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 0.0, 1.0, -1.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
-            uv_from_local: Mat4::IDENTITY,
+            uv_from_local,
         },
     );
     add_quadric(
@@ -168,7 +169,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 0.2 - 1.0, 1.0, -(0.2 * 0.2)].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
-            uv_from_local: Mat4::IDENTITY,
+            uv_from_local,
         },
     );
     add_quadric(
@@ -180,7 +181,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, -1.0, 1.0, 0.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
-            uv_from_local: Mat4::IDENTITY,
+            uv_from_local,
         },
     );
     add_quadric(
@@ -192,7 +193,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 0.2 - 1.0, 1.0, 0.2 * 0.2].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
-            uv_from_local: Mat4::IDENTITY,
+            uv_from_local,
         },
     );
 

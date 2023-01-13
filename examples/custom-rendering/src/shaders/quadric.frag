@@ -97,6 +97,10 @@ void main() {
 
     // Determine the base color
     f16vec3 baseColor = V16(unpackUnorm4x8(material.packedBaseColor));
+    baseColor.rgb -= F16(0.2) * V16(vec3(
+        step(0.5, fract(uv4.x / uv4.w)),
+        step(0.5, fract(uv4.y / uv4.w)),
+        step(0.5, fract(uv4.z / uv4.w))));
 
     if ((materialFlags & MATERIAL_FLAG_HAS_BASE_COLOR_TEXTURE) != 0) {
         baseColor *= V16(texture(textures[baseTextureID], uv));
