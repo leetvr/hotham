@@ -10,7 +10,7 @@ use hotham::{
     components::{
         hand::Handedness, physics::SharedShape, Collider, Grabbable, LocalTransform, Mesh,
     },
-    glam::{Mat4, Quat, Vec3},
+    glam::{Mat4, Quat},
     hecs::World,
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
@@ -125,28 +125,19 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let vulkan_context = &mut engine.vulkan_context;
     let world = &mut engine.world;
 
-    let mut glb_buffers: Vec<&[u8]> = vec![
+    let glb_buffers: Vec<&[u8]> = vec![
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
-        include_bytes!("../../../test_assets/sphere.glb"),
+        include_bytes!("../../../test_assets/hologram_templates.glb"),
     ];
-
-    #[cfg(target_os = "android")]
-    glb_buffers.push(include_bytes!(
-        "../../../test_assets/damaged_helmet_squished.glb"
-    ));
-
-    #[cfg(not(target_os = "android"))]
-    glb_buffers.push(include_bytes!("../../../test_assets/damaged_helmet.glb"));
 
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
-    add_helmet(&models, world, [-1., 1.4, -1.].into());
-    add_helmet(&models, world, [1., 1.4, -1.].into());
     add_hand(&models, Handedness::Left, world);
     add_hand(&models, Handedness::Right, world);
     add_quadric(
         &models,
+        "Sphere",
         world,
         &LocalTransform {
             translation: [1.0, 1.4, -1.5].into(),
@@ -162,6 +153,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     );
     add_quadric(
         &models,
+        "Cylinder",
         world,
         &LocalTransform {
             translation: [-1.0, 1.4, -1.5].into(),
@@ -170,8 +162,24 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         },
         0.5,
         HologramData {
-            surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 0.0, -1.0].into()),
-            bounds_q_in_local: Mat4::from_diagonal([0.0, 0.0, 1.0, -1.0].into()),
+            surface_q_in_local: Mat4::from_diagonal([1.0, -0.5, 1.0, -0.25].into()),
+            bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
+            uv_from_local: Mat4::IDENTITY,
+        },
+    );
+    add_quadric(
+        &models,
+        "Cylinder",
+        world,
+        &LocalTransform {
+            translation: [0.0, 1.4, -1.5].into(),
+            rotation: Quat::IDENTITY,
+            scale: [0.5, 0.5, 0.5].into(),
+        },
+        0.5,
+        HologramData {
+            surface_q_in_local: Mat4::from_diagonal([1.0, 0.0, 1.0, -1.0].into()),
+            bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: Mat4::IDENTITY,
         },
     );
@@ -179,33 +187,16 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     Ok(())
 }
 
-fn add_helmet(
-    models: &std::collections::HashMap<String, World>,
-    world: &mut World,
-    translation: Vec3,
-) {
-    let helmet = add_model_to_world("Damaged Helmet", models, world, None)
-        .expect("Could not find Damaged Helmet");
-
-    {
-        let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
-        local_transform.translation = translation;
-        local_transform.scale = [0.5, 0.5, 0.5].into();
-    }
-
-    let collider = Collider::new(SharedShape::ball(0.35));
-
-    world.insert(helmet, (collider, Grabbable {})).unwrap();
-}
-
 fn add_quadric(
     models: &std::collections::HashMap<String, World>,
+    model_name: &str,
     world: &mut World,
     local_transform: &LocalTransform,
     ball_radius: f32,
     hologram_data: HologramData,
 ) {
-    let entity = add_model_to_world("Sphere", models, world, None).expect("Could not find Sphere");
+    let entity = add_model_to_world(model_name, models, world, None)
+        .unwrap_or_else(|| panic!("Could not find {}", model_name));
     *world.get::<&mut LocalTransform>(entity).unwrap() = *local_transform;
     let collider = Collider::new(SharedShape::ball(ball_radius));
     let hologram_component = Hologram {
