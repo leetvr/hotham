@@ -26,6 +26,21 @@ const vec2 offsetSample1 = vec2(0.875 - 0.5, 0.375 - 0.5);
 const vec2 offsetSample2 = vec2(0.125 - 0.5, 0.625 - 0.5);
 const vec2 offsetSample3 = vec2(0.625 - 0.5, 0.875 - 0.5);
 
+const float N = 10.0; // grid ratio
+float gridTextureGradBox( in vec2 p, in vec2 ddx, in vec2 ddy )
+{
+	// filter kernel
+    vec2 w = max(abs(ddx), abs(ddy)) + 0.01;
+
+	// analytic (box) filtering
+    vec2 a = p + 0.5*w;
+    vec2 b = p - 0.5*w;
+    vec2 i = (floor(a)+min(fract(a)*N,1.0)-
+              floor(b)-min(fract(b)*N,1.0))/(N*w);
+    //pattern
+    return (1.0-i.x)*(1.0-i.y);
+}
+
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
     outColor = ERROR_MAGENTA;
@@ -64,6 +79,14 @@ void main() {
 
     // hitPoint.w = 1 because rayOrigin.w = 1 and rayDir.w = 0.
     vec4 hitPoint = rayOrigin + rayDir * t;
+    // Compute normal from gradient of surface quadric.
+    n = normalize((d.surfaceQ * hitPoint).xyz);
+    // Compute gradient along the surface (orthogonal to surface normal).
+    vec3 ddx_hitPoint = dFdx(rayOrigin.xyz) + dFdx(rayDir.xyz) * t;
+    vec3 ddy_hitPoint = dFdy(rayOrigin.xyz) + dFdy(rayDir.xyz) * t;
+    ddx_hitPoint -= rayDir.xyz * (dot(ddx_hitPoint, n) / dot(rayDir.xyz, n));
+    ddy_hitPoint -= rayDir.xyz * (dot(ddy_hitPoint, n) / dot(rayDir.xyz, n));
+
     float boundsValue = 0.0001 - dot(hitPoint, d.boundsQ * hitPoint);
     vec2 gradientOfBoundsValue = vec2(dFdx(boundsValue), dFdy(boundsValue));
     gl_SampleMask[0] &= int(
@@ -85,11 +108,11 @@ void main() {
     pos = hitPoint.xyz;
     v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - pos);
 
-    // Compute normal from gradient of surface quadric
-    n = normalize((d.surfaceQ * hitPoint).xyz);
-
     vec4 uv4 = d.uvFromGos * hitPoint;
     uv = uv4.xy / uv4.w;
+    mat3x2 uvFromGos23 = mat3x2(d.uvFromGos[0].xy, d.uvFromGos[1].xy, d.uvFromGos[2].xy);
+    vec2 ddx_uv = uvFromGos23 * ddx_hitPoint / uv4.w; // TODO: Handle derivative of w.
+    vec2 ddy_uv = uvFromGos23 * ddy_hitPoint / uv4.w;
 
     // Unpack the material parameters
     materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
@@ -97,10 +120,7 @@ void main() {
 
     // Determine the base color
     f16vec3 baseColor = V16(unpackUnorm4x8(material.packedBaseColor));
-    baseColor.rgb -= F16(0.2) * V16(vec3(
-        step(0.5, fract(uv4.x / uv4.w)),
-        step(0.5, fract(uv4.y / uv4.w)),
-        step(0.5, fract(uv4.z / uv4.w))));
+    baseColor.rgb *= V16(gridTextureGradBox(uv, ddx_uv, ddy_uv));
 
     if ((materialFlags & MATERIAL_FLAG_HAS_BASE_COLOR_TEXTURE) != 0) {
         baseColor *= V16(texture(textures[baseTextureID], uv));
