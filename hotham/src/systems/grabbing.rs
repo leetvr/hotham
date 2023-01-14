@@ -1,7 +1,10 @@
 use hecs::World;
 
 use crate::{
-    components::{physics::BodyType, Collider, Grabbable, Hand, RigidBody},
+    components::{
+        hand::GrabbedEntity, physics::BodyType, Collider, Grabbable, Hand, LocalTransform,
+        RigidBody,
+    },
     Engine,
 };
 
@@ -13,7 +16,10 @@ pub fn grabbing_system(engine: &mut Engine) {
 }
 
 fn grabbing_system_inner(world: &mut World) {
-    for (_, (hand, collider)) in world.query::<(&mut Hand, &Collider)>().iter() {
+    for (_, (hand, collider, local_transform)) in world
+        .query::<(&mut Hand, &Collider, &LocalTransform)>()
+        .iter()
+    {
         // Check to see if we are currently gripping
         if hand.grip_value > 0.1 {
             // If we already have a grabbed entity, no need to do anything.
@@ -30,7 +36,17 @@ fn grabbing_system_inner(world: &mut World) {
                     }
 
                     // Store a reference to the grabbed entity
-                    hand.grabbed_entity.replace(*other_entity);
+                    let global_from_grip = local_transform.to_affine();
+                    let global_from_local = world
+                        .get::<&LocalTransform>(*other_entity)
+                        .unwrap()
+                        .to_affine();
+                    let grip_from_local = global_from_grip.inverse() * global_from_local;
+                    let grabbed_entity = GrabbedEntity {
+                        entity: *other_entity,
+                        grip_from_local,
+                    };
+                    hand.grabbed_entity.replace(grabbed_entity);
 
                     break;
                 }
@@ -40,7 +56,7 @@ fn grabbing_system_inner(world: &mut World) {
             if let Some(grabbed_entity) = hand.grabbed_entity.take() {
                 // If what we're grabbing has a rigid-body, set it back to dynamic.
                 // TODO: This is a bug. We could have grabbed a rigid-body that was originally kinematic!
-                if let Ok(mut rigid_body) = world.get::<&mut RigidBody>(grabbed_entity) {
+                if let Ok(mut rigid_body) = world.get::<&mut RigidBody>(grabbed_entity.entity) {
                     rigid_body.body_type = BodyType::Dynamic;
                 }
             }
@@ -66,6 +82,7 @@ mod tests {
                 node_id: 0,
             },
             Grabbable {},
+            LocalTransform::default(),
         ));
         world
             .insert(grabbed_entity, (grabbed_collider, grabbed_rigid_body))
@@ -84,12 +101,15 @@ mod tests {
             ..Default::default()
         };
 
-        let hand_entity = world.spawn((hand, collider));
+        // A local transform is needed to determine the relative transform.
+        let local_transform = LocalTransform::default();
+
+        let hand_entity = world.spawn((hand, collider, local_transform));
 
         tick(&mut world);
 
         let mut hand = world.get::<&mut Hand>(hand_entity).unwrap();
-        assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
+        assert_eq!(hand.grabbed_entity.as_ref().unwrap().entity, grabbed_entity);
         hand.grip_value = 0.0;
         drop(hand);
 
