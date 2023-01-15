@@ -173,7 +173,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &make_transform(1.0, 1.4, -1.5, 0.5),
         0.5_f32.sqrt(),
         HologramData {
-            surface_q_in_local: Mat4::from_diagonal([1.0, 0.2 - 1.0, 1.0, -(0.2 * 0.2)].into()),
+            surface_q_in_local: Mat4::from_diagonal([1.0, -1.0 + 0.1, 1.0, -0.1].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: uv2_from_local,
         },
@@ -197,7 +197,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &make_transform(3.0, 1.4, -1.5, 0.5),
         0.5_f32.sqrt(),
         HologramData {
-            surface_q_in_local: Mat4::from_diagonal([1.0, 0.2 - 1.0, 1.0, 0.2 * 0.2].into()),
+            surface_q_in_local: Mat4::from_diagonal([1.0, -1.0 - 0.1, 1.0, 0.1].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: uv2_from_local,
         },
