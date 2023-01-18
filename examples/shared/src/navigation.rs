@@ -1,5 +1,5 @@
 use hotham::{
-    components::{Collider, Hand, LocalTransform},
+    components::{hand::Handedness, Hand, LocalTransform},
     contexts::InputContext,
     glam::{Affine3A, Vec3},
     hecs::{self, World},
@@ -28,15 +28,14 @@ fn navigation_system_inner(
     stage_entity: hecs::Entity,
     state: &mut State,
 ) {
-    // First, check to see if either of the hands have collided with anything.
-    let hands_have_collisions = world
-        .query::<&Collider>()
-        .with::<&Hand>()
+    // First, check to see if either of the hands are holding anything.
+    let hands_have_grabbed = world
+        .query::<&Hand>()
         .iter()
-        .any(|(_, collider)| !collider.collisions_this_frame.is_empty());
+        .any(|(_, hand)| hand.grabbed_entity.is_some());
 
-    // If they have, then just return.
-    if hands_have_collisions {
+    // If they are, then just return.
+    if hands_have_grabbed {
         return;
     }
 
