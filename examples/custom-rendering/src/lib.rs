@@ -234,4 +234,13 @@ fn add_quadric(
         .insert(entity, (collider, Grabbable {}, hologram_component))
         .unwrap();
     world.remove_one::<Mesh>(entity).unwrap();
+
+    // Add second entity for the back surface
+    let second_entity = add_model_to_world(model_name, models, world, Some(entity))
+        .unwrap_or_else(|| panic!("Could not find {}", model_name));
+    // Negate Q to flip the surface normal
+    let mut hologram_component = hologram_component;
+    hologram_component.hologram_data.surface_q_in_local *= -1.0;
+    world.insert_one(second_entity, hologram_component).unwrap();
+    world.remove_one::<Mesh>(second_entity).unwrap();
 }
