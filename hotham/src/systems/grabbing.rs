@@ -1,3 +1,4 @@
+use glam::Vec3;
 use hecs::World;
 
 use crate::{
@@ -27,29 +28,35 @@ fn grabbing_system_inner(world: &mut World) {
                 return;
             };
 
+            let global_from_grip = local_transform.to_affine();
+            let grip_origin_in_global = global_from_grip.transform_point3(Vec3::ZERO);
+
             // Check to see if we are colliding with an entity
-            for other_entity in collider.collisions_this_frame.iter() {
-                if world.get::<&Grabbable>(*other_entity).is_ok() {
-                    // If what we're grabbing has a rigid-body, set its body type to kinematic position based so it can be updated with the hand
-                    if let Ok(mut rigid_body) = world.get::<&mut RigidBody>(*other_entity) {
-                        rigid_body.body_type = BodyType::KinematicPositionBased;
+            // Pick the entity closest to the grip origin
+            let mut closest_length_squared = f32::INFINITY;
+            let mut closest_grippable = None;
+            for entity in collider.collisions_this_frame.iter() {
+                if world.get::<&Grabbable>(*entity).is_ok() {
+                    let global_from_local =
+                        world.get::<&LocalTransform>(*entity).unwrap().to_affine();
+                    let local_origin_in_global = global_from_local.transform_point3(Vec3::ZERO);
+                    let length_squared =
+                        (local_origin_in_global - grip_origin_in_global).length_squared();
+                    if length_squared < closest_length_squared {
+                        closest_length_squared = length_squared;
+                        closest_grippable = Some(entity);
                     }
-
-                    // Store a reference to the grabbed entity
-                    let global_from_grip = local_transform.to_affine();
-                    let global_from_local = world
-                        .get::<&LocalTransform>(*other_entity)
-                        .unwrap()
-                        .to_affine();
-                    let grip_from_local = global_from_grip.inverse() * global_from_local;
-                    let grabbed_entity = GrabbedEntity {
-                        entity: *other_entity,
-                        grip_from_local,
-                    };
-                    hand.grabbed_entity.replace(grabbed_entity);
-
-                    break;
                 }
+            }
+            if let Some(entity) = closest_grippable {
+                // Store a reference to the grabbed entity
+                let global_from_local = world.get::<&LocalTransform>(*entity).unwrap().to_affine();
+                let grip_from_local = global_from_grip.inverse() * global_from_local;
+                let grabbed_entity = GrabbedEntity {
+                    entity: *entity,
+                    grip_from_local,
+                };
+                hand.grabbed_entity.replace(grabbed_entity);
             }
         } else {
             // If we are not gripping, but we have a grabbed entity, release it
