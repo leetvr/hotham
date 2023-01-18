@@ -34,14 +34,16 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
         .iter()
     {
         // Get the position of the hand in stage space.
-        let (stage_from_grip, grip_value) = match hand.handedness {
+        let (stage_from_grip, grip_value, grip_button_just_pressed) = match hand.handedness {
             Handedness::Left => (
                 input_context.left.stage_from_grip(),
                 input_context.left.grip_analog(),
+                input_context.left.grip_button_just_pressed(),
             ),
             Handedness::Right => (
                 input_context.right.stage_from_grip(),
                 input_context.right.grip_analog(),
+                input_context.right.grip_button_just_pressed(),
             ),
         };
 
@@ -68,6 +70,7 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
 
         // Apply grip value to hand
         hand.grip_value = grip_value;
+        hand.grip_button_just_pressed = grip_button_just_pressed;
 
         // Apply to AnimationController
         animation_controller.blend_amount = grip_value;

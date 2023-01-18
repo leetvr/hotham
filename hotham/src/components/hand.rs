@@ -24,6 +24,8 @@ pub struct GrabbedEntity {
 pub struct Hand {
     /// How much has this hand been gripped?
     pub grip_value: f32,
+    /// Did the grip button go from not pressed to pressed this frame?
+    pub grip_button_just_pressed: bool,
     /// Which side is this hand on?
     pub handedness: Handedness,
     /// Have we grabbed something?
@@ -35,6 +37,7 @@ impl Hand {
     pub fn left() -> Hand {
         Hand {
             grip_value: 0.0,
+            grip_button_just_pressed: false,
             handedness: Handedness::Left,
             grabbed_entity: None,
         }
@@ -44,6 +47,7 @@ impl Hand {
     pub fn right() -> Hand {
         Hand {
             grip_value: 0.0,
+            grip_button_just_pressed: false,
             handedness: Handedness::Right,
             grabbed_entity: None,
         }

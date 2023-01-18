@@ -23,11 +23,10 @@ fn grabbing_system_inner(world: &mut World) {
     {
         // Check to see if we are currently gripping
         if hand.grip_value > 0.1 {
-            // If we already have a grabbed entity, no need to do anything.
-            if hand.grabbed_entity.is_some() {
-                return;
-            };
-
+            // Only grip when button is just pressed
+            if !hand.grip_button_just_pressed {
+                continue;
+            }
             let global_from_grip = local_transform.to_affine();
             let grip_origin_in_global = global_from_grip.transform_point3(Vec3::ZERO);
 
@@ -99,6 +98,7 @@ mod tests {
         let hand = Hand {
             handedness: Handedness::Left,
             grip_value: 1.0,
+            grip_button_just_pressed: true,
             grabbed_entity: None,
         };
 
@@ -118,6 +118,7 @@ mod tests {
         let mut hand = world.get::<&mut Hand>(hand_entity).unwrap();
         assert_eq!(hand.grabbed_entity.as_ref().unwrap().entity, grabbed_entity);
         hand.grip_value = 0.0;
+        hand.grip_button_just_pressed = false;
         drop(hand);
 
         tick(&mut world);
@@ -127,6 +128,7 @@ mod tests {
 
         // Make sure hand can't grip colliders *without* a Grabbable component
         hand.grip_value = 1.0;
+        hand.grip_button_just_pressed = true;
         drop(hand);
         world.remove::<(Grabbable,)>(grabbed_entity).unwrap();
 
