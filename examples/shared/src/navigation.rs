@@ -28,15 +28,16 @@ fn navigation_system_inner(
     stage_entity: hecs::Entity,
     state: &mut State,
 ) {
+    let mut left_hand_is_holding_something = false;
+    let mut right_hand_is_holding_something = false;
     // First, check to see if either of the hands are holding anything.
-    let hands_have_grabbed = world
-        .query::<&Hand>()
-        .iter()
-        .any(|(_, hand)| hand.grabbed_entity.is_some());
-
-    // If they are, then just return.
-    if hands_have_grabbed {
-        return;
+    for (_, hand) in world.query::<&Hand>().iter() {
+        if hand.grabbed_entity.is_some() {
+            match hand.handedness {
+                Handedness::Left => left_hand_is_holding_something = true,
+                Handedness::Right => right_hand_is_holding_something = true,
+            }
+        }
     }
 
     // Get the stage transform.
@@ -48,21 +49,24 @@ fn navigation_system_inner(
     let stage_from_right_grip = input_context.right.stage_from_grip();
 
     // Update grip states.
-    if input_context.left.grip_button_just_pressed() {
+    if input_context.left.grip_button_just_pressed() && !left_hand_is_holding_something {
         state.global_from_left_grip = Some(global_from_stage * stage_from_left_grip);
     }
-    if input_context.right.grip_button_just_pressed() {
+    if input_context.right.grip_button_just_pressed() && !right_hand_is_holding_something {
         state.global_from_right_grip = Some(global_from_stage * stage_from_right_grip);
     }
-    if input_context.right.grip_button() && input_context.left.grip_button_just_released() {
+    if input_context.right.grip_button()
+        && input_context.left.grip_button_just_released()
+        && !right_hand_is_holding_something
+    {
         // Handle when going from two grips to one
         state.global_from_right_grip = Some(global_from_stage * stage_from_right_grip);
     }
-    if !input_context.left.grip_button() {
+    if !input_context.left.grip_button() || left_hand_is_holding_something {
         state.global_from_left_grip = None;
         state.scale = None;
     }
-    if !input_context.right.grip_button() {
+    if !input_context.right.grip_button() || right_hand_is_holding_something {
         state.global_from_right_grip = None;
     }
 
