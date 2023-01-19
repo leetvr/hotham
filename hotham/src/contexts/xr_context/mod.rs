@@ -304,6 +304,31 @@ pub(crate) fn get_swapchain_resolution(
     Ok(resolution)
 }
 
+#[cfg(not(target_os = "android"))]
+pub(crate) fn create_xr_swapchain(
+    xr_session: &Session<Vulkan>,
+    resolution: &vk::Extent2D,
+    array_size: u32,
+) -> Result<Swapchain<Vulkan>> {
+    xr_session
+        .create_swapchain(&SwapchainCreateInfo {
+            create_flags: SwapchainCreateFlags::EMPTY,
+            usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
+            format: COLOR_FORMAT.as_raw() as u32,
+            sample_count: 1,
+            width: resolution.width,
+            height: resolution.height,
+            face_count: 1,
+            array_size,
+            mip_count: 1,
+        })
+        .map_err(Into::into)
+}
+
+/// Creates the OpenXR swapchain with Fixed Foveated Rendering support on Quest 2
+///
+/// This requires a fair bit of setup as there isn't yet a wrapper for this functionality in OpenXR.
+#[cfg(target_os = "android")]
 pub(crate) fn create_xr_swapchain(
     xr_session: &Session<Vulkan>,
     resolution: &vk::Extent2D,
@@ -372,19 +397,6 @@ pub(crate) fn create_xr_swapchain(
 
         Ok(swapchain)
     }
-
-    // .create_swapchain(&SwapchainCreateInfo {
-    //     create_flags: SwapchainCreateFlags::EMPTY,
-    //     usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
-    //     format: COLOR_FORMAT.as_raw() as u32,
-    //     sample_count: 1,
-    //     width: resolution.width,
-    //     height: resolution.height,
-    //     face_count: 1,
-    //     array_size,
-    //     mip_count: 1,
-    // })
-    // .map_err(Into::into)
 }
 
 pub(crate) fn create_xr_session(
