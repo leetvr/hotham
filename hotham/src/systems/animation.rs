@@ -58,7 +58,7 @@ mod tests {
         let transforms_before = world
             .query_mut::<&LocalTransform>()
             .into_iter()
-            .map(|r| r.1.clone())
+            .map(|r| *r.1)
             .collect::<Vec<LocalTransform>>();
 
         // Run the animation system
@@ -68,7 +68,7 @@ mod tests {
         let transforms_after = world
             .query_mut::<&LocalTransform>()
             .into_iter()
-            .map(|r| r.1.clone())
+            .map(|r| *r.1)
             .collect::<Vec<LocalTransform>>();
 
         // Make sure our transforms have been modified!

@@ -207,7 +207,7 @@ pub(crate) unsafe fn save_image_to_disk(
 
     let resolution = image.extent;
     let size = (resolution.height * resolution.width * 4) as usize;
-    let mut buffer = Buffer::new(&vulkan_context, vk::BufferUsageFlags::TRANSFER_DST, size);
+    let mut buffer = Buffer::new(vulkan_context, vk::BufferUsageFlags::TRANSFER_DST, size);
 
     vulkan_context.device.device_wait_idle().unwrap();
 
@@ -256,10 +256,10 @@ pub(crate) unsafe fn save_image_to_disk(
     let output_hash = hash_file(&output_path);
     let known_good_hash = hash_file(&known_good_path);
 
-    if !output_hash.is_ok() {
+    if output_hash.is_err() {
         return Err(format!("Failed to hash output image: {}", name));
     }
-    if !known_good_hash.is_ok() {
+    if known_good_hash.is_err() {
         return Err(format!("Failed to hash known good image: {}", name));
     }
     if output_hash != known_good_hash {
@@ -292,7 +292,7 @@ pub(crate) fn begin_renderdoc() -> Result<RenderDoc<renderdoc::V141>, renderdoc:
 
 #[cfg(all(test, not(any(target_os = "macos", target_os = "ios"))))]
 pub(crate) fn end_renderdoc(renderdoc: &mut RenderDoc<renderdoc::V141>) {
-    let _ = renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
+    renderdoc.end_frame_capture(std::ptr::null(), std::ptr::null());
 }
 
 /// Interpolate between two affine transforms
