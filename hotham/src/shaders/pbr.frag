@@ -193,7 +193,7 @@ f16vec3 getPBRMetallicRoughnessColor() {
     f16vec3 color;
     if (sceneData.params.x > 0.) {
         f16vec3 reflection = normalize(reflect(V16(-v), V16(normal)));
-        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
+        color = getIBLContribution(f0, alphaRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
     }
 
 
