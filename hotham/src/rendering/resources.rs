@@ -162,6 +162,10 @@ fn load_ibl_textures(
     cube_texture_sampler: vk::Sampler,
 ) {
     // First, load in the LUT file.
+    #[cfg(target_os = "android")]
+    let brdf_lut_file = include_bytes!("../../data/brdf_lut_android.ktx2");
+
+    #[cfg(not(target_os = "android"))]
     let brdf_lut_file = include_bytes!("../../data/brdf_lut.ktx2");
     let ktx2_image = parse_ktx2(brdf_lut_file);
 
@@ -186,6 +190,13 @@ fn load_ibl_textures(
     }
 
     // OK. Next we've got to load in the cubemaps.
+    #[cfg(target_os = "android")]
+    let cubemaps = [
+        include_bytes!("../../data/environment_map_diffuse_android.ktx2").to_vec(),
+        include_bytes!("../../data/environment_map_specular_android.ktx2").to_vec(),
+    ];
+
+    #[cfg(not(target_os = "android"))]
     let cubemaps = [
         include_bytes!("../../data/environment_map_diffuse.ktx2").to_vec(),
         include_bytes!("../../data/environment_map_specular.ktx2").to_vec(),
