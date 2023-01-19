@@ -1,6 +1,7 @@
 mod custom_render_context;
 mod custom_rendering;
 mod hologram;
+mod surface_solver;
 
 use custom_render_context::{create_quadrics_pipeline, CustomRenderContext};
 use custom_rendering::custom_rendering_system;
@@ -11,7 +12,7 @@ use hotham::{
         hand::Handedness, physics::SharedShape, Collider, Grabbable, LocalTransform, Mesh,
     },
     glam::{Mat4, Quat},
-    hecs::World,
+    hecs::{Entity, World},
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, skinning::skinning_system, update_global_transform_system,
@@ -21,6 +22,7 @@ use hotham::{
     xr, Engine, HothamResult, TickData,
 };
 use hotham_examples::navigation::{navigation_system, State};
+use surface_solver::{surface_solver_system, ControlPoints, HologramBackside};
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -63,6 +65,7 @@ fn tick(
         physics_system(engine);
         animation_system(engine);
         navigation_system(engine, state);
+        surface_solver_system(engine);
         update_global_transform_system(engine);
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
@@ -203,6 +206,51 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         },
     );
 
+    let target = add_quadric(
+        &models,
+        "Sphere",
+        world,
+        &make_transform(-1.0, 1.4, 1.5, 0.5),
+        0.5,
+        HologramData {
+            surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
+            bounds_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
+            uv_from_local: uv1_from_local,
+        },
+    );
+
+    let t_from_local = Mat4::from_translation([0.0, -1.0, 0.0].into());
+    let t2_from_local = Mat4::from_translation([0.0, -0.5, 0.0].into());
+    let entities = (0..6)
+        .map(|i| {
+            add_quadric(
+                &models,
+                "Cylinder",
+                world,
+                &make_transform(
+                    -1.0 + 0.1 * (i & 1) as f32,
+                    1.4,
+                    1.5 + 0.1 * (i >> 1) as f32,
+                    0.05,
+                ),
+                0.05,
+                HologramData {
+                    surface_q_in_local: t_from_local.transpose()
+                        * Mat4::from_diagonal([1.0, -1.0, 1.0, 0.0].into())
+                        * t_from_local,
+                    bounds_q_in_local: t2_from_local.transpose()
+                        * Mat4::from_diagonal([0.0, 1.0, 0.0, -0.5].into())
+                        * t2_from_local,
+                    uv_from_local: uv1_from_local,
+                },
+            )
+        })
+        .collect();
+
+    let control_points = ControlPoints { entities };
+    world.insert_one(target, control_points).unwrap();
+    world.remove_one::<Grabbable>(target).unwrap();
+
     Ok(())
 }
 
@@ -221,7 +269,7 @@ fn add_quadric(
     local_transform: &LocalTransform,
     ball_radius: f32,
     hologram_data: HologramData,
-) {
+) -> Entity {
     let entity = add_model_to_world(model_name, models, world, None)
         .unwrap_or_else(|| panic!("Could not find {}", model_name));
     *world.get::<&mut LocalTransform>(entity).unwrap() = *local_transform;
@@ -241,6 +289,13 @@ fn add_quadric(
     // Negate Q to flip the surface normal
     let mut hologram_component = hologram_component;
     hologram_component.hologram_data.surface_q_in_local *= -1.0;
-    world.insert_one(second_entity, hologram_component).unwrap();
+    world
+        .insert(
+            second_entity,
+            (hologram_component, HologramBackside { entity }),
+        )
+        .unwrap();
     world.remove_one::<Mesh>(second_entity).unwrap();
+
+    entity
 }
