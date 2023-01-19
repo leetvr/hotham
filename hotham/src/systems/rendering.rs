@@ -330,7 +330,7 @@ mod tests {
         world.spawn((
             Stage {},
             stage_local_transform,
-            GlobalTransform(global_from_stage.clone()),
+            GlobalTransform(global_from_stage),
         ));
 
         // Set views
@@ -351,7 +351,7 @@ mod tests {
                 angle_right: 6.5_f32.to_radians(),
             },
         };
-        let mut views = vec![view.clone(), view];
+        let mut views = vec![view, view];
 
         // Compensate stage transform by adjusting the views
         for view in &mut views {
@@ -451,7 +451,7 @@ mod tests {
         world.spawn((
             Stage {},
             stage_local_transform,
-            GlobalTransform(global_from_stage.clone()),
+            GlobalTransform(global_from_stage),
         ));
 
         // Set views
@@ -474,7 +474,7 @@ mod tests {
                 angle_right: 45.0_f32.to_radians(),
             },
         };
-        let mut views = vec![view.clone(), view];
+        let mut views = vec![view, view];
 
         // Compensate stage transform by adjusting the views
         for view in &mut views {
@@ -547,7 +547,7 @@ mod tests {
         debug_shader_inputs: f32,
         debug_ibl_intensity: f32,
         light: &Light,
-        views: &Vec<openxr::View>,
+        views: &[openxr::View],
     ) -> Result<(), String> {
         // Render the scene
 
@@ -580,12 +580,12 @@ mod tests {
         debug_ibl_intensity: f32,
         world: &mut World,
         light: &Light,
-        views: &Vec<openxr::View>,
+        views: &[openxr::View],
     ) {
         render_context.begin_frame(vulkan_context);
         render_context.scene_data.params.z = debug_shader_inputs;
         render_context.scene_data.params.x = debug_ibl_intensity;
-        render_context.scene_data.lights[0] = light.clone();
+        render_context.scene_data.lights[0] = *light;
         update_global_transform_system_inner(world);
         update_global_transform_with_parent_system_inner(world);
         rendering_system_inner(world, vulkan_context, render_context, views, 0);
