@@ -410,10 +410,12 @@ fn update_mesh(
     // This is *really* nasty, but we can get away with it as we won't have any other meshes in the scene.
     // In the real world, this would potentially obliterate existing meshes as we're overwriting the shared buffers.
     // DON'T DO THIS in a real application!
-    let staging_buffer = &render_context.resources.staging_buffer;
     unsafe {
         render_context.resources.index_buffer.overwrite(&indices);
-        render_context.resources.vertex_buffer.overwrite(&vertices);
+        render_context
+            .resources
+            .position_buffer
+            .overwrite(&vertices);
     }
 
     println!(
