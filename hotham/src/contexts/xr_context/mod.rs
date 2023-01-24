@@ -6,7 +6,7 @@ use openxr::{
 };
 use xr::{
     vulkan::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType, SwapchainCreateFlags,
-    SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
+    SwapchainUsageFlags, Time, View, ViewStateFlags,
 };
 
 use crate::{
@@ -311,7 +311,7 @@ pub(crate) fn create_xr_swapchain(
     array_size: u32,
 ) -> Result<Swapchain<Vulkan>> {
     xr_session
-        .create_swapchain(&SwapchainCreateInfo {
+        .create_swapchain(&xr::SwapchainCreateInfo {
             create_flags: SwapchainCreateFlags::EMPTY,
             usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
             format: COLOR_FORMAT.as_raw() as u32,
