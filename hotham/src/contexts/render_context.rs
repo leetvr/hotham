@@ -15,7 +15,12 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 ];
 
 const CULLING_TIMEOUT: u64 = u64::MAX;
-pub const USE_MSAA: bool = true;
+
+#[cfg(target_os = "android")]
+const RESOLVE_ATTACHMENT: u32 = 3;
+
+#[cfg(not(target_os = "android"))]
+const RESOLVE_ATTACHMENT: u32 = 2;
 
 use crate::{
     contexts::{VulkanContext, XrContext},
@@ -204,7 +209,6 @@ impl RenderContext {
         let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
-            ffr_images: None,
         };
 
         (
@@ -238,7 +242,6 @@ impl RenderContext {
         let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
-            ffr_images: None,
         };
 
         (
@@ -539,11 +542,7 @@ pub fn create_push_constant<T: 'static>(p: &T) -> &[u8] {
 // TODO: this will break the simulator due to FFR
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     // Attachment used for MSAA
-    let color_store_op = if USE_MSAA {
-        vk::AttachmentStoreOp::DONT_CARE
-    } else {
-        vk::AttachmentStoreOp::STORE
-    };
+    let color_store_op = vk::AttachmentStoreOp::DONT_CARE;
     let color_attachment = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
         .samples(SAMPLES)
@@ -565,6 +564,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
+    // Depth buffer
     let depth_attachment = vk::AttachmentDescription::builder()
         .format(DEPTH_FORMAT)
         .samples(SAMPLES)
@@ -575,6 +575,8 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
+    // Fixed foveated rendering (FFR) attachment
+    #[cfg(target_os = "android")]
     let ffr_attachment = vk::AttachmentDescription::builder()
         .format(vk::Format::R8G8_UNORM)
         .samples(vk::SampleCountFlags::TYPE_1)
@@ -597,29 +599,21 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         .build();
 
+    #[cfg(target_os = "android")]
     let ffr_attachment_reference = vk::AttachmentReference::builder()
         .attachment(2)
         .layout(vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT);
 
     let color_attachment_resolve_reference = vk::AttachmentReference::builder()
-        .attachment(3)
+        .attachment(RESOLVE_ATTACHMENT)
         .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
         .build();
 
-    let color_attachment_resolve_reference = [color_attachment_resolve_reference];
-
-    let subpass = if USE_MSAA {
-        vk::SubpassDescription::builder()
-            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-            .color_attachments(&color_attachment_reference)
-            .resolve_attachments(&color_attachment_resolve_reference)
-            .depth_stencil_attachment(&depth_stencil_reference)
-    } else {
-        vk::SubpassDescription::builder()
-            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-            .color_attachments(&color_attachment_reference)
-            .depth_stencil_attachment(&depth_stencil_reference)
-    };
+    let subpass = vk::SubpassDescription::builder()
+        .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
+        .color_attachments(&color_attachment_reference)
+        .resolve_attachments(std::slice::from_ref(&color_attachment_resolve_reference))
+        .depth_stencil_attachment(&depth_stencil_reference);
 
     let dependency = vk::SubpassDependency::builder()
         .src_subpass(vk::SUBPASS_EXTERNAL)
@@ -643,37 +637,36 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .view_masks(&view_masks)
         .correlation_masks(&view_masks);
 
+    #[cfg(target_os = "android")]
     let mut ffr_info = vk::RenderPassFragmentDensityMapCreateInfoEXT::builder()
         .fragment_density_map_attachment(*ffr_attachment_reference);
 
-    let render_pass = unsafe {
-        if USE_MSAA {
-            vulkan_context.device.create_render_pass(
-                &vk::RenderPassCreateInfo::builder()
-                    .attachments(&[
-                        *color_attachment,
-                        *depth_attachment,
-                        *ffr_attachment,
-                        *color_attachment_resolve,
-                    ])
-                    .subpasses(&[*subpass])
-                    .dependencies(&[*dependency])
-                    .push_next(&mut multiview)
-                    .push_next(&mut ffr_info),
-                None,
-            )
-        } else {
-            vulkan_context.device.create_render_pass(
-                &vk::RenderPassCreateInfo::builder()
-                    .attachments(&[*color_attachment, *depth_attachment, *ffr_attachment])
-                    .subpasses(&[*subpass])
-                    .dependencies(&[*dependency])
-                    .push_next(&mut multiview)
-                    .push_next(&mut ffr_info),
-                None,
-            )
-        }
-    }?;
+    #[cfg(target_os = "android")]
+    let attachments = [
+        *color_attachment,
+        *depth_attachment,
+        *ffr_attachment,
+        *color_attachment_resolve,
+    ];
+
+    #[cfg(not(target_os = "android"))]
+    let attachments = [
+        *color_attachment,
+        *depth_attachment,
+        *color_attachment_resolve,
+    ];
+
+    #[allow(unused_mut)]
+    let mut create_info = vk::RenderPassCreateInfo::builder()
+        .attachments(&attachments)
+        .subpasses(std::slice::from_ref(&subpass))
+        .dependencies(std::slice::from_ref(&dependency))
+        .push_next(&mut multiview);
+
+    #[cfg(target_os = "android")]
+    create_info.push_next(&mut ffr_info);
+
+    let render_pass = unsafe { vulkan_context.device.create_render_pass(&create_info, None) }?;
 
     Ok(render_pass)
 }
@@ -757,11 +750,8 @@ pub(crate) fn create_pipeline(
         .line_width(1.0);
 
     // Multisample state
-    let multisample_state = if USE_MSAA {
-        vk::PipelineMultisampleStateCreateInfo::builder().rasterization_samples(SAMPLES)
-    } else {
-        vk::PipelineMultisampleStateCreateInfo::builder()
-    };
+    let multisample_state =
+        vk::PipelineMultisampleStateCreateInfo::builder().rasterization_samples(SAMPLES);
 
     // Depth stencil state
     let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()

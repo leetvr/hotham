@@ -3,10 +3,7 @@ use ash::vk::{self, Handle};
 use openxr::{Swapchain as SwapchainHandle, Vulkan};
 use vulkan_context::VulkanContext;
 
-use crate::{
-    contexts::{render_context::USE_MSAA, vulkan_context},
-    COLOR_FORMAT, DEPTH_FORMAT,
-};
+use crate::{contexts::vulkan_context, COLOR_FORMAT, DEPTH_FORMAT};
 
 use super::texture::DEFAULT_COMPONENT_MAPPING;
 
@@ -16,28 +13,39 @@ pub struct SwapchainInfo {
     pub resolution: vk::Extent2D,
     /// The images held in the swapchain
     pub images: Vec<vk::Image>,
-    /// Optional images used for fixed foveated rendering
-    pub ffr_images: Option<Vec<FFRImage>>,
+    /// Images used for fixed foveated rendering
+    #[cfg(target_os = "android")]
+    pub ffr_images: Vec<FFRImage>,
 }
 
 impl SwapchainInfo {
+    #[cfg(target_os = "android")]
     pub(crate) fn from_openxr_swapchain(
         handle: &SwapchainHandle<Vulkan>,
         resolution: vk::Extent2D,
     ) -> Result<Self> {
-        // let images = handle
-        //     .enumerate_images()?
-        //     .into_iter()
-        //     .map(vk::Image::from_raw)
-        //     .collect::<Vec<_>>();
+        #[cfg(target_os = "android")]
+        {
+            let (images, ffr_images) = get_swapchain_images_with_ffr(handle);
+            Ok(Self {
+                resolution,
+                images,
+                ffr_images,
+            })
+        }
+    }
 
-        let (images, ffr_images) = get_swapchain_images(handle);
-
-        Ok(Self {
-            resolution,
-            images,
-            ffr_images,
-        })
+    #[cfg(not(target_os = "android"))]
+    pub(crate) fn from_openxr_swapchain(
+        handle: &SwapchainHandle<Vulkan>,
+        resolution: vk::Extent2D,
+    ) -> Result<Self> {
+        let images = handle
+            .enumerate_images()?
+            .into_iter()
+            .map(vk::Image::from_raw)
+            .collect::<Vec<_>>();
+        Ok(Self { resolution, images })
     }
 }
 
@@ -50,9 +58,10 @@ pub struct FFRImage {
     pub image: vk::Image,
 }
 
-fn get_swapchain_images(
+#[cfg(target_os = "android")]
+fn get_swapchain_images_with_ffr(
     handle: &SwapchainHandle<Vulkan>,
-) -> (Vec<vk::Image>, Option<Vec<FFRImage>>) {
+) -> (Vec<vk::Image>, Vec<FFRImage>) {
     let fp = handle.instance().fp();
     let mut output = 0;
 
@@ -115,7 +124,7 @@ fn get_swapchain_images(
         .map(|i| vk::Image::from_raw(i.image))
         .collect();
 
-    (images, Some(ffr_images))
+    (images, ffr_images)
 }
 
 /// A thin container for OpenXR to pass the details of its Swapchain to RenderContext.
@@ -162,23 +171,13 @@ impl Swapchain {
             .unwrap();
 
         // Framebuffers, used for rendering the final image to the swapchain.
-        let framebuffers = if swapchain_info.ffr_images.is_some() {
-            create_framebuffers_with_ffr(
-                swapchain_info,
-                vulkan_context,
-                color_image,
-                depth_image,
-                render_pass,
-            )
-        } else {
-            create_framebuffers(
-                swapchain_info,
-                vulkan_context,
-                color_image,
-                depth_image,
-                render_pass,
-            )
-        };
+        let framebuffers = create_framebuffers(
+            swapchain_info,
+            vulkan_context,
+            color_image,
+            depth_image,
+            render_pass,
+        );
 
         Self {
             render_area,
@@ -187,7 +186,8 @@ impl Swapchain {
     }
 }
 
-fn create_framebuffers_with_ffr(
+#[cfg(target_os = "android")]
+fn create_framebuffers(
     swapchain_info: &SwapchainInfo,
     vulkan_context: &VulkanContext,
     color_image: super::image::Image,
@@ -226,23 +226,13 @@ fn create_framebuffers_with_ffr(
                 ffr_image_view,
                 swapchain_image_view,
             ];
-            let non_msaa_attachments = [swapchain_image_view, depth_image.view, ffr_image_view];
 
-            let frame_buffer_create_info = if USE_MSAA {
-                vk::FramebufferCreateInfo::builder()
-                    .render_pass(render_pass)
-                    .attachments(&msaa_attachments)
-                    .width(swapchain_info.resolution.width)
-                    .height(swapchain_info.resolution.height)
-                    .layers(1) // NOTE: multiview takes care of layers.
-            } else {
-                vk::FramebufferCreateInfo::builder()
-                    .render_pass(render_pass)
-                    .attachments(&non_msaa_attachments)
-                    .width(swapchain_info.resolution.width)
-                    .height(swapchain_info.resolution.height)
-                    .layers(1) // NOTE: multiview takes care of layers.
-            };
+            let frame_buffer_create_info = vk::FramebufferCreateInfo::builder()
+                .render_pass(render_pass)
+                .attachments(&msaa_attachments)
+                .width(swapchain_info.resolution.width)
+                .height(swapchain_info.resolution.height)
+                .layers(1); // NOTE: multiview takes care of layers.
 
             unsafe {
                 vulkan_context
@@ -255,6 +245,7 @@ fn create_framebuffers_with_ffr(
     framebuffers
 }
 
+#[cfg(not(target_os = "android"))]
 fn create_framebuffers(
     swapchain_info: &SwapchainInfo,
     vulkan_context: &VulkanContext,
@@ -277,23 +268,13 @@ fn create_framebuffers(
         })
         .map(|swapchain_image_view| {
             let msaa_attachments = [color_image.view, depth_image.view, swapchain_image_view];
-            let non_msaa_attachments = [swapchain_image_view, depth_image.view];
 
-            let frame_buffer_create_info = if USE_MSAA {
-                vk::FramebufferCreateInfo::builder()
-                    .render_pass(render_pass)
-                    .attachments(&msaa_attachments)
-                    .width(swapchain_info.resolution.width)
-                    .height(swapchain_info.resolution.height)
-                    .layers(1) // NOTE: multiview takes care of layers.
-            } else {
-                vk::FramebufferCreateInfo::builder()
-                    .render_pass(render_pass)
-                    .attachments(&non_msaa_attachments)
-                    .width(swapchain_info.resolution.width)
-                    .height(swapchain_info.resolution.height)
-                    .layers(1) // NOTE: multiview takes care of layers.
-            };
+            let frame_buffer_create_info = vk::FramebufferCreateInfo::builder()
+                .render_pass(render_pass)
+                .attachments(&msaa_attachments)
+                .width(swapchain_info.resolution.width)
+                .height(swapchain_info.resolution.height)
+                .layers(1); // NOTE: multiview takes care of layers.
 
             unsafe {
                 vulkan_context

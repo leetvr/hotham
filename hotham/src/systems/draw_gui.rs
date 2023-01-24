@@ -287,7 +287,6 @@ mod tests {
         let swapchain = SwapchainInfo {
             images: vec![image.handle],
             resolution,
-            ffr_images: None,
         };
 
         let mut render_context =
