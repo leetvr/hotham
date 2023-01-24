@@ -104,7 +104,6 @@ impl VulkanContext {
             "VK_EXT_astc_decode_mode",
             "VK_EXT_descriptor_indexing",
             "VK_KHR_shader_float16_int8",
-            "VK_KHR_16bit_storage",
         ]
         .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
 
@@ -862,8 +861,8 @@ fn add_device_extension_names(extension_names: &mut Vec<CString>) {
     extension_names.push(vk::KhrShaderDrawParametersFn::name().to_owned());
 
     // Add Multiview extension
-    extension_names.push(CString::new("VK_KHR_multiview").unwrap());
     extension_names.push(CString::new("VK_EXT_descriptor_indexing").unwrap());
+    extension_names.push(CString::new("VK_KHR_shader_float16_int8").unwrap());
 
     // If we're on macOS we've got to add portability
     #[cfg(target_os = "macos")]
@@ -979,19 +978,12 @@ fn vulkan_init_legacy(
             .engine_version(1)
             .api_version(vk::make_api_version(0, 1, 2, 0));
 
-        let validation_features_enables = [];
-        let validation_features_disables = [];
-        let mut validation_features = vk::ValidationFeaturesEXT::builder()
-            .enabled_validation_features(&validation_features_enables)
-            .disabled_validation_features(&validation_features_disables);
-
         let instance = entry
             .create_instance(
                 &vk::InstanceCreateInfo::builder()
                     .application_info(&app_info)
                     .enabled_extension_names(&vk_instance_ext_pointers)
-                    .enabled_layer_names(&layer_names)
-                    .push_next(&mut validation_features),
+                    .enabled_layer_names(&layer_names),
                 None,
             )
             .expect("Vulkan error creating Vulkan instance");
@@ -1084,33 +1076,32 @@ fn create_vulkan_device(
         .queue_family_index(graphics_family_index)
         .build();
 
-    // We use a *whole bunch* of different features, and somewhat annoyingly they're all enabled in different ways.
-    let enabled_features = vk::PhysicalDeviceFeatures::builder()
-        .multi_draw_indirect(true)
-        .sampler_anisotropy(true)
-        .build();
-
-    let mut physical_device_features = vk::PhysicalDeviceVulkan11Features::builder()
-        .multiview(true)
-        .shader_draw_parameters(true);
-
     let mut descriptor_indexing_features = vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
         .shader_sampled_image_array_non_uniform_indexing(true)
-        .descriptor_binding_partially_bound(true)
         .descriptor_binding_variable_descriptor_count(true)
-        .descriptor_binding_sampled_image_update_after_bind(true)
+        .descriptor_binding_partially_bound(true)
         .runtime_descriptor_array(true);
+
+    let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::builder().multiview(true);
 
     let mut robust_features =
         vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
 
+    let mut f16_storage =
+        vk::PhysicalDevice16BitStorageFeatures::builder().storage_buffer16_bit_access(true);
+
+    let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::builder()
+        .shader_float16(true)
+        .shader_int8(true);
+
     let device_create_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(slice_from_ref(&queue_create_info))
         .enabled_extension_names(&extension_names)
-        .enabled_features(&enabled_features)
         .push_next(&mut descriptor_indexing_features)
         .push_next(&mut robust_features)
-        .push_next(&mut physical_device_features);
+        .push_next(&mut multiview_features)
+        .push_next(&mut f16_storage)
+        .push_next(&mut f16_arithmetic);
 
     let device =
         unsafe { vulkan_instance.create_device(physical_device, &device_create_info, None) }?;
