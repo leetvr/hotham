@@ -6,54 +6,79 @@
 #include "common.glsl"
 #include "lights.glsl"
 #include "brdf.glsl"
+#include "pbr.glsl"
 
 // Inputs
 layout (location = 0) in vec3 inGosPos;
 layout (location = 1) in vec2 inUV;
-layout (location = 2) flat in uint inMaterialID;
-layout (location = 3) in vec3 inNormal;
-
-// Textures
-layout (set = 0, binding = 4) uniform sampler2D textures[];
-layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
-
-#include "pbr.glsl"
-
-layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
-    Material materials[];
-} materialBuffer;
+layout (location = 2) in vec3 inNormal;
 
 // Outputs
 layout (location = 0) out vec4 outColor;
+
+// Get normal, tangent and bitangent vectors.
+vec3 getNormal() {
+    vec3 N = normalize(inNormal);
+    if ((materialFlags & TEXTURE_FLAG_HAS_NORMAL_MAP) == 0) {
+        return N;
+    }
+
+    vec3 textureNormal;
+    textureNormal.xy = texture(textures[baseTextureID + 2], inUV).ga * 2.0 - 1.0;
+    textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
+
+    // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
+    // See http://www.thetenthplanet.de/archives/1180 for an explanation of how this works
+    // and a little bit about why it is better than using precomputed tangents.
+    // Note however that we are using a slightly different formulation with coordinates in
+    // globally oriented stage space instead of view space and we rely on the UV map not being too distorted.
+    vec3 dGosPosDx = dFdx(inGosPos);
+    vec3 dGosPosDy = dFdy(inGosPos);
+    vec2 dUvDx = dFdx(inUV);
+    vec2 dUvDy = dFdy(inUV);
+
+    vec3 T = normalize(dGosPosDx * dUvDy.t - dGosPosDy * dUvDx.t);
+    vec3 B = normalize(cross(N, T));
+    mat3 TBN = mat3(T, B, N);
+
+    return normalize(TBN * textureNormal);
+}
 
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
     outColor = ERROR_MAGENTA;
 
-    // Retrieve the material from the buffer.
-    Material material = materialBuffer.materials[inMaterialID];
+    // Unpack the material parameters
+    materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
+    baseTextureID = material.flagsAndBaseTextureID >> 16;
+    metallicRoughnessAlphaMaskCutoff = unpackUnorm4x8(
+        material.packedMetallicRoughnessFactorAlphaMaskCutoff).xyz;
 
     // Determine the base color
-    vec4 baseColor;
+    vec4 baseColor = unpackUnorm4x8(material.packedBaseColor);
 
-    if (material.baseColorTextureID == NOT_PRESENT) {
-        baseColor = material.baseColorFactor;
-    } else {
-        baseColor = texture(textures[material.baseColorTextureID], inUV) * material.baseColorFactor;
+    if ((materialFlags & HAS_BASE_COLOR_TEXTURE) != 0) {
+        baseColor *= texture(textures[baseTextureID], inUV);
     }
 
     // Handle transparency
-    if (material.alphaMask == 1.0f) {
-        if (baseColor.a < material.alphaMaskCutoff) {
+    if (metallicRoughnessAlphaMaskCutoff.z > 0.0f) {
+        if (baseColor.a < metallicRoughnessAlphaMaskCutoff.z) {
             // TODO: Apparently Adreno GPUs don't like discarding.
             discard;
         }
     }
 
+    // Set globals that are read inside functions for lighting etc.
+    p = inGosPos;
+    v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
+    n = getNormal();
+    uv = inUV;
+
     // Choose the correct workflow for this material
-    if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor);
-    } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
+    if ((materialFlags & PBR_WORKFLOW_UNLIT) == 0) {
+        outColor.rgb = getPBRMetallicRoughnessColor(baseColor);
+    } else {
         outColor = baseColor;
     }
 
@@ -71,24 +96,23 @@ void main() {
                 break;
             // Normal
             case 2:
-                vec3 n = getNormal(material.normalTextureID);
                 outColor.rgb = n * 0.5 + 0.5;
                 break;
             // Occlusion
             case 3:
-                outColor.rgb = (material.occlusionTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.occlusionTextureID], inUV).rrr;
+                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).rrr;
                 break;
             // Emission
             case 4:
-                outColor.rgb = (material.emissiveTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.emissiveTextureID], inUV).rgb;
+                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], inUV).rgb;
                 break;
             // Roughness
             case 5:
-                outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], inUV).ggg;
+                outColor.rgb = ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).ggg;
                 break;
             // Metallic
             case 6:
-                outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], inUV).bbb;
+                outColor.rgb = ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).bbb;
                 break;
         }
         outColor = outColor;

@@ -1,11 +1,16 @@
 use crate::{
     components::{skin::NO_SKIN, stage, GlobalTransform, Mesh, Skin, Visible},
-    contexts::VulkanContext,
+    contexts::{render_context::create_push_constant, VulkanContext},
     contexts::{
         render_context::{Instance, InstancedPrimitive},
         RenderContext,
     },
-    rendering::resources::{DrawData, PrimitiveCullData},
+    rendering::{
+        buffer::Buffer,
+        material::Material,
+        primitive::Primitive,
+        resources::{DrawData, PrimitiveCullData},
+    },
     Engine,
 };
 use glam::Affine3A;
@@ -161,6 +166,7 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
     let device = &vulkan_context.device;
     let frame = &mut render_context.frames[render_context.frame_index];
     let command_buffer = frame.command_buffer;
+    let material_buffer = &mut render_context.resources.materials_buffer;
     let draw_data_buffer = &mut frame.draw_data_buffer;
     draw_data_buffer.clear();
 
@@ -184,12 +190,13 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
                     .get(&current_primitive_id)
                     .unwrap()
                     .primitive;
-                device.cmd_draw_indexed(
+                draw_primitive(
+                    material_buffer,
+                    render_context.pipeline_layout,
+                    primitive,
+                    device,
                     command_buffer,
-                    primitive.indices_count,
                     instance_count,
-                    primitive.index_buffer_offset,
-                    primitive.vertex_buffer_offset as _,
                     instance_offset,
                 );
             }
@@ -209,7 +216,6 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
             let draw_data = DrawData {
                 gos_from_local: instance.gos_from_local.into(),
                 local_from_gos: instance.gos_from_local.inverse().into(),
-                material_id: instanced_primitive.primitive.material_id,
                 skin_id: instance.skin_id,
             };
             draw_data_buffer.push(&draw_data);
@@ -226,15 +232,47 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
             .get(&current_primitive_id)
             .unwrap()
             .primitive;
-        device.cmd_draw_indexed(
+
+        draw_primitive(
+            material_buffer,
+            render_context.pipeline_layout,
+            primitive,
+            device,
             command_buffer,
-            primitive.indices_count,
             instance_count,
-            primitive.index_buffer_offset,
-            primitive.vertex_buffer_offset as _,
             instance_offset,
         );
     }
+}
+
+// TODO: Just push this into `RenderContext`
+/// Update material push constants and submit draw command.
+pub unsafe fn draw_primitive(
+    materials_buffer: &Buffer<Material>,
+    pipeline_layout: ash::vk::PipelineLayout,
+    primitive: &Primitive,
+    device: &ash::Device,
+    command_buffer: ash::vk::CommandBuffer,
+    instance_count: u32,
+    instance_offset: u32,
+) {
+    let material = &materials_buffer.as_slice()[primitive.material_id as usize];
+    let constants = create_push_constant(material);
+    device.cmd_push_constants(
+        command_buffer,
+        pipeline_layout,
+        ash::vk::ShaderStageFlags::FRAGMENT,
+        0,
+        constants,
+    );
+    device.cmd_draw_indexed(
+        command_buffer,
+        primitive.indices_count,
+        instance_count,
+        primitive.index_buffer_offset,
+        primitive.vertex_buffer_offset as _,
+        instance_offset,
+    );
 }
 
 /// Finish drawing

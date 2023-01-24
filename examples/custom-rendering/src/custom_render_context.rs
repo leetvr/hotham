@@ -42,8 +42,6 @@ pub struct QuadricData {
     pub bounds_q: Mat4,
     /// Projects positions in globally oriented stage space into uv space for texturing
     pub uv_from_gos: Mat4,
-    /// The ID of the material to use.
-    pub material_id: u32,
 }
 
 pub struct CustomRenderContext {

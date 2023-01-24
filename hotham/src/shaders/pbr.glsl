@@ -6,25 +6,37 @@
 #define ENVIRONMENT_MAP_TEXTURE_ID 1
 #define ERROR_MAGENTA vec4(1., 0., 1., 1.)
 
-struct Material {
-    vec4 baseColorFactor;
-    uint workflow;
-    uint baseColorTextureID;
-    uint metallicRoughnessTextureID;
-    uint normalTextureID;
-    uint occlusionTextureID;
-    uint emissiveTextureID;
-    float metallicFactor;
-    float roughnessFactor;
-    float alphaMask;
-    float alphaMaskCutoff;
-};
+#define HAS_BASE_COLOR_TEXTURE 1
+#define HAS_METALLIC_ROUGHNESS_TEXTURE 2
+#define TEXTURE_FLAG_HAS_NORMAL_MAP 4
+#define TEXTURE_FLAG_HAS_AO_TEXTURE 8
+#define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 16
+#define PBR_WORKFLOW_UNLIT 32
 
-const float PBR_WORKFLOW_METALLIC_ROUGHNESS = 0.0;
-const float PBR_WORKFLOW_UNLIT = 1.0;
+// Textures
+layout (set = 0, binding = 3) uniform sampler2D textures[10000];
+layout (set = 0, binding = 4) uniform samplerCube cubeTextures[100];
+
+// Material
+layout( push_constant ) uniform constants
+{
+    uint flagsAndBaseTextureID;
+    uint packedBaseColor;
+    uint packedMetallicRoughnessFactorAlphaMaskCutoff;
+} material;
+
+// Store the unpacked material in globals to avoid copying when calling functions.
+uint materialFlags;
+uint baseTextureID;
+vec3 metallicRoughnessAlphaMaskCutoff;
 
 // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance (eg. f0) of 0.04
 const vec3 DEFAULT_F0 = vec3(0.04);
+
+vec3 p;
+vec3 n;
+vec3 v;
+vec2 uv;
 
 // Fast approximation of ACES tonemap
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
@@ -41,34 +53,6 @@ vec3 tonemap(vec3 color) {
     color *= DEFAULT_EXPOSURE;
     color = toneMapACES_Narkowicz(color.rgb);
     return color;
-}
-
-// Get normal, tangent and bitangent vectors.
-vec3 getNormal(uint normalTextureID) {
-    vec3 N = normalize(inNormal);
-    if (normalTextureID == NOT_PRESENT) {
-        return N;
-    }
-
-    vec3 textureNormal;
-    textureNormal.xy = texture(textures[normalTextureID], inUV).ga * 2.0 - 1.0;
-    textureNormal.z = sqrt(1 - dot(textureNormal.xy, textureNormal.xy));
-
-    // We compute the tangents on the fly because it is faster, presumably because it saves bandwidth.
-    // See http://www.thetenthplanet.de/archives/1180 for an explanation of how this works
-    // and a little bit about why it is better than using precomputed tangents.
-    // Note however that we are using a slightly different formulation with coordinates in
-    // globally oriented stage space instead of view space and we rely on the UV map not being too distorted.
-    vec3 dGosPosDx = dFdx(inGosPos);
-    vec3 dGosPosDy = dFdy(inGosPos);
-    vec2 dUvDx = dFdx(inUV);
-    vec2 dUvDy = dFdy(inUV);
-
-    vec3 T = normalize(dGosPosDx * dUvDy.t - dGosPosDy * dUvDx.t);
-    vec3 B = normalize(cross(N, T));
-    mat3 TBN = mat3(T, B, N);
-
-    return normalize(TBN * textureNormal);
 }
 
 // Calculation of the lighting contribution from an optional Image Based Light source.
@@ -100,11 +84,11 @@ vec3 getIBLContribution(vec3 F0, float perceptualRoughness, vec3 diffuseColor, v
     return diffuse + specular;
 }
 
-vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3 n, vec3 v, float NdotV, Light light) {
+vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, float NdotV, Light light) {
     // Get a vector between this point and the light.
     vec3 pointToLight;
     if (light.type != LightType_Directional) {
-        pointToLight = light.position - inGosPos;
+        pointToLight = light.position - p;
     } else {
         pointToLight = -light.direction;
     }
@@ -132,22 +116,22 @@ vec3 getLightContribution(vec3 F0, float alphaRoughness, vec3 diffuseColor, vec3
     return color;
 }
 
-vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
+vec3 getPBRMetallicRoughnessColor(vec4 baseColor) {
 
     // Metallic and Roughness material properties are packed together
     // In glTF, these factors can be specified by fixed scalar values
     // or from a metallic-roughness map
-    float perceptualRoughness = material.roughnessFactor;
-    float metalness = material.metallicFactor;
+    float perceptualRoughness = metallicRoughnessAlphaMaskCutoff.y;
+    float metalness = metallicRoughnessAlphaMaskCutoff.x;
 
-    if (material.metallicRoughnessTextureID == NOT_PRESENT) {
+    if ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) == 0) {
         perceptualRoughness = clamp(perceptualRoughness, 0., 1.0);
         metalness = clamp(metalness, 0., 1.0);
     } else {
         // As per the glTF spec:
         // The textures for metalness and roughness properties are packed together in a single texture called metallicRoughnessTexture.
         // Its green channel contains roughness values and its blue channel contains metalness values.
-        vec4 mrSample = texture(textures[material.metallicRoughnessTextureID], inUV);
+        vec4 mrSample = texture(textures[baseTextureID + 1], uv);
 
         perceptualRoughness = clamp(mrSample.g * perceptualRoughness, 0.0, 1.0);
         metalness = clamp(mrSample.b * metalness, 0.0, 1.0);
@@ -163,12 +147,6 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     // convert to material roughness by squaring the perceptual roughness
     float alphaRoughness = perceptualRoughness * perceptualRoughness;
 
-    // Get the view vector - from surface point to camera
-    vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
-
-    // Get the normal
-    vec3 n = getNormal(material.normalTextureID);
-
     // Get NdotV and reflection
     float NdotV = clamp(abs(dot(n, v)), 0., 1.0);
     vec3 reflection = normalize(reflect(-v, n));
@@ -182,9 +160,9 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     }
 
     // Apply ambient occlusion, if present.
-    if (material.occlusionTextureID != NOT_PRESENT) {
+    if ((materialFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) {
         // Occlusion is stored in the 'r' channel as per the glTF spec
-        float ao = texture(textures[material.occlusionTextureID], inUV).r;
+        float ao = texture(textures[baseTextureID + 1], uv).r;
         color = color * ao;
     }
 
@@ -192,23 +170,21 @@ vec3 getPBRMetallicRoughnessColor(Material material, vec4 baseColor) {
     // Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
     // Since these values are uniform, they shouldn't have too high of a penalty.
     if (sceneData.lights[0].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[0]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[0]);
     }
     if (sceneData.lights[1].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[1]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[1]);
     }
     if (sceneData.lights[2].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[2]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[2]);
     }
     if (sceneData.lights[3].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, n, v, NdotV, sceneData.lights[3]);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[3]);
     }
 
     // Add emission, if present
-    if (material.emissiveTextureID != NOT_PRESENT) {
-        vec3 emissive = texture(textures[material.emissiveTextureID], inUV).rgb;
-        color += emissive;
+    if ((materialFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) {
+        color += texture(textures[baseTextureID + 3], uv).rgb;
     }
-
     return color;
 }
