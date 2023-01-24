@@ -1,7 +1,6 @@
 use ash::vk::{self};
 use egui::Pos2;
 use glam::Vec2;
-use itertools::izip;
 
 use crate::components::Mesh;
 use crate::hotham_error::HothamError;
@@ -67,11 +66,10 @@ fn create_panel_mesh(
         [1., 0.].into(), // v2
         [0., 1.].into(), // v3
     ];
-    let vertices: Vec<Vertex> = izip!(positions, tex_coords_0)
-        .into_iter()
-        .map(|(p, t)| Vertex {
-            // position: p,
-            texture_coords: t,
+    let vertices: Vec<Vertex> = tex_coords_0
+        .iter()
+        .map(|t| Vertex {
+            texture_coords: *t,
             ..Default::default()
         })
         .collect();

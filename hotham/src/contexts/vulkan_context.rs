@@ -207,15 +207,8 @@ impl VulkanContext {
                     .unwrap() as _,
             )
         };
-        let (device, graphics_queue, queue_family_index) =
+        let (device, _, queue_family_index) =
             create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device)?;
-
-        let command_pool = create_command_pool(&device, queue_family_index)?;
-
-        let descriptor_pool = create_descriptor_pool(&device)?;
-        let debug_utils = DebugUtils::new(&vulkan_entry, &vulkan_instance);
-        let physical_device_properties =
-            unsafe { vulkan_instance.get_physical_device_properties(physical_device) };
 
         Ok(Self::new(
             vulkan_instance,

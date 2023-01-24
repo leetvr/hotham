@@ -1,8 +1,8 @@
 use anyhow::Result;
 use ash::vk::{self, Handle};
 use openxr::{
-    self as xr, sys, EventDataBuffer, FrameStream, FrameWaiter, Session, SessionState, Space,
-    Swapchain, Vulkan,
+    self as xr, EventDataBuffer, FrameStream, FrameWaiter, Session, SessionState, Space, Swapchain,
+    Vulkan,
 };
 use xr::{
     vulkan::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType, SwapchainCreateFlags,

@@ -36,6 +36,8 @@ pub struct Resources {
     pub index_buffer: Buffer<u32>,
 
     /// Buffer for materials, indexed by material_id in DrawData
+    /// TODO: This technically no longer needs to be stored on the GPU and could instead be an array, but may be worth keeping this way
+    /// as it's not a bottleneck and, if it ever gets supported on the Quest2, MultiDrawIndirect will need this.
     pub materials_buffer: Buffer<Material>,
 
     /// Mesh data used to generate DrawData

@@ -250,7 +250,6 @@ impl RenderContext {
 
     pub fn update_scene_data(
         &mut self,
-        vulkan_context: &VulkanContext,
         views: &[xr::View],
         gos_from_global: &Affine3A,
         gos_from_stage: &Affine3A,
@@ -323,7 +322,6 @@ impl RenderContext {
         let primitive_cull_buffer = &mut frame.primitive_cull_data_buffer;
         let command_buffer = frame.compute_command_buffer;
         let fence = frame.compute_fence;
-        let staging_buffer = &self.resources.staging_buffer;
 
         // Create the cull parameters to pass to the compute shader
         let cull_params = CullParams::new(

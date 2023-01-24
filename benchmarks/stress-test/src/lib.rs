@@ -8,7 +8,7 @@ pub mod systems;
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{GlobalTransform, LocalTransform, Mesh, Visible},
-    contexts::{vulkan_context, RenderContext, VulkanContext},
+    contexts::RenderContext,
     glam::{EulerRot, Quat, Vec3},
     hecs::{With, World},
     rendering::{
@@ -16,7 +16,6 @@ use hotham::{
         material::Material,
         mesh_data::MeshData,
         primitive::{calculate_bounding_sphere, Primitive},
-        vertex::Vertex,
     },
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands_system, physics_system,
@@ -160,7 +159,7 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
             models
         }
         StressTest::ManyVertices => {
-            create_mesh(render_context, world, vulkan_context);
+            create_mesh(render_context, world);
             Default::default()
         }
         StressTest::Sponza => {
@@ -262,7 +261,6 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
 fn subdivide_mesh_system(engine: &mut Engine, timer: &mut Timer) {
     let world = &mut engine.world;
     let render_context = &mut engine.render_context;
-    let vulkan_context = &engine.vulkan_context;
 
     if !timer.tick() {
         return;
@@ -273,7 +271,7 @@ fn subdivide_mesh_system(engine: &mut Engine, timer: &mut Timer) {
 
     // Calculate the current step.
     let step = timer.total_time().as_secs() * 10;
-    update_mesh(step as _, mesh, render_context, vulkan_context);
+    update_mesh(step as _, mesh, render_context);
 }
 
 fn model_system(
@@ -331,11 +329,7 @@ fn rearrange_models(world: &mut World) {
     println!("[HOTHAM_STRESS_TEST] There are now {} models", num_models);
 }
 
-fn create_mesh(
-    render_context: &mut RenderContext,
-    world: &mut World,
-    vulkan_context: &VulkanContext,
-) {
+fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
     let material_id = unsafe {
         render_context
             .resources
@@ -349,7 +343,7 @@ fn create_mesh(
         }]),
         render_context,
     );
-    update_mesh(1, &mesh, render_context, vulkan_context);
+    update_mesh(1, &mesh, render_context);
     let local_transform = LocalTransform {
         translation: [0., 1., -1.].into(),
         ..Default::default()
@@ -363,12 +357,7 @@ fn create_mesh(
     ));
 }
 
-fn update_mesh(
-    step: usize,
-    mesh: &Mesh,
-    render_context: &mut RenderContext,
-    vulkan_context: &VulkanContext,
-) {
+fn update_mesh(step: usize, mesh: &Mesh, render_context: &mut RenderContext) {
     let mut vertices = vec![];
     let mut indices = vec![];
 
