@@ -34,7 +34,7 @@ uint baseTextureID;
 vec3 metallicRoughnessAlphaMaskCutoff;
 
 // Common variables used throughout lighting equations
-vec3 pos;     // pos
+vec3 pos;   // pos
 vec3 n;     // normal
 vec3 v;     // view vector
 vec2 uv;    // inUV
@@ -45,7 +45,7 @@ f16vec3 getIBLContribution(f16vec3 F0, float16_t perceptualRoughness, f16vec3 di
 
     f16vec2 brdfSamplePoint = clamp(f16vec2(NdotV, perceptualRoughness), f16vec2(0), f16vec2(1.0));
     f16vec2 f_ab = f16vec2(texture(textures[BRDF_LUT_TEXTURE_ID], brdfSamplePoint)).rg;
-    f16vec3 specularLight = V16(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, 5));
+    f16vec3 specularLight = V16(textureLod(cubeTextures[ENVIRONMENT_MAP_TEXTURE_ID], reflection, lod));
 
     // see https://bruop.github.io/ibl/#single_scattering_results at Single Scattering Results
     // Roughness dependent fresnel, from Fdez-Aguera
@@ -119,10 +119,6 @@ f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
     // convert to material roughness by squaring the perceptual roughness
     float16_t alphaRoughness = perceptualRoughness * perceptualRoughness;
 
-    // Get the view vector - from surface point to camera
-    // IMPORTANT: Keep this as 32bit precision
-    vec3 v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - pos);
-
     // Get NdotV and reflection
     float16_t NdotV = saturate(F16(abs(dot(n, v))));
 
@@ -138,7 +134,7 @@ f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
     f16vec3 color;
     if (sceneData.params.x > 0.) {
         f16vec3 reflection = normalize(reflect(V16(-v), V16(n)));
-        color = getIBLContribution(f0, alphaRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
+        color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
     }
 
 

@@ -62,8 +62,6 @@ vec3 getNormal() {
     return normalize(TBN * textureNormal);
 }
 
-
-
 void main() {
     // Start by setting the output color to a familiar "error" magenta.
     outColor = ERROR_MAGENTA;
