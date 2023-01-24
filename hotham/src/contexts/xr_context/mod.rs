@@ -334,15 +334,15 @@ pub(crate) fn create_xr_swapchain(
     resolution: &vk::Extent2D,
     array_size: u32,
 ) -> Result<Swapchain<Vulkan>> {
-    let mut swapchain_raw = sys::Swapchain::NULL;
-    let foveation_info = sys::SwapchainCreateInfoFoveationFB {
-        ty: sys::StructureType::SWAPCHAIN_CREATE_INFO_FOVEATION_FB,
+    let mut swapchain_raw = xr::sys::Swapchain::NULL;
+    let foveation_info = xr::sys::SwapchainCreateInfoFoveationFB {
+        ty: xr::sys::StructureType::SWAPCHAIN_CREATE_INFO_FOVEATION_FB,
         next: std::ptr::null_mut(),
-        flags: sys::SwapchainCreateFoveationFlagsFB::FRAGMENT_DENSITY_MAP,
+        flags: xr::sys::SwapchainCreateFoveationFlagsFB::FRAGMENT_DENSITY_MAP,
     };
 
-    let create_info = sys::SwapchainCreateInfo {
-        ty: sys::SwapchainCreateInfo::TYPE,
+    let create_info = xr::sys::SwapchainCreateInfo {
+        ty: xr::sys::SwapchainCreateInfo::TYPE,
         create_flags: SwapchainCreateFlags::EMPTY,
         usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
         format: COLOR_FORMAT.as_raw() as _,

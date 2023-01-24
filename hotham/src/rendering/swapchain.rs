@@ -196,7 +196,7 @@ fn create_framebuffers(
 ) -> Vec<vk::Framebuffer> {
     let ffr_image_view = vulkan_context
         .create_image_view(
-            &swapchain_info.ffr_images.as_ref().unwrap()[0].image,
+            &swapchain_info.ffr_images[0].image,
             vk::Format::R8G8_UNORM,
             vk::ImageViewType::TYPE_2D_ARRAY,
             2,
