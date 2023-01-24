@@ -66,8 +66,6 @@ void main() {
     // Unpack the material parameters
     materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
     baseTextureID = material.flagsAndBaseTextureID >> 16;
-    metallicRoughnessAlphaMaskCutoff = unpackUnorm4x8(
-        material.packedMetallicRoughnessFactorAlphaMaskCutoff).xyz;
 
     // Determine the base color
     f16vec3 baseColor = V16(unpackUnorm4x8(material.packedBaseColor));

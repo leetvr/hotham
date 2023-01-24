@@ -31,7 +31,6 @@ layout( push_constant ) uniform constants
 // Store the unpacked material in globals to avoid copying when calling functions.
 uint materialFlags;
 uint baseTextureID;
-vec3 metallicRoughnessAlphaMaskCutoff;
 
 // Common variables used throughout lighting equations
 vec3 pos;   // pos
