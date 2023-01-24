@@ -536,7 +536,7 @@ pub fn create_push_constant<T: 'static>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(p as *const T as *const u8, std::mem::size_of::<T>()) }
 }
 
-// TODO: this will break the simulator due to FFR
+// TODO: Handle Android/Desktop code split more elegantly
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     // Attachment used for MSAA
     let color_store_op = vk::AttachmentStoreOp::DONT_CARE;
@@ -573,6 +573,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     // Fixed foveated rendering (FFR) attachment
+    // Note this only works on Android so we need conditional compilation here.
     #[cfg(target_os = "android")]
     let ffr_attachment = vk::AttachmentDescription::builder()
         .format(vk::Format::R8G8_UNORM)
@@ -661,7 +662,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .push_next(&mut multiview);
 
     #[cfg(target_os = "android")]
-    create_info.push_next(&mut ffr_info);
+    let create_info = create_info.push_next(&mut ffr_info);
 
     let render_pass = unsafe { vulkan_context.device.create_render_pass(&create_info, None) }?;
 
