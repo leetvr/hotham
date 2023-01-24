@@ -36,7 +36,6 @@ use crate::{
         swapchain::{Swapchain, SwapchainInfo},
         vertex::Vertex,
     },
-    util::PerformanceTimer,
     COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
@@ -68,8 +67,6 @@ pub struct RenderContext {
     pub swapchain: Swapchain,
     pub descriptors: Descriptors,
     pub shaders: Shaders,
-    pub render_pass_timer: PerformanceTimer,
-
     // Populated only between rendering::begin and rendering::end
     pub primitive_map: HashMap<u32, InstancedPrimitive>,
 }
@@ -180,7 +177,6 @@ impl RenderContext {
             resources,
             shaders,
             primitive_map: HashMap::default(),
-            render_pass_timer: PerformanceTimer::new("PBR Renderpass"),
         })
     }
 

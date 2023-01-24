@@ -108,7 +108,7 @@ impl<'a> EngineBuilder<'a> {
             physics_context: Default::default(),
             stage_entity,
             hmd_entity,
-            performance_timer: PerformanceTimer::new("total_frame"),
+            performance_timer: PerformanceTimer::new("Application Tick"),
             workers: Workers::new(Default::default()),
         }
     }
@@ -253,6 +253,7 @@ impl Engine {
                 Err(HothamError::NotRendering) => continue,
                 Ok(swapchain_image_index) => {
                     render_context.begin_frame(vulkan_context);
+                    self.performance_timer.start();
                     return Ok(TickData {
                         previous_state,
                         current_state,
@@ -266,6 +267,7 @@ impl Engine {
 
     /// Call this after update
     pub fn finish(&mut self) -> xr::Result<()> {
+        self.performance_timer.end();
         let vulkan_context = &self.vulkan_context;
         let render_context = &mut self.render_context;
 

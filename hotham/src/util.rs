@@ -331,7 +331,9 @@ impl PerformanceTimer {
         if (now - self.last_update).as_secs_f32() >= 1.0 {
             let average = self.timings.iter().fold(0, |a, b| a + b) / self.timings.len();
             let name = &self.name;
-            println!("[HOTHAM_PERF] {name} average tic time: {average}");
+            if average > 0 {
+                println!("[HOTHAM_PERF] Warning: {name} took {average}ms, you might be doing too much work on the CPU");
+            }
             self.last_update = now;
             self.timings.clear();
         }
