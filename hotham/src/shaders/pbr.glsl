@@ -6,11 +6,11 @@
 #define ENVIRONMENT_MAP_TEXTURE_ID 1
 #define ERROR_MAGENTA vec4(1., 0., 1., 1.)
 
-#define TEXTURE_FLAG_HAS_BASE_COLOR_TEXTURE 1
-#define TEXTURE_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE 2
-#define TEXTURE_FLAG_HAS_NORMAL_MAP 4
-#define TEXTURE_FLAG_HAS_AO_TEXTURE 8
-#define TEXTURE_FLAG_HAS_EMISSION_TEXTURE 16
+#define MATERIAL_FLAG_HAS_BASE_COLOR_TEXTURE 1
+#define MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE 2
+#define MATERIAL_FLAG_HAS_NORMAL_TEXTURE 4
+#define MATERIAL_FLAG_HAS_AO_TEXTURE 8
+#define MATERIAL_FLAG_HAS_EMISSION_TEXTURE 16
 #define PBR_WORKFLOW_UNLIT 32
 
 // The default index of refraction of 1.5 yields a dielectric normal incidence reflectance (eg. f0) of 0.04
@@ -25,7 +25,7 @@ layout( push_constant ) uniform constants
 {
     uint flagsAndBaseTextureID;
     uint packedBaseColor;
-    uint packedMetallicRoughnessFactorAlphaMaskCutoff;
+    uint packedMetallicRoughnessFactor;
 } material;
 
 // Store the unpacked material in globals to avoid copying when calling functions.
@@ -96,10 +96,15 @@ f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffu
 f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
     f16vec3 amrSample;
 
-    if ((materialFlags & TEXTURE_FLAG_HAS_BASE_COLOR_TEXTURE) != 0) {
+    if ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) {
         amrSample = V16(texture(textures[baseTextureID + 1], uv).rgb);
     } else {
-        amrSample = f16vec3(1, 0.5, 0.5);
+        // If we don't have a metallic roughness texture, unpack the factors from the material.
+        // Note the awkward swizzle: the variable name is "metallicRoughness", indicating that the
+        // vector (x, y) is (metallic, roughness). However, we need to be consistent with the
+        // channel order of the metallicRoughness texture, which is (g, b) - (roughness, metallic).
+        amrSample.gb = f16vec2(unpackUnorm4x8(
+            material.packedMetallicRoughnessFactor).yx);
     }
 
     // As per the glTF spec:
@@ -121,9 +126,9 @@ f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
     // Get NdotV and reflection
     float16_t NdotV = saturate(F16(abs(dot(n, v))));
 
-    // Occlusion is stored in the 'r' channel as per the glTF spec
+    // Ambient Occlusion is stored in the 'r' channel as per the glTF spec
     float16_t ao;
-    if ((materialFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) {
+    if ((materialFlags & MATERIAL_FLAG_HAS_AO_TEXTURE) != 0) {
         ao  = amrSample.r;
     } else {
         ao = F16(1);
@@ -135,7 +140,7 @@ f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
         f16vec3 reflection = normalize(reflect(V16(-v), V16(n)));
         color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
     } else {
-        // If there is no IBL, set color to 0 to handle the edge-case of having no lights at all, but some emission.
+        // If there is no IBL, set color to 0 to handle the edge-case of having no lights at all.
         color = V16(0.0);
     }
 
@@ -156,7 +161,7 @@ f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
     }
 
     // Add emission, if present
-    if ((materialFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) > 0) {
+    if ((materialFlags & MATERIAL_FLAG_HAS_EMISSION_TEXTURE) > 0) {
         color += V16(texture(textures[baseTextureID + 3], uv)).rgb;
     }
 

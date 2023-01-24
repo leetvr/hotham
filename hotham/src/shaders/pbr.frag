@@ -24,7 +24,7 @@ layout (location = 0) out vec4 outColor;
 
 // Fast approximation of ACES tonemap
 // https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-f16vec3 toneMapACES_Narkowicz(f16vec3 color) {
+f16vec3 toneMapACES_Narkowicz(const f16vec3 color) {
     const float16_t A = F16(2.51);
     const float16_t B = F16(0.03);
     const float16_t C = F16(2.43);
@@ -40,6 +40,11 @@ f16vec3 tonemap(const f16vec3 color) {
 // Get normal, tangent and bitangent vectors.
 vec3 getNormal() {
     vec3 N = normalize(inNormal);
+
+    // If we don't have a normal texture, then just use the vertex normal
+    if ((materialFlags & MATERIAL_FLAG_HAS_NORMAL_TEXTURE) == 0) {
+        return N;
+    }
 
     f16vec3 textureNormal;
     textureNormal.xy = f16vec2(texture(textures[baseTextureID + 2], inUV).ga) * F16(2) - F16(1);
@@ -68,10 +73,17 @@ void main() {
     baseTextureID = material.flagsAndBaseTextureID >> 16;
 
     // Determine the base color
-    f16vec3 baseColor = V16(unpackUnorm4x8(material.packedBaseColor));
+    f16vec3 baseColor;
 
-    if ((materialFlags & TEXTURE_FLAG_HAS_BASE_COLOR_TEXTURE) != 0) {
-        baseColor *= V16(texture(textures[baseTextureID], inUV));
+    if ((materialFlags & MATERIAL_FLAG_HAS_BASE_COLOR_TEXTURE) != 0) {
+        // This is *technically* against the spec, since material base color is meant to be treated as a "factor",
+        // but as of writing no texture authoring tool actually changes these values, so we can skip unnecessary
+        // arithmetic.
+        baseColor = V16(texture(textures[baseTextureID], inUV));
+    } else {
+        // If no base color texture is present, check to see if the material had the base color factors set. This
+        // is usually only for very simple materials or prototyping.`
+        baseColor = V16(unpackUnorm4x8(material.packedBaseColor));
     }
 
     // Set globals that are read inside functions for lighting etc.
@@ -102,19 +114,19 @@ void main() {
                 break;
             // Occlusion
             case 3:
-                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).rrr;
+                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).rrr;
                 break;
             // Emission
             case 4:
-                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], inUV).rgb;
+                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], inUV).rgb;
                 break;
             // Roughness
             case 5:
-                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).ggg;
+                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).ggg;
                 break;
             // Metallic
             case 6:
-                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).bbb;
+                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).bbb;
                 break;
         }
         outColor = outColor;

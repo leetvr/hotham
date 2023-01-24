@@ -37,8 +37,8 @@ pub struct Material {
     pub packed_flags_and_base_texture_id: u32,
     /// The base color of the material
     pub packed_base_color_factor: u32,
-    /// The metallic amd roughness factors, followed by alpha mask cutoff packed with packUnorm4x8.
-    pub packed_metallic_roughness_factor_alpha_mask_cutoff: u32,
+    /// The metallic and roughness factors
+    pub packed_metallic_roughness_factor: u32,
 }
 
 impl Default for Material {
@@ -142,10 +142,10 @@ impl Material {
         let material = Material {
             packed_flags_and_base_texture_id: pack2x16(material_flags.bits, base_color_texture_set),
             packed_base_color_factor: pack_unorm4x8(&pbr_metallic_roughness.base_color_factor()),
-            packed_metallic_roughness_factor_alpha_mask_cutoff: pack_unorm4x8(&[
+            packed_metallic_roughness_factor: pack_unorm4x8(&[
                 pbr_metallic_roughness.metallic_factor(),
                 pbr_metallic_roughness.roughness_factor(),
-                material.alpha_cutoff().unwrap_or(0.0),
+                0.0,
                 0.0,
             ]),
         };
@@ -165,9 +165,7 @@ impl Material {
         Material {
             packed_flags_and_base_texture_id: MaterialFlags::UNLIT_WORKFLOW.bits,
             packed_base_color_factor: u32::MAX,
-            packed_metallic_roughness_factor_alpha_mask_cutoff: pack_unorm4x8(&[
-                1.0, 1.0, 0.0, 0.0,
-            ]),
+            packed_metallic_roughness_factor: pack_unorm4x8(&[1.0, 1.0, 0.0, 0.0]),
         }
     }
 
@@ -177,18 +175,16 @@ impl Material {
         Self {
             packed_flags_and_base_texture_id: MaterialFlags::empty().bits,
             packed_base_color_factor: u32::MAX,
-            packed_metallic_roughness_factor_alpha_mask_cutoff: pack_unorm4x8(&[
-                1.0, 1.0, 0.0, 0.0,
-            ]),
+            packed_metallic_roughness_factor: pack_unorm4x8(&[1.0, 1.0, 0.0, 0.0]),
         }
     }
 }
 
 /// Convert normalized floating-point values into 8-bit integer values and pack them into an u32.
 /// First value is stored in least significant bits. This works the same as packUnorm4x8 in GLSL.
-pub fn pack_unorm4x8(ary: &[f32; 4]) -> u32 {
+pub fn pack_unorm4x8(array: &[f32; 4]) -> u32 {
     let mut packed: u32 = 0;
-    for value in ary.iter().rev() {
+    for value in array.iter().rev() {
         let packed_value = (value.clamp(0.0, 1.0) * 255.0).round() as u32;
         packed = (packed << 8) | packed_value;
     }
