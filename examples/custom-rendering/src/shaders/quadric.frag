@@ -3,22 +3,13 @@
 #include "../../../../hotham/src/shaders/common.glsl"
 #include "../../../../hotham/src/shaders/lights.glsl"
 #include "../../../../hotham/src/shaders/brdf.glsl"
-
-// Textures
-layout (set = 0, binding = 4) uniform sampler2D textures[];
-layout (set = 0, binding = 5) uniform samplerCube cubeTextures[];
-
-#include "pbr.glsl"
+#include "../../../../hotham/src/shaders/pbr.glsl"
 
 // Inputs
 layout (location = 0) in vec4 inRayOrigin;
 layout (location = 1) in flat uint inInstanceIndex;
 
 #include "quadric.glsl"
-
-layout (std430, set = 0, binding = 1) readonly buffer MaterialBuffer {
-    Material materials[];
-} materialBuffer;
 
 // Outputs
 layout (location = 0) out vec4 outColor;
@@ -85,36 +76,41 @@ void main() {
     vec4 v_clip_coord = sceneData.viewProjection[gl_ViewIndex] * hitPoint;
     gl_FragDepth = v_clip_coord.z / v_clip_coord.w;
 
+    // Set globals that are read inside functions for lighting etc.
+    p = hitPoint.xyz;
+    v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - p);
+
     // Compute normal from gradient of surface quadric
-    vec3 normal = normalize((d.surfaceQ * hitPoint).xyz);
+    n = normalize((d.surfaceQ * hitPoint).xyz);
 
     vec4 uv4 = d.uvFromGos * hitPoint;
-    vec2 uv = uv4.xy / uv4.w;
+    uv = uv4.xy / uv4.w;
 
-    // Retrieve the material from the buffer.
-    Material material = materialBuffer.materials[d.materialID];
+    // Unpack the material parameters
+    materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
+    baseTextureID = material.flagsAndBaseTextureID >> 16;
+    metallicRoughnessAlphaMaskCutoff = unpackUnorm4x8(
+        material.packedMetallicRoughnessFactorAlphaMaskCutoff).xyz;
 
     // Determine the base color
-    vec4 baseColor;
+    vec4 baseColor = unpackUnorm4x8(material.packedBaseColor);
 
-    if (material.baseColorTextureID == NOT_PRESENT) {
-        baseColor = material.baseColorFactor;
-    } else {
-        baseColor = texture(textures[material.baseColorTextureID], uv) * material.baseColorFactor;
+    if ((materialFlags & HAS_BASE_COLOR_TEXTURE) != 0) {
+        baseColor *= texture(textures[baseTextureID], uv);
     }
 
     // Handle transparency
-    if (material.alphaMask == 1.0f) {
-        if (baseColor.a < material.alphaMaskCutoff) {
+    if (metallicRoughnessAlphaMaskCutoff.z > 0.0f) {
+        if (baseColor.a < metallicRoughnessAlphaMaskCutoff.z) {
             // TODO: Apparently Adreno GPUs don't like discarding.
             discard;
         }
     }
 
     // Choose the correct workflow for this material
-    if (material.workflow == PBR_WORKFLOW_METALLIC_ROUGHNESS) {
-        outColor.rgb = getPBRMetallicRoughnessColor(material, baseColor, hitPoint.xyz, normal, uv);
-    } else if (material.workflow == PBR_WORKFLOW_UNLIT) {
+    if ((materialFlags & PBR_WORKFLOW_UNLIT) == 0) {
+        outColor.rgb = getPBRMetallicRoughnessColor(baseColor);
+    } else {
         outColor = baseColor;
     }
 
@@ -132,23 +128,23 @@ void main() {
                 break;
             // Normal
             case 2:
-                outColor.rgb = normal * 0.5 + 0.5;
+                outColor.rgb = n * 0.5 + 0.5;
                 break;
             // Occlusion
             case 3:
-                outColor.rgb = (material.occlusionTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.occlusionTextureID], uv).rrr;
+                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).rrr;
                 break;
             // Emission
             case 4:
-                outColor.rgb = (material.emissiveTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.emissiveTextureID], uv).rgb;
+                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], uv).rgb;
                 break;
             // Roughness
             case 5:
-                outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], uv).ggg;
+                outColor.rgb = ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).ggg;
                 break;
             // Metallic
             case 6:
-                outColor.rgb = (material.metallicRoughnessTextureID == NOT_PRESENT) ? ERROR_MAGENTA.rgb : texture(textures[material.metallicRoughnessTextureID], uv).bbb;
+                outColor.rgb = ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).bbb;
                 break;
         }
         outColor = outColor;

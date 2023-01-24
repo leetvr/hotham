@@ -18,7 +18,6 @@ layout (location = 2) out vec3 outNormal;
 struct DrawData {
     mat4 gosFromLocal;
     mat4 localFromGos;
-    uint materialID;
     uint skinID;
 };
 
@@ -40,7 +39,7 @@ void main() {
     mat4 localFromGos = drawDataBuffer.data[gl_InstanceIndex].localFromGos;
 
     if (skinID == NOT_PRESENT) {
-    //     // Mesh has no skin
+        // Mesh has no skin
         outGosPos = gosFromLocal * vec4(inPos, 1.0);
         outNormal = normalize(inNormal * mat3(localFromGos));
     } else {

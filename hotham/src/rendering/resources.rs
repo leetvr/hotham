@@ -245,8 +245,6 @@ pub struct DrawData {
     /// The inverse of the transform of the parent mesh
     /// Transform normals by multiplying with the matrix on the right hand side
     pub local_from_gos: Mat4,
-    /// The ID of the material to use.
-    pub material_id: u32,
     /// An optional skin to use.
     pub skin_id: u32,
 }
