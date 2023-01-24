@@ -30,8 +30,10 @@ pub static NO_MATERIAL: usize = 0;
 
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
+///
+/// TOOD: It would be good to be able to set / retrieve values more naturally and only use the packed representation on the GPU
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Material {
     /// The flags and base_texture_id are stored as two u16 packed into a single u32. The flags are stored in the least significant bits.
     pub packed_flags_and_base_texture_id: u32,

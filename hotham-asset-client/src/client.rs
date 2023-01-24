@@ -85,18 +85,17 @@ async fn ask_for_watch(connection: quinn::Connection, asset_name: String) -> Res
     println!("[CLIENT] Done! Waiting for OK..");
     let mut buffer = vec![0; BUFFER_SIZE];
 
-    loop {
-        match Message::read(&mut recv, &mut buffer).await? {
-            Message::OK => {
-                println!("[CLIENT] OK received! {} is now being watched", asset_name);
-                return Ok(());
-            }
-            Message::Error(e) => {
-                bail!("[CLIENT] Received error watching {} - {}", asset_name, e);
-            }
-            invalid => bail!("[CLIENT] Invalid message received! {:?}", invalid),
-        };
-    }
+    match Message::read(&mut recv, &mut buffer).await? {
+        Message::OK => {
+            println!("[CLIENT] OK received! {} is now being watched", asset_name);
+        }
+        Message::Error(e) => {
+            bail!("[CLIENT] Received error watching {} - {}", asset_name, e);
+        }
+        invalid => bail!("[CLIENT] Invalid message received! {:?}", invalid),
+    };
+
+    Ok(())
 }
 
 async fn handle_incoming(

@@ -14,7 +14,7 @@ pub const MAX_LIGHTS: usize = 4;
 
 /// Representation of a light in a scene, based on the KHR_lights_punctual extension:
 /// https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_lights_punctual
-#[derive(Deserialize, Serialize, Clone, Debug, Copy, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug, Default)]
 #[repr(C, align(16))]
 pub struct Light {
     /// The direction the light is facing.

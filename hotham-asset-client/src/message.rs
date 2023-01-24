@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 #[non_exhaustive]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MessageType {
     GetAsset,
     WatchAsset,
@@ -12,7 +12,7 @@ pub enum MessageType {
     _Invalid,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message<'a> {
     GetAsset(&'a str),
     WatchAsset(&'a str),
@@ -78,6 +78,10 @@ impl<'a> Message<'a> {
 
     pub fn len(&self) -> usize {
         self.buf().len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.buf().is_empty()
     }
 
     pub fn buf(&self) -> &'_ [u8] {

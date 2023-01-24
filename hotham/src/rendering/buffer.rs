@@ -132,6 +132,11 @@ impl<T: Sized> Buffer<T> {
         self.len
     }
 
+    /// Is the buffer empty?
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     /// Write to the specified descriptor set
     pub unsafe fn update_descriptor_set(
         &self,

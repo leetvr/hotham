@@ -471,6 +471,7 @@ impl RenderContext {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn create_texture_image(
         &mut self,
         name: &str,

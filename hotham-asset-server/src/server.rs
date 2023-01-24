@@ -40,7 +40,7 @@ pub async fn handle_connection(conn: quinn::NewConnection, watch_list: WatchList
     Ok(())
 }
 
-pub async fn watch_files(connection: quinn::Connection, watch_list: WatchList) -> () {
+pub async fn watch_files(connection: quinn::Connection, watch_list: WatchList) {
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
         interval.tick().await;
@@ -75,14 +75,13 @@ pub async fn watch_files(connection: quinn::Connection, watch_list: WatchList) -
                 let mut buffer = vec![0; 1024 * 64];
                 println!("[SERVER] {} updated! Sending message..", name.clone());
                 Message::AssetUpdated(&name).write_all(&mut send).await?;
-                loop {
-                    match Message::read(&mut recv, &mut buffer).await? {
-                        Message::OK => return Ok(()),
-                        Message::Error(e) => {
-                            anyhow::bail!("[SERVER] Got an error: {}", e);
-                        }
-                        m => anyhow::bail!("[SERVER] Invalid message: {:?}", m),
+
+                match Message::read(&mut recv, &mut buffer).await? {
+                    Message::OK => Ok(()),
+                    Message::Error(e) => {
+                        anyhow::bail!("[SERVER] Got an error: {}", e);
                     }
+                    m => anyhow::bail!("[SERVER] Invalid message: {:?}", m),
                 }
             });
         }

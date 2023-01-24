@@ -282,7 +282,7 @@ impl Engine {
         self.workers = Workers::new(asset_list);
     }
 
-    fn check_for_worker_messages(&mut self) -> () {
+    fn check_for_worker_messages(&mut self) {
         for message in self.workers.receiver.try_iter() {
             match message {
                 crate::workers::WorkerMessage::AssetUpdated(asset_updated) => {
@@ -291,7 +291,7 @@ impl Engine {
                     let render_context = &mut self.render_context;
                     let world = &mut self.world;
 
-                    let file_type = asset_updated.asset_id.split(".").last().unwrap();
+                    let file_type = asset_updated.asset_id.split('.').last().unwrap();
                     match file_type {
                         "glb" => update_models(
                             vulkan_context,
@@ -346,7 +346,7 @@ fn update_models(
 
     // Add the models back
     for name in models.keys() {
-        add_model_to_world(name, &models, world, None);
+        add_model_to_world(name, models, world, None);
     }
 }
 
