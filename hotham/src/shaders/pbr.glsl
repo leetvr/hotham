@@ -135,8 +135,10 @@ f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
     if (sceneData.params.x > 0.) {
         f16vec3 reflection = normalize(reflect(V16(-v), V16(n)));
         color = getIBLContribution(f0, perceptualRoughness, diffuseColor, reflection, NdotV) * ao * F16(sceneData.params.x);
+    } else {
+        // If there is no IBL, set color to 0 to handle the edge-case of having no lights at all, but some emission.
+        color = V16(0.0);
     }
-
 
     // Walk through each light and add its color contribution.
     // Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.

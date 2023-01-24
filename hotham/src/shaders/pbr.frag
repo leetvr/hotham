@@ -63,9 +63,6 @@ vec3 getNormal() {
 }
 
 void main() {
-    // Start by setting the output color to a familiar "error" magenta.
-    outColor = ERROR_MAGENTA;
-
     // Unpack the material parameters
     materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
     baseTextureID = material.flagsAndBaseTextureID >> 16;
