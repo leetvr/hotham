@@ -67,7 +67,7 @@ impl GameContext {
         let sabers = [Color::Blue, Color::Red].map(|color| add_saber(color, &models, world));
 
         // Spawn cubes
-        for _ in 0..20 {
+        for _ in 0..30 {
             pre_spawn_cube(world, &models);
         }
 
