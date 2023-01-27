@@ -945,7 +945,7 @@ fn vulkan_init_legacy(
         let entry = Entry::new()?;
 
         let layers = vec![];
-        println!("[HOTHAM_VULKAN] Requesting layers: {:?}", layers);
+        println!("[HOTHAM_VULKAN] Requesting layers: {layers:?}");
 
         let layer_names = get_raw_strings(layers);
 

@@ -192,7 +192,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                 if world.get::<&Teleport>(entity).is_ok() {
                     command_buffer.remove_one::<Teleport>(entity);
                     let next_position = global_transform.to_isometry();
-                    println!("[HOTHAM_PHYSICS] Teleporting entity to {:?}", next_position);
+                    println!("[HOTHAM_PHYSICS] Teleporting entity to {next_position:?}");
                     rigid_body.set_position(next_position, true);
                 }
             }
@@ -206,7 +206,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                 if world.get::<&Teleport>(entity).is_ok() {
                     command_buffer.remove_one::<Teleport>(entity);
                     let next_position = global_transform.to_isometry();
-                    println!("[HOTHAM_PHYSICS] Teleporting entity to {:?}", next_position);
+                    println!("[HOTHAM_PHYSICS] Teleporting entity to {next_position:?}");
                     rigid_body.set_position(next_position, true);
                 }
 

@@ -66,7 +66,7 @@ impl Primitive {
         // Positions
         for v in reader
             .read_positions()
-            .unwrap_or_else(|| panic!("Mesh {} has no positions!", mesh_name))
+            .unwrap_or_else(|| panic!("Mesh {mesh_name} has no positions!"))
         {
             positions.push([v[0], v[1], v[2]].into());
         }

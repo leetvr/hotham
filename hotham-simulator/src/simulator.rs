@@ -820,7 +820,7 @@ pub unsafe extern "system" fn create_action_space(
         }
         Some(path) => {
             let space_state = SpaceState::new(path);
-            println!("[HOTHAM_SIMULATOR] Created space for path: {}", path);
+            println!("[HOTHAM_SIMULATOR] Created space for path: {path}");
             state.spaces.insert(raw, space_state);
         }
         _ => {}
@@ -913,7 +913,7 @@ pub unsafe extern "system" fn begin_session(
     session: Session,
     _begin_info: *const SessionBeginInfo,
 ) -> Result {
-    println!("[HOTHAM_SIMULATOR] Beginning session: {:?}", session);
+    println!("[HOTHAM_SIMULATOR] Beginning session: {session:?}");
     Result::SUCCESS
 }
 pub unsafe extern "system" fn wait_frame(
@@ -998,7 +998,7 @@ pub unsafe extern "system" fn create_xr_swapchain(
     let windows_swapchain = build_swapchain(&mut state);
     println!("[HOTHAM_SIMULATOR] ..done");
     let s = Swapchain::from_raw(windows_swapchain.as_raw());
-    println!("[HOTHAM_SIMULATOR] Returning with {:?}", s);
+    println!("[HOTHAM_SIMULATOR] Returning with {s:?}");
     *swapchain = s;
     Result::SUCCESS
 }
@@ -1161,7 +1161,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
     });
     let (surface, swapchain) = swapchain_rx.recv().unwrap();
 
-    println!("[HOTHAM_SIMULATOR] Received swapchain: {:?}", swapchain);
+    println!("[HOTHAM_SIMULATOR] Received swapchain: {swapchain:?}");
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
     let swapchain_ext = khr::Swapchain::new(&instance, device);
 
@@ -1648,7 +1648,7 @@ pub unsafe extern "system" fn end_frame(
             Result::SUCCESS
         }
         Err(e) => {
-            eprintln!("[HOTHAM_SIMULATOR] !ERROR RENDERING FRAME! {:?}", e);
+            eprintln!("[HOTHAM_SIMULATOR] !ERROR RENDERING FRAME! {e:?}");
             Result::ERROR_VALIDATION_FAILURE
         }
     }

@@ -326,7 +326,7 @@ fn rearrange_models(world: &mut World) {
         column += 1;
     }
 
-    println!("[HOTHAM_STRESS_TEST] There are now {} models", num_models);
+    println!("[HOTHAM_STRESS_TEST] There are now {num_models} models");
 }
 
 fn create_mesh(render_context: &mut RenderContext, world: &mut World) {

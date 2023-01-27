@@ -361,7 +361,7 @@ fn find_wall_collider_for_node<'a>(
     import_context: &'a ImportContext,
 ) -> Option<(&'a str, gltf::Mesh<'a>)> {
     // Create a pattern to search for the collider's name, suffixed with the wall collider tag.
-    let wall_pattern = format!("{}{}", name, WALL_COLLIDER_TAG);
+    let wall_pattern = format!("{name}{WALL_COLLIDER_TAG}");
 
     // Iterate through each node to try and find the matching node, then fetch its mesh.
     import_context.document.nodes().find_map(|n| {
@@ -602,10 +602,10 @@ mod tests {
                 23928,
                 [-0.06670809, 2.1408155, -0.46151406].into(),
                 Quat::from_xyzw(
-                    -0.09325116872787476,
-                    0.6883626580238342,
-                    0.006518156733363867,
-                    0.719318151473999,
+                    -0.093_251_17,
+                    0.688_362_66,
+                    0.006_518_156_7,
+                    0.719_318_15,
                 ),
             ),
         ];
@@ -613,11 +613,11 @@ mod tests {
         for (name, id, indices_count, translation, rotation) in &test_data {
             let _ = models
                 .get(*name)
-                .expect(&format!("Unable to find model with name {}", name));
+                .unwrap_or_else(|| panic!("Unable to find model with name {name}"));
 
             let mut world = World::default();
-            let model = add_model_to_world(*name, &models, &mut world, None);
-            assert!(model.is_some(), "Model {} could not be added", name);
+            let model = add_model_to_world(name, &models, &mut world, None);
+            assert!(model.is_some(), "Model {name} could not be added");
 
             let model = model.unwrap();
             let (info, local_transform, mesh, ..) = world
@@ -650,7 +650,7 @@ mod tests {
             assert_relative_eq!(local_transform.translation, *translation,);
             assert_relative_eq!(local_transform.rotation, *rotation,);
             assert_eq!(&info.name, *name);
-            assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
+            assert_eq!(&info.node_id, id, "Node {name} has wrong ID");
         }
     }
 

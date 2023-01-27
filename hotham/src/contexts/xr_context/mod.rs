@@ -148,7 +148,7 @@ impl XrContext {
         match self.instance.poll_event(event_buffer)? {
             Some(xr::Event::SessionStateChanged(session_changed)) => {
                 let new_state = session_changed.state();
-                println!("[HOTHAM_POLL_EVENT] State is now {:?}", new_state);
+                println!("[HOTHAM_POLL_EVENT] State is now {new_state:?}");
                 self.session_state = new_state;
             }
             Some(xr::Event::InstanceLossPending(_)) => {
@@ -295,7 +295,7 @@ pub(crate) fn get_swapchain_resolution(
     system: xr::SystemId,
 ) -> Result<vk::Extent2D> {
     let views = xr_instance.enumerate_view_configuration_views(system, VIEW_TYPE)?;
-    println!("[HOTHAM_VULKAN] Views: {:?}", views);
+    println!("[HOTHAM_VULKAN] Views: {views:?}");
     let resolution = vk::Extent2D {
         width: views[0].recommended_image_rect_width,
         height: views[0].recommended_image_rect_height,

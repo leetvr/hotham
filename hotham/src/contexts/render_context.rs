@@ -368,7 +368,7 @@ impl RenderContext {
                 .unwrap();
             device
                 .wait_for_fences(slice_from_ref(&fence), true, CULLING_TIMEOUT)
-                .unwrap_or_else(|e| panic!("@@@ TIMEOUT WAITING FOR CULLING SHADER - {:?} @@@", e));
+                .unwrap_or_else(|e| panic!("@@@ TIMEOUT WAITING FOR CULLING SHADER - {e:?} @@@"));
             device.reset_fences(slice_from_ref(&fence)).unwrap();
         }
     }

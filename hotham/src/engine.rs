@@ -260,7 +260,7 @@ impl Engine {
                         swapchain_image_index,
                     });
                 }
-                err => panic!("Error beginning frame: {:?}", err),
+                err => panic!("Error beginning frame: {err:?}"),
             };
         }
     }
@@ -313,7 +313,7 @@ impl Engine {
                     );
                 }
                 crate::workers::WorkerMessage::Error(e) => {
-                    panic!("[HOTHAM_ENGINE] Worker enountered error: {:?}", e);
+                    panic!("[HOTHAM_ENGINE] Worker enountered error: {e:?}");
                 }
             }
         }

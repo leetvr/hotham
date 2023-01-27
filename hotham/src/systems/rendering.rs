@@ -416,7 +416,7 @@ mod tests {
                     &mut render_context,
                     &mut world,
                     image.clone(),
-                    &format!("normal_tangent_test_{}", name),
+                    &format!("normal_tangent_test_{name}"),
                     *debug_shader_inputs,
                     *debug_ibl_intensity,
                     light,
@@ -425,7 +425,7 @@ mod tests {
                 .err()
             })
             .collect();
-        assert!(errors.is_empty(), "{:#?}", errors);
+        assert!(errors.is_empty(), "{errors:#?}");
     }
 
     #[test]
@@ -532,7 +532,7 @@ mod tests {
                 .err()
             })
             .collect();
-        assert!(errors.is_empty(), "{:#?}", errors);
+        assert!(errors.is_empty(), "{errors:#?}");
     }
 
     fn render_object_with_debug_data(
