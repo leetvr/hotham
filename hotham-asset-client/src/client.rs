@@ -1,6 +1,6 @@
 use crate::message::Message;
 use crate::AssetUpdatedMessage;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use futures_util::{StreamExt, TryStreamExt};
 use quinn::{ClientConfig, Endpoint};
 use std::sync::Arc;
@@ -16,7 +16,8 @@ async fn run_client(
     mut asset_names: Vec<String>,
     sender: Sender<AssetUpdatedMessage>,
 ) -> Result<()> {
-    let server_addr = "192.168.1.124:5000".parse().unwrap();
+    let server_addr: Option<&'static str> = option_env!("HOTHAM_ASSET_SERVER_ADDRESS");
+    let server_addr = server_addr.ok_or_else(|| anyhow!("Can't connect to server - the HOTHAM_ASSET_SERVER_ADDRESS environment variable was not set at compile time"))?.parse()?;
     let client_cfg = configure_client();
     let mut endpoint = Endpoint::client("0.0.0.0:0".parse().unwrap())?;
     endpoint.set_default_client_config(client_cfg);
