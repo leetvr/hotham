@@ -70,8 +70,7 @@ impl Default for AudioContext {
                 },
                 |err| {
                     eprintln!(
-                        "[HOTHAM_AUDIO_CONTEXT] An error occurred playing the audio stream: {}",
-                        err
+                        "[HOTHAM_AUDIO_CONTEXT] An error occurred playing the audio stream: {err}"
                     )
                 },
             )

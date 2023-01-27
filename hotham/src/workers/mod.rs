@@ -33,8 +33,7 @@ impl Workers {
             local_set.spawn_local(async move {
                 watch(asset_list, to_workers).await.map_err(|e| {
                     to_engine_1.send(WorkerMessage::Error(WorkerError::TaskFailed(format!(
-                        "{:?}",
-                        e
+                        "{e:?}"
                     ))))
                 })
             });

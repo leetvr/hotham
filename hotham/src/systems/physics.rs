@@ -74,8 +74,7 @@ fn create_rigid_bodies(world: &mut hecs::World, physics_context: &mut PhysicsCon
     {
         if r.body_type == BodyType::Dynamic && parent.is_some() {
             panic!(
-                "[HOTHAM-PHYSICS] ERROR - Entities with parents cannot have dynamic rigid bodies: {:?}",
-                entity
+                "[HOTHAM-PHYSICS] ERROR - Entities with parents cannot have dynamic rigid bodies: {entity:?}"
             );
         }
 
@@ -164,8 +163,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
 
         if body_type == BodyType::Dynamic && parent.is_some() {
             panic!(
-                "[HOTHAM-PHYSICS] ERROR - Entities with parents cannot have dynamic rigid bodies: {:?}",
-                entity
+                "[HOTHAM-PHYSICS] ERROR - Entities with parents cannot have dynamic rigid bodies: {entity:?}"
             );
         }
 
@@ -213,10 +211,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                 // Apply one-shot components
                 if let Ok(additional_mass) = world.get::<&AdditionalMass>(entity).map(|a| a.value) {
                     command_buffer.remove_one::<AdditionalMass>(entity);
-                    println!(
-                        "[HOTHAM_PHYSICS] Applying additional mass of {:?}",
-                        additional_mass
-                    );
+                    println!("[HOTHAM_PHYSICS] Applying additional mass of {additional_mass:?}");
                     rigid_body.set_additional_mass(additional_mass, true);
                     rigid_body.recompute_mass_properties_from_colliders(&physics_context.colliders);
                 }
@@ -228,8 +223,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                         println!("[HOTHAM_PHYSICS] Attempted to apply impulse to rigid body with infinite mass. This is stupid and will do nothing.");
                     } else {
                         println!(
-                            "[HOTHAM_PHYSICS] Applying impulse of {:?} to rigid body with {} mass",
-                            impulse, mass
+                            "[HOTHAM_PHYSICS] Applying impulse of {impulse:?} to rigid body with {mass}"
                         );
                         rigid_body.apply_impulse(na_vector_from_glam(impulse), true);
                     }

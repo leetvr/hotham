@@ -306,10 +306,7 @@ pub fn parse_ktx2(ktx2_data: &[u8]) -> KTX2Image {
                 image_buf.extend(mipmap_level.data);
                 mipmap_level.data.len()
             }
-            s => panic!(
-                "Unable to parse KTX2 file, unsupported supercompression scheme: {:?}",
-                s
-            ),
+            s => panic!("Unable to parse KTX2 file, unsupported supercompression scheme: {s:?}",),
         };
 
         let offset_increment = len as u32 / header.face_count;
@@ -356,10 +353,7 @@ fn get_format_from_mime_type(mime_type: &str) -> image::ImageFormat {
     match mime_type {
         "image/png" => image::ImageFormat::Png,
         "image/jpeg" => image::ImageFormat::Jpeg,
-        _ => panic!(
-            "Unable to import image - unsupported MIME type {}",
-            mime_type
-        ),
+        _ => panic!("Unable to import image - unsupported MIME type {mime_type}"),
     }
 }
 

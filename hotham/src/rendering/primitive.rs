@@ -120,7 +120,6 @@ impl Primitive {
         }
 
         let vertices: Vec<Vertex> = izip!(normals, tex_coords, joint_indices, joint_weights)
-            .into_iter()
             .map(Vertex::from_zip)
             .collect();
 
