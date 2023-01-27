@@ -108,7 +108,7 @@ async fn handle_incoming(
     let mut buffer = vec![0; BUFFER_SIZE];
     let asset_name = match Message::read(&mut recv, &mut buffer).await? {
         Message::AssetUpdated(asset_name) => {
-            println!("[CLIENT] Asset updated! {}", asset_name);
+            println!("[CLIENT] Asset updated! {asset_name}");
             Message::OK.write_all(&mut send).await?;
             asset_name
         }
