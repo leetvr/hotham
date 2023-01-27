@@ -88,12 +88,12 @@ async fn ask_for_watch(connection: quinn::Connection, asset_name: String) -> Res
 
     match Message::read(&mut recv, &mut buffer).await? {
         Message::OK => {
-            println!("[CLIENT] OK received! {} is now being watched", asset_name);
+            println!("[CLIENT] OK received! {asset_name} is now being watched");
         }
         Message::Error(e) => {
-            bail!("[CLIENT] Received error watching {} - {}", asset_name, e);
+            bail!("[CLIENT] Received error watching {asset_name} - {e}");
         }
-        invalid => bail!("[CLIENT] Invalid message received! {:?}", invalid),
+        invalid => bail!("[CLIENT] Invalid message received! {invalid:?}"),
     };
 
     Ok(())
@@ -112,13 +112,13 @@ async fn handle_incoming(
             Message::OK.write_all(&mut send).await?;
             asset_name
         }
-        invalid => anyhow::bail!("[CLIENT] Received invalid response: {:?}", invalid),
+        invalid => anyhow::bail!("[CLIENT] Received invalid response: {invalid:?}"),
     };
     let asset_name = asset_name.to_string();
 
     println!("[CLIENT] Opening new stream");
     let (mut send, mut recv) = connection.open_bi().await?;
-    println!("[CLIENT] Done! Fetching {}..", asset_name);
+    println!("[CLIENT] Done! Fetching {asset_name}..");
 
     Message::GetAsset(&asset_name).write_all(&mut send).await?;
     let asset_data = match Message::read(&mut recv, &mut buffer).await? {
@@ -127,7 +127,7 @@ async fn handle_incoming(
             Message::OK.write_all(&mut send).await?;
             buf
         }
-        invalid => anyhow::bail!("Received invalid response: {:?}", invalid),
+        invalid => anyhow::bail!("Received invalid response: {invalid:?}"),
     };
 
     sender
