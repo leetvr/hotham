@@ -34,7 +34,7 @@ pub async fn handle_connection(conn: quinn::NewConnection, watch_list: WatchList
         };
         tokio::spawn(
             handle_incoming(recv, send, watch_list.clone())
-                .map_err(|e| eprintln!("[SERVER] Error in incoming: {:?}", e)),
+                .map_err(|e| eprintln!("[SERVER] Error in incoming: {e:?}")),
         );
     }
     Ok(())
@@ -79,9 +79,9 @@ pub async fn watch_files(connection: quinn::Connection, watch_list: WatchList) {
                 match Message::read(&mut recv, &mut buffer).await? {
                     Message::OK => Ok(()),
                     Message::Error(e) => {
-                        anyhow::bail!("[SERVER] Got an error: {}", e);
+                        anyhow::bail!("[SERVER] Got an error: {e}");
                     }
-                    m => anyhow::bail!("[SERVER] Invalid message: {:?}", m),
+                    m => anyhow::bail!("[SERVER] Invalid message: {m:?}"),
                 }
             });
         }
@@ -109,7 +109,7 @@ async fn handle_request<'a>(
 ) -> Result<Option<Message<'a>>> {
     let message = Message::read(recv, buffer).await?;
 
-    println!("[SERVER] Received a message: {:?}", message);
+    println!("[SERVER] Received a message: {message:?}");
     let response = match message {
         Message::GetAsset(path) => {
             let message = match get_asset(path).await {
@@ -119,7 +119,7 @@ async fn handle_request<'a>(
             Some(message)
         }
         Message::WatchAsset(path) => {
-            println!("[SERVER] Watching an asset: {}", path);
+            println!("[SERVER] Watching an asset: {path}");
             watch_list
                 .lock()
                 .await
@@ -131,7 +131,7 @@ async fn handle_request<'a>(
             None
         }
         Message::Error(e) => {
-            anyhow::bail!("[SERVER] Got an error: {}", e);
+            anyhow::bail!("[SERVER] Got an error: {e}");
         }
         _ => None,
     };
@@ -140,7 +140,7 @@ async fn handle_request<'a>(
 }
 
 async fn get_asset(path: &str) -> Result<Vec<u8>> {
-    println!("[SERVER] Requested an asset: {}. Reading from disk..", path);
+    println!("[SERVER] Requested an asset: {path}. Reading from disk..");
     let bytes = tokio::fs::read(path).await?;
     println!("[SERVER] Done. Read {} bytes", bytes.len());
     Ok(bytes)
