@@ -167,3 +167,18 @@ f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
 
     return color;
 }
+
+// Fast approximation of ACES tonemap
+// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
+f16vec3 toneMapACES_Narkowicz(const f16vec3 color) {
+    const float16_t A = F16(2.51);
+    const float16_t B = F16(0.03);
+    const float16_t C = F16(2.43);
+    const float16_t D = F16(0.59);
+    const float16_t E = F16(0.14);
+    return clamp((color * (A * color + B)) / (color * (C * color + D) + E), F16(0), F16(1));
+}
+
+f16vec3 tonemap(const f16vec3 color) {
+    return toneMapACES_Narkowicz(color);
+}

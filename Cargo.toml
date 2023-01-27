@@ -2,6 +2,7 @@
 members = [
   "hotham",
   "hotham-simulator",
+  "examples/custom-rendering",
   "examples/shared",
   "examples/complex-scene",
   "examples/simple-scene",

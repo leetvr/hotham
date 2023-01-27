@@ -1,4 +1,5 @@
 #extension GL_ARB_separate_shader_objects : enable
+#extension GL_EXT_multiview : enable
 
 #define NOT_PRESENT 4294967295
 #define MAX_JOINTS 64

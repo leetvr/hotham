@@ -1,13 +1,11 @@
 // PBR shader based on the Khronos glTF-Sample Viewer:
 // https://github.com/KhronosGroup/glTF-WebGL-PBR
-
 #version 460
 
 #extension GL_GOOGLE_include_directive : require
 #extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
 #extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
 #extension GL_EXT_shader_16bit_storage : require
-#extension GL_EXT_multiview : enable
 
 #include "common.glsl"
 #include "lights.glsl"
@@ -21,21 +19,6 @@ layout (location = 2) in vec3 inNormal;
 
 // Outputs
 layout (location = 0) out vec4 outColor;
-
-// Fast approximation of ACES tonemap
-// https://knarkowicz.wordpress.com/2016/01/06/aces-filmic-tone-mapping-curve/
-f16vec3 toneMapACES_Narkowicz(const f16vec3 color) {
-    const float16_t A = F16(2.51);
-    const float16_t B = F16(0.03);
-    const float16_t C = F16(2.43);
-    const float16_t D = F16(0.59);
-    const float16_t E = F16(0.14);
-    return clamp((color * (A * color + B)) / (color * (C * color + D) + E), F16(0), F16(1));
-}
-
-f16vec3 tonemap(const f16vec3 color) {
-    return toneMapACES_Narkowicz(color);
-}
 
 // Get normal, tangent and bitangent vectors.
 vec3 getNormal() {
