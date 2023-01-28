@@ -923,9 +923,7 @@ fn vulkan_init_legacy(
         #[cfg(debug_assertions)]
         vk_instance_exts.push(vk::ExtDebugUtilsFn::name().to_owned());
 
-        println!(
-            "[HOTHAM_VULKAN] Required Vulkan instance extensions: {vk_instance_exts:?}"
-        );
+        println!("[HOTHAM_VULKAN] Required Vulkan instance extensions: {vk_instance_exts:?}");
         let vk_instance_ext_pointers = vk_instance_exts
             .iter()
             .map(|x| x.as_ptr())
@@ -1014,9 +1012,7 @@ fn create_vulkan_device(
     vulkan_instance: &AshInstance,
     physical_device: vk::PhysicalDevice,
 ) -> Result<(Device, vk::Queue, u32)> {
-    println!(
-        "[HOTHAM_VULKAN] Using device extensions: {extension_names:?}"
-    );
+    println!("[HOTHAM_VULKAN] Using device extensions: {extension_names:?}");
 
     let extension_names = extension_names
         .iter()

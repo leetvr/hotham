@@ -319,16 +319,12 @@ fn get_collider_for_node(
     };
 
     // Build a collider using the mesh.
-    println!(
-        "[HOTHAM_ASSET_IMPORTER] Getting shape for {collider_node_name}"
-    );
+    println!("[HOTHAM_ASSET_IMPORTER] Getting shape for {collider_node_name}");
     let shape = get_shape_from_mesh(mesh, import_context);
 
     // If this is a wall collider, ensure it's not a sensor.
     let collider = if collider_node_name.ends_with(WALL_COLLIDER_TAG) {
-        println!(
-            "[HOTHAM_ASSET_IMPORTER] Created wall collider for model {collider_node_name}"
-        );
+        println!("[HOTHAM_ASSET_IMPORTER] Created wall collider for model {collider_node_name}");
         Collider {
             sensor: false,
             collision_groups: physics_context::WALL_COLLISION_GROUP,
@@ -337,9 +333,7 @@ fn get_collider_for_node(
             ..Default::default()
         }
     } else {
-        println!(
-            "[HOTHAM_ASSET_IMPORTER] Created sensor collider for model {collider_node_name}"
-        );
+        println!("[HOTHAM_ASSET_IMPORTER] Created sensor collider for model {collider_node_name}");
         Collider {
             sensor: true,
             collision_groups: physics_context::SENSOR_COLLISION_GROUP,

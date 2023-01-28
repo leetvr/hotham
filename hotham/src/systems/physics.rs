@@ -212,9 +212,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                 // Apply one-shot components
                 if let Ok(additional_mass) = world.get::<&AdditionalMass>(entity).map(|a| a.value) {
                     command_buffer.remove_one::<AdditionalMass>(entity);
-                    println!(
-                        "[HOTHAM_PHYSICS] Applying additional mass of {additional_mass:?}"
-                    );
+                    println!("[HOTHAM_PHYSICS] Applying additional mass of {additional_mass:?}");
                     rigid_body.set_additional_mass(additional_mass, true);
                     rigid_body.recompute_mass_properties_from_colliders(&physics_context.colliders);
                 }

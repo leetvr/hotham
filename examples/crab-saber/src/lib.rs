@@ -107,9 +107,7 @@ fn init(engine: &mut Engine) -> GameContext {
 
 fn hide(world: &mut World, entity: Entity) {
     if world.remove_one::<Visible>(entity).is_err() {
-        println!(
-            "[STATE_CHANGE] Tried to make {entity:?} hidden but it had no Visible component"
-        )
+        println!("[STATE_CHANGE] Tried to make {entity:?} hidden but it had no Visible component")
     }
 }
 

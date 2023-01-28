@@ -451,9 +451,7 @@ impl RenderContext {
                 .write_texture_to_array(vulkan_context, &self.descriptors, texture_image)
         };
 
-        println!(
-            "[HOTHAM_VULKAN] ..done! Texture {name} created successfully."
-        );
+        println!("[HOTHAM_VULKAN] ..done! Texture {name} created successfully.");
 
         Ok(texture_index)
     }
