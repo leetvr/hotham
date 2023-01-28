@@ -188,8 +188,7 @@ pub unsafe extern "system" fn create_vulkan_device(
     #[allow(clippy::transmute_ptr_to_ref)] // TODO We shouldn't get a `&mut` from a `*const`.
     let create_info: &mut DeviceCreateInfo = transmute((*create_info).vulkan_create_info);
     println!(
-        "[HOTHAM_SIMULATOR] Create vulkan device called with: {:?}",
-        create_info
+        "[HOTHAM_SIMULATOR] Create vulkan device called with: {create_info:?}"
     );
     let mut extensions = slice::from_raw_parts(
         create_info.pp_enabled_extension_names,
@@ -201,8 +200,7 @@ pub unsafe extern "system" fn create_vulkan_device(
     create_info.enabled_extension_count = extensions.len() as u32;
 
     println!(
-        "[HOTHAM_SIMULATOR] Creating vulkan device with {:?}",
-        create_info
+        "[HOTHAM_SIMULATOR] Creating vulkan device with {create_info:?}"
     );
     let mut state = STATE.lock().unwrap();
     let vulkan_instance = state.vulkan_instance.as_ref().unwrap();
@@ -279,8 +277,7 @@ pub unsafe extern "system" fn create_vulkan_physical_device(
         .unwrap();
 
     println!(
-        "[HOTHAM_SIMULATOR] Created physical device: {:?}",
-        physical_device
+        "[HOTHAM_SIMULATOR] Created physical device: {physical_device:?}"
     );
     *vulkan_physical_device = transmute(physical_device);
 
@@ -308,8 +305,7 @@ pub unsafe extern "system" fn get_vulkan_physical_device(
         .unwrap();
 
     println!(
-        "[HOTHAM_SIMULATOR] Created physical device: {:?}",
-        physical_device
+        "[HOTHAM_SIMULATOR] Created physical device: {physical_device:?}"
     );
     *vk_physical_device = transmute(physical_device);
 
@@ -689,8 +685,7 @@ pub unsafe extern "system" fn create_action_set(
     let create_info = *create_info;
     let name = CStr::from_ptr(create_info.action_set_name.as_ptr());
     println!(
-        "[HOTHAM_SIMULATOR] Create action set called with {:?}",
-        name
+        "[HOTHAM_SIMULATOR] Create action set called with {name:?}"
     );
     *action_set = ActionSet::from_raw(42);
     Result::SUCCESS
@@ -735,8 +730,7 @@ pub unsafe extern "system" fn string_to_path(
         Ok(s) => {
             let path = Path::from_raw(rand::random());
             println!(
-                "[HOTHAM_SIMULATOR] Created path {:?} for {}",
-                path_string, s
+                "[HOTHAM_SIMULATOR] Created path {path_string:?} for {s}"
             );
             STATE
                 .lock()
@@ -792,8 +786,7 @@ pub unsafe extern "system" fn create_action_space(
                 w: 0.707,
             };
             println!(
-                "[HOTHAM_SIMULATOR] Created left hand space: {:?}, {:?}",
-                space_state, space
+                "[HOTHAM_SIMULATOR] Created left hand space: {space_state:?}, {space:?}"
             );
             state.left_hand_space = raw;
             state.spaces.insert(raw, space_state);
@@ -812,15 +805,14 @@ pub unsafe extern "system" fn create_action_space(
                 z: -0.50,
             };
             println!(
-                "[HOTHAM_SIMULATOR] Created right hand space: {:?}, {:?}",
-                space_state, space
+                "[HOTHAM_SIMULATOR] Created right hand space: {space_state:?}, {space:?}"
             );
             state.right_hand_space = raw;
             state.spaces.insert(raw, space_state);
         }
         Some(path) => {
             let space_state = SpaceState::new(path);
-            println!("[HOTHAM_SIMULATOR] Created space for path: {}", path);
+            println!("[HOTHAM_SIMULATOR] Created space for path: {path}");
             state.spaces.insert(raw, space_state);
         }
         _ => {}
@@ -846,8 +838,7 @@ pub unsafe extern "system" fn create_reference_space(
         // Magic value
         reference_space = Space::from_raw(0);
         println!(
-            "[HOTHAM_SIMULATOR] Stage reference space created: {:?}",
-            reference_space
+            "[HOTHAM_SIMULATOR] Stage reference space created: {reference_space:?}"
         );
         state.reference_space = reference_space;
     } else {
@@ -913,7 +904,7 @@ pub unsafe extern "system" fn begin_session(
     session: Session,
     _begin_info: *const SessionBeginInfo,
 ) -> Result {
-    println!("[HOTHAM_SIMULATOR] Beginning session: {:?}", session);
+    println!("[HOTHAM_SIMULATOR] Beginning session: {session:?}");
     Result::SUCCESS
 }
 pub unsafe extern "system" fn wait_frame(
@@ -956,8 +947,7 @@ pub unsafe extern "system" fn enumerate_view_configuration_views(
     }
 
     println!(
-        "[HOTHAM_SIMULATOR] enumerate_view_configuration_views called with: {}",
-        view_capacity_input
+        "[HOTHAM_SIMULATOR] enumerate_view_configuration_views called with: {view_capacity_input}"
     );
 
     let views = std::ptr::slice_from_raw_parts_mut(views, NUM_VIEWS);
@@ -998,7 +988,7 @@ pub unsafe extern "system" fn create_xr_swapchain(
     let windows_swapchain = build_swapchain(&mut state);
     println!("[HOTHAM_SIMULATOR] ..done");
     let s = Swapchain::from_raw(windows_swapchain.as_raw());
-    println!("[HOTHAM_SIMULATOR] Returning with {:?}", s);
+    println!("[HOTHAM_SIMULATOR] Returning with {s:?}");
     *swapchain = s;
     Result::SUCCESS
 }
@@ -1055,8 +1045,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
         let mut event_loop: EventLoop<()> = EventLoop::new_any_thread();
         let visible = true;
         println!(
-            "[HOTHAM_SIMULATOR] Creating window with visible {}..",
-            visible
+            "[HOTHAM_SIMULATOR] Creating window with visible {visible}.."
         );
         let window = WindowBuilder::new()
             .with_inner_size(PhysicalSize::new(VIEWPORT_WIDTH, VIEWPORT_HEIGHT))
@@ -1101,8 +1090,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
         println!("[HOTHAM_SIMULATOR] About to create swapchain..");
         let swapchain = swapchain_ext.create_swapchain(&create_info, None).unwrap();
         println!(
-            "[HOTHAM_SIMULATOR] Created swapchain: {:?}. Sending..",
-            swapchain
+            "[HOTHAM_SIMULATOR] Created swapchain: {swapchain:?}. Sending.."
         );
         swapchain_tx.send((surface, swapchain)).unwrap();
 
@@ -1161,7 +1149,7 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
     });
     let (surface, swapchain) = swapchain_rx.recv().unwrap();
 
-    println!("[HOTHAM_SIMULATOR] Received swapchain: {:?}", swapchain);
+    println!("[HOTHAM_SIMULATOR] Received swapchain: {swapchain:?}");
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
     let swapchain_ext = khr::Swapchain::new(&instance, device);
 
@@ -1207,8 +1195,7 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
         .expect("Unable to create descriptor pool");
 
     println!(
-        "[HOTHAM_SIMULATOR] Created descriptor pool {:?}",
-        descriptor_pool
+        "[HOTHAM_SIMULATOR] Created descriptor pool {descriptor_pool:?}"
     );
 
     let bindings = [vk::DescriptorSetLayoutBinding::builder()
@@ -1231,8 +1218,7 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
     let set_layouts = [layout, layout, layout];
 
     println!(
-        "[HOTHAM_SIMULATOR] Allocating descriptor sets with layouts: {:?}",
-        set_layouts
+        "[HOTHAM_SIMULATOR] Allocating descriptor sets with layouts: {set_layouts:?}"
     );
 
     // allocate
@@ -1648,7 +1634,7 @@ pub unsafe extern "system" fn end_frame(
             Result::SUCCESS
         }
         Err(e) => {
-            eprintln!("[HOTHAM_SIMULATOR] !ERROR RENDERING FRAME! {:?}", e);
+            eprintln!("[HOTHAM_SIMULATOR] !ERROR RENDERING FRAME! {e:?}");
             Result::ERROR_VALIDATION_FAILURE
         }
     }
