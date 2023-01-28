@@ -104,7 +104,7 @@ pub fn pointers_system_inner(
                 }
                 Err(_) => {
                     let info = world.get::<&Info>(entity).map(|i| format!("{:?}", *i));
-                    println!("[HOTHAM_POINTERS] Ray collided with object that does not have a panel: {:?} - {:?}", entity, info);
+                    println!("[HOTHAM_POINTERS] Ray collided with object that does not have a panel: {entity:?} - {info:?}");
                 }
             }
         }

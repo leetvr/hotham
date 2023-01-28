@@ -1,6 +1,8 @@
-use crossbeam::channel::Receiver;
-use rapier3d::na::Matrix3x1;
-use rapier3d::prelude::*;
+use rapier3d::{
+    crossbeam::{self, channel::Receiver},
+    na::Matrix3x1,
+    prelude::*,
+};
 
 pub const DEFAULT_COLLISION_GROUP: u32 = 0b01;
 pub const PANEL_COLLISION_GROUP: u32 = 0b10;
@@ -78,7 +80,7 @@ impl PhysicsContext {
             &mut self.multibody_joints,
             &mut self.ccd_solver,
             &(),
-            &self.event_handler,
+            &(),
         );
 
         self.query_pipeline

@@ -2,7 +2,7 @@ use hotham::{
     anyhow::Result,
     ash,
     contexts::{render_context::create_shader, VulkanContext},
-    glam::{Affine3A, Mat4, Vec4},
+    glam::{Affine3A, Mat4, Vec3, Vec4},
     rendering::{buffer::Buffer, primitive::Primitive, vertex::Vertex},
     vk,
     vk_shader_macros::include_glsl,
@@ -158,12 +158,17 @@ fn create_quadrics_pipeline(
     let stages = [vertex_stage, fragment_stage];
 
     // Vertex input state
-    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
+    let position_binding_description = vk::VertexInputBindingDescription::builder()
         .binding(0)
+        .stride(size_of::<Vec3>() as _)
+        .input_rate(vk::VertexInputRate::VERTEX)
+        .build();
+    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
+        .binding(1)
         .stride(size_of::<Vertex>() as _)
         .input_rate(vk::VertexInputRate::VERTEX)
         .build();
-    let vertex_binding_descriptions = [vertex_binding_description];
+    let vertex_binding_descriptions = [position_binding_description, vertex_binding_description];
     let vertex_attribute_descriptions = Vertex::attribute_descriptions();
 
     let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()

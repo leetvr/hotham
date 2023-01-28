@@ -16,6 +16,12 @@ pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
 
 const CULLING_TIMEOUT: u64 = u64::MAX;
 
+#[cfg(target_os = "android")]
+const RESOLVE_ATTACHMENT: u32 = 3;
+
+#[cfg(not(target_os = "android"))]
+const RESOLVE_ATTACHMENT: u32 = 2;
+
 use crate::{
     contexts::{VulkanContext, XrContext},
     rendering::{
@@ -34,7 +40,7 @@ use crate::{
 };
 use anyhow::Result;
 use ash::vk::{self, Handle};
-use glam::{Affine3A, Mat4, Vec4};
+use glam::{Affine3A, Mat4, Vec3, Vec4};
 use openxr as xr;
 use vk_shader_macros::include_glsl;
 
@@ -60,9 +66,39 @@ pub struct RenderContext {
     pub frames: [Frame; PIPELINE_DEPTH],
     pub swapchain: Swapchain,
     pub descriptors: Descriptors,
-
+    pub shaders: Shaders,
     // Populated only between rendering::begin and rendering::end
     pub primitive_map: HashMap<u32, InstancedPrimitive>,
+}
+
+pub struct Shaders {
+    pub vertex_shader: Vec<u32>,
+    pub fragment_shader: Vec<u32>,
+    pub compute_shader: Vec<u32>,
+}
+
+impl Default for Shaders {
+    fn default() -> Self {
+        Self {
+            vertex_shader: VERT.into(),
+            fragment_shader: FRAG.into(),
+            compute_shader: COMPUTE.into(),
+        }
+    }
+}
+
+impl Shaders {
+    pub fn new(
+        vertex_shader: Vec<u32>,
+        fragment_shader: Vec<u32>,
+        compute_shader: Vec<u32>,
+    ) -> Self {
+        Self {
+            vertex_shader,
+            fragment_shader,
+            compute_shader,
+        }
+    }
 }
 
 impl RenderContext {
@@ -97,12 +133,17 @@ impl RenderContext {
         let swapchain = Swapchain::new(swapchain_info, vulkan_context, render_pass);
         let pipeline_layout =
             create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.graphics_layout))?;
+
+        let shaders = Default::default();
+
         let pipeline = create_pipeline(
             vulkan_context,
             pipeline_layout,
             &swapchain.render_area,
             render_pass,
+            &shaders,
         )?;
+
         let (compute_pipeline, compute_pipeline_layout) = create_compute_pipeline(
             &vulkan_context.device,
             slice_from_ref(&descriptors.compute_layout),
@@ -134,7 +175,7 @@ impl RenderContext {
             scene_data,
             descriptors,
             resources,
-
+            shaders,
             primitive_map: HashMap::default(),
         })
     }
@@ -238,14 +279,13 @@ impl RenderContext {
             self.cameras[1].position_in_gos(),
         ];
 
+        let scene_data_buffer = &mut self.frames[self.frame_index].scene_data_buffer;
         unsafe {
-            let scene_data = &mut self.frames[self.frame_index]
-                .scene_data_buffer
-                .as_slice_mut()[0];
+            let scene_data = &mut scene_data_buffer.as_slice_mut()[0];
             scene_data.camera_position = self.scene_data.camera_position;
             scene_data.view_projection = self.scene_data.view_projection;
             scene_data.params = self.scene_data.params;
-            scene_data.lights = self.scene_data.lights;
+            scene_data.lights = self.scene_data.lights.clone();
             for light in &mut scene_data.lights {
                 light.position = gos_from_global.transform_point3(light.position);
                 light.direction = gos_from_global.transform_vector3(light.direction);
@@ -278,19 +318,21 @@ impl RenderContext {
         let device = &vulkan_context.device;
         let frame_index = self.frame_index;
         let frame = &mut self.frames[self.frame_index];
-        let primitive_cull_buffer = &frame.primitive_cull_data_buffer;
+        let primitive_cull_buffer = &mut frame.primitive_cull_data_buffer;
         let command_buffer = frame.compute_command_buffer;
         let fence = frame.compute_fence;
 
         // Create the cull parameters to pass to the compute shader
-        let cull_params =
-            CullParams::new(&self.scene_data.view_projection, primitive_cull_buffer.len);
+        let cull_params = CullParams::new(
+            &self.scene_data.view_projection,
+            primitive_cull_buffer.len(),
+        );
 
         unsafe {
             frame.cull_params_buffer.overwrite(&[cull_params]);
         }
 
-        let group_count_x = (primitive_cull_buffer.len / 1024) + 1;
+        let group_count_x = (primitive_cull_buffer.len() / 1024) + 1;
 
         unsafe {
             device
@@ -326,7 +368,7 @@ impl RenderContext {
                 .unwrap();
             device
                 .wait_for_fences(slice_from_ref(&fence), true, CULLING_TIMEOUT)
-                .unwrap_or_else(|e| panic!("@@@ TIMEOUT WAITING FOR CULLING SHADER - {:?} @@@", e));
+                .unwrap_or_else(|e| panic!("@@@ TIMEOUT WAITING FOR CULLING SHADER - {e:?} @@@"));
             device.reset_fences(slice_from_ref(&fence)).unwrap();
         }
     }
@@ -334,7 +376,7 @@ impl RenderContext {
     /// Begin the PBR renderpass.
     /// DOES NOT BEGIN RECORDING COMMAND BUFFERS - call begin_frame first!
     pub fn begin_pbr_render_pass(
-        &self,
+        &mut self,
         vulkan_context: &VulkanContext,
         swapchain_image_index: usize,
     ) {
@@ -379,8 +421,11 @@ impl RenderContext {
             device.cmd_bind_vertex_buffers(
                 command_buffer,
                 0,
-                slice_from_ref(&self.resources.vertex_buffer.buffer),
-                &[0],
+                &[
+                    self.resources.position_buffer.buffer,
+                    self.resources.vertex_buffer.buffer,
+                ],
+                &[0, 0],
             );
         }
     }
@@ -426,12 +471,14 @@ impl RenderContext {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn create_texture_image(
         &mut self,
         name: &str,
         vulkan_context: &VulkanContext,
         image_buf: &[u8],
         mip_count: u32,
+        faces: u32,
         offsets: Vec<vk::DeviceSize>,
         texture_image: &Image,
     ) -> Result<u32> {
@@ -447,14 +494,24 @@ impl RenderContext {
         }
 
         let texture_index = unsafe {
-            self.resources
-                .write_texture_to_array(vulkan_context, &self.descriptors, texture_image)
+            if faces == 1 {
+                self.resources.write_texture_to_array(
+                    vulkan_context,
+                    &self.descriptors,
+                    texture_image,
+                )
+            } else if faces == 6 {
+                self.resources.write_cube_texture_to_array(
+                    vulkan_context,
+                    &self.descriptors,
+                    texture_image,
+                )
+            } else {
+                panic!("Image {name} has an invalid number of faces: {faces}");
+            }
         };
 
-        println!(
-            "[HOTHAM_VULKAN] ..done! Texture {} created successfully.",
-            name
-        );
+        println!("[HOTHAM_VULKAN] ..done! Texture {name} created successfully.");
 
         Ok(texture_index)
     }
@@ -476,13 +533,15 @@ pub fn create_push_constant<T: 'static>(p: &T) -> &[u8] {
     unsafe { std::slice::from_raw_parts(p as *const T as *const u8, std::mem::size_of::<T>()) }
 }
 
+// TODO: Handle Android/Desktop code split more elegantly
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     // Attachment used for MSAA
+    let color_store_op = vk::AttachmentStoreOp::DONT_CARE;
     let color_attachment = vk::AttachmentDescription::builder()
         .format(COLOR_FORMAT)
-        .samples(vk::SampleCountFlags::TYPE_4)
+        .samples(SAMPLES)
         .load_op(vk::AttachmentLoadOp::CLEAR)
-        .store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .store_op(color_store_op)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
@@ -499,15 +558,29 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
+    // Depth buffer
     let depth_attachment = vk::AttachmentDescription::builder()
         .format(DEPTH_FORMAT)
-        .samples(vk::SampleCountFlags::TYPE_4)
+        .samples(SAMPLES)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::DONT_CARE)
         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
+    // Fixed foveated rendering (FFR) attachment
+    // Note this only works on Android so we need conditional compilation here.
+    #[cfg(target_os = "android")]
+    let ffr_attachment = vk::AttachmentDescription::builder()
+        .format(vk::Format::R8G8_UNORM)
+        .samples(vk::SampleCountFlags::TYPE_1)
+        .load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
+        .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
+        .initial_layout(vk::ImageLayout::UNDEFINED)
+        .final_layout(vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT);
 
     let color_attachment_reference = vk::AttachmentReference::builder()
         .attachment(0)
@@ -521,17 +594,20 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
         .build();
 
-    let color_attachment_resolve_reference = vk::AttachmentReference::builder()
+    #[cfg(target_os = "android")]
+    let ffr_attachment_reference = vk::AttachmentReference::builder()
         .attachment(2)
+        .layout(vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT);
+
+    let color_attachment_resolve_reference = vk::AttachmentReference::builder()
+        .attachment(RESOLVE_ATTACHMENT)
         .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
         .build();
-
-    let color_attachment_resolve_reference = [color_attachment_resolve_reference];
 
     let subpass = vk::SubpassDescription::builder()
         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
         .color_attachments(&color_attachment_reference)
-        .resolve_attachments(&color_attachment_resolve_reference)
+        .resolve_attachments(std::slice::from_ref(&color_attachment_resolve_reference))
         .depth_stencil_attachment(&depth_stencil_reference);
 
     let dependency = vk::SubpassDependency::builder()
@@ -556,51 +632,77 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .view_masks(&view_masks)
         .correlation_masks(&view_masks);
 
+    #[cfg(target_os = "android")]
+    let mut ffr_info = vk::RenderPassFragmentDensityMapCreateInfoEXT::builder()
+        .fragment_density_map_attachment(*ffr_attachment_reference);
+
+    #[cfg(target_os = "android")]
+    let attachments = [
+        *color_attachment,
+        *depth_attachment,
+        *ffr_attachment,
+        *color_attachment_resolve,
+    ];
+
+    #[cfg(not(target_os = "android"))]
     let attachments = [
         *color_attachment,
         *depth_attachment,
         *color_attachment_resolve,
     ];
 
-    let render_pass = unsafe {
-        vulkan_context.device.create_render_pass(
-            &vk::RenderPassCreateInfo::builder()
-                .attachments(&attachments)
-                .subpasses(&[*subpass])
-                .dependencies(&[*dependency])
-                .push_next(&mut multiview),
-            None,
-        )
-    }?;
+    #[allow(unused_mut)]
+    let mut create_info = vk::RenderPassCreateInfo::builder()
+        .attachments(&attachments)
+        .subpasses(std::slice::from_ref(&subpass))
+        .dependencies(std::slice::from_ref(&dependency))
+        .push_next(&mut multiview);
+
+    #[cfg(target_os = "android")]
+    let create_info = create_info.push_next(&mut ffr_info);
+
+    let render_pass = unsafe { vulkan_context.device.create_render_pass(&create_info, None) }?;
 
     Ok(render_pass)
 }
 
-fn create_pipeline(
+pub(crate) fn create_pipeline(
     vulkan_context: &VulkanContext,
     pipeline_layout: vk::PipelineLayout,
     render_area: &vk::Rect2D,
     render_pass: vk::RenderPass,
+    shaders: &Shaders,
 ) -> Result<vk::Pipeline> {
     // Build up the state of the pipeline
 
     // Vertex shader stage
-    let (vertex_shader, vertex_stage) =
-        create_shader(VERT, vk::ShaderStageFlags::VERTEX, vulkan_context)?;
+    let (vertex_shader, vertex_stage) = create_shader(
+        &shaders.vertex_shader,
+        vk::ShaderStageFlags::VERTEX,
+        vulkan_context,
+    )?;
 
     // Fragment shader stage
-    let (fragment_shader, fragment_stage) =
-        create_shader(FRAG, vk::ShaderStageFlags::FRAGMENT, vulkan_context)?;
+    let (fragment_shader, fragment_stage) = create_shader(
+        &shaders.fragment_shader,
+        vk::ShaderStageFlags::FRAGMENT,
+        vulkan_context,
+    )?;
 
     let stages = [vertex_stage, fragment_stage];
 
     // Vertex input state
-    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
+    let position_binding_description = vk::VertexInputBindingDescription::builder()
         .binding(0)
+        .stride(size_of::<Vec3>() as _)
+        .input_rate(vk::VertexInputRate::VERTEX)
+        .build();
+    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
+        .binding(1)
         .stride(size_of::<Vertex>() as _)
         .input_rate(vk::VertexInputRate::VERTEX)
         .build();
-    let vertex_binding_descriptions = [vertex_binding_description];
+    let vertex_binding_descriptions = [position_binding_description, vertex_binding_description];
     let vertex_attribute_descriptions = Vertex::attribute_descriptions();
 
     let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
@@ -643,8 +745,8 @@ fn create_pipeline(
         .line_width(1.0);
 
     // Multisample state
-    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
-        .rasterization_samples(vk::SampleCountFlags::TYPE_4);
+    let multisample_state =
+        vk::PipelineMultisampleStateCreateInfo::builder().rasterization_samples(SAMPLES);
 
     // Depth stencil state
     let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()

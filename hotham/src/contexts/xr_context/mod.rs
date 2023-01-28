@@ -6,7 +6,7 @@ use openxr::{
 };
 use xr::{
     vulkan::SessionCreateInfo, Duration, FrameState, ReferenceSpaceType, SwapchainCreateFlags,
-    SwapchainCreateInfo, SwapchainUsageFlags, Time, View, ViewStateFlags,
+    SwapchainUsageFlags, Time, View, ViewStateFlags,
 };
 
 use crate::{
@@ -148,7 +148,7 @@ impl XrContext {
         match self.instance.poll_event(event_buffer)? {
             Some(xr::Event::SessionStateChanged(session_changed)) => {
                 let new_state = session_changed.state();
-                println!("[HOTHAM_POLL_EVENT] State is now {:?}", new_state);
+                println!("[HOTHAM_POLL_EVENT] State is now {new_state:?}");
                 self.session_state = new_state;
             }
             Some(xr::Event::InstanceLossPending(_)) => {
@@ -295,7 +295,7 @@ pub(crate) fn get_swapchain_resolution(
     system: xr::SystemId,
 ) -> Result<vk::Extent2D> {
     let views = xr_instance.enumerate_view_configuration_views(system, VIEW_TYPE)?;
-    println!("[HOTHAM_VULKAN] Views: {:?}", views);
+    println!("[HOTHAM_VULKAN] Views: {views:?}");
     let resolution = vk::Extent2D {
         width: views[0].recommended_image_rect_width,
         height: views[0].recommended_image_rect_height,
@@ -304,13 +304,14 @@ pub(crate) fn get_swapchain_resolution(
     Ok(resolution)
 }
 
+#[cfg(not(target_os = "android"))]
 pub(crate) fn create_xr_swapchain(
     xr_session: &Session<Vulkan>,
     resolution: &vk::Extent2D,
     array_size: u32,
 ) -> Result<Swapchain<Vulkan>> {
     xr_session
-        .create_swapchain(&SwapchainCreateInfo {
+        .create_swapchain(&xr::SwapchainCreateInfo {
             create_flags: SwapchainCreateFlags::EMPTY,
             usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
             format: COLOR_FORMAT.as_raw() as u32,
@@ -322,6 +323,80 @@ pub(crate) fn create_xr_swapchain(
             mip_count: 1,
         })
         .map_err(Into::into)
+}
+
+/// Creates the OpenXR swapchain with Fixed Foveated Rendering support on Quest 2
+///
+/// This requires a fair bit of setup as there isn't yet a wrapper for this functionality in OpenXR.
+#[cfg(target_os = "android")]
+pub(crate) fn create_xr_swapchain(
+    xr_session: &Session<Vulkan>,
+    resolution: &vk::Extent2D,
+    array_size: u32,
+) -> Result<Swapchain<Vulkan>> {
+    let mut swapchain_raw = xr::sys::Swapchain::NULL;
+    let foveation_info = xr::sys::SwapchainCreateInfoFoveationFB {
+        ty: xr::sys::StructureType::SWAPCHAIN_CREATE_INFO_FOVEATION_FB,
+        next: std::ptr::null_mut(),
+        flags: xr::sys::SwapchainCreateFoveationFlagsFB::FRAGMENT_DENSITY_MAP,
+    };
+
+    let create_info = xr::sys::SwapchainCreateInfo {
+        ty: xr::sys::SwapchainCreateInfo::TYPE,
+        create_flags: SwapchainCreateFlags::EMPTY,
+        usage_flags: SwapchainUsageFlags::COLOR_ATTACHMENT,
+        format: COLOR_FORMAT.as_raw() as _,
+        sample_count: 1,
+        width: resolution.width,
+        height: resolution.height,
+        face_count: 1,
+        mip_count: 1,
+        array_size,
+        next: &foveation_info as *const _ as *const std::ffi::c_void,
+    };
+
+    unsafe {
+        let fp = xr_session.instance().fp();
+        let xr_result =
+            (fp.create_swapchain)(xr_session.as_raw(), &create_info, &mut swapchain_raw);
+
+        let swapchain = if xr_result.into_raw() >= 0 {
+            Swapchain::from_raw(xr_session.clone(), swapchain_raw)
+        } else {
+            return Err(anyhow::Error::new(xr_result));
+        };
+
+        let fp = xr_session
+            .instance()
+            .exts()
+            .fb_swapchain_update_state
+            .unwrap();
+
+        let foveation_profile = xr::FoveationLevelProfile {
+            level: xr::FoveationLevelFB::HIGH,
+            vertical_offset: 0.,
+            dynamic: xr::FoveationDynamicFB::DISABLED,
+        };
+
+        let foveation_profile_handle =
+            xr_session.create_foveation_profile(Some(foveation_profile))?;
+
+        let swapchain_update_state = xr::sys::SwapchainStateFoveationFB {
+            ty: xr::sys::SwapchainStateFoveationFB::TYPE,
+            next: std::ptr::null_mut(),
+            flags: xr::SwapchainStateFoveationFlagsFB::EMPTY,
+            profile: foveation_profile_handle.as_raw(),
+        };
+
+        let result =
+            (fp.update_swapchain)(swapchain_raw, std::mem::transmute(&swapchain_update_state));
+
+        if result.into_raw() < 0 {
+            return Err(anyhow::Error::new(result));
+        }
+
+        Ok(swapchain)
+    }
 }
 
 pub(crate) fn create_xr_session(
@@ -380,6 +455,10 @@ pub(crate) fn create_xr_instance(
 fn enable_xr_extensions(required_extensions: &mut xr::ExtensionSet) {
     required_extensions.khr_android_create_instance = true;
     required_extensions.khr_vulkan_enable2 = true;
+    required_extensions.fb_foveation = true;
+    required_extensions.fb_foveation_configuration = true;
+    required_extensions.fb_foveation_vulkan = true;
+    required_extensions.fb_swapchain_update_state = true;
 }
 
 #[cfg(not(target_os = "android"))]

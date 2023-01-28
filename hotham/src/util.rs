@@ -5,7 +5,7 @@ use anyhow::Result;
 use glam::{Affine3A, Quat, Vec3};
 use openxr::{Posef, SpaceLocation, SpaceLocationFlags, ViewStateFlags};
 use rapier3d::na::Vector3;
-use std::{ffi::CStr, os::raw::c_char, str::Utf8Error};
+use std::{ffi::CStr, os::raw::c_char, str::Utf8Error, time::Instant};
 
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
     strings
@@ -233,7 +233,7 @@ pub(crate) unsafe fn save_image_to_disk(
     let image_from_vulkan = DynamicImage::ImageRgba8(
         RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
     );
-    let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
+    let known_good_path = format!("../test_assets/render_{name}_known_good.jpg");
     if env::var("UPDATE_IMAGES").map_or(false, |s| {
         s.eq_ignore_ascii_case("true")
             || s.eq_ignore_ascii_case("t")
@@ -246,7 +246,7 @@ pub(crate) unsafe fn save_image_to_disk(
         let mut jpeg_encoder = JpegEncoder::new(&mut file);
         jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
     }
-    let output_path = format!("../test_assets/render_{}.jpg", name);
+    let output_path = format!("../test_assets/render_{name}.jpg");
     {
         let output_path = std::path::Path::new(&output_path);
         let mut file = std::fs::File::create(output_path).unwrap();
@@ -257,13 +257,13 @@ pub(crate) unsafe fn save_image_to_disk(
     let known_good_hash = hash_file(&known_good_path);
 
     if output_hash.is_err() {
-        return Err(format!("Failed to hash output image: {}", name));
+        return Err(format!("Failed to hash output image: {name}"));
     }
     if known_good_hash.is_err() {
-        return Err(format!("Failed to hash known good image: {}", name));
+        return Err(format!("Failed to hash known good image: {name}"));
     }
     if output_hash != known_good_hash {
-        return Err(format!("Bad render: {}", name));
+        return Err(format!("Bad render: {name}"));
     }
     Ok(())
 }
@@ -305,4 +305,47 @@ pub fn lerp_slerp(a: &Affine3A, b: &Affine3A, s: f32) -> Affine3A {
         a_rotation.slerp(b_rotation, s),
         a_translation.lerp(b_translation, s),
     )
+}
+
+#[derive(Debug)]
+/// A timer to track performance
+pub struct PerformanceTimer {
+    name: String,
+    frame_start: Instant,
+    timings: Vec<usize>,
+    last_update: Instant,
+}
+
+impl PerformanceTimer {
+    /// Start tracking
+    pub fn start(&mut self) {
+        self.frame_start = Instant::now();
+    }
+
+    /// Stop tracking
+    pub fn end(&mut self) {
+        let now = Instant::now();
+        let tic_time = now - self.frame_start;
+        self.timings.push(tic_time.as_millis() as usize);
+
+        if (now - self.last_update).as_secs_f32() >= 1.0 {
+            let average = self.timings.iter().sum::<usize>() / self.timings.len();
+            let name = &self.name;
+            if average > 0 {
+                println!("[HOTHAM_PERF] Warning: {name} took {average}ms, you might be doing too much work on the CPU");
+            }
+            self.last_update = now;
+            self.timings.clear();
+        }
+    }
+
+    /// Create a new performance timer
+    pub fn new(name: &'static str) -> Self {
+        Self {
+            name: name.to_string(),
+            frame_start: Instant::now(),
+            last_update: Instant::now(),
+            timings: Default::default(),
+        }
+    }
 }

@@ -67,7 +67,7 @@ impl GameContext {
         let sabers = [Color::Blue, Color::Red].map(|color| add_saber(color, &models, world));
 
         // Spawn cubes
-        for _ in 0..20 {
+        for _ in 0..30 {
             pre_spawn_cube(world, &models);
         }
 
@@ -121,7 +121,7 @@ impl GameContext {
             red_saber: sabers[1],
             songs: Default::default(),
             models,
-            last_spawn_time: Instant::now() - Duration::new(100, 0),
+            last_spawn_time: Instant::now().checked_sub(Duration::new(100, 0)).unwrap(),
             sound_effects: Default::default(),
         }
     }

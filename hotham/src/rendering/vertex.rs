@@ -1,12 +1,14 @@
 use ash::vk;
 use glam::{Vec2, Vec3, Vec4};
+// const VERTEX_FORMAT: vk::Format = vk::Format::R16G16B16_SFLOAT;
+const VERTEX_FORMAT: vk::Format = vk::Format::R32G32B32_SFLOAT;
 
 /// Representation of a single vertex, usually imported from a glTF file.
 #[repr(C)]
 #[derive(Clone, Debug, Copy, PartialEq, Default)]
 pub struct Vertex {
-    /// Position in model space
-    pub position: Vec3,
+    // /// Position in model space
+    // pub position: Vec3,
     /// Normal in model space
     pub normal: Vec3,
     /// First set of texture coordinates
@@ -19,15 +21,9 @@ pub struct Vertex {
 
 impl Vertex {
     /// Create a new vertex
-    pub fn new(
-        position: Vec3,
-        normal: Vec3,
-        texture_coords: Vec2,
-        joint_indices: u32,
-        joint_weights: u32,
-    ) -> Self {
+    pub fn new(normal: Vec3, texture_coords: Vec2, joint_indices: u32, joint_weights: u32) -> Self {
         Self {
-            position,
+            // position,
             normal,
             texture_coords,
             joint_indices,
@@ -38,24 +34,23 @@ impl Vertex {
     /// Create a new vertex from a zip - useful when importing from glTF
     // Clippy warning suppressed for adjudication separately
     #[cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
-    pub fn from_zip(t: (Vec3, Vec3, Vec2, [u8; 4], Vec4)) -> Self {
+    pub fn from_zip(t: (Vec3, Vec2, [u8; 4], Vec4)) -> Self {
         // Normalize weights to 0 <= w <= 255 while avoiding division with zero.
-        let max_weight = t.4.max_element().max(f32::EPSILON);
+        let max_weight = t.3.max_element().max(f32::EPSILON);
         let weight_normalization = 255.0 / max_weight;
         Vertex::new(
             t.0,
             t.1,
-            t.2,
             // Pack indices into one u32 with one byte per index.
-            (t.3[0] as u32)
-                + (t.3[1] as u32) * 256
-                + (t.3[2] as u32) * 256 * 256
-                + (t.3[3] as u32) * 256 * 256 * 256,
+            (t.2[0] as u32)
+                + (t.2[1] as u32) * 256
+                + (t.2[2] as u32) * 256 * 256
+                + (t.2[3] as u32) * 256 * 256 * 256,
             // Pack weights into one u32 with one byte per weight.
-            ((t.4[0] * weight_normalization).round() as u32)
-                + ((t.4[1] * weight_normalization).round() as u32) * 256
-                + ((t.4[2] * weight_normalization).round() as u32) * 256 * 256
-                + ((t.4[3] * weight_normalization).round() as u32) * 256 * 256 * 256,
+            ((t.3[0] * weight_normalization).round() as u32)
+                + ((t.3[1] * weight_normalization).round() as u32) * 256
+                + ((t.3[2] * weight_normalization).round() as u32) * 256 * 256
+                + ((t.3[3] * weight_normalization).round() as u32) * 256 * 256 * 256,
         )
     }
 }
@@ -66,33 +61,33 @@ impl Vertex {
         let position = vk::VertexInputAttributeDescription::builder()
             .binding(0)
             .location(0)
-            .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, position) as _)
+            .format(VERTEX_FORMAT)
+            .offset(0)
             .build();
 
         let normal = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
+            .binding(1)
             .location(1)
             .format(vk::Format::R32G32B32_SFLOAT)
             .offset(memoffset::offset_of!(Vertex, normal) as _)
             .build();
 
         let texture_coords = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
+            .binding(1)
             .location(2)
             .format(vk::Format::R32G32_SFLOAT)
             .offset(memoffset::offset_of!(Vertex, texture_coords) as _)
             .build();
 
         let joint_indices = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
+            .binding(1)
             .location(3)
             .format(vk::Format::R32_UINT)
             .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
             .build();
 
         let joint_weights = vk::VertexInputAttributeDescription::builder()
-            .binding(0)
+            .binding(1)
             .location(4)
             .format(vk::Format::R32_UINT)
             .offset(memoffset::offset_of!(Vertex, joint_weights) as _)

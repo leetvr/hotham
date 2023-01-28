@@ -30,34 +30,17 @@ pub static NO_MATERIAL: usize = 0;
 
 /// Mostly maps to the [glTF material spec](https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#materials) and
 /// added by default by the `gltf_loader`
+///
+/// TOOD: It would be good to be able to set / retrieve values more naturally and only use the packed representation on the GPU
 #[repr(C)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Material {
     /// The flags and base_texture_id are stored as two u16 packed into a single u32. The flags are stored in the least significant bits.
     pub packed_flags_and_base_texture_id: u32,
     /// The base color of the material
     pub packed_base_color_factor: u32,
-    /// The metallic amd roughness factors, followed by alpha mask cutoff packed with packUnorm4x8.
-    pub packed_metallic_roughness_factor_alpha_mask_cutoff: u32,
-    // /// What workflow should be used - 0.0 for Metallic Roughness / 1.0 for unlit
-    // pub workflow: u32,
-    // pub base_color_texture_set: u32,
-    // /// The metallic-roughness texture.
-    // pub metallic_roughness_texture_id: u32,
-    // /// Normal texture
-    // pub normal_texture_set: u32,
-    // /// Occlusion texture set
-    // // pub occlusion_texture_set: u32,
-    // /// Emissive texture set
-    // pub emissive_texture_set: u32,
-    // /// The factor for the metalness of the material.
-    // pub metallic_factor: f32,
-    // /// The factor for the roughness of the material.
-    // pub roughness_factor: f32,
-    // /// Alpha mask - see fragment shader
-    // pub alpha_mask: f32,
-    // /// Alpha mask cutoff - see fragment shader
-    // pub alpha_mask_cutoff: f32,
+    /// The metallic and roughness factors
+    pub packed_metallic_roughness_factor: u32,
 }
 
 impl Default for Material {
@@ -161,13 +144,10 @@ impl Material {
         let material = Material {
             packed_flags_and_base_texture_id: pack2x16(material_flags.bits, base_color_texture_set),
             packed_base_color_factor: pack_unorm4x8(&pbr_metallic_roughness.base_color_factor()),
-            // base_color_factor,
-            // workflow,
-            // occlusion_texture_set,
-            packed_metallic_roughness_factor_alpha_mask_cutoff: pack_unorm4x8(&[
+            packed_metallic_roughness_factor: pack_unorm4x8(&[
                 pbr_metallic_roughness.metallic_factor(),
                 pbr_metallic_roughness.roughness_factor(),
-                material.alpha_cutoff().unwrap_or(0.0),
+                0.0,
                 0.0,
             ]),
         };
@@ -187,9 +167,7 @@ impl Material {
         Material {
             packed_flags_and_base_texture_id: MaterialFlags::UNLIT_WORKFLOW.bits,
             packed_base_color_factor: u32::MAX,
-            packed_metallic_roughness_factor_alpha_mask_cutoff: pack_unorm4x8(&[
-                1.0, 1.0, 0.0, 0.0,
-            ]),
+            packed_metallic_roughness_factor: pack_unorm4x8(&[1.0, 1.0, 0.0, 0.0]),
         }
     }
 
@@ -199,29 +177,16 @@ impl Material {
         Self {
             packed_flags_and_base_texture_id: MaterialFlags::empty().bits,
             packed_base_color_factor: u32::MAX,
-            packed_metallic_roughness_factor_alpha_mask_cutoff: pack_unorm4x8(&[
-                1.0, 1.0, 0.0, 0.0,
-            ]),
-            // base_color_factor: [1., 1., 1., 1.].into(),
-            // workflow: METALLIC_ROUGHNESS_WORKFLOW,
-            // base_color_texture_set: NO_TEXTURE,
-            // metallic_roughness_texture_id: NO_TEXTURE,
-            // normal_texture_set: NO_TEXTURE,
-            // occlusion_texture_set: NO_TEXTURE,
-            // emissive_texture_set: NO_TEXTURE,
-            // metallic_factor: 1.0,
-            // roughness_factor: 1.0,
-            // alpha_mask: Default::default(),
-            // alpha_mask_cutoff: Default::default(),
+            packed_metallic_roughness_factor: pack_unorm4x8(&[1.0, 1.0, 0.0, 0.0]),
         }
     }
 }
 
 /// Convert normalized floating-point values into 8-bit integer values and pack them into an u32.
 /// First value is stored in least significant bits. This works the same as packUnorm4x8 in GLSL.
-pub fn pack_unorm4x8(ary: &[f32; 4]) -> u32 {
+pub fn pack_unorm4x8(array: &[f32; 4]) -> u32 {
     let mut packed: u32 = 0;
-    for value in ary.iter().rev() {
+    for value in array.iter().rev() {
         let packed_value = (value.clamp(0.0, 1.0) * 255.0).round() as u32;
         packed = (packed << 8) | packed_value;
     }

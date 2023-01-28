@@ -166,8 +166,8 @@ pub unsafe fn draw_world(vulkan_context: &VulkanContext, render_context: &mut Re
     let device = &vulkan_context.device;
     let frame = &mut render_context.frames[render_context.frame_index];
     let command_buffer = frame.command_buffer;
-    let material_buffer = &mut render_context.resources.materials_buffer;
     let draw_data_buffer = &mut frame.draw_data_buffer;
+    let material_buffer = &mut render_context.resources.materials_buffer;
     draw_data_buffer.clear();
 
     let mut instance_offset = 0;
@@ -416,7 +416,7 @@ mod tests {
                     &mut render_context,
                     &mut world,
                     image.clone(),
-                    &format!("normal_tangent_test_{}", name),
+                    &format!("normal_tangent_test_{name}"),
                     *debug_shader_inputs,
                     *debug_ibl_intensity,
                     light,
@@ -425,7 +425,7 @@ mod tests {
                 .err()
             })
             .collect();
-        assert!(errors.is_empty(), "{:#?}", errors);
+        assert!(errors.is_empty(), "{errors:#?}");
     }
 
     #[test]
@@ -532,7 +532,7 @@ mod tests {
                 .err()
             })
             .collect();
-        assert!(errors.is_empty(), "{:#?}", errors);
+        assert!(errors.is_empty(), "{errors:#?}");
     }
 
     fn render_object_with_debug_data(
@@ -582,7 +582,7 @@ mod tests {
         render_context.begin_frame(vulkan_context);
         render_context.scene_data.params.z = debug_shader_inputs;
         render_context.scene_data.params.x = debug_ibl_intensity;
-        render_context.scene_data.lights[0] = *light;
+        render_context.scene_data.lights[0] = light.clone();
         update_global_transform_system_inner(world);
         update_global_transform_with_parent_system_inner(world);
         rendering_system_inner(world, vulkan_context, render_context, views, 0);

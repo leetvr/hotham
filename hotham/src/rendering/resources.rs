@@ -1,5 +1,5 @@
 use ash::vk;
-use glam::{Mat4, Vec4};
+use glam::{Mat4, Vec3, Vec4};
 use id_arena::Arena;
 use vulkan_context::VulkanContext;
 
@@ -10,6 +10,7 @@ use super::{
     descriptors::{Descriptors, SKINS_BINDING},
     image::Image,
     material::Material,
+    memory::allocate_memory,
     mesh_data::MeshData,
     texture::{parse_ktx2, DEFAULT_COMPONENT_MAPPING},
     vertex::Vertex,
@@ -20,8 +21,14 @@ static SKINS_BUFFER_SIZE: usize = 4; // TODO
 
 pub(crate) const MAX_JOINTS: usize = 64;
 
+/// f16vec3
+pub type F16VEC3 = [u16; 3];
+
 /// A container that holds all of the resources required to draw a frame.
 pub struct Resources {
+    /// Position only data
+    pub position_buffer: Buffer<Vec3>,
+
     /// All the vertices that will be drawn this frame.
     pub vertex_buffer: Buffer<Vertex>,
 
@@ -29,6 +36,8 @@ pub struct Resources {
     pub index_buffer: Buffer<u32>,
 
     /// Buffer for materials, indexed by material_id in DrawData
+    /// TODO: This technically no longer needs to be stored on the GPU and could instead be an array, but may be worth keeping this way
+    /// as it's not a bottleneck and, if it ever gets supported on the Quest2, MultiDrawIndirect will need this.
     pub materials_buffer: Buffer<Material>,
 
     /// Mesh data used to generate DrawData
@@ -43,13 +52,22 @@ pub struct Resources {
     /// Shared sampler
     pub cube_sampler: vk::Sampler,
 
+    /// Staging buffer for GPU data transfer
+    pub staging_buffer: StagingBuffer,
+
     /// Texture descriptor information
     texture_count: u32,
+    cube_texture_count: u32,
 }
 
 impl Resources {
     /// Create all the buffers required and update the relevant descriptor sets.
     pub(crate) unsafe fn new(vulkan_context: &VulkanContext, descriptors: &Descriptors) -> Self {
+        let position_buffer = Buffer::new(
+            vulkan_context,
+            vk::BufferUsageFlags::VERTEX_BUFFER,
+            VERTEX_BUFFER_SIZE,
+        );
         let vertex_buffer = Buffer::new(
             vulkan_context,
             vk::BufferUsageFlags::VERTEX_BUFFER,
@@ -89,15 +107,20 @@ impl Resources {
 
         load_ibl_textures(vulkan_context, descriptors, cube_sampler);
 
+        let staging_buffer = StagingBuffer::new(vulkan_context);
+
         Self {
+            position_buffer,
             vertex_buffer,
             index_buffer,
             materials_buffer,
             skins_buffer,
             mesh_data: Default::default(),
             texture_count: 1, // IMPORTANT! Because we stashed the BRDF Lut texture in here, make sure we increment the count accordingly
+            cube_texture_count: 2, // IMPORTANT! We stashed the IBL textures in here, so increment the count
             texture_sampler,
             cube_sampler,
+            staging_buffer,
         }
     }
 
@@ -107,12 +130,26 @@ impl Resources {
         descriptors: &Descriptors,
         image: &Image,
     ) -> u32 {
-        // There doesn't seem any reason to add support for dynamic cube maps yet as there isn't any user facing way of loading them.
         let sampler = self.texture_sampler;
 
         let index = self.texture_count;
         descriptors.write_texture_descriptor(vulkan_context, image.view, sampler, index);
         self.texture_count += 1;
+
+        index
+    }
+
+    pub(crate) unsafe fn write_cube_texture_to_array(
+        &mut self,
+        vulkan_context: &VulkanContext,
+        descriptors: &Descriptors,
+        image: &Image,
+    ) -> u32 {
+        let sampler = self.cube_sampler;
+
+        let index = self.cube_texture_count;
+        descriptors.write_cube_texture_descriptor(vulkan_context, image.view, sampler, index);
+        self.cube_texture_count += 1;
 
         index
     }
@@ -127,6 +164,10 @@ fn load_ibl_textures(
     cube_texture_sampler: vk::Sampler,
 ) {
     // First, load in the LUT file.
+    #[cfg(target_os = "android")]
+    let brdf_lut_file = include_bytes!("../../data/brdf_lut_android.ktx2");
+
+    #[cfg(not(target_os = "android"))]
     let brdf_lut_file = include_bytes!("../../data/brdf_lut.ktx2");
     let ktx2_image = parse_ktx2(brdf_lut_file);
 
@@ -151,6 +192,13 @@ fn load_ibl_textures(
     }
 
     // OK. Next we've got to load in the cubemaps.
+    #[cfg(target_os = "android")]
+    let cubemaps = [
+        include_bytes!("../../data/environment_map_diffuse_android.ktx2").to_vec(),
+        include_bytes!("../../data/environment_map_specular_android.ktx2").to_vec(),
+    ];
+
+    #[cfg(not(target_os = "android"))]
     let cubemaps = [
         include_bytes!("../../data/environment_map_diffuse.ktx2").to_vec(),
         include_bytes!("../../data/environment_map_specular.ktx2").to_vec(),
@@ -215,4 +263,49 @@ pub struct PrimitiveCullData {
     pub primitive_id: u32,
     /// The result of culling test. True if the bounding sphere is intersecting with any camera frustum.
     pub visible: bool,
+}
+
+const STAGING_BUFFER_SIZE: vk::DeviceSize = 128 * 1000 * 1000; // 128MB
+
+#[derive(Clone)]
+/// Staging buffer used to upload and download data to the GPU
+pub struct StagingBuffer {
+    /// The Vulkan buffer object
+    pub buffer: vk::Buffer,
+    /// A pointer into the buffer memory
+    pub pointer: std::ptr::NonNull<std::ffi::c_void>,
+}
+
+impl StagingBuffer {
+    fn new(vulkan_context: &VulkanContext) -> StagingBuffer {
+        let device = &vulkan_context.device;
+        unsafe {
+            let buffer = device
+                .create_buffer(
+                    &vk::BufferCreateInfo::builder()
+                        .usage(
+                            vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST,
+                        )
+                        .size(STAGING_BUFFER_SIZE as _),
+                    None,
+                )
+                .unwrap();
+
+            let memory_requirements = device.get_buffer_memory_requirements(buffer);
+            let flags = vk::MemoryPropertyFlags::HOST_VISIBLE;
+
+            let device_memory = allocate_memory(vulkan_context, memory_requirements, flags);
+            device.bind_buffer_memory(buffer, device_memory, 0).unwrap();
+            let memory_address = device
+                .map_memory(
+                    device_memory,
+                    0,
+                    vk::WHOLE_SIZE,
+                    vk::MemoryMapFlags::empty(),
+                )
+                .unwrap();
+            let pointer = std::ptr::NonNull::new_unchecked(memory_address);
+            StagingBuffer { buffer, pointer }
+        }
+    }
 }
