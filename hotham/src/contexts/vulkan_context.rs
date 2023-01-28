@@ -391,8 +391,7 @@ impl VulkanContext {
         let (device_memory_size, device_memory) = self.allocate_buffer_memory(buffer)?;
 
         println!(
-            "[HOTHAM_VULKAN] Allocated {} bits of buffer memory: {:?}",
-            device_memory_size, device_memory
+            "[HOTHAM_VULKAN] Allocated {device_memory_size} bits of buffer memory: {device_memory:?}"
         );
         unsafe { device.bind_buffer_memory(buffer, device_memory, 0) }?;
         self.update_buffer(data, device_memory, buffer_size, usage)?;
@@ -909,7 +908,7 @@ fn vulkan_init_legacy(
         let entry = Entry::new()?;
 
         let layers = vec![];
-        println!("[HOTHAM_VULKAN] Requesting layers: {:?}", layers);
+        println!("[HOTHAM_VULKAN] Requesting layers: {layers:?}");
 
         let layer_names = get_raw_strings(layers);
 
@@ -925,8 +924,7 @@ fn vulkan_init_legacy(
         vk_instance_exts.push(vk::ExtDebugUtilsFn::name().to_owned());
 
         println!(
-            "[HOTHAM_VULKAN] Required Vulkan instance extensions: {:?}",
-            vk_instance_exts
+            "[HOTHAM_VULKAN] Required Vulkan instance extensions: {vk_instance_exts:?}"
         );
         let vk_instance_ext_pointers = vk_instance_exts
             .iter()
@@ -1017,8 +1015,7 @@ fn create_vulkan_device(
     physical_device: vk::PhysicalDevice,
 ) -> Result<(Device, vk::Queue, u32)> {
     println!(
-        "[HOTHAM_VULKAN] Using device extensions: {:?}",
-        extension_names
+        "[HOTHAM_VULKAN] Using device extensions: {extension_names:?}"
     );
 
     let extension_names = extension_names

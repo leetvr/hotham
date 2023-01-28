@@ -452,8 +452,7 @@ impl RenderContext {
         };
 
         println!(
-            "[HOTHAM_VULKAN] ..done! Texture {} created successfully.",
-            name
+            "[HOTHAM_VULKAN] ..done! Texture {name} created successfully."
         );
 
         Ok(texture_index)

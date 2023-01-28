@@ -233,7 +233,7 @@ pub(crate) unsafe fn save_image_to_disk(
     let image_from_vulkan = DynamicImage::ImageRgba8(
         RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
     );
-    let known_good_path = format!("../test_assets/render_{}_known_good.jpg", name);
+    let known_good_path = format!("../test_assets/render_{name}_known_good.jpg");
     if env::var("UPDATE_IMAGES").map_or(false, |s| {
         s.eq_ignore_ascii_case("true")
             || s.eq_ignore_ascii_case("t")
@@ -246,7 +246,7 @@ pub(crate) unsafe fn save_image_to_disk(
         let mut jpeg_encoder = JpegEncoder::new(&mut file);
         jpeg_encoder.encode_image(&image_from_vulkan).unwrap();
     }
-    let output_path = format!("../test_assets/render_{}.jpg", name);
+    let output_path = format!("../test_assets/render_{name}.jpg");
     {
         let output_path = std::path::Path::new(&output_path);
         let mut file = std::fs::File::create(output_path).unwrap();
@@ -257,13 +257,13 @@ pub(crate) unsafe fn save_image_to_disk(
     let known_good_hash = hash_file(&known_good_path);
 
     if output_hash.is_err() {
-        return Err(format!("Failed to hash output image: {}", name));
+        return Err(format!("Failed to hash output image: {name}"));
     }
     if known_good_hash.is_err() {
-        return Err(format!("Failed to hash known good image: {}", name));
+        return Err(format!("Failed to hash known good image: {name}"));
     }
     if output_hash != known_good_hash {
-        return Err(format!("Bad render: {}", name));
+        return Err(format!("Bad render: {name}"));
     }
     Ok(())
 }

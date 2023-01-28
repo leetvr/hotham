@@ -320,16 +320,14 @@ fn get_collider_for_node(
 
     // Build a collider using the mesh.
     println!(
-        "[HOTHAM_ASSET_IMPORTER] Getting shape for {}",
-        collider_node_name
+        "[HOTHAM_ASSET_IMPORTER] Getting shape for {collider_node_name}"
     );
     let shape = get_shape_from_mesh(mesh, import_context);
 
     // If this is a wall collider, ensure it's not a sensor.
     let collider = if collider_node_name.ends_with(WALL_COLLIDER_TAG) {
         println!(
-            "[HOTHAM_ASSET_IMPORTER] Created wall collider for model {}",
-            collider_node_name
+            "[HOTHAM_ASSET_IMPORTER] Created wall collider for model {collider_node_name}"
         );
         Collider {
             sensor: false,
@@ -340,8 +338,7 @@ fn get_collider_for_node(
         }
     } else {
         println!(
-            "[HOTHAM_ASSET_IMPORTER] Created sensor collider for model {}",
-            collider_node_name
+            "[HOTHAM_ASSET_IMPORTER] Created sensor collider for model {collider_node_name}"
         );
         Collider {
             sensor: true,
@@ -361,7 +358,7 @@ fn find_wall_collider_for_node<'a>(
     import_context: &'a ImportContext,
 ) -> Option<(&'a str, gltf::Mesh<'a>)> {
     // Create a pattern to search for the collider's name, suffixed with the wall collider tag.
-    let wall_pattern = format!("{}{}", name, WALL_COLLIDER_TAG);
+    let wall_pattern = format!("{name}{WALL_COLLIDER_TAG}");
 
     // Iterate through each node to try and find the matching node, then fetch its mesh.
     import_context.document.nodes().find_map(|n| {

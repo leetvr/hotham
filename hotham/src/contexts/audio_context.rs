@@ -49,7 +49,7 @@ impl Default for AudioContext {
             sample_rate,
             buffer_size: cpal::BufferSize::Default,
         };
-        println!("[HOTHAM_AUDIO_CONTEXT] cpal AudioConfig: {:?}", config);
+        println!("[HOTHAM_AUDIO_CONTEXT] cpal AudioConfig: {config:?}");
 
         // Create a spatialized audio scene
         let (scene_handle, scene) = oddio::split(oddio::SpatialScene::new(sample_rate.0, 0.1));
@@ -70,8 +70,7 @@ impl Default for AudioContext {
                 },
                 |err| {
                     eprintln!(
-                        "[HOTHAM_AUDIO_CONTEXT] An error occurred playing the audio stream: {}",
-                        err
+                        "[HOTHAM_AUDIO_CONTEXT] An error occurred playing the audio stream: {err}"
                     )
                 },
             )
@@ -261,7 +260,7 @@ fn decode_mp3(mp3_bytes: Vec<u8>) -> (Vec<f32>, u32) {
         let packet = match reader.next_packet() {
             Ok(packet) => packet,
             Err(err) => {
-                eprintln!("Error reading packet: {:?}", err);
+                eprintln!("Error reading packet: {err:?}");
                 break;
             }
         };
@@ -282,7 +281,7 @@ fn decode_mp3(mp3_bytes: Vec<u8>) -> (Vec<f32>, u32) {
                 }
             }
             Err(err) => {
-                eprintln!("Error while decoding: {:?}", err);
+                eprintln!("Error while decoding: {err:?}");
                 break;
             }
         }

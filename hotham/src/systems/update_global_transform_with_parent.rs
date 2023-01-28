@@ -102,7 +102,7 @@ mod tests {
 
         for n in 0..=32 {
             let info = Info {
-                name: format!("Node {}", n),
+                name: format!("Node {n}"),
                 node_id: n,
             };
             let local_transform = LocalTransform {

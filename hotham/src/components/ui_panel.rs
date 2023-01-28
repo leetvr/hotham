@@ -76,7 +76,7 @@ pub fn add_ui_panel_to_world(
     gui_context: &GuiContext,
     world: &mut World,
 ) -> Entity {
-    println!("[PANEL] Adding panel with text {}", text);
+    println!("[PANEL] Adding panel with text {text}");
     let (panel, mesh) = Panel::create(vulkan_context, render_context, resolution, world_size)
         .expect("failed to create Panel");
     let egui_context = CtxRef::default();
@@ -139,7 +139,7 @@ pub fn add_ui_panel_to_world(
         ..Default::default()
     };
     world.insert_one(panel_entity, collider).unwrap();
-    println!("[PANEL] ..done! {:?}", panel_entity);
+    println!("[PANEL] ..done! {panel_entity:?}");
     panel_entity
 }
 

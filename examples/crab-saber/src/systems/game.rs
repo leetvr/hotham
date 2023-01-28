@@ -144,7 +144,7 @@ fn transition(
                 .get::<&mut UIPanel>(game_context.main_menu_panel)
                 .unwrap();
 
-            panel.text = format!("Game Over\n{}", message);
+            panel.text = format!("Game Over\n{message}");
             panel.buttons = vec![UIPanelButton::new("Back to main menu")];
         }
         _ => panic!(
@@ -249,7 +249,7 @@ fn check_for_hits(
                     }
                 }
                 haptic_context.request_haptic_feedback(1., Handedness::Right);
-                println!("Hit BLUE: Adding cube to dispose list: {:?}", c);
+                println!("Hit BLUE: Adding cube to dispose list: {c:?}");
                 cubes_to_dispose.push(*c);
             }
         }
@@ -274,7 +274,7 @@ fn check_for_hits(
                     }
                 }
                 haptic_context.request_haptic_feedback(1., Handedness::Left);
-                println!("Hit RED: Adding cube to dispose list: {:?}", c);
+                println!("Hit RED: Adding cube to dispose list: {c:?}");
                 cubes_to_dispose.push(*c);
             }
         }
@@ -290,7 +290,7 @@ fn check_for_hits(
             if e.get::<&Cube>().is_some() {
                 game_context.current_score -= 1;
                 pending_sound_effects.push((*c, "Miss"));
-                println!("MISSED: Adding cube to dispose list: {:?}", c);
+                println!("MISSED: Adding cube to dispose list: {c:?}");
                 cubes_to_dispose.push(*c);
             }
         }
@@ -306,7 +306,7 @@ fn is_cube(e: hotham::hecs::EntityRef) -> bool {
 
 fn dispose_of_cubes(cubes_to_dispose: Vec<Entity>, world: &mut World) {
     for e in cubes_to_dispose.into_iter() {
-        println!("Removing visibilty of cube: {:?}", e);
+        println!("Removing visibilty of cube: {e:?}");
         world.remove_one::<Visible>(e).unwrap();
         world.get::<&mut RigidBody>(e).unwrap().linear_velocity = glam::Vec3::ZERO;
     }

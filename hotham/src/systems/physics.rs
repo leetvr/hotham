@@ -191,7 +191,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                 if world.get::<&Teleport>(entity).is_ok() {
                     command_buffer.remove_one::<Teleport>(entity);
                     let next_position = global_transform.to_isometry();
-                    println!("[HOTHAM_PHYSICS] Teleporting entity to {:?}", next_position);
+                    println!("[HOTHAM_PHYSICS] Teleporting entity to {next_position:?}");
                     rigid_body.set_position(next_position, true);
                 }
             }
@@ -205,7 +205,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                 if world.get::<&Teleport>(entity).is_ok() {
                     command_buffer.remove_one::<Teleport>(entity);
                     let next_position = global_transform.to_isometry();
-                    println!("[HOTHAM_PHYSICS] Teleporting entity to {:?}", next_position);
+                    println!("[HOTHAM_PHYSICS] Teleporting entity to {next_position:?}");
                     rigid_body.set_position(next_position, true);
                 }
 
@@ -213,8 +213,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                 if let Ok(additional_mass) = world.get::<&AdditionalMass>(entity).map(|a| a.value) {
                     command_buffer.remove_one::<AdditionalMass>(entity);
                     println!(
-                        "[HOTHAM_PHYSICS] Applying additional mass of {:?}",
-                        additional_mass
+                        "[HOTHAM_PHYSICS] Applying additional mass of {additional_mass:?}"
                     );
                     rigid_body.set_additional_mass(additional_mass, true);
                     rigid_body.recompute_mass_properties_from_colliders(&physics_context.colliders);
@@ -227,8 +226,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                         println!("[HOTHAM_PHYSICS] Attempted to apply impulse to rigid body with infinite mass. This is stupid and will do nothing.");
                     } else {
                         println!(
-                            "[HOTHAM_PHYSICS] Applying impulse of {:?} to rigid body with {} mass",
-                            impulse, mass
+                            "[HOTHAM_PHYSICS] Applying impulse of {impulse:?} to rigid body with {mass} mass"
                         );
                         rigid_body.apply_impulse(na_vector_from_glam(impulse), true);
                     }
