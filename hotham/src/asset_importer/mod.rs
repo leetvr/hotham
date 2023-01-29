@@ -592,23 +592,18 @@ mod tests {
                 1,
                 23928,
                 [-0.06670809, 2.1408155, -0.46151406].into(),
-                Quat::from_xyzw(
-                    -0.09325116872787476,
-                    0.6883626580238342,
-                    0.006518156733363867,
-                    0.719318151473999,
-                ),
+                Quat::from_xyzw(-0.093_251_17, 0.688_362_66, 0.006_518_156_7, 0.719_318_15),
             ),
         ];
 
         for (name, id, indices_count, translation, rotation) in &test_data {
             let _ = models
                 .get(*name)
-                .expect(&format!("Unable to find model with name {}", name));
+                .unwrap_or_else(|| panic!("Unable to find model with name {name}"));
 
             let mut world = World::default();
-            let model = add_model_to_world(*name, &models, &mut world, None);
-            assert!(model.is_some(), "Model {} could not be added", name);
+            let model = add_model_to_world(name, &models, &mut world, None);
+            assert!(model.is_some(), "Model {name} could not be added");
 
             let model = model.unwrap();
             let (info, local_transform, mesh, ..) = world
@@ -641,7 +636,7 @@ mod tests {
             assert_relative_eq!(local_transform.translation, *translation,);
             assert_relative_eq!(local_transform.rotation, *rotation,);
             assert_eq!(&info.name, *name);
-            assert_eq!(&info.node_id, id, "Node {} has wrong ID", name);
+            assert_eq!(&info.node_id, id, "Node {name} has wrong ID");
         }
     }
 

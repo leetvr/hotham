@@ -1,9 +1,12 @@
 use crate::{
-    components::{GlobalTransform, LocalTransform, Parent, Stage, HMD},
+    asset_importer::{self, add_model_to_world},
+    components::{GlobalTransform, Info, LocalTransform, Parent, Stage, HMD},
     contexts::{
-        AudioContext, GuiContext, HapticContext, InputContext, PhysicsContext, RenderContext,
-        VulkanContext, XrContext, XrContextBuilder,
+        render_context::create_pipeline, AudioContext, GuiContext, HapticContext, InputContext,
+        PhysicsContext, RenderContext, VulkanContext, XrContext, XrContextBuilder,
     },
+    util::PerformanceTimer,
+    workers::Workers,
     HothamError, HothamResult, VIEW_TYPE,
 };
 use openxr as xr;
@@ -14,7 +17,7 @@ use std::{
         Arc,
     },
     thread::sleep,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use xr::{EventDataBuffer, SessionState};
@@ -105,6 +108,8 @@ impl<'a> EngineBuilder<'a> {
             physics_context: Default::default(),
             stage_entity,
             hmd_entity,
+            performance_timer: PerformanceTimer::new("Application Tick"),
+            workers: Workers::new(Default::default()),
         }
     }
 }
@@ -132,7 +137,6 @@ pub struct Engine {
     #[allow(dead_code)]
     resumed: bool,
     event_data_buffer: EventDataBuffer,
-
     /// World
     pub world: hecs::World,
     /// OpenXR context
@@ -155,6 +159,10 @@ pub struct Engine {
     pub stage_entity: hecs::Entity,
     /// HMD entity
     pub hmd_entity: hecs::Entity,
+    /// Performance timers
+    pub performance_timer: PerformanceTimer,
+    /// Workers
+    workers: Workers,
 }
 
 /// The result of calling `update()` on Engine.
@@ -234,6 +242,9 @@ impl Engine {
                 _ => {}
             }
 
+            // Check to see if there are any messages from our workers:
+            self.check_for_worker_messages();
+
             let vulkan_context = &self.vulkan_context;
             let render_context = &mut self.render_context;
 
@@ -242,19 +253,21 @@ impl Engine {
                 Err(HothamError::NotRendering) => continue,
                 Ok(swapchain_image_index) => {
                     render_context.begin_frame(vulkan_context);
+                    self.performance_timer.start();
                     return Ok(TickData {
                         previous_state,
                         current_state,
                         swapchain_image_index,
                     });
                 }
-                err => panic!("Error beginning frame: {:?}", err),
+                err => panic!("Error beginning frame: {err:?}"),
             };
         }
     }
 
     /// Call this after update
     pub fn finish(&mut self) -> xr::Result<()> {
+        self.performance_timer.end();
         let vulkan_context = &self.vulkan_context;
         let render_context = &mut self.render_context;
 
@@ -262,6 +275,138 @@ impl Engine {
             render_context.end_frame(vulkan_context);
         }
         self.xr_context.end_frame()
+    }
+
+    /// Watch some assets, just for fun.
+    pub fn watch_assets(&mut self, asset_list: Vec<String>) {
+        self.workers = Workers::new(asset_list);
+    }
+
+    fn check_for_worker_messages(&mut self) {
+        for message in self.workers.receiver.try_iter() {
+            match message {
+                crate::workers::WorkerMessage::AssetUpdated(asset_updated) => {
+                    let tick = Instant::now();
+                    let vulkan_context = &self.vulkan_context;
+                    let render_context = &mut self.render_context;
+                    let world = &mut self.world;
+
+                    let file_type = asset_updated.asset_id.split('.').last().unwrap();
+                    match file_type {
+                        "glb" => update_models(
+                            vulkan_context,
+                            render_context,
+                            world,
+                            asset_updated.asset_data,
+                        ),
+                        "spv" => update_shader(
+                            vulkan_context,
+                            render_context,
+                            &asset_updated.asset_id,
+                            asset_updated.asset_data,
+                        ),
+                        _ => {}
+                    }
+                    println!(
+                        "[HOTHAM_ASSET_HOT_RELOAD] Asset reload took {:.2} seconds",
+                        Instant::now().duration_since(tick).as_secs_f32()
+                    );
+                }
+                crate::workers::WorkerMessage::Error(e) => {
+                    panic!("[HOTHAM_ENGINE] Worker enountered error: {e:?}");
+                }
+            }
+        }
+    }
+}
+
+fn update_models(
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+    world: &mut hecs::World,
+    asset: Arc<Vec<u8>>,
+) {
+    // First, load the asset in
+    let scene =
+        asset_importer::load_scene_from_glb(&asset, vulkan_context, render_context).unwrap();
+
+    let models = &scene.models;
+
+    // First, then remove the existing assets:
+    let mut command_buffer = hecs::CommandBuffer::default();
+    for (e, info) in world.query::<&Info>().iter() {
+        if !models.contains_key(&info.name) {
+            continue;
+        }
+
+        command_buffer.despawn(e);
+        despawn_children(world, e, &mut command_buffer);
+    }
+    command_buffer.run_on(world);
+
+    // Add the models back
+    for name in models.keys() {
+        add_model_to_world(name, models, world, None);
+    }
+}
+
+fn update_shader(
+    vulkan_context: &VulkanContext,
+    render_context: &mut RenderContext,
+    shader_name: &str,
+    asset_data: Arc<Vec<u8>>,
+) {
+    println!(
+        "[HOTHAM_ASSET_HOT_RELOAD] STAND BACK - HOT RELOADING SHADER {shader_name} MOTHERFUCKER"
+    );
+
+    {
+        let shaders = &mut render_context.shaders;
+        let shader = u8_to_u32(asset_data);
+        if shader_name.contains("vert") {
+            shaders.vertex_shader = shader;
+        } else {
+            shaders.fragment_shader = shader;
+        }
+    }
+
+    unsafe {
+        vulkan_context.device.device_wait_idle().unwrap();
+        render_context.pipeline = create_pipeline(
+            vulkan_context,
+            render_context.pipeline_layout,
+            &render_context.render_area(),
+            render_context.render_pass,
+            &render_context.shaders,
+        )
+        .unwrap();
+    }
+}
+
+// shout out to wgpu to for this:
+fn u8_to_u32(asset_data: Arc<Vec<u8>>) -> Vec<u32> {
+    let mut words = vec![0u32; asset_data.len() / std::mem::size_of::<u32>()];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            asset_data.as_ptr(),
+            words.as_mut_ptr() as *mut u8,
+            asset_data.len(),
+        );
+    }
+
+    words
+}
+
+fn despawn_children(
+    world: &hecs::World,
+    parent: hecs::Entity,
+    command_buffer: &mut hecs::CommandBuffer,
+) {
+    for (child, p) in world.query::<&Parent>().iter() {
+        if p.0 == parent {
+            command_buffer.despawn(child);
+            despawn_children(world, child, command_buffer);
+        }
     }
 }
 

@@ -268,6 +268,7 @@ mod tests {
         HapticContext,
         GuiContext,
     ) {
+        // TODO: We've got helpers for this
         let vulkan_context = VulkanContext::testing().unwrap();
         // Create an image with vulkan_context
         let image = vulkan_context

@@ -712,7 +712,7 @@ mod tests {
                 .get::<&UIPanel>(game_context.score_panel)
                 .unwrap()
                 .text,
-            format!("Score: {}", score)
+            format!("Score: {score}")
         );
     }
 }

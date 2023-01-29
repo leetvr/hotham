@@ -18,6 +18,7 @@ use rapier3d::prelude::RigidBodyType as RapierBodyType;
 pub struct RigidBody {
     pub body_type: BodyType,
     pub linear_velocity: glam::Vec3,
+    pub angular_velocity: glam::Vec3,
     pub mass: f32,
     pub lock_rotations: bool,
 }
@@ -46,6 +47,7 @@ impl Default for RigidBody {
         Self {
             body_type: BodyType::Dynamic,
             linear_velocity: Default::default(),
+            angular_velocity: Default::default(),
             mass: 0.,
             lock_rotations: false,
         }

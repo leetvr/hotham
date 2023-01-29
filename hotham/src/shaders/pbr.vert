@@ -1,6 +1,7 @@
 // PBR shader based on the Khronos glTF-Sample Viewer:
 // https://github.com/KhronosGroup/glTF-WebGL-PBR
 #version 460
+#extension GL_EXT_multiview : enable
 
 #include "common.glsl"
 

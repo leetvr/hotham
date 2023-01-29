@@ -150,8 +150,8 @@ mod tests {
                     let expected_matrix = get_expected_matrix(depth);
                     if !relative_eq!(expected_matrix, global_transform.0) {
                         panic!(
-                            "[Node {}] - {:?} did not equal {:?} at depth {}",
-                            info.node_id, global_transform.0, expected_matrix, depth
+                            "[Node {}] - {:?} did not equal {expected_matrix:?} at depth {depth}",
+                            info.node_id, global_transform.0
                         );
                     }
                     break;

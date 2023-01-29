@@ -14,12 +14,20 @@ use ash::{
     Device, Entry, Instance as AshInstance,
 };
 use openxr as xr;
-use std::{cmp::max, ffi::CString, fmt::Debug, ptr::copy, slice::from_ref as slice_from_ref};
+use std::{
+    cmp::max,
+    ffi::{c_char, CString},
+    fmt::Debug,
+    ptr::copy,
+    slice::from_ref as slice_from_ref,
+};
 
 type XrVulkan = xr::Vulkan;
 
 #[cfg(debug_assertions)]
 use ash::vk::DebugUtilsObjectNameInfoEXT;
+
+use super::render_context::SAMPLES;
 
 #[derive(Clone)]
 pub struct VulkanContext {
@@ -91,6 +99,36 @@ impl VulkanContext {
             )
         };
 
+        // Seems fine.
+        let enabled_extensions = [
+            "VK_EXT_astc_decode_mode",
+            "VK_EXT_descriptor_indexing",
+            "VK_KHR_shader_float16_int8",
+        ]
+        .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
+
+        let mut descriptor_indexing_features =
+            vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
+                .shader_sampled_image_array_non_uniform_indexing(true)
+                .descriptor_binding_variable_descriptor_count(true)
+                .descriptor_binding_partially_bound(true)
+                .runtime_descriptor_array(true);
+
+        let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::builder().multiview(true);
+
+        let mut robust_features =
+            vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
+
+        let mut f16_storage =
+            vk::PhysicalDevice16BitStorageFeatures::builder().storage_buffer16_bit_access(true);
+
+        let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::builder()
+            .shader_float16(true)
+            .shader_int8(true);
+
+        let mut fragment_density = vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT::builder()
+            .fragment_density_map_deferred(true);
+
         let queue_family_index = unsafe {
             instance
                 .get_physical_device_queue_family_properties(physical_device)
@@ -103,7 +141,7 @@ impl VulkanContext {
                         None
                     }
                 })
-                .ok_or(HothamError::EmptyListError)?
+                .unwrap()
         };
 
         let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
@@ -111,33 +149,15 @@ impl VulkanContext {
             .queue_priorities(&[1.0])
             .build();
 
-        // We use a *whole bunch* of different features, and somewhat annoyingly they're all enabled in different ways.
-        let enabled_features = vk::PhysicalDeviceFeatures::builder()
-            .multi_draw_indirect(true)
-            .sampler_anisotropy(true)
-            .build();
-
-        let mut physical_device_features = vk::PhysicalDeviceVulkan11Features::builder()
-            .multiview(true)
-            .shader_draw_parameters(true);
-
-        let mut descriptor_indexing_features =
-            vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
-                .shader_sampled_image_array_non_uniform_indexing(true)
-                .descriptor_binding_partially_bound(true)
-                .descriptor_binding_variable_descriptor_count(true)
-                .descriptor_binding_sampled_image_update_after_bind(true)
-                .runtime_descriptor_array(true);
-
-        let mut robust_features =
-            vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
-
         let device_create_info = vk::DeviceCreateInfo::builder()
+            .enabled_extension_names(&enabled_extensions)
             .queue_create_infos(slice_from_ref(&graphics_queue_create_info))
-            .enabled_features(&enabled_features)
             .push_next(&mut descriptor_indexing_features)
             .push_next(&mut robust_features)
-            .push_next(&mut physical_device_features);
+            .push_next(&mut multiview_features)
+            .push_next(&mut f16_storage)
+            .push_next(&mut f16_arithmetic)
+            .push_next(&mut fragment_density);
 
         let device_handle = unsafe {
             xr_instance.create_vulkan_device(
@@ -152,29 +172,13 @@ impl VulkanContext {
         let device =
             unsafe { Device::load(instance.fp_v1_0(), vk::Device::from_raw(device_handle as _)) };
 
-        let graphics_queue = unsafe { device.get_device_queue(queue_family_index, 0) };
-
-        let command_pool = create_command_pool(&device, queue_family_index)?;
-
-        let descriptor_pool = create_descriptor_pool(&device)?;
-        let debug_utils = DebugUtils::new(&entry, &instance);
-        let physical_device_properties =
-            unsafe { instance.get_physical_device_properties(physical_device) };
-
-        println!(" ..done!");
-
-        Ok(Self {
-            entry,
+        Ok(Self::new(
             instance,
+            entry,
             device,
             physical_device,
-            command_pool,
             queue_family_index,
-            graphics_queue,
-            descriptor_pool,
-            debug_utils,
-            physical_device_properties,
-        })
+        ))
     }
 
     #[cfg(not(target_os = "android"))]
@@ -202,28 +206,45 @@ impl VulkanContext {
                     .unwrap() as _,
             )
         };
-        let (device, graphics_queue, queue_family_index) =
+        let (device, _, queue_family_index) =
             create_vulkan_device_legacy(xr_instance, system, &vulkan_instance, physical_device)?;
 
-        let command_pool = create_command_pool(&device, queue_family_index)?;
+        Ok(Self::new(
+            vulkan_instance,
+            vulkan_entry,
+            device,
+            physical_device,
+            queue_family_index,
+        ))
+    }
 
-        let descriptor_pool = create_descriptor_pool(&device)?;
-        let debug_utils = DebugUtils::new(&vulkan_entry, &vulkan_instance);
+    fn new(
+        instance: ash::Instance,
+        entry: ash::Entry,
+        device: ash::Device,
+        physical_device: vk::PhysicalDevice,
+        queue_family_index: u32,
+    ) -> Self {
+        let graphics_queue = unsafe { device.get_device_queue(queue_family_index, 0) };
+        let command_pool = create_command_pool(&device, queue_family_index).unwrap();
+        let descriptor_pool = create_descriptor_pool(&device).unwrap();
+
+        let debug_utils = DebugUtils::new(&entry, &instance);
         let physical_device_properties =
-            unsafe { vulkan_instance.get_physical_device_properties(physical_device) };
+            unsafe { instance.get_physical_device_properties(physical_device) };
 
-        Ok(Self {
-            entry: vulkan_entry,
-            instance: vulkan_instance,
+        Self {
+            entry,
+            instance,
             physical_device,
             device,
-            graphics_queue,
-            queue_family_index,
             command_pool,
+            queue_family_index,
+            graphics_queue,
             descriptor_pool,
             debug_utils,
             physical_device_properties,
-        })
+        }
     }
 
     pub fn testing() -> Result<Self> {
@@ -232,27 +253,16 @@ impl VulkanContext {
         let mut extension_names = Vec::new();
         add_device_extension_names(&mut extension_names);
 
-        let (device, graphics_queue, queue_family_index) =
+        let (device, _, queue_family_index) =
             create_vulkan_device(&extension_names, &instance, physical_device)?;
 
-        let command_pool = create_command_pool(&device, queue_family_index)?;
-        let descriptor_pool = create_descriptor_pool(&device)?;
-        let debug_utils = DebugUtils::new(&entry, &instance);
-        let physical_device_properties =
-            unsafe { instance.get_physical_device_properties(physical_device) };
-
-        Ok(Self {
-            entry,
+        Ok(Self::new(
             instance,
-            physical_device,
+            entry,
             device,
-            graphics_queue,
+            physical_device,
             queue_family_index,
-            command_pool,
-            descriptor_pool,
-            debug_utils,
-            physical_device_properties,
-        })
+        ))
     }
 
     pub fn create_image_view(
@@ -265,9 +275,19 @@ impl VulkanContext {
         component_mapping: vk::ComponentMapping,
     ) -> Result<vk::ImageView> {
         let aspect_mask = get_aspect_mask(format);
-        let create_info = vk::ImageViewCreateInfo::builder()
+        let mut astc_decode_mode =
+            vk::ImageViewASTCDecodeModeEXT::builder().decode_mode(vk::Format::R8G8B8A8_UNORM);
+
+        let flags = if format == vk::Format::R8G8_UNORM {
+            vk::ImageViewCreateFlags::FRAGMENT_DENSITY_MAP_DEFERRED_EXT
+        } else {
+            vk::ImageViewCreateFlags::empty()
+        };
+
+        let mut create_info = vk::ImageViewCreateInfo::builder()
             .view_type(view_type)
             .format(format)
+            .flags(flags)
             .subresource_range(vk::ImageSubresourceRange {
                 aspect_mask,
                 base_mip_level: 0,
@@ -277,6 +297,15 @@ impl VulkanContext {
             })
             .components(component_mapping)
             .image(*image);
+
+        // push_next takes ownership of the builder so we have to return it again.
+        create_info = if format == vk::Format::ASTC_8X8_UNORM_BLOCK {
+            println!("[HOTHAM_VULKAN] Using ASTC decode mode for image!");
+            create_info.push_next(&mut astc_decode_mode)
+        } else {
+            create_info
+        };
+
         unsafe { self.device.create_image_view(&create_info, None) }.map_err(Into::into)
     }
 
@@ -316,6 +345,11 @@ impl VulkanContext {
                 vk::ImageCreateFlags::CUBE_COMPATIBLE,
                 vk::ImageViewType::CUBE,
             )
+        } else if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT) {
+            (
+                vk::ImageCreateFlags::SUBSAMPLED_EXT,
+                vk::ImageViewType::TYPE_2D_ARRAY,
+            )
         } else {
             (
                 vk::ImageCreateFlags::empty(),
@@ -325,7 +359,7 @@ impl VulkanContext {
 
         // TODO: This indicates that it's MSAA.. but do we need MSAA for depth?
         let samples = if usage.contains(vk::ImageUsageFlags::TRANSIENT_ATTACHMENT) {
-            vk::SampleCountFlags::TYPE_4
+            SAMPLES
         } else {
             vk::SampleCountFlags::TYPE_1
         };
@@ -655,6 +689,8 @@ impl VulkanContext {
         let mut regions = Vec::new();
 
         let mut offset = 0;
+
+        // KR: https://bit.ly/3ABKTFc
         for (mip_level, offset_increment) in offsets.iter().enumerate() {
             let image_subresource = vk::ImageSubresourceLayers::builder()
                 .aspect_mask(vk::ImageAspectFlags::COLOR)
@@ -824,8 +860,8 @@ fn add_device_extension_names(extension_names: &mut Vec<CString>) {
     extension_names.push(vk::KhrShaderDrawParametersFn::name().to_owned());
 
     // Add Multiview extension
-    extension_names.push(CString::new("VK_KHR_multiview").unwrap());
     extension_names.push(CString::new("VK_EXT_descriptor_indexing").unwrap());
+    extension_names.push(CString::new("VK_KHR_shader_float16_int8").unwrap());
 
     // If we're on macOS we've got to add portability
     #[cfg(target_os = "macos")]
@@ -938,19 +974,12 @@ fn vulkan_init_legacy(
             .engine_version(1)
             .api_version(vk::make_api_version(0, 1, 2, 0));
 
-        let validation_features_enables = [];
-        let validation_features_disables = [];
-        let mut validation_features = vk::ValidationFeaturesEXT::builder()
-            .enabled_validation_features(&validation_features_enables)
-            .disabled_validation_features(&validation_features_disables);
-
         let instance = entry
             .create_instance(
                 &vk::InstanceCreateInfo::builder()
                     .application_info(&app_info)
                     .enabled_extension_names(&vk_instance_ext_pointers)
-                    .enabled_layer_names(&layer_names)
-                    .push_next(&mut validation_features),
+                    .enabled_layer_names(&layer_names),
                 None,
             )
             .expect("Vulkan error creating Vulkan instance");
@@ -1040,33 +1069,32 @@ fn create_vulkan_device(
         .queue_family_index(graphics_family_index)
         .build();
 
-    // We use a *whole bunch* of different features, and somewhat annoyingly they're all enabled in different ways.
-    let enabled_features = vk::PhysicalDeviceFeatures::builder()
-        .multi_draw_indirect(true)
-        .sampler_anisotropy(true)
-        .build();
-
-    let mut physical_device_features = vk::PhysicalDeviceVulkan11Features::builder()
-        .multiview(true)
-        .shader_draw_parameters(true);
-
     let mut descriptor_indexing_features = vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
         .shader_sampled_image_array_non_uniform_indexing(true)
-        .descriptor_binding_partially_bound(true)
         .descriptor_binding_variable_descriptor_count(true)
-        .descriptor_binding_sampled_image_update_after_bind(true)
+        .descriptor_binding_partially_bound(true)
         .runtime_descriptor_array(true);
+
+    let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::builder().multiview(true);
 
     let mut robust_features =
         vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
 
+    let mut f16_storage =
+        vk::PhysicalDevice16BitStorageFeatures::builder().storage_buffer16_bit_access(true);
+
+    let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::builder()
+        .shader_float16(true)
+        .shader_int8(true);
+
     let device_create_info = vk::DeviceCreateInfo::builder()
         .queue_create_infos(slice_from_ref(&queue_create_info))
         .enabled_extension_names(&extension_names)
-        .enabled_features(&enabled_features)
         .push_next(&mut descriptor_indexing_features)
         .push_next(&mut robust_features)
-        .push_next(&mut physical_device_features);
+        .push_next(&mut multiview_features)
+        .push_next(&mut f16_storage)
+        .push_next(&mut f16_arithmetic);
 
     let device =
         unsafe { vulkan_instance.create_device(physical_device, &device_create_info, None) }?;

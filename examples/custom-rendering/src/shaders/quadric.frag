@@ -1,5 +1,10 @@
 #version 460
+
 #extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_shader_explicit_arithmetic_types_int16 : require
+#extension GL_EXT_shader_explicit_arithmetic_types_float16 : require
+#extension GL_EXT_shader_16bit_storage : require
+
 #include "../../../../hotham/src/shaders/common.glsl"
 #include "../../../../hotham/src/shaders/lights.glsl"
 #include "../../../../hotham/src/shaders/brdf.glsl"
@@ -77,8 +82,8 @@ void main() {
     gl_FragDepth = v_clip_coord.z / v_clip_coord.w;
 
     // Set globals that are read inside functions for lighting etc.
-    p = hitPoint.xyz;
-    v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - p);
+    pos = hitPoint.xyz;
+    v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - pos);
 
     // Compute normal from gradient of surface quadric
     n = normalize((d.surfaceQ * hitPoint).xyz);
@@ -89,33 +94,20 @@ void main() {
     // Unpack the material parameters
     materialFlags = material.flagsAndBaseTextureID & 0xFFFF;
     baseTextureID = material.flagsAndBaseTextureID >> 16;
-    metallicRoughnessAlphaMaskCutoff = unpackUnorm4x8(
-        material.packedMetallicRoughnessFactorAlphaMaskCutoff).xyz;
 
     // Determine the base color
-    vec4 baseColor = unpackUnorm4x8(material.packedBaseColor);
+    f16vec3 baseColor = V16(unpackUnorm4x8(material.packedBaseColor));
 
-    if ((materialFlags & HAS_BASE_COLOR_TEXTURE) != 0) {
-        baseColor *= texture(textures[baseTextureID], uv);
-    }
-
-    // Handle transparency
-    if (metallicRoughnessAlphaMaskCutoff.z > 0.0f) {
-        if (baseColor.a < metallicRoughnessAlphaMaskCutoff.z) {
-            // TODO: Apparently Adreno GPUs don't like discarding.
-            discard;
-        }
+    if ((materialFlags & MATERIAL_FLAG_HAS_BASE_COLOR_TEXTURE) != 0) {
+        baseColor *= V16(texture(textures[baseTextureID], uv));
     }
 
     // Choose the correct workflow for this material
     if ((materialFlags & PBR_WORKFLOW_UNLIT) == 0) {
         outColor.rgb = getPBRMetallicRoughnessColor(baseColor);
     } else {
-        outColor = baseColor;
+        outColor.rgb = tonemap(baseColor);
     }
-
-    // Finally, tonemap the color.
-    outColor.rgb = tonemap(outColor.rgb);
 
     // Debugging
     // Shader inputs debug visualization
@@ -124,7 +116,7 @@ void main() {
         switch (index) {
             // Base Color Texture
             case 1:
-                outColor.rgba = baseColor;
+                outColor.rgb = baseColor;
                 break;
             // Normal
             case 2:
@@ -132,19 +124,19 @@ void main() {
                 break;
             // Occlusion
             case 3:
-                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).rrr;
+                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).rrr;
                 break;
             // Emission
             case 4:
-                outColor.rgb = ((materialFlags & TEXTURE_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], uv).rgb;
+                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], uv).rgb;
                 break;
             // Roughness
             case 5:
-                outColor.rgb = ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).ggg;
+                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).ggg;
                 break;
             // Metallic
             case 6:
-                outColor.rgb = ((materialFlags & HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).bbb;
+                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], uv).bbb;
                 break;
         }
         outColor = outColor;

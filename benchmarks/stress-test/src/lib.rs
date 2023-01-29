@@ -16,7 +16,6 @@ use hotham::{
         material::Material,
         mesh_data::MeshData,
         primitive::{calculate_bounding_sphere, Primitive},
-        vertex::Vertex,
     },
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands_system, physics_system,
@@ -402,7 +401,10 @@ fn update_mesh(step: usize, mesh: &Mesh, render_context: &mut RenderContext) {
     // DON'T DO THIS in a real application!
     unsafe {
         render_context.resources.index_buffer.overwrite(&indices);
-        render_context.resources.vertex_buffer.overwrite(&vertices);
+        render_context
+            .resources
+            .position_buffer
+            .overwrite(&vertices);
     }
 
     println!(
@@ -412,9 +414,6 @@ fn update_mesh(step: usize, mesh: &Mesh, render_context: &mut RenderContext) {
     );
 }
 
-fn vertex(x: f32, y: f32) -> Vertex {
-    Vertex {
-        position: [x, y, -1.0].into(),
-        ..Default::default()
-    }
+fn vertex(x: f32, y: f32) -> Vec3 {
+    [x, y, -1.0].into()
 }

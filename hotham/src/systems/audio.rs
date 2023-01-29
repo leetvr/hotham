@@ -195,7 +195,7 @@ mod tests {
         match xr_context.begin_frame() {
             Err(HothamError::NotRendering) => (),
             Ok(_) => (),
-            err => panic!("Error beginning frame: {:?}", err),
+            err => panic!("Error beginning frame: {err:?}"),
         };
         let (view_state_flags, views) = xr_context
             .session

@@ -92,7 +92,7 @@ mod tests {
                 let expected = correct_matrices[i];
                 let actual = joint_matrices[i];
                 if !relative_eq!(expected, actual) {
-                    println!("Matrix {} is incorrect", i);
+                    println!("Matrix {i} is incorrect");
                     println!("Actual:");
                     println!("{}", serde_json::to_string_pretty(&actual).unwrap());
                     println!("Expected:");

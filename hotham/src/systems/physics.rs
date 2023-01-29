@@ -74,14 +74,14 @@ fn create_rigid_bodies(world: &mut hecs::World, physics_context: &mut PhysicsCon
     {
         if r.body_type == BodyType::Dynamic && parent.is_some() {
             panic!(
-                "[HOTHAM-PHYSICS] ERROR - Entities with parents cannot have dynamic rigid bodies: {:?}",
-                entity
+                "[HOTHAM-PHYSICS] ERROR - Entities with parents cannot have dynamic rigid bodies: {entity:?}"
             );
         }
 
         let mut rigid_body = RigidBodyBuilder::new(r.body_type.into())
             .additional_mass(r.mass)
             .position(global_transform.to_isometry())
+            .angvel(na_vector_from_glam(r.angular_velocity))
             .linvel(na_vector_from_glam(r.linear_velocity))
             .user_data(entity.to_bits().get() as _)
             .build();
@@ -163,8 +163,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
 
         if body_type == BodyType::Dynamic && parent.is_some() {
             panic!(
-                "[HOTHAM-PHYSICS] ERROR - Entities with parents cannot have dynamic rigid bodies: {:?}",
-                entity
+                "[HOTHAM-PHYSICS] ERROR - Entities with parents cannot have dynamic rigid bodies: {entity:?}"
             );
         }
 

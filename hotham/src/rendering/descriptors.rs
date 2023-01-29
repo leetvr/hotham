@@ -186,7 +186,7 @@ unsafe fn create_descriptor_layouts(
             binding: CUBE_TEXTURE_BINDING,
             descriptor_type: vk::DescriptorType::COMBINED_IMAGE_SAMPLER,
             stage_flags: vk::ShaderStageFlags::FRAGMENT,
-            descriptor_count: 2,
+            descriptor_count: 100,
             ..Default::default()
         },
     ];
@@ -210,16 +210,14 @@ unsafe fn create_descriptor_layouts(
         },
     ];
 
-    let flags =
-        vk::DescriptorBindingFlags::PARTIALLY_BOUND | vk::DescriptorBindingFlags::UPDATE_AFTER_BIND;
+    let flags = vk::DescriptorBindingFlags::PARTIALLY_BOUND;
 
     let descriptor_flags = [
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
         vk::DescriptorBindingFlags::empty(),
-        vk::DescriptorBindingFlags::empty(),
         flags,
-        vk::DescriptorBindingFlags::empty(),
+        flags,
     ];
     let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
         .binding_flags(&descriptor_flags);
@@ -228,8 +226,7 @@ unsafe fn create_descriptor_layouts(
         .create_descriptor_set_layout(
             &vk::DescriptorSetLayoutCreateInfo::builder()
                 .bindings(&graphics_bindings)
-                .push_next(&mut binding_flags)
-                .flags(vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL),
+                .push_next(&mut binding_flags),
             None,
         )
         .unwrap();
@@ -263,8 +260,7 @@ unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
         .create_descriptor_pool(
             &vk::DescriptorPoolCreateInfo::builder()
                 .pool_sizes(&pool_sizes)
-                .max_sets(1000)
-                .flags(vk::DescriptorPoolCreateFlags::UPDATE_AFTER_BIND),
+                .max_sets(1000),
             None,
         )
         .unwrap()
