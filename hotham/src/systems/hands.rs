@@ -163,12 +163,15 @@ mod tests {
     }
 
     fn add_hand_to_world(world: &mut World, grabbed_entity: Option<Entity>) -> Entity {
-        let mut animation_controller = AnimationController::default();
-        animation_controller.blend_amount = 100.0; // bogus value
-
-        let mut hand = Hand::left();
-        hand.grip_value = 100.0; // bogus value
-        hand.grabbed_entity = grabbed_entity;
+        let animation_controller = AnimationController {
+            blend_amount: 100.0, // bogus value
+            ..Default::default()
+        };
+        let hand = Hand {
+            grip_value: 100.0, // bogus value
+            grabbed_entity,
+            ..Hand::left()
+        };
         world.spawn((
             animation_controller,
             hand,

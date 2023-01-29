@@ -223,7 +223,7 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                         println!("[HOTHAM_PHYSICS] Attempted to apply impulse to rigid body with infinite mass. This is stupid and will do nothing.");
                     } else {
                         println!(
-                            "[HOTHAM_PHYSICS] Applying impulse of {impulse:?} to rigid body with {mass}"
+                            "[HOTHAM_PHYSICS] Applying impulse of {impulse:?} to rigid body with {mass} mass"
                         );
                         rigid_body.apply_impulse(na_vector_from_glam(impulse), true);
                     }

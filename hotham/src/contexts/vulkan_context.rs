@@ -959,7 +959,7 @@ fn vulkan_init_legacy(
         #[cfg(debug_assertions)]
         vk_instance_exts.push(vk::ExtDebugUtilsFn::name().to_owned());
 
-        println!("[HOTHAM_VULKAN] Required Vulkan instance extensions: {vk_instance_exts:?}",);
+        println!("[HOTHAM_VULKAN] Required Vulkan instance extensions: {vk_instance_exts:?}");
         let vk_instance_ext_pointers = vk_instance_exts
             .iter()
             .map(|x| x.as_ptr())
