@@ -10,7 +10,6 @@ use hotham::{
 use crate::hologram::Hologram;
 
 type Matrix10x10 = Matrix<f32, U10, U10, ArrayStorage<f32, 10, 10>>;
-type Matrix3x10 = Matrix<f32, U3, U10, ArrayStorage<f32, 3, 10>>;
 type Matrix10x3 = Matrix<f32, U10, U3, ArrayStorage<f32, 10, 3>>;
 type Vector10 = Matrix<f32, U10, U1, ArrayStorage<f32, 10, 1>>;
 type RowVector10 = Matrix<f32, U1, U10, ArrayStorage<f32, 1, 10>>;
@@ -35,9 +34,12 @@ fn surface_solver_system_inner(world: &mut World) {
     {
         let local_from_global = local_transform.to_affine().inverse();
 
-        let mut AtA: Matrix<f32, U10, U10, ArrayStorage<f32, 10, 10>> = Default::default();
-        let mut BtB: Matrix<f32, U10, U10, ArrayStorage<f32, 10, 10>> = Default::default();
-        let mut BtN: Matrix<f32, U10, U1, ArrayStorage<f32, 10, 1>> = Default::default();
+        #[allow(non_snake_case)]
+        let mut AtA: Matrix10x10 = Default::default();
+        #[allow(non_snake_case)]
+        let mut BtB: Matrix10x10 = Default::default();
+        #[allow(non_snake_case)]
+        let mut BtN: Vector10 = Default::default();
 
         for e in &control_points.entities {
             let t = world.get::<&LocalTransform>(*e).unwrap();
