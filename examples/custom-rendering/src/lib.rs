@@ -145,6 +145,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         0.0, 1.0, 0.0, 0.0, //
         0.0, 0.0, 0.0, 0.1, //
     ]);
+    let uv3_from_local = Mat4::from_diagonal([0.0, 1.0, 0.0, 0.1].into());
     add_quadric(
         &models,
         "Sphere",
@@ -215,7 +216,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
-            uv_from_local: uv1_from_local,
+            uv_from_local: uv2_from_local,
         },
     );
 
@@ -241,7 +242,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
                     bounds_q_in_local: t2_from_local.transpose()
                         * Mat4::from_diagonal([0.0, 1.0, 0.0, -0.5].into())
                         * t2_from_local,
-                    uv_from_local: uv1_from_local,
+                    uv_from_local: uv3_from_local,
                 },
             )
         })
