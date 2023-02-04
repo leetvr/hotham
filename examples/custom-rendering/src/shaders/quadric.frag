@@ -70,7 +70,9 @@ void main() {
         step(0.0, discriminant + dot(offsetSample3, gradientOfDiscriminant)) * 8);
 
     // Pick the solution that is facing us
-    float t = -(b + sqrt(max(0.0, discriminant))) / a;
+    // float t = -(b + sqrt(max(0.0, discriminant))) / a;
+    // The "Citardauq Formula" works even if a is zero.
+    float t = c / -(b + sqrt(max(0.0, discriminant)));
 
     if (t < -0.0001) {
         t = 0.0;
