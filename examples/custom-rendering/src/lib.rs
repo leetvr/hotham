@@ -207,50 +207,55 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         },
     );
 
-    let target = add_quadric(
-        &models,
-        "Sphere",
-        world,
-        &make_transform(-1.0, 1.4, 1.5, 0.5),
-        0.5,
-        HologramData {
-            surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
-            bounds_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
-            uv_from_local: uv2_from_local,
-        },
-    );
-
+    // Quadric surfaces with varying number of control points
+    let target_initial_hologram_data = HologramData {
+        surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
+        bounds_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
+        uv_from_local: uv2_from_local,
+    };
     let t_from_local = Mat4::from_translation([0.0, -1.0, 0.0].into());
     let t2_from_local = Mat4::from_translation([0.0, -0.5, 0.0].into());
-    let entities = (0..6)
-        .map(|i| {
-            add_quadric(
-                &models,
-                "Cylinder",
-                world,
-                &make_transform(
-                    -1.0 + 0.1 * (i & 1) as f32,
-                    1.4,
-                    1.5 + 0.1 * (i >> 1) as f32,
-                    0.05,
-                ),
-                0.05,
-                HologramData {
-                    surface_q_in_local: t_from_local.transpose()
-                        * Mat4::from_diagonal([1.0, -1.0, 1.0, 0.0].into())
-                        * t_from_local,
-                    bounds_q_in_local: t2_from_local.transpose()
-                        * Mat4::from_diagonal([0.0, 1.0, 0.0, -0.5].into())
-                        * t2_from_local,
-                    uv_from_local: uv3_from_local,
-                },
-            )
-        })
-        .collect();
+    let control_point_hologram_data = HologramData {
+        surface_q_in_local: t_from_local.transpose()
+            * Mat4::from_diagonal([1.0, -1.0, 1.0, 0.0].into())
+            * t_from_local,
+        bounds_q_in_local: t2_from_local.transpose()
+            * Mat4::from_diagonal([0.0, 1.0, 0.0, -0.25].into())
+            * t2_from_local,
+        uv_from_local: uv3_from_local,
+    };
+    for n in 1..=9 {
+        let target = add_quadric(
+            &models,
+            "Sphere",
+            world,
+            &make_transform(-2.0 + n as f32, 1.4, 1.5, 0.5),
+            0.5,
+            target_initial_hologram_data,
+        );
 
-    let control_points = ControlPoints { entities };
-    world.insert_one(target, control_points).unwrap();
-    world.remove_one::<Grabbable>(target).unwrap();
+        let entities = (0..n)
+            .map(|i| {
+                add_quadric(
+                    &models,
+                    "Cylinder",
+                    world,
+                    &make_transform(
+                        -2.0 + n as f32 + 0.1 * (i & 1) as f32,
+                        1.4,
+                        1.5 + 0.1 * (i >> 1) as f32,
+                        0.05,
+                    ),
+                    0.05,
+                    control_point_hologram_data,
+                )
+            })
+            .collect();
+
+        let control_points = ControlPoints { entities };
+        world.insert_one(target, control_points).unwrap();
+        world.remove_one::<Grabbable>(target).unwrap();
+    }
 
     Ok(())
 }
