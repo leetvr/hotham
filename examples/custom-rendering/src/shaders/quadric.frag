@@ -26,18 +26,15 @@ const vec2 offsetSample1 = vec2(0.875 - 0.5, 0.375 - 0.5);
 const vec2 offsetSample2 = vec2(0.125 - 0.5, 0.625 - 0.5);
 const vec2 offsetSample3 = vec2(0.625 - 0.5, 0.875 - 0.5);
 
-const float N = 10.0; // grid ratio
-float gridTextureGradBox( in vec2 p, in vec2 ddx, in vec2 ddy )
+// Based on https://iquilezles.org/articles/filterableprocedurals/
+float filteredGrid( in vec2 p, in vec2 dpdx, in vec2 dpdy )
 {
-	// filter kernel
-    vec2 w = max(abs(ddx), abs(ddy)) + 0.01;
-
-	// analytic (box) filtering
+    const float N = 10.0;
+    vec2 w = max(abs(dpdx), abs(dpdy)) + 0.001;
     vec2 a = p + 0.5*w;
     vec2 b = p - 0.5*w;
     vec2 i = (floor(a)+min(fract(a)*N,1.0)-
               floor(b)-min(fract(b)*N,1.0))/(N*w);
-    //pattern
     return (1.0-i.x)*(1.0-i.y);
 }
 
@@ -122,7 +119,7 @@ void main() {
 
     // Determine the base color
     f16vec3 baseColor = V16(unpackUnorm4x8(material.packedBaseColor));
-    baseColor.rgb *= V16(gridTextureGradBox(uv, ddx_uv, ddy_uv));
+    baseColor.rgb *= V16(filteredGrid(uv, ddx_uv, ddy_uv));
 
     if ((materialFlags & MATERIAL_FLAG_HAS_BASE_COLOR_TEXTURE) != 0) {
         baseColor *= V16(texture(textures[baseTextureID], uv));
