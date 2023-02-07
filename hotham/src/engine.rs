@@ -313,7 +313,7 @@ impl Engine {
                     );
                 }
                 crate::workers::WorkerMessage::Error(e) => {
-                    panic!("[HOTHAM_ENGINE] Worker enountered error: {e:?}");
+                    panic!("[HOTHAM_ENGINE] Worker encountered error: {e:?}");
                 }
             }
         }
