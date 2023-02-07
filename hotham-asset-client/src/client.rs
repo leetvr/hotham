@@ -197,6 +197,7 @@ mod tests {
 
         std::thread::spawn(move || {
             tokio::runtime::Builder::new_current_thread()
+                .enable_all()
                 .build()
                 .unwrap()
                 .block_on(watch(files, sender))
