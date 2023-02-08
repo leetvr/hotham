@@ -40,6 +40,9 @@ thiserror = "1.0"
 tokio = {version = "1.0.1", default-features = false, features = ["rt"]}
 vk-shader-macros = "0.2.8"
 
+[features]
+editor = []
+
 [target.'cfg(not(any(target_os = "macos", target_os = "ios")))'.dev-dependencies]
 renderdoc = "0.10"
 

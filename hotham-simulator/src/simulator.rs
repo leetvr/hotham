@@ -173,6 +173,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
     let mut state = STATE.lock().unwrap();
 
     state.vulkan_entry.replace(entry);
+    println!("[HOTHAM_SIMULATOR] Setting Vulkan instance..");
     state.vulkan_instance.replace(ash_instance);
     Result::SUCCESS
 }

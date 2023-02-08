@@ -1,0 +1,8 @@
+{
+  "file_format_version": "1.0.0",
+  "runtime": {
+    "api_version": "1.0",
+    "name": "Hotham OpenXR Client",
+    "library_path": "..\\target\\debug\\hotham_openxr_client.dll"
+  }
+}

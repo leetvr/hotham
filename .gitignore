@@ -21,3 +21,6 @@ sponza*
 
 # Ignore compiled shaders
 *.spv
+
+# Checking in a socket is probably a terrible idea
+*.socket

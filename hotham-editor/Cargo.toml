@@ -1,0 +1,14 @@
+[package]
+edition = "2021"
+name = "hotham-editor"
+version = "0.1.0"
+
+[dependencies]
+ash = "0.37.2"
+env_logger = "0.10.0"
+lazy_vulkan = {git = "https://github.com/leetvr/lazy_vulkan", rev = "5347dd3295fd4c687c35adbe7c0b4aad00c893e3"}
+log = "0.4.17"
+winit = "0.28.1"
+
+[target.'cfg(windows)'.dependencies]
+uds_windows = "1.0.2"

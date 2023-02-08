@@ -1,0 +1,19 @@
+[package]
+edition = "2021"
+name = "hotham_openxr_client"
+version = "0.1.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+ash = "0.37.2"
+env_logger = "0.10.0"
+lazy_vulkan = {git = "https://github.com/leetvr/lazy_vulkan", rev = "aad2f44"}# main @ 8/2, year of our lord twenty twenty three
+log = "0.4.17"
+once_cell = "1.17.0"
+openxr-sys = "0.9.3"
+rand = "0.8.5"
+
+[target.'cfg(windows)'.dependencies]
+uds_windows = "1.0.2"
