@@ -2,7 +2,7 @@ mod custom_render_context;
 mod custom_rendering;
 mod hologram;
 
-use custom_render_context::CustomRenderContext;
+use custom_render_context::{create_quadrics_pipeline, CustomRenderContext};
 use custom_rendering::custom_rendering_system;
 use hologram::{Hologram, HologramData};
 use hotham::{
@@ -53,6 +53,26 @@ fn tick(
     custom_render_context: &mut CustomRenderContext,
     state: &mut State,
 ) {
+    if engine.get_updated_assets().iter().any(|asset_id| -> bool {
+        match asset_id.as_str() {
+            "examples/custom-rendering/src/shaders/quadric.frag.spv" => true,
+            "examples/custom-rendering/src/shaders/quadric.vert.spv" => true,
+            _ => false,
+        }
+    }) {
+        let vulkan_context = &mut engine.vulkan_context;
+        let render_context = &engine.render_context;
+        let quadrics_pipeline = create_quadrics_pipeline(
+            vulkan_context,
+            custom_render_context.quadrics_pipeline_layout,
+            &render_context.render_area(),
+            render_context.render_pass,
+            &render_context.shaders,
+        );
+        if let Ok(quadrics_pipeline) = quadrics_pipeline {
+            custom_render_context.quadrics_pipeline = quadrics_pipeline;
+        }
+    }
     if tick_data.current_state == xr::SessionState::FOCUSED {
         hands_system(engine);
         grabbing_system(engine);
@@ -73,6 +93,13 @@ fn tick(
 }
 
 fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
+    if option_env!("HOTHAM_ASSET_SERVER_ADDRESS").is_some() {
+        let asset_list = vec![
+            "examples/custom-rendering/src/shaders/quadric.frag.spv".into(),
+            "examples/custom-rendering/src/shaders/quadric.vert.spv".into(),
+        ];
+        engine.watch_assets(asset_list);
+    }
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let world = &mut engine.world;
