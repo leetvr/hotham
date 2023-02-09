@@ -291,7 +291,8 @@ impl Engine {
                     let render_context = &mut self.render_context;
                     let world = &mut self.world;
 
-                    let file_type = asset_updated.asset_id.split('.').last().unwrap();
+                    let file_name = asset_updated.asset_id.rsplit('/').next().unwrap();
+                    let file_type = asset_updated.asset_id.rsplit('.').next().unwrap();
                     match file_type {
                         "glb" => update_models(
                             vulkan_context,
@@ -302,7 +303,7 @@ impl Engine {
                         "spv" => update_shader(
                             vulkan_context,
                             render_context,
-                            &asset_updated.asset_id,
+                            &file_name,
                             asset_updated.asset_data,
                         ),
                         _ => {}
@@ -363,10 +364,11 @@ fn update_shader(
     {
         let shaders = &mut render_context.shaders;
         let shader = u8_to_u32(asset_data);
-        if shader_name.contains("vert") {
-            shaders.vertex_shader = shader;
+        let old = shaders.insert(shader_name.to_owned(), shader);
+        if old.is_some() {
+            println!("[HOTHAM_ASSET_HOT_RELOAD] UPDATED {shader_name}");
         } else {
-            shaders.fragment_shader = shader;
+            println!("[HOTHAM_ASSET_HOT_RELOAD] ADDED {shader_name}");
         }
     }
 

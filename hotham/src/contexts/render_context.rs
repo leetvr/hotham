@@ -44,6 +44,9 @@ use glam::{Affine3A, Mat4, Vec3, Vec4};
 use openxr as xr;
 use vk_shader_macros::include_glsl;
 
+static VERT_NAME: &str = "pbr.vert.spv";
+static FRAG_NAME: &str = "pbr.frag.spv";
+static COMPUTE_NAME: &str = "culling.comp";
 static VERT: &[u32] = include_glsl!("src/shaders/pbr.vert", target: vulkan1_1);
 static FRAG: &[u32] = include_glsl!("src/shaders/pbr.frag", target: vulkan1_1);
 static COMPUTE: &[u32] = include_glsl!("src/shaders/culling.comp", target: vulkan1_1);
@@ -71,35 +74,7 @@ pub struct RenderContext {
     pub primitive_map: HashMap<u32, InstancedPrimitive>,
 }
 
-pub struct Shaders {
-    pub vertex_shader: Vec<u32>,
-    pub fragment_shader: Vec<u32>,
-    pub compute_shader: Vec<u32>,
-}
-
-impl Default for Shaders {
-    fn default() -> Self {
-        Self {
-            vertex_shader: VERT.into(),
-            fragment_shader: FRAG.into(),
-            compute_shader: COMPUTE.into(),
-        }
-    }
-}
-
-impl Shaders {
-    pub fn new(
-        vertex_shader: Vec<u32>,
-        fragment_shader: Vec<u32>,
-        compute_shader: Vec<u32>,
-    ) -> Self {
-        Self {
-            vertex_shader,
-            fragment_shader,
-            compute_shader,
-        }
-    }
-}
+pub type Shaders = HashMap<String, Vec<u32>>;
 
 impl RenderContext {
     pub fn new(vulkan_context: &VulkanContext, xr_context: &XrContext) -> Result<Self> {
@@ -134,7 +109,11 @@ impl RenderContext {
         let pipeline_layout =
             create_pipeline_layout(vulkan_context, slice_from_ref(&descriptors.graphics_layout))?;
 
-        let shaders = Default::default();
+        let shaders = Shaders::from([
+            (VERT_NAME.into(), VERT.into()),
+            (FRAG_NAME.into(), FRAG.into()),
+            (COMPUTE_NAME.into(), COMPUTE.into()),
+        ]);
 
         let pipeline = create_pipeline(
             vulkan_context,
@@ -677,14 +656,14 @@ pub(crate) fn create_pipeline(
 
     // Vertex shader stage
     let (vertex_shader, vertex_stage) = create_shader(
-        &shaders.vertex_shader,
+        &shaders[VERT_NAME],
         vk::ShaderStageFlags::VERTEX,
         vulkan_context,
     )?;
 
     // Fragment shader stage
     let (fragment_shader, fragment_stage) = create_shader(
-        &shaders.fragment_shader,
+        &shaders[FRAG_NAME],
         vk::ShaderStageFlags::FRAGMENT,
         vulkan_context,
     )?;
