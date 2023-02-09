@@ -147,11 +147,12 @@ async fn get_asset(path: &str) -> Result<Vec<u8>> {
 }
 
 async fn get_last_updated(path: &str) -> SystemTime {
-    tokio::fs::metadata(path)
-        .await
-        .unwrap()
-        .modified()
-        .expect("[SERVER] TIME SHENNANIGANS HAVE OCURRED!")
+    match tokio::fs::metadata(path).await {
+        Ok(metadata) => metadata
+            .modified()
+            .expect("[SERVER] TIME SHENNANIGANS HAVE OCURRED!"),
+        Err(_) => SystemTime::UNIX_EPOCH.clone(),
+    }
 }
 
 pub fn make_server_endpoint(bind_addr: SocketAddr) -> Result<(Incoming, Vec<u8>), Box<dyn Error>> {
