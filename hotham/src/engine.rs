@@ -292,14 +292,15 @@ impl Engine {
                     let world = &mut self.world;
 
                     let file_type = asset_updated.asset_id.split('.').last().unwrap();
-                    match file_type {
-                        "glb" => update_models(
+                    match (asset_updated.asset_id.as_str(), file_type) {
+                        (_, "glb") => update_models(
                             vulkan_context,
                             render_context,
                             world,
                             asset_updated.asset_data,
                         ),
-                        "spv" => update_shader(
+                        ("hotham/src/shaders/pbr.frag.spv", _)
+                        | ("hotham/src/shaders/pbr.vert.spv", _) => update_shader(
                             vulkan_context,
                             render_context,
                             &asset_updated.asset_id,
