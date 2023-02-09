@@ -109,6 +109,7 @@ impl<'a> EngineBuilder<'a> {
             stage_entity,
             hmd_entity,
             performance_timer: PerformanceTimer::new("Application Tick"),
+            recently_updated_assets: Default::default(),
             workers: Workers::new(Default::default()),
         }
     }
@@ -161,6 +162,8 @@ pub struct Engine {
     pub hmd_entity: hecs::Entity,
     /// Performance timers
     pub performance_timer: PerformanceTimer,
+    /// File paths that were hot reloaded this frame
+    recently_updated_assets: Vec<String>,
     /// Workers
     workers: Workers,
 }
@@ -282,7 +285,13 @@ impl Engine {
         self.workers = Workers::new(asset_list);
     }
 
+    /// Get a list of assets updated this frame.
+    pub fn get_updated_assets(&self) -> &Vec<String> {
+        &self.recently_updated_assets
+    }
+
     fn check_for_worker_messages(&mut self) {
+        self.recently_updated_assets.clear();
         for message in self.workers.receiver.try_iter() {
             match message {
                 crate::workers::WorkerMessage::AssetUpdated(asset_updated) => {
@@ -308,6 +317,7 @@ impl Engine {
                         ),
                         _ => {}
                     }
+                    self.recently_updated_assets.push(asset_updated.asset_id);
                     println!(
                         "[HOTHAM_ASSET_HOT_RELOAD] Asset reload took {:.2} seconds",
                         Instant::now().duration_since(tick).as_secs_f32()
