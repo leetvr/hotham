@@ -1,7 +1,10 @@
 use hotham::{
     anyhow::Result,
     ash,
-    contexts::{render_context::create_shader, VulkanContext},
+    contexts::{
+        render_context::{create_shader, Shaders},
+        VulkanContext,
+    },
     glam::{Affine3A, Mat4, Vec3, Vec4},
     rendering::{buffer::Buffer, primitive::Primitive, vertex::Vertex},
     vk,
@@ -70,11 +73,18 @@ impl CustomRenderContext {
         let create_info = &vk::PipelineLayoutCreateInfo::builder().set_layouts(&layouts);
         let quadrics_pipeline_layout =
             unsafe { device.create_pipeline_layout(create_info, None).unwrap() };
+        render_context
+            .shaders
+            .insert("quadric.vert.spv".into(), QUADRIC_VERT.into());
+        render_context
+            .shaders
+            .insert("quadric.frag.spv".into(), QUADRIC_FRAG.into());
         let quadrics_pipeline = create_quadrics_pipeline(
             vulkan_context,
             quadrics_pipeline_layout,
             &render_context.render_area(),
             render_context.render_pass,
+            &render_context.shaders,
         )
         .unwrap();
         let quadrics_descriptor_set = unsafe {
@@ -141,19 +151,26 @@ fn create_quadrics_descriptor_set_layout(device: &ash::Device) -> vk::Descriptor
 }
 
 // This is duplicated from hotham/src/contexts/render_context.rs with only minor changes.
-fn create_quadrics_pipeline(
+pub fn create_quadrics_pipeline(
     vulkan_context: &VulkanContext,
     pipeline_layout: vk::PipelineLayout,
     render_area: &vk::Rect2D,
     render_pass: vk::RenderPass,
+    shaders: &Shaders,
 ) -> Result<vk::Pipeline> {
     // Vertex shader stage
-    let (vertex_shader, vertex_stage) =
-        create_shader(QUADRIC_VERT, vk::ShaderStageFlags::VERTEX, vulkan_context)?;
+    let (vertex_shader, vertex_stage) = create_shader(
+        &shaders["quadric.vert.spv"],
+        vk::ShaderStageFlags::VERTEX,
+        vulkan_context,
+    )?;
 
     // Fragment shader stage
-    let (fragment_shader, fragment_stage) =
-        create_shader(QUADRIC_FRAG, vk::ShaderStageFlags::FRAGMENT, vulkan_context)?;
+    let (fragment_shader, fragment_stage) = create_shader(
+        &shaders["quadric.frag.spv"],
+        vk::ShaderStageFlags::FRAGMENT,
+        vulkan_context,
+    )?;
 
     let stages = [vertex_stage, fragment_stage];
 
