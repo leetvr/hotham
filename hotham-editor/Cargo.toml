@@ -4,8 +4,10 @@ name = "hotham-editor"
 version = "0.1.0"
 
 [dependencies]
+anyhow = "1.0.69"
 ash = "0.37.2"
 env_logger = "0.10.0"
+hotham-editor-protocol = {path = "../hotham-editor-protocol"}
 lazy_vulkan = {git = "https://github.com/leetvr/lazy_vulkan", rev = "5347dd3295fd4c687c35adbe7c0b4aad00c893e3"}
 log = "0.4.17"
 winit = "0.28.1"

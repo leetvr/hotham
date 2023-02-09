@@ -6,5 +6,9 @@
     "files.insertFinalNewline": true,
     "files.trimFinalNewlines": true,
     "files.trimTrailingWhitespace": true,
-    "webgl-glsl-editor.format.placeSpaceAfterKeywords": true
+    "webgl-glsl-editor.format.placeSpaceAfterKeywords": true,
+    "rust-analyzer.check.extraArgs": [
+        "--target-dir",
+        "C:/windows/temp/rust-analyzer-check"
+    ],
 }

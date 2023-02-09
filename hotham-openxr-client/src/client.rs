@@ -6,6 +6,7 @@
 )]
 use crate::space_state::SpaceState;
 use ash::vk::{self, Handle};
+use hotham_editor_protocol::{requests, responses, EditorClient, Request};
 use log::{debug, error, trace};
 use once_cell::sync::OnceCell;
 use openxr_sys::{
@@ -29,6 +30,7 @@ use std::{
     collections::HashMap,
     ffi::{c_char, CStr},
     mem::transmute,
+    ptr::null_mut,
 };
 use std::{ptr, slice};
 use uds_windows::UnixStream;
@@ -42,7 +44,7 @@ static INSTANCE: OnceCell<Instance> = OnceCell::new();
 static SESSION: OnceCell<Session> = OnceCell::new();
 static VULKAN_CONTEXT: OnceCell<VulkanContext> = OnceCell::new();
 static mut SPACES: OnceCell<SpaceMap> = OnceCell::new();
-static STREAM: OnceCell<UnixStream> = OnceCell::new();
+static mut EDITOR_CLIENT: OnceCell<EditorClient<UnixStream>> = OnceCell::new();
 
 pub unsafe extern "system" fn enumerate_instance_extension_properties(
     _layer_names: *const ::std::os::raw::c_char,
@@ -101,7 +103,7 @@ pub unsafe extern "system" fn create_instance(
     match UnixStream::connect("hotham_editor.socket") {
         Ok(stream) => {
             trace!("Successfully connected to editor!");
-            drop(STREAM.set(stream));
+            drop(EDITOR_CLIENT.set(EditorClient::new(stream)));
             Result::SUCCESS
         }
         Err(e) => {
@@ -185,8 +187,6 @@ pub unsafe extern "system" fn create_vulkan_device(
     let device_create_info: &vk::DeviceCreateInfo = &*create_info.vulkan_create_info.cast();
     trace!("Physical device: {physical_device:?}");
     trace!("Create info: {device_create_info:?}");
-
-    // let t = instance.
 
     // Create a Vulkan device for the *application*. We'll stash our own away soon enough,
     // don't you worry about that.
@@ -481,30 +481,34 @@ pub unsafe extern "system" fn enumerate_view_configuration_views(
     view_count_output: *mut u32,
     views: *mut ViewConfigurationView,
 ) -> Result {
-    // if view_capacity_input == 0 {
-    //     *view_count_output = NUM_VIEWS as _;
-    //     return Result::ERROR_FEATURE_UNSUPPORTED;
-    // }
+    trace!("enumerate_view_configuration_views");
+    let client = EDITOR_CLIENT.get_mut().unwrap();
+    if view_capacity_input == 0 {
+        let view_count = client.request(&requests::GetViewCount {}).unwrap();
+        trace!("Received view count from server {view_count}");
+        *view_count_output = view_count;
+        return Result::SUCCESS;
+    }
 
-    // println!(
-    //     "[HOTHAM_SIMULATOR] enumerate_view_configuration_views called with: {view_capacity_input}"
-    // );
+    let view_configuration = client.request(&requests::GetViewConfiguration {}).unwrap();
 
-    // let views = std::ptr::slice_from_raw_parts_mut(views, NUM_VIEWS);
+    set_array(
+        view_capacity_input,
+        view_count_output,
+        views,
+        [ViewConfigurationView {
+            ty: StructureType::VIEW_CONFIGURATION_VIEW,
+            next: null_mut(),
+            recommended_image_rect_width: view_configuration.width,
+            max_image_rect_height: view_configuration.height,
+            recommended_swapchain_sample_count: 1,
+            max_swapchain_sample_count: 1,
+            max_image_rect_width: view_configuration.width,
+            recommended_image_rect_height: view_configuration.height,
+        }; 3],
+    );
 
-    // for i in 0..NUM_VIEWS {
-    //     (*views)[i] = ViewConfigurationView {
-    //         ty: StructureType::VIEW_CONFIGURATION_VIEW,
-    //         next: null_mut(),
-    //         recommended_image_rect_width: VIEWPORT_WIDTH as _,
-    //         max_image_rect_width: VIEWPORT_WIDTH as _,
-    //         recommended_image_rect_height: VIEWPORT_HEIGHT as _,
-    //         max_image_rect_height: VIEWPORT_HEIGHT as _,
-    //         recommended_swapchain_sample_count: 3,
-    //         max_swapchain_sample_count: 3,
-    //     };
-    // }
-    Result::ERROR_FEATURE_UNSUPPORTED
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn create_xr_swapchain(

@@ -1,10 +1,6 @@
-// TODO Safety doc would be nice
-#![allow(clippy::missing_safety_doc)]
-
 mod client;
 
 mod space_state;
-mod state;
 
 use std::ffi::c_char;
 
@@ -144,7 +140,6 @@ pub unsafe extern "system" fn get_instance_proc_addr(
             panic!("UNIMPLEMENTED FUNCTION!");
         }
         *function = transmute::<DummyFn, _>(bang);
-        // return Result::ERROR_HANDLE_INVALID.into_raw();
     }
     Result::SUCCESS
 }

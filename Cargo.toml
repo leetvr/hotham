@@ -10,7 +10,7 @@ members = [
   "hotham-asset-server",
   "hotham-simulator",
   "hotham-editor",
-  "hotham-editor-client",
+  "hotham-editor-protocol",
   "hotham-openxr-client",
   "hotham",
 ]

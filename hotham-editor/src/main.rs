@@ -1,9 +1,11 @@
+use anyhow::{bail, Result};
 use ash::vk;
+use hotham_editor_protocol::{requests, responses, EditorServer, RequestType};
 use lazy_vulkan::{
-    find_memorytype_index, vulkan_texture::VulkanTexture, DrawCall, LazyRenderer, LazyVulkan,
-    SwapchainInfo, Vertex,
+    find_memorytype_index, vulkan_context::VulkanContext, vulkan_texture::VulkanTexture, DrawCall,
+    LazyRenderer, LazyVulkan, SwapchainInfo, Vertex,
 };
-use log::{debug, info};
+use log::{debug, info, trace};
 use std::io::{Read, Write};
 use uds_windows::{UnixListener, UnixStream};
 use winit::{
@@ -18,7 +20,7 @@ static VERTEX_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.vert.spv");
 const SWAPCHAIN_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
 static UNIX_SOCKET_PATH: &'_ str = "hotham_editor.socket";
 
-pub fn main() {
+pub fn main() -> Result<()> {
     env_logger::builder()
         .filter_level(log::LevelFilter::Info)
         .init();
@@ -49,6 +51,7 @@ pub fn main() {
     if std::fs::remove_file(UNIX_SOCKET_PATH).is_ok() {
         debug!("Removed pre-existing unix socket at {UNIX_SOCKET_PATH}");
     }
+
     let listener = UnixListener::bind(UNIX_SOCKET_PATH).unwrap();
     info!("Listening on {UNIX_SOCKET_PATH} - waiting for client..");
     let swapchain_info = SwapchainInfo {
@@ -56,17 +59,14 @@ pub fn main() {
         resolution: lazy_vulkan.surface.surface_resolution,
         format: SWAPCHAIN_FORMAT,
     };
-    let (images, image_memory_handles) =
-        unsafe { create_render_images(lazy_vulkan.context(), &swapchain_info) };
-    let (semaphores, semaphore_handles) =
-        unsafe { create_semaphores(lazy_vulkan.context(), swapchain_info.image_count) };
-    let textures = create_render_textures(lazy_vulkan.context(), &mut lazy_renderer, images);
     let (mut stream, _) = listener.accept().unwrap();
-    info!("Client connected!");
-    let mut buf: [u8; 1024] = [0; 1024];
-    send_swapchain_info(&mut stream, &swapchain_info, &mut buf).unwrap();
-    send_image_memory_handles(&mut stream, image_memory_handles, &mut buf).unwrap();
-    send_semaphore_handles(&mut stream, semaphore_handles, &mut buf);
+    let mut server = EditorServer::new(stream);
+    let xr_swapchain = do_openxr_setup(&mut server, lazy_vulkan.context(), &swapchain_info)?;
+    let textures = create_render_textures(
+        lazy_vulkan.context(),
+        &mut lazy_renderer,
+        xr_swapchain.images,
+    );
 
     // Off we go!
     let mut winit_initializing = true;
@@ -98,8 +98,8 @@ pub fn main() {
 
             Event::MainEventsCleared => {
                 let framebuffer_index = lazy_vulkan.render_begin();
-                send_swapchain_image_index(&mut stream, &mut buf, framebuffer_index);
-                get_render_complete(&mut stream, &mut buf);
+                // send_swapchain_image_index(&mut stream, &mut buf, framebuffer_index);
+                // get_render_complete(&mut stream, &mut buf);
                 let texture_id = textures[framebuffer_index as usize].id;
                 lazy_renderer.render(
                     lazy_vulkan.context(),
@@ -112,7 +112,7 @@ pub fn main() {
                     )],
                 );
 
-                let semaphore = semaphores[framebuffer_index as usize];
+                let semaphore = xr_swapchain.semaphores[framebuffer_index as usize];
                 lazy_vulkan.render_end(
                     framebuffer_index,
                     &[semaphore, lazy_vulkan.rendering_complete_semaphore],
@@ -135,6 +135,47 @@ pub fn main() {
     unsafe {
         lazy_renderer.cleanup(&lazy_vulkan.context().device);
     }
+
+    Ok(())
+}
+
+pub struct XrSwapchain {
+    images: Vec<vk::Image>,
+    semaphores: Vec<vk::Semaphore>,
+}
+
+fn do_openxr_setup(
+    server: &mut EditorServer<UnixStream>,
+    vulkan_context: &VulkanContext,
+    swapchain_info: &SwapchainInfo,
+) -> Result<XrSwapchain> {
+    check_request(server, RequestType::GetViewCount)?;
+    server.send_response(&swapchain_info.image_count)?;
+
+    check_request(server, RequestType::GetViewConfiguration)?;
+    server.send_response(&responses::ViewConfiguration {
+        width: swapchain_info.resolution.width,
+        height: swapchain_info.resolution.height,
+    })?;
+
+    let (images, image_memory_handles) =
+        unsafe { create_render_images(vulkan_context, &swapchain_info) };
+    let (semaphores, semaphore_handles) =
+        unsafe { create_semaphores(vulkan_context, swapchain_info.image_count) };
+
+    Ok(XrSwapchain { images, semaphores })
+}
+
+fn check_request(
+    server: &mut EditorServer<UnixStream>,
+    expected_request_type: RequestType,
+) -> Result<(), anyhow::Error> {
+    let header = server.get_request_header()?;
+    if header.request_type != expected_request_type {
+        bail!("Invalid request type: {:?}!", header.request_type);
+    }
+    trace!("Received request from cilent {expected_request_type:?}");
+    Ok(())
 }
 
 fn send_semaphore_handles(
