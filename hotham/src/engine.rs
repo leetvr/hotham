@@ -9,6 +9,7 @@ use crate::{
     workers::Workers,
     HothamError, HothamResult, VIEW_TYPE,
 };
+use hotham_asset_client::AssetUpdatedMessage;
 use openxr as xr;
 
 use std::{
@@ -109,6 +110,7 @@ impl<'a> EngineBuilder<'a> {
             stage_entity,
             hmd_entity,
             performance_timer: PerformanceTimer::new("Application Tick"),
+            recently_updated_assets: Default::default(),
             workers: Workers::new(Default::default()),
         }
     }
@@ -161,6 +163,8 @@ pub struct Engine {
     pub hmd_entity: hecs::Entity,
     /// Performance timers
     pub performance_timer: PerformanceTimer,
+    /// Files that were hot reloaded this frame
+    recently_updated_assets: Vec<AssetUpdatedMessage>,
     /// Workers
     workers: Workers,
 }
@@ -282,7 +286,13 @@ impl Engine {
         self.workers = Workers::new(asset_list);
     }
 
+    /// Get a list of assets updated this frame.
+    pub fn get_updated_assets(&self) -> &Vec<AssetUpdatedMessage> {
+        &self.recently_updated_assets
+    }
+
     fn check_for_worker_messages(&mut self) {
+        self.recently_updated_assets.clear();
         for message in self.workers.receiver.try_iter() {
             match message {
                 crate::workers::WorkerMessage::AssetUpdated(asset_updated) => {
@@ -297,17 +307,18 @@ impl Engine {
                             vulkan_context,
                             render_context,
                             world,
-                            asset_updated.asset_data,
+                            asset_updated.asset_data.clone(),
                         ),
                         ("hotham/src/shaders/pbr.frag.spv", _)
                         | ("hotham/src/shaders/pbr.vert.spv", _) => update_shader(
                             vulkan_context,
                             render_context,
                             &asset_updated.asset_id,
-                            asset_updated.asset_data,
+                            asset_updated.asset_data.clone(),
                         ),
                         _ => {}
                     }
+                    self.recently_updated_assets.push(asset_updated);
                     println!(
                         "[HOTHAM_ASSET_HOT_RELOAD] Asset reload took {:.2} seconds",
                         Instant::now().duration_since(tick).as_secs_f32()
