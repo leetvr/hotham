@@ -516,6 +516,7 @@ pub unsafe extern "system" fn create_xr_swapchain(
     create_info: *const SwapchainCreateInfo,
     swapchain: *mut Swapchain,
 ) -> Result {
+    trace!("create_swapchain");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
