@@ -100,12 +100,17 @@ impl VulkanContext {
         };
 
         // Seems fine.
+        #[cfg(target_os = "android")]
         let enabled_extensions = [
             "VK_EXT_astc_decode_mode",
             "VK_EXT_descriptor_indexing",
             "VK_KHR_shader_float16_int8",
         ]
         .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
+
+        #[cfg(not(target_os = "android"))]
+        let enabled_extensions = ["VK_EXT_descriptor_indexing", "VK_KHR_shader_float16_int8"]
+            .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
 
         let mut descriptor_indexing_features =
             vk::PhysicalDeviceDescriptorIndexingFeatures::builder()

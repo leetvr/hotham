@@ -57,9 +57,9 @@ pub fn main() -> Result<()> {
     let swapchain_info = SwapchainInfo {
         image_count: lazy_vulkan.surface.desired_image_count,
         resolution: lazy_vulkan.surface.surface_resolution,
-        format: SWAPCHAIN_FORMAT,
+        format: vk::Format::R8G8B8A8_SRGB,
     };
-    let (mut stream, _) = listener.accept().unwrap();
+    let (stream, _) = listener.accept().unwrap();
     let mut server = EditorServer::new(stream);
     let xr_swapchain = do_openxr_setup(&mut server, lazy_vulkan.context(), &swapchain_info)?;
     let textures = create_render_textures(
@@ -149,6 +149,11 @@ fn do_openxr_setup(
     vulkan_context: &VulkanContext,
     swapchain_info: &SwapchainInfo,
 ) -> Result<XrSwapchain> {
+    let (images, image_memory_handles) =
+        unsafe { create_render_images(vulkan_context, &swapchain_info) };
+    let (semaphores, semaphore_handles) =
+        unsafe { create_semaphores(vulkan_context, swapchain_info.image_count) };
+
     check_request(server, RequestType::GetViewCount)?;
     server.send_response(&swapchain_info.image_count)?;
 
@@ -158,10 +163,17 @@ fn do_openxr_setup(
         height: swapchain_info.resolution.height,
     })?;
 
-    let (images, image_memory_handles) =
-        unsafe { create_render_images(vulkan_context, &swapchain_info) };
-    let (semaphores, semaphore_handles) =
-        unsafe { create_semaphores(vulkan_context, swapchain_info.image_count) };
+    check_request(server, RequestType::GetSwapchainInfo)?;
+    server.send_response(&responses::SwapchainInfo {
+        format: swapchain_info.format,
+        resolution: swapchain_info.resolution,
+    })?;
+
+    check_request(server, RequestType::GetSwapchainImages)?;
+    server.send_response_vec(&image_memory_handles)?;
+
+    check_request(server, RequestType::GetSwapchainSemaphores)?;
+    server.send_response_vec(&semaphore_handles)?;
 
     Ok(XrSwapchain { images, semaphores })
 }
@@ -301,7 +313,7 @@ unsafe fn create_render_images(
                         format: *format,
                         extent: (*resolution).into(),
                         mip_levels: 1,
-                        array_layers: 1,
+                        array_layers: 2,
                         samples: vk::SampleCountFlags::TYPE_1,
                         tiling: vk::ImageTiling::OPTIMAL,
                         usage: vk::ImageUsageFlags::TRANSFER_DST | vk::ImageUsageFlags::SAMPLED,

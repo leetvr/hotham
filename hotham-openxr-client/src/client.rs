@@ -6,7 +6,11 @@
 )]
 use crate::space_state::SpaceState;
 use ash::vk::{self, Handle};
-use hotham_editor_protocol::{requests, responses, EditorClient, Request};
+use hotham_editor_protocol::{
+    requests,
+    responses::{self, SwapchainInfo},
+    EditorClient, Request,
+};
 use log::{debug, error, trace};
 use once_cell::sync::OnceCell;
 use openxr_sys::{
@@ -16,12 +20,13 @@ use openxr_sys::{
     EnvironmentBlendMode, EventDataBuffer, ExtensionProperties, FrameBeginInfo, FrameEndInfo,
     FrameState, FrameWaitInfo, GraphicsBindingVulkanKHR, GraphicsRequirementsVulkanKHR,
     HapticActionInfo, HapticBaseHeader, Instance, InstanceCreateInfo, InstanceProperties,
-    InteractionProfileSuggestedBinding, Path, ReferenceSpaceCreateInfo, ReferenceSpaceType, Result,
-    Session, SessionActionSetsAttachInfo, SessionBeginInfo, SessionCreateInfo, Space,
-    SpaceLocation, StructureType, Swapchain, SwapchainCreateInfo, SwapchainImageAcquireInfo,
-    SwapchainImageBaseHeader, SwapchainImageReleaseInfo, SwapchainImageWaitInfo, SystemGetInfo,
-    SystemId, SystemProperties, Time, Version, View, ViewConfigurationType, ViewConfigurationView,
-    ViewLocateInfo, ViewState, VulkanDeviceCreateInfoKHR, VulkanGraphicsDeviceGetInfoKHR,
+    InteractionProfileSuggestedBinding, Path, Quaternionf, ReferenceSpaceCreateInfo,
+    ReferenceSpaceType, Result, Session, SessionActionSetsAttachInfo, SessionBeginInfo,
+    SessionCreateInfo, Space, SpaceLocation, StructureType, Swapchain, SwapchainCreateInfo,
+    SwapchainImageAcquireInfo, SwapchainImageBaseHeader, SwapchainImageReleaseInfo,
+    SwapchainImageVulkanKHR, SwapchainImageWaitInfo, SystemGetInfo, SystemId, SystemProperties,
+    Time, Vector3f, Version, View, ViewConfigurationType, ViewConfigurationView, ViewLocateInfo,
+    ViewState, VulkanDeviceCreateInfoKHR, VulkanGraphicsDeviceGetInfoKHR,
     VulkanInstanceCreateInfoKHR, FALSE, TRUE,
 };
 
@@ -37,6 +42,9 @@ use uds_windows::UnixStream;
 
 type PartialVulkan = (ash::Entry, ash::Instance);
 type SpaceMap = HashMap<u64, SpaceState>;
+type StringToPathMap = HashMap<String, Path>;
+type PathToStringMap = HashMap<Path, String>;
+type BindingMap = HashMap<Path, Action>;
 
 // Used during the init phase
 static mut PARTIAL_VULKAN: OnceCell<PartialVulkan> = OnceCell::new();
@@ -45,6 +53,12 @@ static SESSION: OnceCell<Session> = OnceCell::new();
 static VULKAN_CONTEXT: OnceCell<VulkanContext> = OnceCell::new();
 static mut SPACES: OnceCell<SpaceMap> = OnceCell::new();
 static mut EDITOR_CLIENT: OnceCell<EditorClient<UnixStream>> = OnceCell::new();
+static mut STRING_TO_PATH: OnceCell<StringToPathMap> = OnceCell::new();
+static mut PATH_TO_STRING: OnceCell<PathToStringMap> = OnceCell::new();
+static mut BINDINGS: OnceCell<BindingMap> = OnceCell::new();
+static mut VIEW_COUNT: u32 = 0; // handy to keep around
+static mut SWAPCHAIN_IMAGES: OnceCell<Vec<vk::Image>> = OnceCell::new();
+static mut SWAPCHAIN_SEMAPHORES: OnceCell<Vec<vk::Semaphore>> = OnceCell::new();
 
 pub unsafe extern "system" fn enumerate_instance_extension_properties(
     _layer_names: *const ::std::os::raw::c_char,
@@ -92,8 +106,11 @@ pub unsafe extern "system" fn create_instance(
 
     trace!("create_instance");
 
-    // Initialise our spaces map
+    // Initialise our various maps
     let _ = SPACES.set(Default::default());
+    let _ = STRING_TO_PATH.set(Default::default());
+    let _ = PATH_TO_STRING.set(Default::default());
+    let _ = BINDINGS.set(Default::default());
 
     // New instance, new luck.
     *instance = Instance::from_raw(rand::random());
@@ -184,14 +201,33 @@ pub unsafe extern "system" fn create_vulkan_device(
     let create_info = &*create_info;
     let physical_device: vk::PhysicalDevice =
         vk::PhysicalDevice::from_raw(transmute(create_info.vulkan_physical_device));
-    let device_create_info: &vk::DeviceCreateInfo = &*create_info.vulkan_create_info.cast();
+    let device_create_info: &mut vk::DeviceCreateInfo =
+        &mut *create_info.vulkan_create_info.cast_mut().cast(); // evil? probably
+    let mut extension_names = std::slice::from_raw_parts(
+        device_create_info.pp_enabled_extension_names,
+        device_create_info.enabled_extension_count as _,
+    )
+    .to_vec();
+
+    #[cfg(target_os = "windows")]
+    extension_names.push(ash::extensions::khr::ExternalMemoryWin32::name().as_ptr());
+
+    #[cfg(target_os = "windows")]
+    extension_names.push(ash::extensions::khr::ExternalSemaphoreWin32::name().as_ptr());
+
+    for e in &extension_names {
+        let e = CStr::from_ptr(*e).to_str().unwrap();
+        trace!("Application requested Vulkan extension: {e}")
+    }
+
+    device_create_info.enabled_extension_count = extension_names.len() as _;
+    device_create_info.pp_enabled_extension_names = extension_names.as_ptr();
+
     trace!("Physical device: {physical_device:?}");
     trace!("Create info: {device_create_info:?}");
 
-    // Create a Vulkan device for the *application*. We'll stash our own away soon enough,
-    // don't you worry about that.
     let device = instance
-        .create_device(physical_device, &vk::DeviceCreateInfo::builder(), None)
+        .create_device(physical_device, device_create_info, None)
         .unwrap();
 
     *vulkan_device = transmute(device.handle().as_raw());
@@ -277,7 +313,10 @@ pub unsafe extern "system" fn create_action_set(
     action_set: *mut ActionSet,
 ) -> Result {
     trace!("create_action_set");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    let name = CStr::from_ptr((*create_info).action_set_name.as_ptr());
+    trace!("Creating action set with name {name:?}");
+    *action_set = ActionSet::from_raw(rand::random());
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn create_action(
@@ -286,14 +325,29 @@ pub unsafe extern "system" fn create_action(
     action_out: *mut Action,
 ) -> Result {
     trace!("create_action");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    *action_out = Action::from_raw(rand::random());
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn suggest_interaction_profile_bindings(
     _instance: Instance,
     suggested_bindings: *const InteractionProfileSuggestedBinding,
 ) -> Result {
-    Result::ERROR_FEATURE_UNSUPPORTED
+    trace!("suggest_interaction_profile_bindings");
+    let suggested_bindings = *suggested_bindings;
+
+    let bindings = std::slice::from_raw_parts(
+        suggested_bindings.suggested_bindings,
+        suggested_bindings.count_suggested_bindings as _,
+    );
+
+    let bindings_map = BINDINGS.get_mut().unwrap();
+
+    for binding in bindings {
+        bindings_map.insert(binding.binding, binding.action);
+    }
+
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn string_to_path(
@@ -301,10 +355,21 @@ pub unsafe extern "system" fn string_to_path(
     path_string: *const c_char,
     path_out: *mut Path,
 ) -> Result {
+    trace!("string_to_path");
     match CStr::from_ptr(path_string).to_str() {
-        Ok(s) => {
+        Ok(path_string) => {
             let path = Path::from_raw(rand::random());
-            Result::ERROR_FEATURE_UNSUPPORTED
+            trace!("Adding ({path_string}, {path:?}) to path map");
+            STRING_TO_PATH
+                .get_mut()
+                .unwrap()
+                .insert(path_string.to_string(), path.clone());
+            PATH_TO_STRING
+                .get_mut()
+                .unwrap()
+                .insert(path.clone(), path_string.to_string());
+            *path_out = path;
+            Result::SUCCESS
         }
         Err(_) => Result::ERROR_VALIDATION_FAILURE,
     }
@@ -314,8 +379,8 @@ pub unsafe extern "system" fn attach_action_sets(
     _session: Session,
     _attach_info: *const SessionActionSetsAttachInfo,
 ) -> Result {
-    println!("[HOTHAM_SIMULATOR] Attach action sets called");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    trace!("attach_action_sets");
+    Result::SUCCESS
 }
 
 // TODO: Handle aim pose.
@@ -324,55 +389,58 @@ pub unsafe extern "system" fn create_action_space(
     create_info: *const ActionSpaceCreateInfo,
     space_out: *mut Space,
 ) -> Result {
-    // match state
-    //     .path_string
-    //     .get(&(*create_info).subaction_path)
-    //     .map(|s| s.as_str())
-    // {
-    // Some("/user/hand/left") => {
-    //     let mut space_state = SpaceState::new("Left Hand");
-    //     space_state.position = Vector3f {
-    //         x: -0.20,
-    //         y: 1.4,
-    //         z: -0.50,
-    //     };
-    //     space_state.orientation = Quaternionf {
-    //         x: 0.707,
-    //         y: 0.,
-    //         z: 0.,
-    //         w: 0.707,
-    //     };
-    //     println!("[HOTHAM_SIMULATOR] Created left hand space: {space_state:?}, {space:?}");
-    //     state.left_hand_space = raw;
-    //     state.spaces.insert(raw, space_state);
-    // }
-    // Some("/user/hand/right") => {
-    //     let mut space_state = SpaceState::new("Right Hand");
-    //     space_state.orientation = Quaternionf {
-    //         x: 0.707,
-    //         y: 0.,
-    //         z: 0.,
-    //         w: 0.707,
-    //     };
-    //     space_state.position = Vector3f {
-    //         x: 0.20,
-    //         y: 1.4,
-    //         z: -0.50,
-    //     };
-    //     println!("[HOTHAM_SIMULATOR] Created right hand space: {space_state:?}, {space:?}");
-    //     state.right_hand_space = raw;
-    //     state.spaces.insert(raw, space_state);
-    // }
-    // Some(path) => {
-    //     let space_state = SpaceState::new(path);
-    //     println!("[HOTHAM_SIMULATOR] Created space for path: {path}");
-    //     state.spaces.insert(raw, space_state);
-    // }
-    // _ => {}
-    // }
+    trace!("create_action_space");
+    let path_string = PATH_TO_STRING
+        .get()
+        .unwrap()
+        .get(&(*create_info).subaction_path)
+        .map(|s| s.as_str());
+    let space = Space::from_raw(rand::random());
+    let spaces = SPACES.get_mut().unwrap();
 
-    // *space_out = space;
-    Result::ERROR_FEATURE_UNSUPPORTED
+    match path_string {
+        Some("/user/hand/left") => {
+            let mut space_state = SpaceState::new("Left Hand");
+            space_state.position = Vector3f {
+                x: -0.20,
+                y: 1.4,
+                z: -0.50,
+            };
+            space_state.orientation = Quaternionf {
+                x: 0.707,
+                y: 0.,
+                z: 0.,
+                w: 0.707,
+            };
+            trace!("Created left hand space: {space_state:?}, {space:?}");
+            spaces.insert(space.into_raw(), space_state);
+        }
+        Some("/user/hand/right") => {
+            let mut space_state = SpaceState::new("Right Hand");
+            space_state.orientation = Quaternionf {
+                x: 0.707,
+                y: 0.,
+                z: 0.,
+                w: 0.707,
+            };
+            space_state.position = Vector3f {
+                x: 0.20,
+                y: 1.4,
+                z: -0.50,
+            };
+            trace!("Created right hand space: {space_state:?}, {space:?}");
+            spaces.insert(space.into_raw(), space_state);
+        }
+        Some(path) => {
+            let space_state = SpaceState::new(path);
+            trace!("Created new space: {space_state:?}, {space:?}");
+            spaces.insert(space.into_raw(), space_state);
+        }
+        _ => return Result::ERROR_PATH_INVALID,
+    };
+
+    *space_out = space;
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn create_reference_space(
@@ -487,6 +555,7 @@ pub unsafe extern "system" fn enumerate_view_configuration_views(
         let view_count = client.request(&requests::GetViewCount {}).unwrap();
         trace!("Received view count from server {view_count}");
         *view_count_output = view_count;
+        VIEW_COUNT = view_count;
         return Result::SUCCESS;
     }
 
@@ -513,11 +582,12 @@ pub unsafe extern "system" fn enumerate_view_configuration_views(
 
 pub unsafe extern "system" fn create_xr_swapchain(
     _session: Session,
-    create_info: *const SwapchainCreateInfo,
+    _create_info: *const SwapchainCreateInfo,
     swapchain: *mut Swapchain,
 ) -> Result {
     trace!("create_swapchain");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    *swapchain = Swapchain::from_raw(rand::random());
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn enumerate_swapchain_images(
@@ -526,7 +596,47 @@ pub unsafe extern "system" fn enumerate_swapchain_images(
     image_count_output: *mut u32,
     images: *mut SwapchainImageBaseHeader,
 ) -> Result {
-    Result::ERROR_FEATURE_UNSUPPORTED
+    trace!("enumerate_swapchain_images");
+    if image_capacity_input == 0 {
+        *image_count_output = VIEW_COUNT;
+        return Result::SUCCESS;
+    }
+
+    let client = EDITOR_CLIENT.get_mut().unwrap();
+
+    trace!("Requesting swapchain info");
+    let swapchain_info = client.request(&requests::GetSwapchainInfo {}).unwrap();
+    trace!("Got swapchain info {swapchain_info:?}");
+
+    trace!("Requesting swapchain image handles..");
+    let swapchain_image_handles = client
+        .request_vec(&requests::GetSwapchainImages {})
+        .unwrap();
+    trace!("Got swapchain image handles {swapchain_image_handles:?}");
+
+    trace!("Requesting semaphore handles..");
+    let semaphore_handles = client
+        .request_vec(&requests::GetSwapchainSemaphores {})
+        .unwrap();
+    trace!("Got semaphore handles {semaphore_handles:?}");
+
+    let swapchain_images = create_swapchain_images(swapchain_image_handles, swapchain_info);
+    trace!("Created swapchain images {swapchain_images:?}");
+
+    let _ = SWAPCHAIN_SEMAPHORES.set(create_swapchain_semaphores(semaphore_handles));
+    let _ = SWAPCHAIN_IMAGES.set(swapchain_images.clone());
+
+    let output_images =
+        std::slice::from_raw_parts_mut(images as *mut SwapchainImageVulkanKHR, VIEW_COUNT as _);
+    for (output_image, swapchain_image) in output_images.iter_mut().zip(swapchain_images.iter()) {
+        *output_image = SwapchainImageVulkanKHR {
+            ty: StructureType::SWAPCHAIN_IMAGE_VULKAN_KHR,
+            next: null_mut(),
+            image: swapchain_image.as_raw(),
+        };
+    }
+
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn acquire_swapchain_image(
@@ -534,6 +644,7 @@ pub unsafe extern "system" fn acquire_swapchain_image(
     _acquire_info: *const SwapchainImageAcquireInfo,
     index: *mut u32,
 ) -> Result {
+    trace!("acquire_swapchain_image");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -541,6 +652,7 @@ pub unsafe extern "system" fn wait_swapchain_image(
     _swapchain: Swapchain,
     _wait_info: *const SwapchainImageWaitInfo,
 ) -> Result {
+    trace!("wait_swapchain_image");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -555,6 +667,7 @@ pub unsafe extern "system" fn locate_space(
     _time: Time,
     location_out: *mut SpaceLocation,
 ) -> Result {
+    trace!("locate_space");
     // match STATE.lock().unwrap().spaces.get(&space.into_raw()) {
     //     Some(space_state) => {
     //         let pose = Posef {
@@ -580,6 +693,7 @@ pub unsafe extern "system" fn get_action_state_pose(
     _get_info: *const ActionStateGetInfo,
     state: *mut ActionStatePose,
 ) -> Result {
+    trace!("get_action_state_pose");
     *state = ActionStatePose {
         ty: StructureType::ACTION_STATE_POSE,
         next: ptr::null_mut(),
@@ -592,6 +706,7 @@ pub unsafe extern "system" fn sync_actions(
     _session: Session,
     _sync_info: *const ActionsSyncInfo,
 ) -> Result {
+    trace!("sync_actions");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -603,6 +718,7 @@ pub unsafe extern "system" fn locate_views(
     view_count_output: *mut u32,
     views: *mut View,
 ) -> Result {
+    trace!("locate_views");
     // *view_count_output = NUM_VIEWS as _;
 
     // if view_capacity_input == 0 {
@@ -641,6 +757,7 @@ pub unsafe extern "system" fn release_swapchain_image(
     _swapchain: Swapchain,
     _release_info: *const SwapchainImageReleaseInfo,
 ) -> Result {
+    trace!("release_swapchain_images");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -648,34 +765,42 @@ pub unsafe extern "system" fn end_frame(
     _session: Session,
     frame_end_info: *const FrameEndInfo,
 ) -> Result {
+    trace!("end_frame");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
 pub unsafe extern "system" fn request_exit_session(_session: Session) -> Result {
+    trace!("request_exit_session");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
 pub unsafe extern "system" fn destroy_space(_space: Space) -> Result {
+    trace!("destroy_space");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
 pub unsafe extern "system" fn destroy_action(_action: Action) -> Result {
+    trace!("destroy_actions");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
 pub unsafe extern "system" fn destroy_action_set(_action_set: ActionSet) -> Result {
+    trace!("destroy_action_set");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
 pub unsafe extern "system" fn destroy_swapchain(_swapchain: Swapchain) -> Result {
+    trace!("destroy_swapchain");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
 pub unsafe extern "system" fn destroy_session(_session: Session) -> Result {
+    trace!("destroy_session");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
 pub unsafe extern "system" fn destroy_instance(_instance: Instance) -> Result {
+    trace!("destroy_instance");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -686,6 +811,7 @@ pub unsafe extern "system" fn enumerate_view_configurations(
     view_configuration_type_count_output: *mut u32,
     _view_configuration_types: *mut ViewConfigurationType,
 ) -> Result {
+    trace!("enumerate_view_configurations");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -695,6 +821,7 @@ pub unsafe extern "system" fn enumerate_reference_spaces(
     space_count_output: *mut u32,
     spaces: *mut ReferenceSpaceType,
 ) -> Result {
+    trace!("enumerate_reference_spaces");
     *space_count_output = 1;
     if space_capacity_input == 0 {
         return Result::ERROR_FEATURE_UNSUPPORTED;
@@ -711,6 +838,7 @@ pub unsafe extern "system" fn get_system_properties(
     _system_id: SystemId,
     _properties: *mut SystemProperties,
 ) -> Result {
+    trace!("get_system_properties");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -720,6 +848,7 @@ pub unsafe extern "system" fn enumerate_swapchain_formats(
     format_count_output: *mut u32,
     formats: *mut i64,
 ) -> Result {
+    trace!("enumerate_swapchain_formats");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -728,6 +857,7 @@ pub unsafe extern "system" fn get_action_state_float(
     _get_info: *const ActionStateGetInfo,
     state: *mut ActionStateFloat,
 ) -> Result {
+    trace!("get_action_state_float");
     *state = ActionStateFloat {
         ty: StructureType::ACTION_STATE_FLOAT,
         next: ptr::null_mut(),
@@ -740,6 +870,7 @@ pub unsafe extern "system" fn get_action_state_float(
 }
 
 pub unsafe extern "system" fn end_session(_session: Session) -> Result {
+    trace!("end_session");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -748,6 +879,7 @@ pub unsafe extern "system" fn get_action_state_boolean(
     get_info: *const ActionStateGetInfo,
     action_state: *mut ActionStateBoolean,
 ) -> Result {
+    trace!("get_action_state_boolean");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -756,6 +888,7 @@ pub unsafe extern "system" fn apply_haptic_feedback(
     _haptic_action_info: *const HapticActionInfo,
     _haptic_feedback: *const HapticBaseHeader,
 ) -> Result {
+    trace!("apply_haptic_feedback");
     /* explicit no-op, could possibly be extended with controller support in future if winit ever
      * provides such APIs */
     Result::ERROR_FEATURE_UNSUPPORTED
@@ -768,6 +901,7 @@ pub unsafe extern "system" fn get_vulkan_instance_extensions(
     buffer_count_output: *mut u32,
     buffer: *mut c_char,
 ) -> Result {
+    trace!("get_vulkan_instance_extensions");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -778,6 +912,7 @@ pub unsafe extern "system" fn get_vulkan_device_extensions(
     buffer_count_output: *mut u32,
     buffer: *mut c_char,
 ) -> Result {
+    trace!("get_vulkan_device_extensions");
     Result::ERROR_FEATURE_UNSUPPORTED
 }
 
@@ -804,4 +939,92 @@ unsafe fn set_array<T: Copy, const COUNT: usize>(
     // There's probably some clever way to do this without copying, but whatever
     let slice = slice::from_raw_parts_mut(array_ptr, COUNT);
     slice.copy_from_slice(&data);
+}
+
+fn create_swapchain_images(
+    handles: Vec<vk::HANDLE>,
+    swapchain_info: SwapchainInfo,
+) -> Vec<vk::Image> {
+    let vulkan_context = VULKAN_CONTEXT.get().unwrap();
+    let device = &vulkan_context.device;
+
+    handles
+        .into_iter()
+        .map(|handle| unsafe {
+            trace!("Creating image..");
+            let handle_type = vk::ExternalMemoryHandleTypeFlags::OPAQUE_WIN32_KMT;
+
+            let mut external_memory_image_create_info =
+                vk::ExternalMemoryImageCreateInfo::builder().handle_types(handle_type);
+            let image = device
+                .create_image(
+                    &vk::ImageCreateInfo {
+                        image_type: vk::ImageType::TYPE_2D,
+                        format: swapchain_info.format,
+                        extent: swapchain_info.resolution.into(),
+                        mip_levels: 1,
+                        array_layers: 2,
+                        samples: vk::SampleCountFlags::TYPE_1,
+                        tiling: vk::ImageTiling::OPTIMAL,
+                        usage: vk::ImageUsageFlags::COLOR_ATTACHMENT,
+                        sharing_mode: vk::SharingMode::EXCLUSIVE,
+                        p_next: &mut external_memory_image_create_info as *mut _ as *mut _,
+                        ..Default::default()
+                    },
+                    None,
+                )
+                .unwrap();
+            trace!("Allocating image memory..");
+            let requirements = device.get_image_memory_requirements(image);
+            let mut external_memory_allocate_info = vk::ImportMemoryWin32HandleInfoKHR::builder()
+                .handle(handle)
+                .handle_type(handle_type);
+            let memory = device
+                .allocate_memory(
+                    &vk::MemoryAllocateInfo::builder()
+                        .allocation_size(requirements.size)
+                        .push_next(&mut external_memory_allocate_info),
+                    None,
+                )
+                .unwrap();
+            trace!("Done, allocating..");
+            device.bind_image_memory(image, memory, 0).unwrap();
+            image
+        })
+        .collect()
+}
+
+fn create_swapchain_semaphores(handles: Vec<vk::HANDLE>) -> Vec<vk::Semaphore> {
+    let vulkan_context = VULKAN_CONTEXT.get().unwrap();
+    let device = &vulkan_context.device;
+    let external_semaphore = ash::extensions::khr::ExternalSemaphoreWin32::new(
+        &vulkan_context.instance,
+        &vulkan_context.device,
+    );
+    let handle_type = vk::ExternalSemaphoreHandleTypeFlags::OPAQUE_WIN32_KMT;
+
+    handles
+        .iter()
+        .map(|h| unsafe {
+            let mut external_semaphore_info =
+                vk::ExportSemaphoreCreateInfo::builder().handle_types(handle_type);
+            let semaphore = device
+                .create_semaphore(
+                    &vk::SemaphoreCreateInfo::builder().push_next(&mut external_semaphore_info),
+                    None,
+                )
+                .unwrap();
+
+            external_semaphore
+                .import_semaphore_win32_handle(
+                    &vk::ImportSemaphoreWin32HandleInfoKHR::builder()
+                        .handle(*h)
+                        .semaphore(semaphore)
+                        .handle_type(handle_type),
+                )
+                .unwrap();
+
+            semaphore
+        })
+        .collect()
 }

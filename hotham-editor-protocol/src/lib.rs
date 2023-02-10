@@ -7,6 +7,9 @@ pub use openxr_sys::ViewConfigurationView;
 pub enum RequestType {
     GetViewConfiguration,
     GetViewCount,
+    GetSwapchainInfo,
+    GetSwapchainImages,
+    GetSwapchainSemaphores,
 }
 
 pub trait Request {
@@ -19,8 +22,13 @@ pub trait RequestWithVecResponse {
 }
 
 pub mod requests {
-    use crate::{responses::ViewConfiguration, Request, RequestType};
+    use crate::{
+        responses::{SwapchainInfo, ViewConfiguration},
+        Request, RequestType, RequestWithVecResponse,
+    };
+    use ash::vk;
 
+    #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct GetViewConfiguration {}
 
@@ -31,6 +39,7 @@ pub mod requests {
         }
     }
 
+    #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct GetViewCount {}
 
@@ -40,13 +49,64 @@ pub mod requests {
             RequestType::GetViewCount
         }
     }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct GetSwapchainInfo {}
+
+    impl Request for GetSwapchainInfo {
+        type Response = SwapchainInfo;
+        fn request_type(&self) -> RequestType {
+            RequestType::GetSwapchainInfo
+        }
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct GetSwapchainImages {}
+
+    impl Request for GetSwapchainImages {
+        type Response = bool; // TODO: might need to split up the Response trait
+        fn request_type(&self) -> RequestType {
+            RequestType::GetSwapchainImages
+        }
+    }
+
+    impl RequestWithVecResponse for GetSwapchainImages {
+        type ResponseItem = vk::HANDLE;
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct GetSwapchainSemaphores {}
+
+    impl Request for GetSwapchainSemaphores {
+        type Response = bool; // TODO: might need to split up the Response trait
+        fn request_type(&self) -> RequestType {
+            RequestType::GetSwapchainSemaphores
+        }
+    }
+
+    impl RequestWithVecResponse for GetSwapchainSemaphores {
+        type ResponseItem = vk::HANDLE;
+    }
 }
 
 pub mod responses {
+    use ash::vk;
+
+    #[repr(C)]
     #[derive(Debug, Clone, Copy)]
     pub struct ViewConfiguration {
         pub width: u32,
         pub height: u32,
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Copy, Clone)]
+    pub struct SwapchainInfo {
+        pub resolution: vk::Extent2D,
+        pub format: vk::Format,
     }
 }
 
@@ -190,6 +250,18 @@ impl<S: Read + Write> EditorServer<S> {
 
         Ok(())
     }
+
+    pub fn send_response_vec<T>(&mut self, response: &Vec<T>) -> std::io::Result<()> {
+        let message_size = (std::mem::size_of::<T>() * response.len()) as u32;
+        self.socket.write(&message_size.to_be_bytes())?;
+        self.socket.write(&unsafe { bytes_from_vec(response) })?;
+
+        Ok(())
+    }
+}
+unsafe fn bytes_from_vec<T>(data: &[T]) -> Vec<u8> {
+    let len = std::mem::size_of::<T>() * data.len();
+    std::slice::from_raw_parts(data as *const _ as *const u8, len).to_vec()
 }
 
 unsafe fn vec_from_bytes<T: Clone>(data: &[u8]) -> Vec<T> {
