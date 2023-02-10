@@ -54,11 +54,11 @@ fn tick(
     state: &mut State,
 ) {
     if engine.get_updated_assets().iter().any(|asset_id| -> bool {
-        match asset_id.as_str() {
-            "examples/custom-rendering/src/shaders/quadric.frag.spv" => true,
-            "examples/custom-rendering/src/shaders/quadric.vert.spv" => true,
-            _ => false,
-        }
+        matches!(
+            asset_id.as_str(),
+            "examples/custom-rendering/src/shaders/quadric.frag.spv"
+                | "examples/custom-rendering/src/shaders/quadric.vert.spv"
+        )
     }) {
         let vulkan_context = &mut engine.vulkan_context;
         let render_context = &engine.render_context;

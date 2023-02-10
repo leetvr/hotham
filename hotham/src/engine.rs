@@ -312,7 +312,7 @@ impl Engine {
                         "spv" => update_shader(
                             vulkan_context,
                             render_context,
-                            &file_name,
+                            file_name,
                             asset_updated.asset_data,
                         ),
                         _ => {}
