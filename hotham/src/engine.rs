@@ -5,7 +5,7 @@ use crate::{
         render_context::create_pipeline, AudioContext, GuiContext, HapticContext, InputContext,
         PhysicsContext, RenderContext, VulkanContext, XrContext, XrContextBuilder,
     },
-    util::PerformanceTimer,
+    util::{u8_to_u32, PerformanceTimer},
     workers::Workers,
     HothamError, HothamResult, VIEW_TYPE,
 };
@@ -393,20 +393,6 @@ fn update_shader(
         )
         .unwrap();
     }
-}
-
-// shout out to wgpu to for this:
-fn u8_to_u32(asset_data: Arc<Vec<u8>>) -> Vec<u32> {
-    let mut words = vec![0u32; asset_data.len() / std::mem::size_of::<u32>()];
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            asset_data.as_ptr(),
-            words.as_mut_ptr() as *mut u8,
-            asset_data.len(),
-        );
-    }
-
-    words
 }
 
 fn despawn_children(
