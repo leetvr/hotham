@@ -14,7 +14,7 @@ use futures_util::StreamExt;
 // 5. GOTO 2
 use server::{handle_connection, make_server_endpoint, watch_files};
 
-pub type WatchList = Arc<Mutex<HashMap<String, SystemTime>>>;
+pub type WatchList = Arc<Mutex<HashMap<String, anyhow::Result<SystemTime>>>>;
 
 #[tokio::main]
 async fn main() -> Result<()> {

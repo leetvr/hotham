@@ -52,38 +52,40 @@ pub async fn watch_files(connection: quinn::Connection, watch_list: WatchList) {
         // This could definitely be more optimised, but it's not really important.
         for (name, last_updated) in asset_names.iter_mut() {
             let current_updated = get_last_updated(name).await;
-            if last_updated == &SystemTime::UNIX_EPOCH {
-                *last_updated = current_updated;
-                continue;
-            }
 
-            let diff = current_updated.duration_since(*last_updated).unwrap();
+            // Figure out if we should send an updated version or not
+            let should_send_update = match (&last_updated, &current_updated) {
+                (Ok(_), Err(e)) => {
+                    println!("[SERVER] Failed to get timestamp for {name}: {e}");
+                    false
+                }
+                (Ok(last), Ok(current)) => current != last,
+                (Err(_), Ok(_)) => true,
+                (Err(_), Err(_)) => false,
+            };
 
             // Update the last_updated in the hashmap
             *last_updated = current_updated;
 
-            // File hasn't been updated! Continue.
-            if diff.is_zero() {
-                continue;
-            }
+            if should_send_update {
+                // If we got here, the file has been updated. Open a connection to the client and tell them the file has been updated.
+                let connection = connection.clone();
+                let name = name.clone();
+                tokio::spawn(async move {
+                    let (mut send, mut recv) = connection.open_bi().await?;
+                    let mut buffer = vec![0; 1024 * 64];
+                    println!("[SERVER] {} updated! Sending message..", name.clone());
+                    Message::AssetUpdated(&name).write_all(&mut send).await?;
 
-            // If we got here, the file has been updated. Open a connection to the client and tell them the file has been updated.
-            let connection = connection.clone();
-            let name = name.clone();
-            tokio::spawn(async move {
-                let (mut send, mut recv) = connection.open_bi().await?;
-                let mut buffer = vec![0; 1024 * 64];
-                println!("[SERVER] {} updated! Sending message..", name.clone());
-                Message::AssetUpdated(&name).write_all(&mut send).await?;
-
-                match Message::read(&mut recv, &mut buffer).await? {
-                    Message::OK => Ok(()),
-                    Message::Error(e) => {
-                        anyhow::bail!("[SERVER] Got an error: {e}");
+                    match Message::read(&mut recv, &mut buffer).await? {
+                        Message::OK => Ok(()),
+                        Message::Error(e) => {
+                            anyhow::bail!("[SERVER] Got an error: {e}");
+                        }
+                        m => anyhow::bail!("[SERVER] Invalid message: {m:?}"),
                     }
-                    m => anyhow::bail!("[SERVER] Invalid message: {m:?}"),
-                }
-            });
+                });
+            }
         }
     }
 }
@@ -123,7 +125,7 @@ async fn handle_request<'a>(
             watch_list
                 .lock()
                 .await
-                .insert(path.into(), SystemTime::UNIX_EPOCH);
+                .insert(path.into(), Ok(SystemTime::UNIX_EPOCH));
             Some(Message::OK)
         }
         Message::OK => {
@@ -146,13 +148,8 @@ async fn get_asset(path: &str) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-async fn get_last_updated(path: &str) -> SystemTime {
-    match tokio::fs::metadata(path).await {
-        Ok(metadata) => metadata
-            .modified()
-            .expect("[SERVER] TIME SHENNANIGANS HAVE OCURRED!"),
-        Err(_) => SystemTime::UNIX_EPOCH.clone(),
-    }
+async fn get_last_updated(path: &str) -> anyhow::Result<SystemTime> {
+    Ok(tokio::fs::metadata(path).await?.modified()?)
 }
 
 pub fn make_server_endpoint(bind_addr: SocketAddr) -> Result<(Incoming, Vec<u8>), Box<dyn Error>> {
