@@ -118,7 +118,8 @@ void main() {
     // Compute gradient along the surface (orthogonal to surface normal).
     vec3 ddx_hitPoint = dFdx(rayDir.xyz) * t;
     vec3 ddy_hitPoint = dFdy(rayDir.xyz) * t;
-    float denom = dot(rayDir.xyz, n) / rayDir.length();
+    rayDir = normalize(rayDir);
+    float denom = dot(rayDir.xyz, n);
     denom = max(abs(denom), 0.01) * sign(denom); // Avoid division by zero
     ddx_hitPoint -= rayDir.xyz * (dot(ddx_hitPoint, n) / denom);
     ddy_hitPoint -= rayDir.xyz * (dot(ddy_hitPoint, n) / denom);
