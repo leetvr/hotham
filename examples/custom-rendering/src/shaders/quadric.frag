@@ -123,10 +123,11 @@ void main() {
     ddx_hitPoint -= rayDir.xyz * (dot(ddx_hitPoint, n) / denom);
     ddy_hitPoint -= rayDir.xyz * (dot(ddy_hitPoint, n) / denom);
 
-    float boundsValue = dot(hitPoint, d.boundsQ * hitPoint);
+    vec4 boundsQTimesHitPoint = d.boundsQ * hitPoint;
+    float boundsValue = dot(hitPoint, boundsQTimesHitPoint);
     vec2 gradientOfBoundsValue = vec2(
-        dot(ddx_hitPoint, (d.boundsQ * hitPoint).xyz),
-        dot(ddy_hitPoint, (d.boundsQ * hitPoint).xyz));
+        dot(ddx_hitPoint, boundsQTimesHitPoint.xyz),
+        dot(ddy_hitPoint, boundsQTimesHitPoint.xyz));
     gl_SampleMask[0] &= int(
         step(boundsValue + dot(offsetSample0, gradientOfBoundsValue), 0.0) +
         step(boundsValue + dot(offsetSample1, gradientOfBoundsValue), 0.0) * 2 +
