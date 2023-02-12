@@ -116,13 +116,9 @@ void main() {
     // Compute normal from gradient of surface quadric.
     n = normalize((d.surfaceQ * hitPoint).xyz);
     // Compute gradient along the surface (orthogonal to surface normal).
-    vec3 ddx_hitPoint = dFdx(rayDir.xyz) * t;
-    vec3 ddy_hitPoint = dFdy(rayDir.xyz) * t;
-    rayDir = normalize(rayDir);
-    float denom = dot(rayDir.xyz, n);
-    denom = max(abs(denom), 0.01) * sign(denom); // Avoid division by zero
-    ddx_hitPoint -= rayDir.xyz * (dot(ddx_hitPoint, n) / denom);
-    ddy_hitPoint -= rayDir.xyz * (dot(ddy_hitPoint, n) / denom);
+    // Clamp them to avoid flying pixels due to overshooting.
+    vec3 ddx_hitPoint = clamp(dFdx(hitPoint.xyz), -1.0, 1.0);
+    vec3 ddy_hitPoint = clamp(dFdy(hitPoint.xyz), -1.0, 1.0);
 
     vec4 boundsQTimesHitPoint = d.boundsQ * hitPoint;
     float boundsValue = dot(hitPoint, boundsQTimesHitPoint);
