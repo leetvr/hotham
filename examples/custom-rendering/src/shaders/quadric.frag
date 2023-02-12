@@ -46,8 +46,8 @@ void main() {
     QuadricData d = quadricDataBuffer.data[inInstanceIndex];
 
     // Find ray-quadric intersection, if any
-    vec4 rayOrigin = inRayOrigin / inRayOrigin.w;
-    vec4 rayDir = vec4(normalize(rayOrigin.xyz - sceneData.cameraPosition[gl_ViewIndex].xyz), 0.0);
+    vec4 rayOrigin = sceneData.cameraPosition[gl_ViewIndex];
+    vec4 rayDir = vec4(inRayOrigin.xyz / inRayOrigin.w - sceneData.cameraPosition[gl_ViewIndex].xyz, 0.0);
 
     // A point p on the ray is
     // p = rayOrigin + rayDir*t
@@ -94,7 +94,7 @@ void main() {
     vec4 surfaceQTimesRayDir = d.surfaceQ * rayDir;
 
     float a = dot(rayDir, surfaceQTimesRayDir);
-    float b = dot(rayOrigin, surfaceQTimesRayDir);
+    float b = dot(rayDir, surfaceQTimesRayOrigin);
     float c = dot(rayOrigin, surfaceQTimesRayOrigin);
 
     float discriminant = b * b - a * c;
@@ -107,8 +107,7 @@ void main() {
 
     // Pick the solution that is facing us
     float t = c / (-b + sqrt(max(0.0, discriminant)));
-    if (t < -0.0001) {
-        t = 0.0;
+    if (t < 1.0) {
         gl_SampleMask[0] = 0;
     }
 
@@ -117,10 +116,10 @@ void main() {
     // Compute normal from gradient of surface quadric.
     n = normalize((d.surfaceQ * hitPoint).xyz);
     // Compute gradient along the surface (orthogonal to surface normal).
-    vec3 ddx_hitPoint = dFdx(rayOrigin.xyz) + dFdx(rayDir.xyz) * t;
-    vec3 ddy_hitPoint = dFdy(rayOrigin.xyz) + dFdy(rayDir.xyz) * t;
-    float denom = dot(rayDir.xyz, n);
-    denom = max(abs(denom), 0.001) * sign(denom); // Avoid division by zero
+    vec3 ddx_hitPoint = dFdx(rayDir.xyz) * t;
+    vec3 ddy_hitPoint = dFdy(rayDir.xyz) * t;
+    float denom = dot(rayDir.xyz, n) / rayDir.length();
+    denom = max(abs(denom), 0.01) * sign(denom); // Avoid division by zero
     ddx_hitPoint -= rayDir.xyz * (dot(ddx_hitPoint, n) / denom);
     ddy_hitPoint -= rayDir.xyz * (dot(ddy_hitPoint, n) / denom);
 
