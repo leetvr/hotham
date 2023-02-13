@@ -107,18 +107,18 @@ void main() {
 
     // Pick the solution that is facing us
     float t = c / (-b + sqrt(max(0.0, discriminant)));
-    if (t < 1.0) {
-        gl_SampleMask[0] = 0;
-    }
-
     // hitPoint.w = 1 because rayOrigin.w = 1 and rayDir.w = 0.
     vec4 hitPoint = rayOrigin + rayDir * t;
-    // Compute normal from gradient of surface quadric.
-    n = normalize((d.surfaceQ * hitPoint).xyz);
+
     // Compute gradient along the surface (orthogonal to surface normal).
     // Clamp them to avoid flying pixels due to overshooting.
     vec3 ddx_hitPoint = clamp(dFdx(hitPoint.xyz), -1.0, 1.0);
     vec3 ddy_hitPoint = clamp(dFdy(hitPoint.xyz), -1.0, 1.0);
+
+    // Discarding is postponed until here to make sure the derivatives above are valid.
+    if (t < 1.0) {
+        discard;
+    }
 
     vec4 boundsQTimesHitPoint = d.boundsQ * hitPoint;
     float boundsValue = dot(hitPoint, boundsQTimesHitPoint);
@@ -131,7 +131,7 @@ void main() {
         step(boundsValue + dot(offsetSample2, gradientOfBoundsValue), 0.0) * 4 +
         step(boundsValue + dot(offsetSample3, gradientOfBoundsValue), 0.0) * 8);
 
-    // Discarding is postponed until here to make sure the derivatives above are valid.
+    // Discard if all samples have been masked out.
     if (gl_SampleMask[0] == 0) {
         discard;
     }
@@ -143,6 +143,9 @@ void main() {
     // Set globals that are read inside functions for lighting etc.
     pos = hitPoint.xyz;
     v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - pos);
+
+    // Compute normal from gradient of surface quadric.
+    n = normalize((d.surfaceQ * hitPoint).xyz);
 
     vec4 uv4 = d.uvFromGos * hitPoint;
     uv = uv4.xy / uv4.w;
