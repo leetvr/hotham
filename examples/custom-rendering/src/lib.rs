@@ -153,6 +153,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &make_transform(-1.0, 1.4, -1.5, 0.5),
         0.5,
         HologramData {
+            // Sphere, x² + y² + z² = 1
             surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 0.0, 0.0, 0.0].into()),
             uv_from_local: uv1_from_local,
@@ -165,6 +166,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &make_transform(0.0, 1.4, -1.5, 0.5),
         0.5_f32.sqrt(),
         HologramData {
+            // Cylinder, x² + z² = 1
             surface_q_in_local: Mat4::from_diagonal([1.0, 0.0, 1.0, -1.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: uv1_from_local,
@@ -177,6 +179,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &make_transform(1.0, 1.4, -1.5, 0.5),
         0.5_f32.sqrt(),
         HologramData {
+            // Hyperboloid of one sheet, x² - y² + z² = c
             surface_q_in_local: Mat4::from_diagonal([1.0, -1.0 + 0.1, 1.0, -0.1].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: uv2_from_local,
@@ -189,6 +192,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &make_transform(2.0, 1.4, -1.5, 0.5),
         0.5_f32.sqrt(),
         HologramData {
+            // Double cones, x² - y² + z² = 0
             surface_q_in_local: Mat4::from_diagonal([1.0, -1.0, 1.0, 0.0].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: uv2_from_local,
@@ -201,6 +205,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &make_transform(3.0, 1.4, -1.5, 0.5),
         0.5_f32.sqrt(),
         HologramData {
+            // Hyperboloid of two sheets, x² - y² + z² = -c
             surface_q_in_local: Mat4::from_diagonal([1.0, -1.0 - 0.1, 1.0, 0.1].into()),
             bounds_q_in_local: Mat4::from_diagonal([0.0, 1.0, 0.0, -1.0].into()),
             uv_from_local: uv2_from_local,
@@ -213,6 +218,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
         &make_transform(4.0, 1.4, -1.5, 0.5),
         0.5_f32.sqrt(),
         HologramData {
+            // Hyperbolic paraboloid - "saddle", cy = x² + z²
             surface_q_in_local: Mat4::from_cols(
                 [1.0, 0.0, 0.0, 0.0].into(),
                 [0.0, 0.0, 0.0, 1.0].into(),
