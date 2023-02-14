@@ -206,6 +206,23 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
             uv_from_local: uv2_from_local,
         },
     );
+    add_quadric(
+        &models,
+        "Cylinder",
+        world,
+        &make_transform(4.0, 1.4, -1.5, 0.5),
+        0.5_f32.sqrt(),
+        HologramData {
+            surface_q_in_local: Mat4::from_cols(
+                [1.0, 0.0, 0.0, 0.0].into(),
+                [0.0, 0.0, 0.0, 1.0].into(),
+                [0.0, 0.0, -1.0, 0.0].into(),
+                [0.0, 1.0, 0.0, 0.0].into(),
+            ),
+            bounds_q_in_local: Mat4::from_diagonal([1.0, 0.0, 1.0, -1.0].into()),
+            uv_from_local: uv2_from_local,
+        },
+    );
 
     // Quadric surfaces with varying number of control points
     let target_initial_hologram_data = HologramData {
