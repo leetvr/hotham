@@ -10,6 +10,11 @@ pub enum RequestType {
     GetSwapchainInfo,
     GetSwapchainImages,
     GetSwapchainSemaphores,
+    WaitFrame,
+    AcquireSwapchainImage,
+    EndFrame,
+    GetInputEvents,
+    LocateView,
 }
 
 pub trait Request {
@@ -23,7 +28,7 @@ pub trait RequestWithVecResponse {
 
 pub mod requests {
     use crate::{
-        responses::{SwapchainInfo, ViewConfiguration},
+        responses::{InputEvent, SwapchainInfo, ViewConfiguration},
         Request, RequestType, RequestWithVecResponse,
     };
     use ash::vk;
@@ -63,6 +68,50 @@ pub mod requests {
 
     #[repr(C)]
     #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct WaitFrame;
+
+    impl Request for WaitFrame {
+        type Response = u32;
+        fn request_type(&self) -> RequestType {
+            RequestType::WaitFrame
+        }
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct AcquireSwapchainImage;
+
+    impl Request for AcquireSwapchainImage {
+        type Response = u32;
+        fn request_type(&self) -> RequestType {
+            RequestType::AcquireSwapchainImage
+        }
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct EndFrame;
+
+    impl Request for EndFrame {
+        type Response = u32;
+        fn request_type(&self) -> RequestType {
+            RequestType::EndFrame
+        }
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct LocateView;
+
+    impl Request for LocateView {
+        type Response = openxr_sys::Posef;
+        fn request_type(&self) -> RequestType {
+            RequestType::LocateView
+        }
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub struct GetSwapchainImages {}
 
     impl Request for GetSwapchainImages {
@@ -90,6 +139,21 @@ pub mod requests {
     impl RequestWithVecResponse for GetSwapchainSemaphores {
         type ResponseItem = vk::HANDLE;
     }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct GetInputEvents;
+
+    impl Request for GetInputEvents {
+        type Response = bool; // TODO: might need to split up the Response trait
+        fn request_type(&self) -> RequestType {
+            RequestType::GetInputEvents
+        }
+    }
+
+    impl RequestWithVecResponse for GetInputEvents {
+        type ResponseItem = InputEvent;
+    }
 }
 
 pub mod responses {
@@ -107,6 +171,19 @@ pub mod responses {
     pub struct SwapchainInfo {
         pub resolution: vk::Extent2D,
         pub format: vk::Format,
+    }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy)]
+    pub enum InputEvent {
+        AButtonPressed,
+        AButtonReleased,
+        BButtonPressed,
+        BButtonReleased,
+        XButtonPressed,
+        XButtonReleased,
+        YButtonPressed,
+        YButtonReleased,
     }
 }
 

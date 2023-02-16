@@ -463,10 +463,10 @@ fn enable_xr_extensions(required_extensions: &mut xr::ExtensionSet) {
 
 #[cfg(not(target_os = "android"))]
 fn enable_xr_extensions(required_extensions: &mut xr::ExtensionSet) {
-    required_extensions.khr_vulkan_enable = true;
-
     if cfg!(feature = "editor") {
         required_extensions.khr_vulkan_enable2 = true;
+    } else {
+        required_extensions.khr_vulkan_enable = true;
     }
 }
 

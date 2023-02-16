@@ -1,12 +1,14 @@
 use anyhow::{bail, Result};
 use ash::vk;
-use hotham_editor_protocol::{requests, responses, EditorServer, RequestType};
+use glam::{Quat, Vec3};
+use hotham_editor_protocol::{responses, EditorServer, RequestType};
 use lazy_vulkan::{
     find_memorytype_index, vulkan_context::VulkanContext, vulkan_texture::VulkanTexture, DrawCall,
     LazyRenderer, LazyVulkan, SwapchainInfo, Vertex,
 };
 use log::{debug, info, trace};
-use std::io::{Read, Write};
+use openxr_sys::{Posef, Vector3f};
+use std::time::Instant;
 use uds_windows::{UnixListener, UnixStream};
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
@@ -17,7 +19,7 @@ use winit::{
 /// Compile your own damn shaders! LazyVulkan is just as lazy as you are!
 static FRAGMENT_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.frag.spv");
 static VERTEX_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.vert.spv");
-const SWAPCHAIN_FORMAT: vk::Format = vk::Format::R8G8B8A8_UNORM;
+const SWAPCHAIN_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB; // OpenXR really, really wants us to use SRGB swapchains
 static UNIX_SOCKET_PATH: &'_ str = "hotham_editor.socket";
 
 pub fn main() -> Result<()> {
@@ -57,19 +59,34 @@ pub fn main() -> Result<()> {
     let swapchain_info = SwapchainInfo {
         image_count: lazy_vulkan.surface.desired_image_count,
         resolution: lazy_vulkan.surface.surface_resolution,
-        format: vk::Format::R8G8B8A8_SRGB,
+        format: SWAPCHAIN_FORMAT,
     };
     let (stream, _) = listener.accept().unwrap();
+    info!("Client connected! Doing OpenXR setup..");
     let mut server = EditorServer::new(stream);
     let xr_swapchain = do_openxr_setup(&mut server, lazy_vulkan.context(), &swapchain_info)?;
+    info!("..done!");
     let textures = create_render_textures(
         lazy_vulkan.context(),
         &mut lazy_renderer,
         xr_swapchain.images,
     );
 
+    let mut view_state = Posef {
+        position: Vector3f {
+            x: 0.,
+            y: 1.4,
+            z: 0.,
+        },
+        ..Posef::IDENTITY
+    };
+    let mut last_frame_time = Instant::now();
+    let mut keyboard_events = Vec::new();
+    let mut last_key_pressed = None;
+
     // Off we go!
     let mut winit_initializing = true;
+    let mut focused = false;
     event_loop.run_return(|event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         match event {
@@ -88,6 +105,13 @@ pub fn main() -> Result<()> {
                 ..
             } => *control_flow = ControlFlow::Exit,
 
+            Event::WindowEvent {
+                event: WindowEvent::Focused(window_focused),
+                ..
+            } => {
+                focused = window_focused;
+            }
+
             Event::NewEvents(cause) => {
                 if cause == winit::event::StartCause::Init {
                     winit_initializing = true;
@@ -98,8 +122,31 @@ pub fn main() -> Result<()> {
 
             Event::MainEventsCleared => {
                 let framebuffer_index = lazy_vulkan.render_begin();
-                // send_swapchain_image_index(&mut stream, &mut buf, framebuffer_index);
-                // get_render_complete(&mut stream, &mut buf);
+
+                update_camera(
+                    &mut view_state,
+                    last_frame_time,
+                    &mut last_key_pressed,
+                    &keyboard_events,
+                );
+
+                keyboard_events.clear();
+
+                check_request(&mut server, RequestType::LocateView).unwrap();
+                server.send_response(&view_state).unwrap();
+
+                check_request(&mut server, RequestType::WaitFrame).unwrap();
+                server.send_response(&0).unwrap();
+
+                check_request(&mut server, RequestType::AcquireSwapchainImage).unwrap();
+                server.send_response(&framebuffer_index).unwrap();
+
+                check_request(&mut server, RequestType::LocateView).unwrap();
+                server.send_response(&view_state).unwrap();
+
+                check_request(&mut server, RequestType::EndFrame).unwrap();
+                server.send_response(&0).unwrap();
+
                 let texture_id = textures[framebuffer_index as usize].id;
                 lazy_renderer.render(
                     lazy_vulkan.context(),
@@ -117,6 +164,7 @@ pub fn main() -> Result<()> {
                     framebuffer_index,
                     &[semaphore, lazy_vulkan.rendering_complete_semaphore],
                 );
+                last_frame_time = Instant::now();
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -125,6 +173,14 @@ pub fn main() -> Result<()> {
                 if !winit_initializing {
                     let new_render_surface = lazy_vulkan.resized(size.width, size.height);
                     lazy_renderer.update_surface(new_render_surface, &lazy_vulkan.context().device);
+                }
+            }
+            Event::WindowEvent {
+                event: WindowEvent::KeyboardInput { input, .. },
+                ..
+            } => {
+                if focused && input.virtual_keycode.is_some() {
+                    keyboard_events.push(input);
                 }
             }
             _ => (),
@@ -188,20 +244,6 @@ fn check_request(
     }
     trace!("Received request from cilent {expected_request_type:?}");
     Ok(())
-}
-
-fn send_semaphore_handles(
-    stream: &mut UnixStream,
-    semaphore_handles: Vec<*mut std::ffi::c_void>,
-    buf: &mut [u8; 1024],
-) {
-    stream.read(buf).unwrap();
-    let value = buf[0];
-    debug!("Read {value}");
-
-    debug!("Sending handles: {semaphore_handles:?}");
-    let write = stream.write(bytes_of_slice(&semaphore_handles)).unwrap();
-    debug!("Wrote {write} bytes");
 }
 
 unsafe fn create_semaphores(
@@ -277,19 +319,6 @@ fn create_render_textures(
         .collect()
 }
 
-fn get_render_complete(stream: &mut UnixStream, buf: &mut [u8]) {
-    stream.read(buf).unwrap();
-}
-
-fn send_swapchain_image_index(
-    stream: &mut UnixStream,
-    buf: &mut [u8; 1024],
-    framebuffer_index: u32,
-) {
-    stream.read(buf).unwrap();
-    stream.write(&mut [framebuffer_index as u8]).unwrap();
-}
-
 unsafe fn create_render_images(
     context: &lazy_vulkan::vulkan_context::VulkanContext,
     swapchain_info: &SwapchainInfo,
@@ -363,53 +392,86 @@ unsafe fn create_render_images(
         .unzip()
 }
 
-fn send_swapchain_info(
-    stream: &mut UnixStream,
-    swapchain_info: &SwapchainInfo,
-    buf: &mut [u8],
-) -> std::io::Result<()> {
-    stream.read(buf)?;
-    let value = buf[0];
-    debug!("Read {value}");
+// TODO:    This needs to be replaced with a nice state machine that can handle keyboard input, mouse input
+//          and gamepad input.
+pub fn update_camera(
+    pose: &mut Posef,
+    last_frame_time: Instant,
+    last_key_pressed: &mut Option<VirtualKeyCode>,
+    input_events: &[KeyboardInput],
+) {
+    // We need to adjust the speed value so its always the same speed even if the frame rate isn't consistent
+    // The delta time is the the current time - last frame time
+    let dt = (Instant::now() - last_frame_time).as_secs_f32();
 
-    if value == 0 {
-        let write = stream.write(bytes_of(swapchain_info)).unwrap();
-        debug!("Write {write} bytes");
-        return Ok(());
-    } else {
-        panic!("Invalid request!");
+    let movement_speed = 10. * dt;
+
+    // Process the event queue
+    for event in input_events {
+        if event.state == ElementState::Pressed {
+            move_camera(pose, movement_speed, event.virtual_keycode.unwrap());
+        }
+    }
+
+    // Finally, we want to handle someone holding a key down. This is annoying.
+
+    // First, we need to check if the key was released
+    let key_has_been_released = !input_events.is_empty();
+
+    // If the user is still holding down the key, we need to treat that as an input event
+    if !key_has_been_released {
+        if let Some(last_key) = last_key_pressed {
+            move_camera(pose, movement_speed, *last_key);
+        }
+    }
+
+    // Otherwise, find the last key pressed and mark that as the final one
+    for event in input_events {
+        if event.state == ElementState::Pressed {
+            *last_key_pressed = event.virtual_keycode;
+        } else if last_key_pressed == &event.virtual_keycode {
+            *last_key_pressed = None;
+        }
     }
 }
 
-fn send_image_memory_handles(
-    stream: &mut UnixStream,
-    handles: Vec<vk::HANDLE>,
-    buf: &mut [u8],
-) -> std::io::Result<()> {
-    stream.read(buf)?;
-    let value = buf[0];
-    debug!("Read {value}");
+fn move_camera(pose: &mut Posef, movement_speed: f32, virtual_keycode: VirtualKeyCode) {
+    let position = &mut pose.position;
+    let o = pose.orientation;
+    let orientation = Quat::from_xyzw(o.x, o.y, o.z, o.w);
+    // get the forward vector rotated by the camera rotation quaternion
+    let forward = orientation * -Vec3::Z;
+    // get the right vector rotated by the camera rotation quaternion
+    let right = orientation * Vec3::X;
+    let up = Vec3::Y;
 
-    if value == 1 {
-        debug!("Sending handles: {handles:?}");
-        let write = stream.write(bytes_of_slice(&handles)).unwrap();
-        debug!("Write {write} bytes");
-        return Ok(());
-    } else {
-        panic!("Invalid request!");
-    }
-}
-
-fn bytes_of_slice<T>(t: &[T]) -> &[u8] {
-    unsafe {
-        let ptr = t.as_ptr();
-        std::slice::from_raw_parts(ptr.cast(), std::mem::size_of::<T>() * t.len())
-    }
-}
-
-fn bytes_of<T>(t: &T) -> &[u8] {
-    unsafe {
-        let ptr = t as *const T;
-        std::slice::from_raw_parts(ptr.cast(), std::mem::size_of::<T>())
+    match virtual_keycode {
+        winit::event::VirtualKeyCode::W => {
+            position.x += forward.x * movement_speed;
+            position.y += forward.y * movement_speed;
+            position.z += forward.z * movement_speed;
+        }
+        winit::event::VirtualKeyCode::S => {
+            position.x -= forward.x * movement_speed;
+            position.y -= forward.y * movement_speed;
+            position.z -= forward.z * movement_speed;
+        }
+        winit::event::VirtualKeyCode::A => {
+            position.x -= right.x * movement_speed;
+            position.y -= right.y * movement_speed;
+            position.z -= right.z * movement_speed;
+        }
+        winit::event::VirtualKeyCode::D => {
+            position.x += right.x * movement_speed;
+            position.y += right.y * movement_speed;
+            position.z += right.z * movement_speed;
+        }
+        winit::event::VirtualKeyCode::Space => {
+            position.y += up.y * movement_speed;
+        }
+        winit::event::VirtualKeyCode::LShift => {
+            position.y -= up.y * movement_speed;
+        }
+        _ => {}
     }
 }

@@ -9,6 +9,7 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
+use log::info;
 
 #[derive(Clone, Debug, Default)]
 /// Most Hotham applications will want to keep track of some sort of state.
@@ -24,9 +25,20 @@ pub fn main() {
 }
 
 pub fn real_main() -> HothamResult<()> {
+    let _ = env_logger::builder()
+        .filter_module("hotham-openxr-client", log::LevelFilter::Trace)
+        .filter_module("simple_scene_example", log::LevelFilter::Trace)
+        .init();
+
+    println!("Hello!");
+    info!("Building engine..");
     let mut engine = Engine::new();
+    info!("..done!");
+
+    info!("Initialising app..");
     let mut state = Default::default();
     init(&mut engine)?;
+    info!("Done! Entering main loop..");
 
     while let Ok(tick_data) = engine.update() {
         tick(tick_data, &mut engine, &mut state);

@@ -4,12 +4,12 @@
     non_upper_case_globals,
     non_camel_case_types
 )]
-use crate::space_state::SpaceState;
+use crate::{action_state::ActionState, space_state::SpaceState};
 use ash::vk::{self, Handle};
 use hotham_editor_protocol::{
-    requests,
-    responses::{self, SwapchainInfo},
-    EditorClient, Request,
+    requests::{self, AcquireSwapchainImage, EndFrame, LocateView},
+    responses::SwapchainInfo,
+    EditorClient,
 };
 use log::{debug, error, trace};
 use once_cell::sync::OnceCell;
@@ -17,16 +17,17 @@ use openxr_sys::{
     platform::{VkDevice, VkInstance, VkPhysicalDevice, VkResult},
     Action, ActionCreateInfo, ActionSet, ActionSetCreateInfo, ActionSpaceCreateInfo,
     ActionStateBoolean, ActionStateFloat, ActionStateGetInfo, ActionStatePose, ActionsSyncInfo,
-    EnvironmentBlendMode, EventDataBuffer, ExtensionProperties, FrameBeginInfo, FrameEndInfo,
-    FrameState, FrameWaitInfo, GraphicsBindingVulkanKHR, GraphicsRequirementsVulkanKHR,
-    HapticActionInfo, HapticBaseHeader, Instance, InstanceCreateInfo, InstanceProperties,
-    InteractionProfileSuggestedBinding, Path, Quaternionf, ReferenceSpaceCreateInfo,
-    ReferenceSpaceType, Result, Session, SessionActionSetsAttachInfo, SessionBeginInfo,
-    SessionCreateInfo, Space, SpaceLocation, StructureType, Swapchain, SwapchainCreateInfo,
+    EnvironmentBlendMode, EventDataBuffer, EventDataSessionStateChanged, ExtensionProperties, Fovf,
+    FrameBeginInfo, FrameEndInfo, FrameState, FrameWaitInfo, GraphicsBindingVulkanKHR,
+    GraphicsRequirementsVulkanKHR, HapticActionInfo, HapticBaseHeader, Instance,
+    InstanceCreateInfo, InstanceProperties, InteractionProfileSuggestedBinding, Path, Posef,
+    Quaternionf, ReferenceSpaceCreateInfo, ReferenceSpaceType, Result, Session,
+    SessionActionSetsAttachInfo, SessionBeginInfo, SessionCreateInfo, SessionState, Space,
+    SpaceLocation, SpaceLocationFlags, StructureType, Swapchain, SwapchainCreateInfo,
     SwapchainImageAcquireInfo, SwapchainImageBaseHeader, SwapchainImageReleaseInfo,
     SwapchainImageVulkanKHR, SwapchainImageWaitInfo, SystemGetInfo, SystemId, SystemProperties,
     Time, Vector3f, Version, View, ViewConfigurationType, ViewConfigurationView, ViewLocateInfo,
-    ViewState, VulkanDeviceCreateInfoKHR, VulkanGraphicsDeviceGetInfoKHR,
+    ViewState, ViewStateFlags, VulkanDeviceCreateInfoKHR, VulkanGraphicsDeviceGetInfoKHR,
     VulkanInstanceCreateInfoKHR, FALSE, TRUE,
 };
 
@@ -37,7 +38,7 @@ use std::{
     mem::transmute,
     ptr::null_mut,
 };
-use std::{ptr, slice};
+use std::{ptr, slice, time::Instant};
 use uds_windows::UnixStream;
 
 type PartialVulkan = (ash::Entry, ash::Instance);
@@ -56,9 +57,15 @@ static mut EDITOR_CLIENT: OnceCell<EditorClient<UnixStream>> = OnceCell::new();
 static mut STRING_TO_PATH: OnceCell<StringToPathMap> = OnceCell::new();
 static mut PATH_TO_STRING: OnceCell<PathToStringMap> = OnceCell::new();
 static mut BINDINGS: OnceCell<BindingMap> = OnceCell::new();
-static mut VIEW_COUNT: u32 = 0; // handy to keep around
+static mut SWAPCHAIN_IMAGE_COUNT: u32 = 0; // handy to keep around
 static mut SWAPCHAIN_IMAGES: OnceCell<Vec<vk::Image>> = OnceCell::new();
 static mut SWAPCHAIN_SEMAPHORES: OnceCell<Vec<vk::Semaphore>> = OnceCell::new();
+static mut SESSION_STATE: SessionState = SessionState::UNKNOWN;
+static mut ACTION_STATE: OnceCell<ActionState> = OnceCell::new();
+static CLOCK: OnceCell<Instant> = OnceCell::new();
+
+// Camera, etc
+pub const CAMERA_FIELD_OF_VIEW: f32 = 1.; // about 57 degrees
 
 pub unsafe extern "system" fn enumerate_instance_extension_properties(
     _layer_names: *const ::std::os::raw::c_char,
@@ -66,31 +73,18 @@ pub unsafe extern "system" fn enumerate_instance_extension_properties(
     property_count_output: *mut u32,
     properties: *mut ExtensionProperties,
 ) -> Result {
-    // If the client didn't initialise env logger, do it now
-    let _ = env_logger::builder()
-        .filter_module("hotham_openxr_client", log::LevelFilter::Trace)
-        .try_init();
-
     trace!("enumerate_instance_extension_properties");
 
     set_array(
         property_capacity_input,
         property_count_output,
         properties,
-        [
-            ExtensionProperties {
-                ty: StructureType::EXTENSION_PROPERTIES,
-                next: ptr::null_mut(),
-                extension_name: str_to_fixed_bytes("XR_KHR_vulkan_enable"),
-                extension_version: 1,
-            },
-            ExtensionProperties {
-                ty: StructureType::EXTENSION_PROPERTIES,
-                next: ptr::null_mut(),
-                extension_name: str_to_fixed_bytes("XR_KHR_vulkan_enable2"),
-                extension_version: 1,
-            },
-        ],
+        [ExtensionProperties {
+            ty: StructureType::EXTENSION_PROPERTIES,
+            next: ptr::null_mut(),
+            extension_name: str_to_fixed_bytes("XR_KHR_vulkan_enable2"),
+            extension_version: 1,
+        }],
     );
     Result::SUCCESS
 }
@@ -99,11 +93,9 @@ pub unsafe extern "system" fn create_instance(
     _create_info: *const InstanceCreateInfo,
     instance: *mut Instance,
 ) -> Result {
-    // If the client didn't initialise env logger, do it now
-    let _ = env_logger::builder()
-        .filter_module("hotham_openxr_client", log::LevelFilter::Trace)
-        .try_init();
-
+    env_logger::builder()
+        .filter_level(log::LevelFilter::Debug)
+        .init();
     trace!("create_instance");
 
     // Initialise our various maps
@@ -111,10 +103,14 @@ pub unsafe extern "system" fn create_instance(
     let _ = STRING_TO_PATH.set(Default::default());
     let _ = PATH_TO_STRING.set(Default::default());
     let _ = BINDINGS.set(Default::default());
+    let _ = ACTION_STATE.set(Default::default());
 
     // New instance, new luck.
     *instance = Instance::from_raw(rand::random());
     let _ = INSTANCE.set(*instance);
+
+    // Mr. Gaeta, start the clock.
+    CLOCK.set(Instant::now()).unwrap();
 
     // Connect to the server
     match UnixStream::connect("hotham_editor.socket") {
@@ -263,7 +259,7 @@ pub unsafe extern "system" fn get_vulkan_graphics_requirements(
 
 pub unsafe extern "system" fn get_instance_properties(
     _instance: Instance,
-    instance_properties: *mut InstanceProperties,
+    _instance_properties: *mut InstanceProperties,
 ) -> Result {
     trace!("get_instance_properties");
     Result::ERROR_FEATURE_UNSUPPORTED
@@ -273,9 +269,9 @@ pub unsafe extern "system" fn enumerate_environment_blend_modes(
     _instance: Instance,
     _system_id: SystemId,
     _view_configuration_type: ViewConfigurationType,
-    environment_blend_mode_capacity_input: u32,
-    environment_blend_mode_count_output: *mut u32,
-    environment_blend_modes: *mut EnvironmentBlendMode,
+    _environment_blend_mode_capacity_input: u32,
+    _environment_blend_mode_count_output: *mut u32,
+    _environment_blend_modes: *mut EnvironmentBlendMode,
 ) -> Result {
     trace!("enumerate_environment_blend_modes");
     Result::ERROR_FEATURE_UNSUPPORTED
@@ -478,67 +474,80 @@ pub unsafe extern "system" fn poll_event(
     _instance: Instance,
     event_data: *mut EventDataBuffer,
 ) -> Result {
-    // let mut state = STATE.lock().unwrap();
-    // let mut next_state = state.session_state;
-    // if state.session_state == SessionState::UNKNOWN {
-    //     next_state = SessionState::IDLE;
-    //     state.has_event = true;
-    // }
-    // if state.session_state == SessionState::IDLE {
-    //     next_state = SessionState::READY;
-    //     state.has_event = true;
-    // }
-    // if state.session_state == SessionState::READY {
-    //     next_state = SessionState::SYNCHRONIZED;
-    //     state.has_event = true;
-    // }
-    // if state.session_state == SessionState::SYNCHRONIZED {
-    //     next_state = SessionState::VISIBLE;
-    //     state.has_event = true;
-    // }
-    // if state.session_state == SessionState::SYNCHRONIZED {
-    //     next_state = SessionState::FOCUSED;
-    //     state.has_event = true;
-    // }
+    let next_state = match SESSION_STATE {
+        SessionState::UNKNOWN => Some(SessionState::IDLE),
+        SessionState::IDLE => Some(SessionState::READY),
+        SessionState::READY => Some(SessionState::SYNCHRONIZED),
+        SessionState::SYNCHRONIZED => Some(SessionState::VISIBLE),
+        SessionState::VISIBLE => Some(SessionState::FOCUSED),
+        _ => None,
+    };
 
-    // if state.has_event {
-    //     let data = EventDataSessionStateChanged {
-    //         ty: StructureType::EVENT_DATA_SESSION_STATE_CHANGED,
-    //         next: ptr::null(),
-    //         session: Session::from_raw(42),
-    //         state: next_state,
-    //         time: openxr_sys::Time::from_nanos(10),
-    //     };
-    //     copy_nonoverlapping(&data, transmute(event_data), 1);
-    //     state.has_event = false;
-    //     state.session_state = next_state;
+    if let Some(next_state) = next_state {
+        SESSION_STATE = next_state;
+        let event_data = event_data as *mut EventDataSessionStateChanged;
+        *event_data = EventDataSessionStateChanged {
+            ty: StructureType::EVENT_DATA_SESSION_STATE_CHANGED,
+            next: ptr::null(),
+            session: *SESSION.get().unwrap(),
+            state: next_state,
+            time: now(),
+        };
+        return Result::SUCCESS;
+    }
 
-    //     Result::ERROR_FEATURE_UNSUPPORTED
-    // } else {
-    Result::EVENT_UNAVAILABLE
-    // }
+    return Result::EVENT_UNAVAILABLE;
 }
 
 pub unsafe extern "system" fn begin_session(
     session: Session,
     _begin_info: *const SessionBeginInfo,
 ) -> Result {
-    debug!("[HOTHAM_SIMULATOR] Beginning session: {session:?}");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    trace!("begin_session");
+    debug!("Beginning session: {session:?}");
+    Result::SUCCESS
 }
 pub unsafe extern "system" fn wait_frame(
     _session: Session,
     _frame_wait_info: *const FrameWaitInfo,
     frame_state: *mut FrameState,
 ) -> Result {
-    Result::ERROR_FEATURE_UNSUPPORTED
+    trace!("wait_frame");
+
+    // This is a bit of a hack, but if we're not in the FOCUSED state, we'll be sending `wait_frame` before
+    // `locate_views` which will annoy the editor.
+    if SESSION_STATE != SessionState::FOCUSED {
+        *frame_state = FrameState {
+            ty: StructureType::FRAME_STATE,
+            next: null_mut(),
+            predicted_display_time: now(),
+            predicted_display_period: openxr_sys::Duration::from_nanos(1),
+            should_render: false.into(),
+        };
+
+        return Result::SUCCESS;
+    }
+
+    let client = EDITOR_CLIENT.get_mut().unwrap();
+    client.request(&requests::WaitFrame).unwrap();
+
+    *frame_state = FrameState {
+        ty: StructureType::FRAME_STATE,
+        next: null_mut(),
+        predicted_display_time: now(),
+        predicted_display_period: openxr_sys::Duration::from_nanos(1),
+        should_render: true.into(),
+    };
+
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn begin_frame(
     _session: Session,
     _frame_begin_info: *const FrameBeginInfo,
 ) -> Result {
-    Result::ERROR_FEATURE_UNSUPPORTED
+    trace!("begin_frame");
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn enumerate_view_configuration_views(
@@ -555,7 +564,7 @@ pub unsafe extern "system" fn enumerate_view_configuration_views(
         let view_count = client.request(&requests::GetViewCount {}).unwrap();
         trace!("Received view count from server {view_count}");
         *view_count_output = view_count;
-        VIEW_COUNT = view_count;
+        SWAPCHAIN_IMAGE_COUNT = view_count;
         return Result::SUCCESS;
     }
 
@@ -598,7 +607,7 @@ pub unsafe extern "system" fn enumerate_swapchain_images(
 ) -> Result {
     trace!("enumerate_swapchain_images");
     if image_capacity_input == 0 {
-        *image_count_output = VIEW_COUNT;
+        *image_count_output = SWAPCHAIN_IMAGE_COUNT;
         return Result::SUCCESS;
     }
 
@@ -626,8 +635,10 @@ pub unsafe extern "system" fn enumerate_swapchain_images(
     let _ = SWAPCHAIN_SEMAPHORES.set(create_swapchain_semaphores(semaphore_handles));
     let _ = SWAPCHAIN_IMAGES.set(swapchain_images.clone());
 
-    let output_images =
-        std::slice::from_raw_parts_mut(images as *mut SwapchainImageVulkanKHR, VIEW_COUNT as _);
+    let output_images = std::slice::from_raw_parts_mut(
+        images as *mut SwapchainImageVulkanKHR,
+        SWAPCHAIN_IMAGE_COUNT as _,
+    );
     for (output_image, swapchain_image) in output_images.iter_mut().zip(swapchain_images.iter()) {
         *output_image = SwapchainImageVulkanKHR {
             ty: StructureType::SWAPCHAIN_IMAGE_VULKAN_KHR,
@@ -640,12 +651,21 @@ pub unsafe extern "system" fn enumerate_swapchain_images(
 }
 
 pub unsafe extern "system" fn acquire_swapchain_image(
-    swapchain: Swapchain,
+    _swapchain: Swapchain,
     _acquire_info: *const SwapchainImageAcquireInfo,
     index: *mut u32,
 ) -> Result {
     trace!("acquire_swapchain_image");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    // This is a bit of a hack, but if we're not in the FOCUSED state, we'll be sending `acquire_swapchain_image` before
+    // `locate_views` which will annoy the editor.
+    if SESSION_STATE != SessionState::FOCUSED {
+        *index = 0;
+        return Result::SUCCESS;
+    }
+
+    let client = EDITOR_CLIENT.get_mut().unwrap();
+    *index = client.request(&AcquireSwapchainImage).unwrap();
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn wait_swapchain_image(
@@ -653,7 +673,7 @@ pub unsafe extern "system" fn wait_swapchain_image(
     _wait_info: *const SwapchainImageWaitInfo,
 ) -> Result {
     trace!("wait_swapchain_image");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn dummy() -> Result {
@@ -668,25 +688,24 @@ pub unsafe extern "system" fn locate_space(
     location_out: *mut SpaceLocation,
 ) -> Result {
     trace!("locate_space");
-    // match STATE.lock().unwrap().spaces.get(&space.into_raw()) {
-    //     Some(space_state) => {
-    //         let pose = Posef {
-    //             position: space_state.position,
-    //             orientation: space_state.orientation,
-    //         };
-    //         *location_out = SpaceLocation {
-    //             ty: StructureType::SPACE_LOCATION,
-    //             next: null_mut(),
-    //             location_flags: SpaceLocationFlags::ORIENTATION_TRACKED
-    //                 | SpaceLocationFlags::POSITION_VALID
-    //                 | SpaceLocationFlags::ORIENTATION_VALID,
-    //             pose,
-    //         };
-    // Result::ERROR_FEATURE_UNSUPPORTED
-    //     }
-    //     None => Result::ERROR_HANDLE_INVALID,
-    // }
-    Result::ERROR_FEATURE_UNSUPPORTED
+    match SPACES.get().unwrap().get(&space.into_raw()) {
+        Some(space_state) => {
+            let pose = Posef {
+                position: space_state.position,
+                orientation: space_state.orientation,
+            };
+            *location_out = SpaceLocation {
+                ty: StructureType::SPACE_LOCATION,
+                next: null_mut(),
+                location_flags: SpaceLocationFlags::ORIENTATION_TRACKED
+                    | SpaceLocationFlags::POSITION_VALID
+                    | SpaceLocationFlags::ORIENTATION_VALID,
+                pose,
+            };
+            Result::SUCCESS
+        }
+        None => Result::ERROR_HANDLE_INVALID,
+    }
 }
 pub unsafe extern "system" fn get_action_state_pose(
     _session: Session,
@@ -707,7 +726,7 @@ pub unsafe extern "system" fn sync_actions(
     _sync_info: *const ActionsSyncInfo,
 ) -> Result {
     trace!("sync_actions");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn locate_views(
@@ -719,38 +738,35 @@ pub unsafe extern "system" fn locate_views(
     views: *mut View,
 ) -> Result {
     trace!("locate_views");
-    // *view_count_output = NUM_VIEWS as _;
 
-    // if view_capacity_input == 0 {
-    //     return Result::ERROR_FEATURE_UNSUPPORTED;
-    // }
+    // To avoid hitting the editor twice, early return
+    if view_capacity_input == 0 {
+        *view_count_output = 2;
+        return Result::SUCCESS;
+    }
 
-    // *view_state = ViewState {
-    //     ty: StructureType::VIEW_STATE,
-    //     next: null_mut(),
-    //     view_state_flags: ViewStateFlags::ORIENTATION_VALID | ViewStateFlags::POSITION_VALID,
-    // };
-    // let views = slice::from_raw_parts_mut(views, NUM_VIEWS);
-    // let state = STATE.lock().unwrap();
-    // #[allow(clippy::approx_constant)]
-    // for (i, view) in views.iter_mut().enumerate() {
-    //     let pose = state.view_poses[i];
+    let editor_client = EDITOR_CLIENT.get_mut().unwrap();
+    let pose = editor_client.request(&LocateView).unwrap();
 
-    //     // The actual fov is defined as (right - left). As these are all symetrical, we just divide the fov variable by 2.
-    //     *view = View {
-    //         ty: StructureType::VIEW,
-    //         next: null_mut(),
-    //         pose,
-    //         fov: Fovf {
-    //             angle_down: -CAMERA_FIELD_OF_VIEW / 2.,
-    //             angle_up: CAMERA_FIELD_OF_VIEW / 2.,
-    //             angle_left: -CAMERA_FIELD_OF_VIEW / 2.,
-    //             angle_right: CAMERA_FIELD_OF_VIEW / 2.,
-    //         },
-    //     };
-    // }
+    let view = View {
+        ty: StructureType::VIEW,
+        next: null_mut(),
+        pose,
+        fov: Fovf {
+            angle_down: -CAMERA_FIELD_OF_VIEW / 2.,
+            angle_up: CAMERA_FIELD_OF_VIEW / 2.,
+            angle_left: -CAMERA_FIELD_OF_VIEW / 2.,
+            angle_right: CAMERA_FIELD_OF_VIEW / 2.,
+        },
+    };
+    set_array(view_capacity_input, view_count_output, views, [view; 2]);
+    *view_state = ViewState {
+        ty: StructureType::VIEW_STATE,
+        next: null_mut(),
+        view_state_flags: ViewStateFlags::ORIENTATION_VALID | ViewStateFlags::POSITION_VALID,
+    };
 
-    Result::ERROR_FEATURE_UNSUPPORTED
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn release_swapchain_image(
@@ -758,15 +774,16 @@ pub unsafe extern "system" fn release_swapchain_image(
     _release_info: *const SwapchainImageReleaseInfo,
 ) -> Result {
     trace!("release_swapchain_images");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn end_frame(
     _session: Session,
-    frame_end_info: *const FrameEndInfo,
+    _frame_end_info: *const FrameEndInfo,
 ) -> Result {
     trace!("end_frame");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    EDITOR_CLIENT.get_mut().unwrap().request(&EndFrame).unwrap();
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn request_exit_session(_session: Session) -> Result {
@@ -808,7 +825,7 @@ pub unsafe extern "system" fn enumerate_view_configurations(
     _instance: Instance,
     _system_id: SystemId,
     _view_configuration_type_capacity_input: u32,
-    view_configuration_type_count_output: *mut u32,
+    _view_configuration_type_count_output: *mut u32,
     _view_configuration_types: *mut ViewConfigurationType,
 ) -> Result {
     trace!("enumerate_view_configurations");
@@ -844,9 +861,9 @@ pub unsafe extern "system" fn get_system_properties(
 
 pub unsafe extern "system" fn enumerate_swapchain_formats(
     _session: Session,
-    format_capacity_input: u32,
-    format_count_output: *mut u32,
-    formats: *mut i64,
+    _format_capacity_input: u32,
+    _format_count_output: *mut u32,
+    _formats: *mut i64,
 ) -> Result {
     trace!("enumerate_swapchain_formats");
     Result::ERROR_FEATURE_UNSUPPORTED
@@ -866,7 +883,7 @@ pub unsafe extern "system" fn get_action_state_float(
         last_change_time: openxr_sys::Time::from_nanos(0),
         is_active: TRUE,
     };
-    Result::ERROR_FEATURE_UNSUPPORTED
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn end_session(_session: Session) -> Result {
@@ -880,7 +897,16 @@ pub unsafe extern "system" fn get_action_state_boolean(
     action_state: *mut ActionStateBoolean,
 ) -> Result {
     trace!("get_action_state_boolean");
-    Result::ERROR_FEATURE_UNSUPPORTED
+    let current_state = ACTION_STATE.get().unwrap().get_boolean((*get_info).action);
+    *action_state = ActionStateBoolean {
+        ty: StructureType::ACTION_STATE_BOOLEAN,
+        next: ptr::null_mut(),
+        current_state,
+        changed_since_last_sync: FALSE,
+        last_change_time: openxr_sys::Time::from_nanos(0),
+        is_active: TRUE,
+    };
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn apply_haptic_feedback(
@@ -891,15 +917,15 @@ pub unsafe extern "system" fn apply_haptic_feedback(
     trace!("apply_haptic_feedback");
     /* explicit no-op, could possibly be extended with controller support in future if winit ever
      * provides such APIs */
-    Result::ERROR_FEATURE_UNSUPPORTED
+    Result::SUCCESS
 }
 
 pub unsafe extern "system" fn get_vulkan_instance_extensions(
     _instance: Instance,
     _system_id: SystemId,
-    buffer_capacity_input: u32,
-    buffer_count_output: *mut u32,
-    buffer: *mut c_char,
+    _buffer_capacity_input: u32,
+    _buffer_count_output: *mut u32,
+    _buffer: *mut c_char,
 ) -> Result {
     trace!("get_vulkan_instance_extensions");
     Result::ERROR_FEATURE_UNSUPPORTED
@@ -908,9 +934,9 @@ pub unsafe extern "system" fn get_vulkan_instance_extensions(
 pub unsafe extern "system" fn get_vulkan_device_extensions(
     _instance: Instance,
     _system_id: SystemId,
-    buffer_capacity_input: u32,
-    buffer_count_output: *mut u32,
-    buffer: *mut c_char,
+    _buffer_capacity_input: u32,
+    _buffer_count_output: *mut u32,
+    _buffer: *mut c_char,
 ) -> Result {
     trace!("get_vulkan_device_extensions");
     Result::ERROR_FEATURE_UNSUPPORTED
@@ -1027,4 +1053,10 @@ fn create_swapchain_semaphores(handles: Vec<vk::HANDLE>) -> Vec<vk::Semaphore> {
             semaphore
         })
         .collect()
+}
+
+fn now() -> openxr_sys::Time {
+    openxr_sys::Time::from_nanos(
+        (std::time::Instant::now() - *CLOCK.get().unwrap()).as_nanos() as _,
+    )
 }

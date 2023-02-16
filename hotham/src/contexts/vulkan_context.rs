@@ -75,7 +75,15 @@ impl VulkanContext {
             .engine_version(1)
             .build();
 
-        let create_info = vk::InstanceCreateInfo::builder().application_info(&app_info);
+        #[allow(unused_mut)]
+        let mut instance_extensions = vec![];
+
+        #[cfg(debug_assertions)]
+        instance_extensions.push(vk::ExtDebugUtilsFn::name().as_ptr());
+
+        let create_info = vk::InstanceCreateInfo::builder()
+            .application_info(&app_info)
+            .enabled_extension_names(&instance_extensions);
 
         let instance_handle = unsafe {
             xr_instance.create_vulkan_instance(
