@@ -5,7 +5,7 @@ use anyhow::Result;
 use glam::{Affine3A, Quat, Vec3};
 use openxr::{Posef, SpaceLocation, SpaceLocationFlags, ViewStateFlags};
 use rapier3d::na::Vector3;
-use std::{ffi::CStr, os::raw::c_char, str::Utf8Error, time::Instant};
+use std::{ffi::CStr, os::raw::c_char, str::Utf8Error, sync::Arc, time::Instant};
 
 pub(crate) unsafe fn get_raw_strings(strings: Vec<&str>) -> Vec<*const c_char> {
     strings
@@ -26,6 +26,21 @@ pub(crate) unsafe fn parse_raw_string(
 ) -> Result<&'static str, Utf8Error> {
     let cstr = CStr::from_ptr(raw_string);
     cstr.to_str()
+}
+
+// shout out to wgpu to for this:
+/// Creates a new vec with a copy of the same bytes.
+pub fn u8_to_u32(asset_data: Arc<Vec<u8>>) -> Vec<u32> {
+    let mut words = vec![0u32; asset_data.len() / std::mem::size_of::<u32>()];
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            asset_data.as_ptr(),
+            words.as_mut_ptr() as *mut u8,
+            asset_data.len(),
+        );
+    }
+
+    words
 }
 
 #[cfg(test)]

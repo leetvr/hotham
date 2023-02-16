@@ -5,10 +5,11 @@ use crate::{
         render_context::create_pipeline, AudioContext, GuiContext, HapticContext, InputContext,
         PhysicsContext, RenderContext, VulkanContext, XrContext, XrContextBuilder,
     },
-    util::PerformanceTimer,
+    util::{u8_to_u32, PerformanceTimer},
     workers::Workers,
     HothamError, HothamResult, VIEW_TYPE,
 };
+use hotham_asset_client::AssetUpdatedMessage;
 use openxr as xr;
 
 use std::{
@@ -109,6 +110,7 @@ impl<'a> EngineBuilder<'a> {
             stage_entity,
             hmd_entity,
             performance_timer: PerformanceTimer::new("Application Tick"),
+            recently_updated_assets: Default::default(),
             workers: Workers::new(Default::default()),
         }
     }
@@ -161,6 +163,8 @@ pub struct Engine {
     pub hmd_entity: hecs::Entity,
     /// Performance timers
     pub performance_timer: PerformanceTimer,
+    /// Files that were hot reloaded this frame
+    recently_updated_assets: Vec<AssetUpdatedMessage>,
     /// Workers
     workers: Workers,
 }
@@ -282,7 +286,13 @@ impl Engine {
         self.workers = Workers::new(asset_list);
     }
 
+    /// Get a list of assets updated this frame.
+    pub fn get_updated_assets(&self) -> &Vec<AssetUpdatedMessage> {
+        &self.recently_updated_assets
+    }
+
     fn check_for_worker_messages(&mut self) {
+        self.recently_updated_assets.clear();
         for message in self.workers.receiver.try_iter() {
             match message {
                 crate::workers::WorkerMessage::AssetUpdated(asset_updated) => {
@@ -292,21 +302,23 @@ impl Engine {
                     let world = &mut self.world;
 
                     let file_type = asset_updated.asset_id.split('.').last().unwrap();
-                    match file_type {
-                        "glb" => update_models(
+                    match (asset_updated.asset_id.as_str(), file_type) {
+                        (_, "glb") => update_models(
                             vulkan_context,
                             render_context,
                             world,
-                            asset_updated.asset_data,
+                            asset_updated.asset_data.clone(),
                         ),
-                        "spv" => update_shader(
+                        ("hotham/src/shaders/pbr.frag.spv", _)
+                        | ("hotham/src/shaders/pbr.vert.spv", _) => update_shader(
                             vulkan_context,
                             render_context,
                             &asset_updated.asset_id,
-                            asset_updated.asset_data,
+                            asset_updated.asset_data.clone(),
                         ),
                         _ => {}
                     }
+                    self.recently_updated_assets.push(asset_updated);
                     println!(
                         "[HOTHAM_ASSET_HOT_RELOAD] Asset reload took {:.2} seconds",
                         Instant::now().duration_since(tick).as_secs_f32()
@@ -381,20 +393,6 @@ fn update_shader(
         )
         .unwrap();
     }
-}
-
-// shout out to wgpu to for this:
-fn u8_to_u32(asset_data: Arc<Vec<u8>>) -> Vec<u32> {
-    let mut words = vec![0u32; asset_data.len() / std::mem::size_of::<u32>()];
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            asset_data.as_ptr(),
-            words.as_mut_ptr() as *mut u8,
-            asset_data.len(),
-        );
-    }
-
-    words
 }
 
 fn despawn_children(
