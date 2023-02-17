@@ -1,13 +1,16 @@
+mod camera;
+mod input_context;
+
 use anyhow::{bail, Result};
 use ash::vk;
-use glam::{Quat, Vec3};
+
 use hotham_editor_protocol::{responses, EditorServer, RequestType};
 use lazy_vulkan::{
     find_memorytype_index, vulkan_context::VulkanContext, vulkan_texture::VulkanTexture, DrawCall,
     LazyRenderer, LazyVulkan, SwapchainInfo, Vertex,
 };
 use log::{debug, info, trace};
-use openxr_sys::{Posef, Vector3f};
+
 use std::time::Instant;
 use uds_windows::{UnixListener, UnixStream};
 use winit::{
@@ -15,6 +18,8 @@ use winit::{
     event_loop::ControlFlow,
     platform::run_return::EventLoopExtRunReturn,
 };
+
+use crate::camera::Camera;
 
 /// Compile your own damn shaders! LazyVulkan is just as lazy as you are!
 static FRAGMENT_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.frag.spv");
@@ -72,17 +77,9 @@ pub fn main() -> Result<()> {
         xr_swapchain.images,
     );
 
-    let mut view_state = Posef {
-        position: Vector3f {
-            x: 0.,
-            y: 1.4,
-            z: 0.,
-        },
-        ..Posef::IDENTITY
-    };
     let mut last_frame_time = Instant::now();
     let mut keyboard_events = Vec::new();
-    let mut last_key_pressed = None;
+    let mut camera = Camera::default();
 
     // Off we go!
     let mut winit_initializing = true;
@@ -122,18 +119,11 @@ pub fn main() -> Result<()> {
 
             Event::MainEventsCleared => {
                 let framebuffer_index = lazy_vulkan.render_begin();
-
-                update_camera(
-                    &mut view_state,
-                    last_frame_time,
-                    &mut last_key_pressed,
-                    &keyboard_events,
-                );
-
+                camera.process_input(last_frame_time, &keyboard_events);
                 keyboard_events.clear();
 
                 check_request(&mut server, RequestType::LocateView).unwrap();
-                server.send_response(&view_state).unwrap();
+                server.send_response(&camera.as_pose()).unwrap();
 
                 check_request(&mut server, RequestType::WaitFrame).unwrap();
                 server.send_response(&0).unwrap();
@@ -142,7 +132,7 @@ pub fn main() -> Result<()> {
                 server.send_response(&framebuffer_index).unwrap();
 
                 check_request(&mut server, RequestType::LocateView).unwrap();
-                server.send_response(&view_state).unwrap();
+                server.send_response(&camera.as_pose()).unwrap();
 
                 check_request(&mut server, RequestType::EndFrame).unwrap();
                 server.send_response(&0).unwrap();
@@ -390,88 +380,4 @@ unsafe fn create_render_images(
             (image, handle)
         })
         .unzip()
-}
-
-// TODO:    This needs to be replaced with a nice state machine that can handle keyboard input, mouse input
-//          and gamepad input.
-pub fn update_camera(
-    pose: &mut Posef,
-    last_frame_time: Instant,
-    last_key_pressed: &mut Option<VirtualKeyCode>,
-    input_events: &[KeyboardInput],
-) {
-    // We need to adjust the speed value so its always the same speed even if the frame rate isn't consistent
-    // The delta time is the the current time - last frame time
-    let dt = (Instant::now() - last_frame_time).as_secs_f32();
-
-    let movement_speed = 10. * dt;
-
-    // Process the event queue
-    for event in input_events {
-        if event.state == ElementState::Pressed {
-            move_camera(pose, movement_speed, event.virtual_keycode.unwrap());
-        }
-    }
-
-    // Finally, we want to handle someone holding a key down. This is annoying.
-
-    // First, we need to check if the key was released
-    let key_has_been_released = !input_events.is_empty();
-
-    // If the user is still holding down the key, we need to treat that as an input event
-    if !key_has_been_released {
-        if let Some(last_key) = last_key_pressed {
-            move_camera(pose, movement_speed, *last_key);
-        }
-    }
-
-    // Otherwise, find the last key pressed and mark that as the final one
-    for event in input_events {
-        if event.state == ElementState::Pressed {
-            *last_key_pressed = event.virtual_keycode;
-        } else if last_key_pressed == &event.virtual_keycode {
-            *last_key_pressed = None;
-        }
-    }
-}
-
-fn move_camera(pose: &mut Posef, movement_speed: f32, virtual_keycode: VirtualKeyCode) {
-    let position = &mut pose.position;
-    let o = pose.orientation;
-    let orientation = Quat::from_xyzw(o.x, o.y, o.z, o.w);
-    // get the forward vector rotated by the camera rotation quaternion
-    let forward = orientation * -Vec3::Z;
-    // get the right vector rotated by the camera rotation quaternion
-    let right = orientation * Vec3::X;
-    let up = Vec3::Y;
-
-    match virtual_keycode {
-        winit::event::VirtualKeyCode::W => {
-            position.x += forward.x * movement_speed;
-            position.y += forward.y * movement_speed;
-            position.z += forward.z * movement_speed;
-        }
-        winit::event::VirtualKeyCode::S => {
-            position.x -= forward.x * movement_speed;
-            position.y -= forward.y * movement_speed;
-            position.z -= forward.z * movement_speed;
-        }
-        winit::event::VirtualKeyCode::A => {
-            position.x -= right.x * movement_speed;
-            position.y -= right.y * movement_speed;
-            position.z -= right.z * movement_speed;
-        }
-        winit::event::VirtualKeyCode::D => {
-            position.x += right.x * movement_speed;
-            position.y += right.y * movement_speed;
-            position.z += right.z * movement_speed;
-        }
-        winit::event::VirtualKeyCode::Space => {
-            position.y += up.y * movement_speed;
-        }
-        winit::event::VirtualKeyCode::LShift => {
-            position.y -= up.y * movement_speed;
-        }
-        _ => {}
-    }
 }
