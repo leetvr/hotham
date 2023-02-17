@@ -3,7 +3,7 @@ use std::time::Instant;
 use glam::{Quat, Vec3};
 use winit::event::KeyboardInput;
 
-use crate::input_context::InputContext;
+use crate::{input_context::InputContext, MouseInput};
 
 #[derive(Debug, Clone)]
 pub struct Camera {
@@ -15,7 +15,8 @@ impl Default for Camera {
     fn default() -> Self {
         let pose = Pose {
             position: [0., 1.4, 0.].into(),
-            orientation: Default::default(),
+            pitch: 0.,
+            yaw: 0.,
         };
         Self {
             pose,
@@ -29,23 +30,35 @@ impl Camera {
         (&self.pose).into()
     }
 
-    pub fn process_input(&mut self, last_frame_time: Instant, keyboard_input: &[KeyboardInput]) {
+    pub fn process_input(
+        &mut self,
+        last_frame_time: Instant,
+        keyboard_input: &[KeyboardInput],
+        mouse_input: &[MouseInput],
+    ) {
         let delta_time = (Instant::now() - last_frame_time).as_secs_f32();
         self.input_context
-            .update(delta_time, keyboard_input, &mut self.pose)
+            .update(delta_time, keyboard_input, mouse_input, &mut self.pose)
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct Pose {
     pub position: Vec3,
-    pub orientation: Quat,
+    pub pitch: f32,
+    pub yaw: f32,
+}
+
+impl Pose {
+    pub fn orientation(&self) -> Quat {
+        Quat::from_euler(glam::EulerRot::YXZ, self.yaw, self.pitch, 0.)
+    }
 }
 
 impl From<&Pose> for openxr_sys::Posef {
     fn from(pose: &Pose) -> Self {
         let p = pose.position;
-        let o = pose.orientation;
+        let o = pose.orientation();
 
         openxr_sys::Posef {
             orientation: openxr_sys::Quaternionf {

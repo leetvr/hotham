@@ -4,6 +4,7 @@ mod input_context;
 use anyhow::{bail, Result};
 use ash::vk;
 
+use glam::Vec2;
 use hotham_editor_protocol::{responses, EditorServer, RequestType};
 use lazy_vulkan::{
     find_memorytype_index, vulkan_context::VulkanContext, vulkan_texture::VulkanTexture, DrawCall,
@@ -79,6 +80,7 @@ pub fn main() -> Result<()> {
 
     let mut last_frame_time = Instant::now();
     let mut keyboard_events = Vec::new();
+    let mut mouse_events = Vec::new();
     let mut camera = Camera::default();
 
     // Off we go!
@@ -119,8 +121,9 @@ pub fn main() -> Result<()> {
 
             Event::MainEventsCleared => {
                 let framebuffer_index = lazy_vulkan.render_begin();
-                camera.process_input(last_frame_time, &keyboard_events);
+                camera.process_input(last_frame_time, &keyboard_events, &mouse_events);
                 keyboard_events.clear();
+                mouse_events.clear();
 
                 check_request(&mut server, RequestType::LocateView).unwrap();
                 server.send_response(&camera.as_pose()).unwrap();
@@ -173,6 +176,32 @@ pub fn main() -> Result<()> {
                     keyboard_events.push(input);
                 }
             }
+            Event::DeviceEvent { event, .. } => match event {
+                winit::event::DeviceEvent::MouseMotion { delta } => {
+                    if focused {
+                        mouse_events.push(MouseInput::MouseMoved(
+                            [delta.0 as f32, delta.1 as f32].into(), // translate from screen space to world space.. sort of
+                        ))
+                    }
+                }
+                winit::event::DeviceEvent::Button {
+                    button: 1,
+                    state: ElementState::Pressed,
+                } => {
+                    if focused {
+                        mouse_events.push(MouseInput::LeftClickPressed)
+                    }
+                }
+                winit::event::DeviceEvent::Button {
+                    button: 1,
+                    state: ElementState::Released,
+                } => {
+                    if focused {
+                        mouse_events.push(MouseInput::LeftClickReleased)
+                    }
+                }
+                _ => {}
+            },
             _ => (),
         }
     });
@@ -183,6 +212,12 @@ pub fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+pub enum MouseInput {
+    LeftClickPressed,
+    LeftClickReleased,
+    MouseMoved(Vec2),
 }
 
 pub struct XrSwapchain {
