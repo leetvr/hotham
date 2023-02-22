@@ -1,6 +1,9 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, physics::SharedShape, Collider, LocalTransform, RigidBody},
+    components::{
+        hand::Handedness, physics::SharedShape, Collider, GlobalTransform, LocalTransform,
+        RigidBody,
+    },
     hecs::World,
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
@@ -30,7 +33,17 @@ pub fn real_main() -> HothamResult<()> {
         .filter_module("simple_scene_example", log::LevelFilter::Trace)
         .init();
 
-    println!("Hello!");
+    info!("Initialising Simple Scene example..");
+
+    #[cfg(feature = "editor")]
+    let mut editor = {
+        use hotham_editor_protocol::EditorClient;
+        use uds_windows::UnixStream;
+        info!("Connecting to editor..");
+        let stream = UnixStream::connect("hotham_editor.socket")?;
+        EditorClient::new(stream)
+    };
+
     info!("Building engine..");
     let mut engine = Engine::new();
     info!("..done!");
@@ -41,9 +54,26 @@ pub fn real_main() -> HothamResult<()> {
     info!("Done! Entering main loop..");
 
     while let Ok(tick_data) = engine.update() {
+        #[cfg(feature = "editor")]
+        send_scene(&mut engine.world, &mut editor)?;
+
         tick(tick_data, &mut engine, &mut state);
         engine.finish()?;
     }
+
+    Ok(())
+}
+
+fn send_scene(
+    world: &mut World,
+    editor: &mut hotham_editor_protocol::EditorClient<uds_windows::UnixStream>,
+) -> HothamResult<()> {
+    let scene = hotham_editor_protocol::scene::Scene {
+        name: "Simple Scene".to_string(),
+        entities: vec![],
+    };
+
+    editor.send_json(&scene).unwrap(); // TODO: error types
 
     Ok(())
 }

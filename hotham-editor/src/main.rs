@@ -1,4 +1,5 @@
 mod camera;
+mod gui;
 mod input_context;
 
 use anyhow::{bail, Result};
@@ -7,7 +8,7 @@ use ash::vk;
 use glam::Vec2;
 use hotham_editor_protocol::{responses, EditorServer, RequestType};
 use lazy_vulkan::{
-    find_memorytype_index, vulkan_context::VulkanContext, vulkan_texture::VulkanTexture, DrawCall,
+    find_memorytype_index, vulkan_context::VulkanContext, vulkan_texture::VulkanTexture,
     LazyRenderer, LazyVulkan, SwapchainInfo, Vertex,
 };
 use log::{debug, info, trace};
@@ -20,12 +21,15 @@ use winit::{
     platform::run_return::EventLoopExtRunReturn,
 };
 
-use crate::camera::Camera;
+use crate::{
+    camera::Camera,
+    gui::{gui, GuiState},
+};
 
 /// Compile your own damn shaders! LazyVulkan is just as lazy as you are!
 static FRAGMENT_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.frag.spv");
 static VERTEX_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.vert.spv");
-const SWAPCHAIN_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB; // OpenXR really, really wants us to use SRGB swapchains
+const SWAPCHAIN_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB; // OpenXR really, really wants us to use sRGB swapchains
 static UNIX_SOCKET_PATH: &'_ str = "hotham_editor.socket";
 
 pub fn main() -> Result<()> {
@@ -46,14 +50,10 @@ pub fn main() -> Result<()> {
     // Your own index type?! What are you going to use, `u16`?
     let indices = [0, 1, 2, 2, 1, 3];
 
-    // Alright, let's build some stuff
-    let (mut lazy_vulkan, mut lazy_renderer, mut event_loop) = LazyVulkan::builder()
-        .initial_vertices(&vertices)
-        .initial_indices(&indices)
-        .fragment_shader(FRAGMENT_SHADER)
-        .vertex_shader(VERTEX_SHADER)
-        .with_present(true)
-        .build();
+    let window_size = vk::Extent2D {
+        width: 800,
+        height: 500,
+    };
 
     // Let's do something totally normal and wait for a TCP connection
     if std::fs::remove_file(UNIX_SOCKET_PATH).is_ok() {
@@ -61,18 +61,35 @@ pub fn main() -> Result<()> {
     }
 
     let listener = UnixListener::bind(UNIX_SOCKET_PATH).unwrap();
-    info!("Listening on {UNIX_SOCKET_PATH} - waiting for client..");
+    info!("Listening on {UNIX_SOCKET_PATH}: waiting for game client..");
+    let (stream, _) = listener.accept().unwrap();
+    let mut game_server = EditorServer::new(stream);
+
+    info!("Game connected! Waiting for OpenXR client..",);
+    let (stream, _) = listener.accept().unwrap();
+    let mut openxr_server = EditorServer::new(stream);
+    info!("OpenXR client connected! Opening window and doing OpenXR setup");
+
+    // Alright, let's build some stuff
+    let (mut lazy_vulkan, mut lazy_renderer, mut event_loop) = LazyVulkan::builder()
+        .initial_vertices(&vertices)
+        .initial_indices(&indices)
+        .fragment_shader(FRAGMENT_SHADER)
+        .vertex_shader(VERTEX_SHADER)
+        .with_present(true)
+        .window_size(window_size)
+        .build();
     let swapchain_info = SwapchainInfo {
         image_count: lazy_vulkan.surface.desired_image_count,
-        resolution: lazy_vulkan.surface.surface_resolution,
+        resolution: vk::Extent2D {
+            width: 1500,
+            height: 1500,
+        },
         format: SWAPCHAIN_FORMAT,
     };
-    let (stream, _) = listener.accept().unwrap();
-    info!("Client connected! Doing OpenXR setup..");
-    let mut server = EditorServer::new(stream);
-    let xr_swapchain = do_openxr_setup(&mut server, lazy_vulkan.context(), &swapchain_info)?;
+    let xr_swapchain = do_openxr_setup(&mut openxr_server, lazy_vulkan.context(), &swapchain_info)?;
     info!("..done!");
-    let textures = create_render_textures(
+    let mut yak_images = create_render_textures(
         lazy_vulkan.context(),
         &mut lazy_renderer,
         xr_swapchain.images,
@@ -82,6 +99,40 @@ pub fn main() -> Result<()> {
     let mut keyboard_events = Vec::new();
     let mut mouse_events = Vec::new();
     let mut camera = Camera::default();
+    let mut yak = yakui::Yakui::new();
+    yak.set_surface_size([800 as f32, 500 as f32].into());
+
+    let (mut yakui_vulkan, yak_images) = {
+        let context = lazy_vulkan.context();
+        let yakui_vulkan_context = yakui_vulkan::VulkanContext::new(
+            &context.device,
+            context.queue,
+            context.draw_command_buffer,
+            context.command_pool,
+            context.memory_properties,
+        );
+        let render_surface = yakui_vulkan::RenderSurface {
+            resolution: window_size,
+            format: lazy_vulkan.surface.surface_format.format,
+            image_views: lazy_renderer.render_surface.image_views.clone(),
+        };
+        let mut yakui_vulkan =
+            yakui_vulkan::YakuiVulkan::new(&yakui_vulkan_context, render_surface);
+        let yak_images = yak_images
+            .drain(..)
+            .map(|t| {
+                let yak_texture = lazy_to_yak(&yakui_vulkan_context, yakui_vulkan.descriptors(), t);
+                yakui_vulkan.add_user_texture(&yakui_vulkan_context, yak_texture)
+            })
+            .collect::<Vec<_>>();
+
+        (yakui_vulkan, yak_images)
+    };
+
+    let mut gui_state = GuiState {
+        texture_id: yak_images[0],
+        scene_name: "".into(),
+    };
 
     // Off we go!
     let mut winit_initializing = true;
@@ -125,32 +176,41 @@ pub fn main() -> Result<()> {
                 keyboard_events.clear();
                 mouse_events.clear();
 
-                check_request(&mut server, RequestType::LocateView).unwrap();
-                server.send_response(&camera.as_pose()).unwrap();
+                check_request(&mut openxr_server, RequestType::LocateView).unwrap();
+                openxr_server.send_response(&camera.as_pose()).unwrap();
 
-                check_request(&mut server, RequestType::WaitFrame).unwrap();
-                server.send_response(&0).unwrap();
+                check_request(&mut openxr_server, RequestType::WaitFrame).unwrap();
+                openxr_server.send_response(&0).unwrap();
 
-                check_request(&mut server, RequestType::AcquireSwapchainImage).unwrap();
-                server.send_response(&framebuffer_index).unwrap();
+                check_request(&mut openxr_server, RequestType::AcquireSwapchainImage).unwrap();
+                openxr_server.send_response(&framebuffer_index).unwrap();
 
-                check_request(&mut server, RequestType::LocateView).unwrap();
-                server.send_response(&camera.as_pose()).unwrap();
+                let scene: hotham_editor_protocol::scene::Scene = game_server.get_json().unwrap();
+                gui_state.scene_name = scene.name;
 
-                check_request(&mut server, RequestType::EndFrame).unwrap();
-                server.send_response(&0).unwrap();
+                // game has finished frame here
 
-                let texture_id = textures[framebuffer_index as usize].id;
-                lazy_renderer.render(
-                    lazy_vulkan.context(),
-                    framebuffer_index,
-                    &[DrawCall::new(
-                        0,
-                        indices.len() as _,
-                        texture_id,
-                        lazy_vulkan::Workflow::Main,
-                    )],
+                check_request(&mut openxr_server, RequestType::LocateView).unwrap();
+                openxr_server.send_response(&camera.as_pose()).unwrap();
+
+                check_request(&mut openxr_server, RequestType::EndFrame).unwrap();
+                openxr_server.send_response(&0).unwrap();
+
+                gui_state.texture_id = yak_images[framebuffer_index as usize];
+                yak.start();
+                gui(&gui_state);
+                yak.finish();
+
+                let context = lazy_vulkan.context();
+                let yakui_vulkan_context = yakui_vulkan::VulkanContext::new(
+                    &context.device,
+                    context.queue,
+                    context.draw_command_buffer,
+                    context.command_pool,
+                    context.memory_properties,
                 );
+
+                yakui_vulkan.paint(&mut yak, &yakui_vulkan_context, framebuffer_index);
 
                 let semaphore = xr_swapchain.semaphores[framebuffer_index as usize];
                 lazy_vulkan.render_end(
@@ -165,9 +225,19 @@ pub fn main() -> Result<()> {
             } => {
                 if !winit_initializing {
                     let new_render_surface = lazy_vulkan.resized(size.width, size.height);
-                    lazy_renderer.update_surface(new_render_surface, &lazy_vulkan.context().device);
+                    let render_surface = yakui_vulkan::RenderSurface {
+                        resolution: new_render_surface.resolution,
+                        format: new_render_surface.format,
+                        image_views: new_render_surface.image_views,
+                    };
+                    yakui_vulkan.update_surface(render_surface, &lazy_vulkan.context().device);
+                    yak.set_surface_size([size.width as f32, size.height as f32].into());
                 }
             }
+            Event::WindowEvent {
+                event: WindowEvent::ScaleFactorChanged { scale_factor, .. },
+                ..
+            } => yak.set_scale_factor(scale_factor as _),
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { input, .. },
                 ..
@@ -180,7 +250,7 @@ pub fn main() -> Result<()> {
                 winit::event::DeviceEvent::MouseMotion { delta } => {
                     if focused {
                         mouse_events.push(MouseInput::MouseMoved(
-                            [delta.0 as f32, delta.1 as f32].into(), // translate from screen space to world space.. sort of
+                            [delta.0 as f32, delta.1 as f32].into(),
                         ))
                     }
                 }
@@ -212,6 +282,20 @@ pub fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn lazy_to_yak(
+    yakui_vulkan_context: &yakui_vulkan::VulkanContext,
+    descriptors: &mut yakui_vulkan::Descriptors,
+    t: VulkanTexture,
+) -> yakui_vulkan::VulkanTexture {
+    yakui_vulkan::VulkanTexture::from_image(
+        yakui_vulkan_context,
+        descriptors,
+        t.image,
+        t.memory,
+        t.view,
+    )
 }
 
 pub enum MouseInput {

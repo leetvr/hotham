@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 
 pub use openxr_sys::ViewConfigurationView;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -15,6 +16,9 @@ pub enum RequestType {
     EndFrame,
     GetInputEvents,
     LocateView,
+    InitEditor,
+    PutEntities,
+    JSON, // some arbitrary sized data
 }
 
 pub trait Request {
@@ -24,6 +28,22 @@ pub trait Request {
 
 pub trait RequestWithVecResponse {
     type ResponseItem: Clone; // shitty name
+}
+
+pub mod scene {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize, Clone)]
+    pub struct Scene {
+        pub name: String,
+        pub entities: Vec<EditorEntity>,
+    }
+
+    #[derive(Serialize, Deserialize, Clone)]
+    pub struct EditorEntity {
+        pub name: String,
+        pub id: u64,
+    }
 }
 
 pub mod requests {
@@ -154,10 +174,22 @@ pub mod requests {
     impl RequestWithVecResponse for GetInputEvents {
         type ResponseItem = InputEvent;
     }
+
+    #[repr(C)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct PutEntities;
+
+    impl Request for PutEntities {
+        type Response = bool; // TODO: might need to split up the Response trait
+        fn request_type(&self) -> RequestType {
+            RequestType::PutEntities
+        }
+    }
 }
 
 pub mod responses {
     use ash::vk;
+    use serde::{Deserialize, Serialize};
 
     #[repr(C)]
     #[derive(Debug, Clone, Copy)]
@@ -261,6 +293,24 @@ impl<S: Read + Write> EditorClient<S> {
         write_request(request, &mut self.socket)
     }
 
+    pub fn send_json<J: Serialize + DeserializeOwned>(
+        &mut self,
+        value: &J,
+    ) -> serde_json::Result<()> {
+        let json_bytes = serde_json::to_vec(value)?;
+        let header = RequestHeader {
+            request_type: RequestType::JSON,
+            payload_length: json_bytes.len() as u32,
+        };
+
+        self.socket
+            .write_all(&{ unsafe { bytes_from_t(&header) } })
+            .unwrap(); // TODO error types
+        self.socket.write_all(&json_bytes).unwrap(); // TODO error types
+
+        Ok(())
+    }
+
     pub fn get_response<R: Clone>(&mut self) -> std::io::Result<R> {
         let socket = &mut self.socket;
         let buf = &mut self.buffer;
@@ -307,6 +357,14 @@ impl<S: Read + Write> EditorServer<S> {
             &mut self.buffer,
             request_header.payload_length as usize,
         )
+    }
+
+    pub fn get_json<J: DeserializeOwned + Clone>(&mut self) -> serde_json::Result<J> {
+        let request_header = self.get_request_header().unwrap(); // TODO error types
+        assert_eq!(request_header.request_type, RequestType::JSON);
+        let buffer = &mut self.buffer[..request_header.payload_length as _];
+        self.socket.read_exact(buffer).unwrap(); // TODO: error types
+        serde_json::from_slice(buffer)
     }
 
     pub fn get_request_header(&mut self) -> std::io::Result<RequestHeader> {
@@ -360,6 +418,7 @@ mod tests {
 
     use super::*;
     use openxr_sys::{StructureType, ViewConfigurationView};
+    use serde::Deserialize;
     use std::{cell::RefCell, rc::Rc};
 
     #[derive(Default, Clone)]
@@ -469,5 +528,23 @@ mod tests {
             response[1].max_swapchain_sample_count,
             response_from_server[1].max_swapchain_sample_count
         );
+    }
+
+    #[test]
+    pub fn test_json() -> std::io::Result<()> {
+        let socket = MockSocket::default();
+        let mut client = EditorClient::new(socket.clone());
+        let mut server = EditorServer::new(socket);
+
+        #[derive(Serialize, Deserialize, Clone)]
+        struct GetThing {
+            thing_amount: usize,
+        }
+
+        client.send_json(&GetThing { thing_amount: 5 }).unwrap();
+        let request: GetThing = server.get_json().unwrap();
+        assert_eq!(request.thing_amount, 5);
+
+        Ok(())
     }
 }

@@ -9,10 +9,13 @@ ash = "0.37.2"
 env_logger = "0.10.0"
 glam = "0.22.0"
 hotham-editor-protocol = {path = "../hotham-editor-protocol"}
-lazy_vulkan = {git = "https://github.com/leetvr/lazy_vulkan", rev = "5347dd3295fd4c687c35adbe7c0b4aad00c893e3"}
+lazy_vulkan = {git = "https://github.com/leetvr/lazy_vulkan", rev = "4e8b4982328f7bda76b10e6b7e83c65398917fef"}# main @ 20/2/2023
 log = "0.4.17"
 openxr-sys = "0.9.3"
 winit = "0.28.1"
+# yakui = {git = "https://github.com/LPGhatguy/yakui", rev = "0b7d6f7ded117525f0986476c3f34a03fd9391a8"}# main @ 20/02/2023
+yakui = {path = "../../yakui/crates/yakui"}
+yakui-vulkan = {path = "../../yakui/crates/yakui-vulkan"}
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1.0.2"
