@@ -1,8 +1,8 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{
-        hand::Handedness, physics::SharedShape, Collider, GlobalTransform, LocalTransform,
-        RigidBody,
+        hand::Handedness, physics::SharedShape, Collider, GlobalTransform, Info, LocalTransform,
+        Mesh, RigidBody, HMD,
     },
     hecs::World,
     systems::{
@@ -12,7 +12,8 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
-use log::info;
+use hotham_editor_protocol::scene::{EditorEntity, EditorUpdates, Transform};
+use log::{debug, info};
 
 #[derive(Clone, Debug, Default)]
 /// Most Hotham applications will want to keep track of some sort of state.
@@ -55,7 +56,7 @@ pub fn real_main() -> HothamResult<()> {
 
     while let Ok(tick_data) = engine.update() {
         #[cfg(feature = "editor")]
-        send_scene(&mut engine.world, &mut editor)?;
+        sync_with_editor(&mut engine.world, &mut editor)?;
 
         tick(tick_data, &mut engine, &mut state);
         engine.finish()?;
@@ -64,16 +65,44 @@ pub fn real_main() -> HothamResult<()> {
     Ok(())
 }
 
-fn send_scene(
+fn sync_with_editor(
     world: &mut World,
     editor: &mut hotham_editor_protocol::EditorClient<uds_windows::UnixStream>,
 ) -> HothamResult<()> {
+    use hotham::hecs::{Entity, Or};
+    let entities = world
+        .query_mut::<(&GlobalTransform, &Info)>()
+        .with::<&Mesh>()
+        .into_iter()
+        .map(|(entity, (transform, info))| {
+            let (_, _, translation) = transform.to_scale_rotation_translation();
+            EditorEntity {
+                name: info.name.clone(),
+                id: entity.to_bits().get(),
+                transform: Transform {
+                    translation: translation.into(),
+                },
+            }
+        })
+        .collect();
+
     let scene = hotham_editor_protocol::scene::Scene {
         name: "Simple Scene".to_string(),
-        entities: vec![],
+        entities,
     };
 
     editor.send_json(&scene).unwrap(); // TODO: error types
+
+    let editor_updates: EditorUpdates = editor.get_json().unwrap(); // TODO: error types
+    for entity in editor_updates.entity_updates {
+        debug!("Received update: {entity:?}");
+        let mut entity_transform = world
+            .entity(Entity::from_bits(entity.id).unwrap())
+            .unwrap()
+            .get::<&mut LocalTransform>()
+            .unwrap();
+        entity_transform.translation = entity.transform.translation.into();
+    }
 
     Ok(())
 }
@@ -136,7 +165,5 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
 
     let collider = Collider::new(SharedShape::ball(0.35));
 
-    world
-        .insert(helmet, (collider, RigidBody::default()))
-        .unwrap();
+    world.insert_one(helmet, collider).unwrap();
 }

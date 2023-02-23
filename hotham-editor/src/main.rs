@@ -6,12 +6,13 @@ use anyhow::{bail, Result};
 use ash::vk;
 
 use glam::Vec2;
-use hotham_editor_protocol::{responses, EditorServer, RequestType};
+use hotham_editor_protocol::{responses, scene::EditorUpdates, EditorServer, RequestType};
 use lazy_vulkan::{
     find_memorytype_index, vulkan_context::VulkanContext, vulkan_texture::VulkanTexture,
     LazyRenderer, LazyVulkan, SwapchainInfo, Vertex,
 };
 use log::{debug, info, trace};
+use yakui_winit::YakuiWinit;
 
 use std::time::Instant;
 use uds_windows::{UnixListener, UnixStream};
@@ -26,7 +27,6 @@ use crate::{
     gui::{gui, GuiState},
 };
 
-/// Compile your own damn shaders! LazyVulkan is just as lazy as you are!
 static FRAGMENT_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.frag.spv");
 static VERTEX_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.vert.spv");
 const SWAPCHAIN_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB; // OpenXR really, really wants us to use sRGB swapchains
@@ -37,9 +37,6 @@ pub fn main() -> Result<()> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    // Oh, you thought you could supply your own Vertex type? What is this, a rendergraph?!
-    // Better make sure those shaders use the right layout!
-    // **LAUGHS IN VULKAN**
     let vertices = [
         Vertex::new([1.0, 1.0, 0.0, 1.0], [1.0, 1.0, 1.0, 0.0], [1.0, 1.0]), // bottom right
         Vertex::new([-1.0, 1.0, 0.0, 1.0], [1.0, 1.0, 1.0, 0.0], [0.0, 1.0]), // bottom left
@@ -82,8 +79,8 @@ pub fn main() -> Result<()> {
     let swapchain_info = SwapchainInfo {
         image_count: lazy_vulkan.surface.desired_image_count,
         resolution: vk::Extent2D {
-            width: 1500,
-            height: 1500,
+            width: 500,
+            height: 500,
         },
         format: SWAPCHAIN_FORMAT,
     };
@@ -95,12 +92,14 @@ pub fn main() -> Result<()> {
         xr_swapchain.images,
     );
 
+    let window = &lazy_vulkan.window;
+
     let mut last_frame_time = Instant::now();
     let mut keyboard_events = Vec::new();
     let mut mouse_events = Vec::new();
     let mut camera = Camera::default();
     let mut yak = yakui::Yakui::new();
-    yak.set_surface_size([800 as f32, 500 as f32].into());
+    let mut yakui_window = YakuiWinit::new(window);
 
     let (mut yakui_vulkan, yak_images) = {
         let context = lazy_vulkan.context();
@@ -129,16 +128,14 @@ pub fn main() -> Result<()> {
         (yakui_vulkan, yak_images)
     };
 
-    let mut gui_state = GuiState {
-        texture_id: yak_images[0],
-        scene_name: "".into(),
-    };
-
     // Off we go!
     let mut winit_initializing = true;
     let mut focused = false;
+    let mut right_mouse_clicked = false;
+
     event_loop.run_return(|event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
+        yakui_window.handle_event(&mut yak, &event);
         match event {
             Event::WindowEvent {
                 event:
@@ -186,9 +183,26 @@ pub fn main() -> Result<()> {
                 openxr_server.send_response(&framebuffer_index).unwrap();
 
                 let scene: hotham_editor_protocol::scene::Scene = game_server.get_json().unwrap();
-                gui_state.scene_name = scene.name;
 
-                // game has finished frame here
+                let entity_updates = if right_mouse_clicked {
+                    let mut helmet = scene
+                        .entities
+                        .iter()
+                        .find(|e| e.name.as_str() == "Damaged Helmet")
+                        .unwrap()
+                        .clone();
+                    helmet.transform.translation.y += 0.1;
+                    debug!("Sending update: {helmet:?}");
+                    vec![helmet]
+                } else {
+                    vec![]
+                };
+
+                game_server
+                    .send_json(&EditorUpdates { entity_updates })
+                    .unwrap();
+
+                // game has finished rendering its frame here
 
                 check_request(&mut openxr_server, RequestType::LocateView).unwrap();
                 openxr_server.send_response(&camera.as_pose()).unwrap();
@@ -196,9 +210,13 @@ pub fn main() -> Result<()> {
                 check_request(&mut openxr_server, RequestType::EndFrame).unwrap();
                 openxr_server.send_response(&0).unwrap();
 
-                gui_state.texture_id = yak_images[framebuffer_index as usize];
+                let gui_state = GuiState {
+                    texture_id: yak_images[framebuffer_index as usize],
+                    scene,
+                };
+
                 yak.start();
-                gui(&gui_state);
+                gui(gui_state);
                 yak.finish();
 
                 let context = lazy_vulkan.context();
@@ -218,6 +236,7 @@ pub fn main() -> Result<()> {
                     &[semaphore, lazy_vulkan.rendering_complete_semaphore],
                 );
                 last_frame_time = Instant::now();
+                right_mouse_clicked = false;
             }
             Event::WindowEvent {
                 event: WindowEvent::Resized(size),
@@ -235,9 +254,15 @@ pub fn main() -> Result<()> {
                 }
             }
             Event::WindowEvent {
-                event: WindowEvent::ScaleFactorChanged { scale_factor, .. },
+                event:
+                    WindowEvent::ScaleFactorChanged {
+                        scale_factor,
+                        new_inner_size,
+                    },
                 ..
-            } => yak.set_scale_factor(scale_factor as _),
+            } => {
+                debug!("Scale factor changed! Scale factor: {scale_factor}, new inner size: {new_inner_size:?}");
+            }
             Event::WindowEvent {
                 event: WindowEvent::KeyboardInput { input, .. },
                 ..
@@ -245,6 +270,18 @@ pub fn main() -> Result<()> {
                 if focused && input.virtual_keycode.is_some() {
                     keyboard_events.push(input);
                 }
+            }
+            Event::WindowEvent {
+                event: WindowEvent::CursorMoved { .. },
+                ..
+            } => {
+                focused = true;
+            }
+            Event::WindowEvent {
+                event: WindowEvent::CursorLeft { .. },
+                ..
+            } => {
+                focused = false;
             }
             Event::DeviceEvent { event, .. } => match event {
                 winit::event::DeviceEvent::MouseMotion { delta } => {
@@ -254,6 +291,14 @@ pub fn main() -> Result<()> {
                         ))
                     }
                 }
+                winit::event::DeviceEvent::Button {
+                    button: 3,
+                    state: ElementState::Pressed,
+                } => {
+                    debug!("Right mouse clicked");
+                    right_mouse_clicked = true;
+                }
+
                 winit::event::DeviceEvent::Button {
                     button: 1,
                     state: ElementState::Pressed,

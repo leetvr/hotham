@@ -16,6 +16,7 @@ winit = "0.28.1"
 # yakui = {git = "https://github.com/LPGhatguy/yakui", rev = "0b7d6f7ded117525f0986476c3f34a03fd9391a8"}# main @ 20/02/2023
 yakui = {path = "../../yakui/crates/yakui"}
 yakui-vulkan = {path = "../../yakui/crates/yakui-vulkan"}
+yakui-winit = {path = "../../yakui/crates/yakui-winit"}
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1.0.2"

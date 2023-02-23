@@ -1,7 +1,7 @@
 use std::io::{Read, Write};
 
 pub use openxr_sys::ViewConfigurationView;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 
 #[repr(u32)]
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -33,16 +33,27 @@ pub trait RequestWithVecResponse {
 pub mod scene {
     use serde::{Deserialize, Serialize};
 
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Serialize, Deserialize, Clone, Debug)]
+    pub struct EditorUpdates {
+        pub entity_updates: Vec<EditorEntity>,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug)]
     pub struct Scene {
         pub name: String,
         pub entities: Vec<EditorEntity>,
     }
 
-    #[derive(Serialize, Deserialize, Clone)]
+    #[derive(Serialize, Deserialize, Clone, Debug)]
     pub struct EditorEntity {
         pub name: String,
         pub id: u64,
+        pub transform: Transform,
+    }
+
+    #[derive(Serialize, Deserialize, Clone, Debug)]
+    pub struct Transform {
+        pub translation: mint::Vector3<f32>,
     }
 }
 
@@ -293,6 +304,14 @@ impl<S: Read + Write> EditorClient<S> {
         write_request(request, &mut self.socket)
     }
 
+    pub fn get_json<J: DeserializeOwned + Clone>(&mut self) -> serde_json::Result<J> {
+        let request_header = read_request_header(&mut self.socket, &mut self.buffer).unwrap(); // TODO error types
+        assert_eq!(request_header.request_type, RequestType::JSON);
+        let buffer = &mut self.buffer[..request_header.payload_length as _];
+        self.socket.read_exact(buffer).unwrap(); // TODO: error types
+        serde_json::from_slice(buffer)
+    }
+
     pub fn send_json<J: Serialize + DeserializeOwned>(
         &mut self,
         value: &J,
@@ -365,6 +384,24 @@ impl<S: Read + Write> EditorServer<S> {
         let buffer = &mut self.buffer[..request_header.payload_length as _];
         self.socket.read_exact(buffer).unwrap(); // TODO: error types
         serde_json::from_slice(buffer)
+    }
+
+    pub fn send_json<J: Serialize + DeserializeOwned>(
+        &mut self,
+        value: &J,
+    ) -> serde_json::Result<()> {
+        let json_bytes = serde_json::to_vec(value)?;
+        let header = RequestHeader {
+            request_type: RequestType::JSON,
+            payload_length: json_bytes.len() as u32,
+        };
+
+        self.socket
+            .write_all(&{ unsafe { bytes_from_t(&header) } })
+            .unwrap(); // TODO error types
+        self.socket.write_all(&json_bytes).unwrap(); // TODO error types
+
+        Ok(())
     }
 
     pub fn get_request_header(&mut self) -> std::io::Result<RequestHeader> {
