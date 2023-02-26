@@ -267,7 +267,7 @@ fn check_request(
     if header.request_type != expected_request_type {
         bail!("Invalid request type: {:?}!", header.request_type);
     }
-    trace!("Received request from cilent {expected_request_type:?}");
+    trace!("Received request from client {expected_request_type:?}");
     Ok(())
 }
 

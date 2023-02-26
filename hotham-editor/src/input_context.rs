@@ -46,7 +46,7 @@ impl InputContext {
 
         let mut keyboard_motion = Vec3::ZERO;
         for event in keyboard_input {
-            //safe as we only receive events with a keycode
+            // Safe as we only receive events with a keycode
             let (state, key) = (event.state, event.virtual_keycode.unwrap());
 
             match state {
@@ -80,9 +80,9 @@ fn handle_mouse_movement(movement: Vec2, pose: &mut Pose) {
 fn handle_keypress(key: VirtualKeyCode, pose: &mut Pose) -> Vec3 {
     let orientation = pose.orientation();
     let mut position = Vec3::ZERO;
-    // get the forward vector rotated by the camera rotation quaternion
+    // Get the forward vector rotated by the camera rotation quaternion
     let forward = orientation * Vec3::NEG_Z;
-    // get the right vector rotated by the camera rotation quaternion
+    // Get the right vector rotated by the camera rotation quaternion
     let right = orientation * Vec3::X;
     let up = Vec3::Y;
 

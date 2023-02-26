@@ -98,7 +98,7 @@ pub unsafe extern "system" fn create_instance(
         .init();
     trace!("create_instance");
 
-    // Initialise our various maps
+    // Initialize our various maps
     let _ = SPACES.set(Default::default());
     let _ = STRING_TO_PATH.set(Default::default());
     let _ = PATH_TO_STRING.set(Default::default());
@@ -132,7 +132,7 @@ pub unsafe extern "system" fn get_system(
     system_id: *mut SystemId,
 ) -> Result {
     trace!("get_system");
-    // we are teh leetzor systemz
+    // We are teh leetzor systemz
     *system_id = SystemId::from_raw(1337);
     Result::SUCCESS
 }

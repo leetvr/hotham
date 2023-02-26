@@ -1,6 +1,6 @@
 # Hotham Editor Protocol
 ## Why?
-Whenever two programs want to talk to eachother, the most complicated question is *where is the protocol defined?*. Sometimes the protocol is inferred from the way the programs serialise and deserialise their messages, but this leads to all sorts of problems.
+Whenever two programs want to talk to each other, the most complicated question is *where is the protocol defined?*. Sometimes the protocol is inferred from the way the programs serialize and deserialize their messages, but this leads to all sorts of problems.
 
 In essence, this is a *contract* problem. What is the contract, where is it, and how is it enforced?
 
