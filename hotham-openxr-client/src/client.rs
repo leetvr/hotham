@@ -32,6 +32,8 @@ use openxr_sys::{
 };
 
 use lazy_vulkan::vulkan_context::VulkanContext;
+#[cfg(not(target_os = "windows"))]
+use std::os::unix::net::UnixStream;
 use std::{
     collections::HashMap,
     ffi::{c_char, CStr},
@@ -39,6 +41,7 @@ use std::{
     ptr::null_mut,
 };
 use std::{ptr, slice, time::Instant};
+#[cfg(target_os = "windows")]
 use uds_windows::UnixStream;
 
 type PartialVulkan = (ash::Entry, ash::Instance);

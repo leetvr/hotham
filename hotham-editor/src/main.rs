@@ -12,7 +12,10 @@ use lazy_vulkan::{
 };
 use log::{debug, info, trace};
 
+#[cfg(not(target_os = "windows"))]
+use std::os::unix::net::{UnixListener, UnixStream};
 use std::time::Instant;
+#[cfg(target_os = "windows")]
 use uds_windows::{UnixListener, UnixStream};
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
