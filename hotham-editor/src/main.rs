@@ -274,6 +274,7 @@ fn check_request(
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
 unsafe fn create_semaphores(
     context: &lazy_vulkan::vulkan_context::VulkanContext,
     image_count: u32,
@@ -296,6 +297,39 @@ unsafe fn create_semaphores(
             let handle = external_semaphore
                 .get_semaphore_win32_handle(
                     &vk::SemaphoreGetWin32HandleInfoKHR::builder()
+                        .handle_type(handle_type)
+                        .semaphore(semaphore),
+                )
+                .unwrap();
+
+            (semaphore, handle)
+        })
+        .unzip()
+}
+
+#[cfg(not(target_os = "windows"))]
+unsafe fn create_semaphores(
+    context: &lazy_vulkan::vulkan_context::VulkanContext,
+    image_count: u32,
+) -> (Vec<vk::Semaphore>, Vec<i32>) {
+    let device = &context.device;
+    let external_semaphore =
+        ash::extensions::khr::ExternalSemaphoreFd::new(&context.instance, &context.device);
+    let handle_type = vk::ExternalSemaphoreHandleTypeFlags::OPAQUE_FD;
+    (0..image_count)
+        .map(|_| {
+            let mut external_semaphore_info =
+                vk::ExportSemaphoreCreateInfo::builder().handle_types(handle_type);
+            let semaphore = device
+                .create_semaphore(
+                    &vk::SemaphoreCreateInfo::builder().push_next(&mut external_semaphore_info),
+                    None,
+                )
+                .unwrap();
+
+            let handle = external_semaphore
+                .get_semaphore_fd(
+                    &vk::SemaphoreGetFdInfoKHR::builder()
                         .handle_type(handle_type)
                         .semaphore(semaphore),
                 )
@@ -347,10 +381,15 @@ fn create_render_textures(
         .collect()
 }
 
+#[cfg(target_os = "windows")]
+type HandleOrFd = vk::HANDLE;
+#[cfg(not(target_os = "windows"))]
+type HandleOrFd = i32;
+
 unsafe fn create_render_images(
     context: &lazy_vulkan::vulkan_context::VulkanContext,
     swapchain_info: &SwapchainInfo,
-) -> (Vec<vk::Image>, Vec<vk::HANDLE>) {
+) -> (Vec<vk::Image>, Vec<HandleOrFd>) {
     let device = &context.device;
     let SwapchainInfo {
         resolution,
@@ -404,11 +443,24 @@ unsafe fn create_render_images(
 
             device.bind_image_memory(image, memory, 0).unwrap();
 
+            #[cfg(target_os = "windows")]
             let external_memory =
                 ash::extensions::khr::ExternalMemoryWin32::new(&context.instance, &context.device);
+            #[cfg(target_os = "windows")]
             let handle = external_memory
                 .get_memory_win32_handle(
                     &vk::MemoryGetWin32HandleInfoKHR::builder()
+                        .handle_type(handle_type)
+                        .memory(memory),
+                )
+                .unwrap();
+            #[cfg(not(target_os = "windows"))]
+            let external_memory =
+                ash::extensions::khr::ExternalMemoryFd::new(&context.instance, &context.device);
+            #[cfg(not(target_os = "windows"))]
+            let handle = external_memory
+                .get_memory_fd(
+                    &vk::MemoryGetFdInfoKHR::builder()
                         .handle_type(handle_type)
                         .memory(memory),
                 )

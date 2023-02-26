@@ -209,10 +209,15 @@ pub unsafe extern "system" fn create_vulkan_device(
     .to_vec();
 
     #[cfg(target_os = "windows")]
-    extension_names.push(ash::extensions::khr::ExternalMemoryWin32::name().as_ptr());
-
-    #[cfg(target_os = "windows")]
-    extension_names.push(ash::extensions::khr::ExternalSemaphoreWin32::name().as_ptr());
+    {
+        extension_names.push(ash::extensions::khr::ExternalMemoryWin32::name().as_ptr());
+        extension_names.push(ash::extensions::khr::ExternalSemaphoreWin32::name().as_ptr());
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        extension_names.push(ash::extensions::khr::ExternalMemoryFd::name().as_ptr());
+        extension_names.push(ash::extensions::khr::ExternalSemaphoreFd::name().as_ptr());
+    }
 
     for e in &extension_names {
         let e = CStr::from_ptr(*e).to_str().unwrap();
