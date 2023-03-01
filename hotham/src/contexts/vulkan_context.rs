@@ -75,11 +75,11 @@ impl VulkanContext {
             .engine_version(1)
             .build();
 
-        #[allow(unused_mut)]
-        let mut instance_extensions = vec![];
+        #[cfg(not(debug_assertions))]
+        let instance_extensions = vec![];
 
         #[cfg(debug_assertions)]
-        instance_extensions.push(vk::ExtDebugUtilsFn::name().as_ptr());
+        let instance_extensions = vec![vk::ExtDebugUtilsFn::name().as_ptr()];
 
         let create_info = vk::InstanceCreateInfo::builder()
             .application_info(&app_info)

@@ -29,7 +29,7 @@ pub fn main() {
 }
 
 pub fn real_main() -> HothamResult<()> {
-    let _ = env_logger::builder()
+    env_logger::builder()
         .filter_module("hotham-openxr-client", log::LevelFilter::Trace)
         .filter_module("simple_scene_example", log::LevelFilter::Trace)
         .init();

@@ -4,7 +4,7 @@ pub use openxr_sys::ViewConfigurationView;
 use serde::{de::DeserializeOwned, Serialize};
 
 #[repr(u32)]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RequestType {
     GetViewConfiguration,
     GetViewCount,
@@ -65,7 +65,7 @@ pub mod requests {
     use ash::vk;
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct GetViewConfiguration {}
 
     impl Request for GetViewConfiguration {
@@ -76,7 +76,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct GetViewCount {}
 
     impl Request for GetViewCount {
@@ -87,7 +87,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct GetSwapchainInfo {}
 
     impl Request for GetSwapchainInfo {
@@ -98,7 +98,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct WaitFrame;
 
     impl Request for WaitFrame {
@@ -109,7 +109,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct AcquireSwapchainImage;
 
     impl Request for AcquireSwapchainImage {
@@ -120,7 +120,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct EndFrame;
 
     impl Request for EndFrame {
@@ -131,7 +131,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct LocateView;
 
     impl Request for LocateView {
@@ -142,7 +142,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct GetSwapchainImages {}
 
     impl Request for GetSwapchainImages {
@@ -157,7 +157,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct GetSwapchainSemaphores {}
 
     impl Request for GetSwapchainSemaphores {
@@ -172,7 +172,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct GetInputEvents;
 
     impl Request for GetInputEvents {
@@ -187,7 +187,7 @@ pub mod requests {
     }
 
     #[repr(C)]
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
     pub struct PutEntities;
 
     impl Request for PutEntities {
@@ -200,7 +200,6 @@ pub mod requests {
 
 pub mod responses {
     use ash::vk;
-    use serde::{Deserialize, Serialize};
 
     #[repr(C)]
     #[derive(Debug, Clone, Copy)]
@@ -254,19 +253,16 @@ fn write_request<S: Write, R: Request>(request: &R, writer: &mut S) -> std::io::
     Ok(())
 }
 
-fn read_request_header<'a, S: Read>(
-    reader: &mut S,
-    buf: &'a mut [u8],
-) -> std::io::Result<RequestHeader> {
+fn read_request_header<S: Read>(reader: &mut S, buf: &mut [u8]) -> std::io::Result<RequestHeader> {
     reader.read_exact(&mut buf[..std::mem::size_of::<RequestHeader>()])?;
     let header: RequestHeader =
-        unsafe { t_from_bytes(&mut buf[..std::mem::size_of::<RequestHeader>()]) };
+        unsafe { t_from_bytes(&buf[..std::mem::size_of::<RequestHeader>()]) };
     Ok(header)
 }
 
-fn read_request_payload<'a, R: Request + Clone, S: Read>(
+fn read_request_payload<R: Request + Clone, S: Read>(
     reader: &mut S,
-    buf: &'a mut [u8],
+    buf: &mut [u8],
     payload_length: usize,
 ) -> std::io::Result<R> {
     reader.read_exact(&mut buf[..payload_length])?;
@@ -417,16 +413,17 @@ impl<S: Read + Write> EditorServer<S> {
 
     pub fn send_response<T>(&mut self, response: &T) -> std::io::Result<()> {
         let message_size = std::mem::size_of::<T>() as u32;
-        self.socket.write(&message_size.to_be_bytes())?;
-        self.socket.write(&unsafe { bytes_from_t(response) })?;
+        self.socket.write_all(&message_size.to_be_bytes())?;
+        self.socket.write_all(&unsafe { bytes_from_t(response) })?;
 
         Ok(())
     }
 
     pub fn send_response_vec<T>(&mut self, response: &Vec<T>) -> std::io::Result<()> {
         let message_size = (std::mem::size_of::<T>() * response.len()) as u32;
-        self.socket.write(&message_size.to_be_bytes())?;
-        self.socket.write(&unsafe { bytes_from_vec(response) })?;
+        self.socket.write_all(&message_size.to_be_bytes())?;
+        self.socket
+            .write_all(&unsafe { bytes_from_vec(response) })?;
 
         Ok(())
     }
@@ -441,6 +438,8 @@ unsafe fn vec_from_bytes<T: Clone>(data: &[u8]) -> Vec<T> {
     std::slice::from_raw_parts(data.as_ptr().cast(), len).to_vec()
 }
 
+// Clippy knows not what evil we do
+#[allow(clippy::redundant_clone)]
 unsafe fn t_from_bytes<T: Clone>(data: &[u8]) -> T {
     std::ptr::read(data.as_ptr().cast::<T>()).clone()
 }

@@ -121,7 +121,7 @@ pub fn main() -> Result<()> {
             .drain(..)
             .map(|t| {
                 let yak_texture = lazy_to_yak(&yakui_vulkan_context, yakui_vulkan.descriptors(), t);
-                yakui_vulkan.add_user_texture(&yakui_vulkan_context, yak_texture)
+                yakui_vulkan.add_user_texture(yak_texture)
             })
             .collect::<Vec<_>>();
 
@@ -350,7 +350,7 @@ fn do_openxr_setup(
     swapchain_info: &SwapchainInfo,
 ) -> Result<XrSwapchain> {
     let (images, image_memory_handles) =
-        unsafe { create_render_images(vulkan_context, &swapchain_info) };
+        unsafe { create_render_images(vulkan_context, swapchain_info) };
     let (semaphores, semaphore_handles) =
         unsafe { create_semaphores(vulkan_context, swapchain_info.image_count) };
 

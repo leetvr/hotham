@@ -1,13 +1,12 @@
-mod client;
+#![allow(clippy::missing_safety_doc)]
 
 mod action_state;
+mod client;
 mod space_state;
 
-use std::ffi::c_char;
-
 use crate::client::*;
-
 use openxr_sys::{loader, pfn, Instance, Result};
+use std::ffi::c_char;
 
 type DummyFn = unsafe extern "system" fn() -> Result;
 

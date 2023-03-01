@@ -7,7 +7,7 @@ use openxr_sys::{Action, Path, FALSE};
 // A bit yuck to use u64 instead of Action, but it doesn't support Hash.. but whatever.
 pub struct ActionState {
     boolean_actions: HashMap<u64, bool>,
-    bindings: HashMap<Path, u64>,
+    _bindings: HashMap<Path, u64>,
 }
 impl ActionState {
     pub(crate) fn get_boolean(&self, action: Action) -> openxr_sys::Bool32 {
@@ -17,18 +17,18 @@ impl ActionState {
             .unwrap_or(FALSE)
     }
 
-    pub(crate) fn add_binding(&mut self, path: Path, action: Action) {
-        self.bindings.insert(path, action.into_raw());
+    pub(crate) fn _add_binding(&mut self, path: Path, action: Action) {
+        self._bindings.insert(path, action.into_raw());
     }
 
     /// Resets all action state.
-    pub(crate) fn clear(&mut self) {
+    pub(crate) fn _clear(&mut self) {
         // Set all the booleans to false.
         self.boolean_actions.values_mut().for_each(|v| *v = false);
     }
 
-    pub(crate) fn set_boolean(&mut self, path: &Path, value: bool) {
-        let action = self.bindings.get(path).unwrap();
+    pub(crate) fn _set_boolean(&mut self, path: &Path, value: bool) {
+        let action = self._bindings.get(path).unwrap();
         self.boolean_actions.insert(*action, value);
     }
 }

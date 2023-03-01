@@ -61,9 +61,10 @@ impl InputContext {
         }
 
         // If there were no keyboard inputs, but we're still holding down a key, act as if that key was pressed
-        match (&self.keyboard_state, keyboard_input.is_empty()) {
-            (KeyboardState::HoldingKey(key), true) => keyboard_motion = handle_keypress(*key, pose),
-            _ => {}
+        if let (KeyboardState::HoldingKey(key), true) =
+            (&self.keyboard_state, keyboard_input.is_empty())
+        {
+            keyboard_motion = handle_keypress(*key, pose);
         }
 
         pose.position += keyboard_motion * movement_speed;

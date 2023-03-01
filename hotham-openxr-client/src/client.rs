@@ -165,7 +165,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
     trace!("Application requested extension names: {extension_names:?}");
 
     let (entry, instance) = lazy_vulkan::vulkan_context::init(&mut extension_names.to_vec());
-    *vulkan_instance = transmute(instance.handle().as_raw());
+    *vulkan_instance = instance.handle().as_raw() as *const _;
 
     let _ = PARTIAL_VULKAN.set((entry, instance));
 
@@ -182,7 +182,7 @@ pub unsafe extern "system" fn get_vulkan_graphics_device_2(
     let (_, instance) = PARTIAL_VULKAN.get().unwrap();
     let physical_device = lazy_vulkan::vulkan_context::get_physical_device(instance, None, None).0;
     trace!("Physical device: {physical_device:?}");
-    *vulkan_physical_device = transmute(physical_device.as_raw());
+    *vulkan_physical_device = physical_device.as_raw() as *const _;
     Result::SUCCESS
 }
 
@@ -196,7 +196,7 @@ pub unsafe extern "system" fn create_vulkan_device(
     let (_, instance) = PARTIAL_VULKAN.get().unwrap();
     let create_info = &*create_info;
     let physical_device: vk::PhysicalDevice =
-        vk::PhysicalDevice::from_raw(transmute(create_info.vulkan_physical_device));
+        vk::PhysicalDevice::from_raw(create_info.vulkan_physical_device as u64);
     let device_create_info: &mut vk::DeviceCreateInfo =
         &mut *create_info.vulkan_create_info.cast_mut().cast(); // evil? probably
     let mut extension_names = std::slice::from_raw_parts(
@@ -226,7 +226,7 @@ pub unsafe extern "system" fn create_vulkan_device(
         .create_device(physical_device, device_create_info, None)
         .unwrap();
 
-    *vulkan_device = transmute(device.handle().as_raw());
+    *vulkan_device = device.handle().as_raw() as *const _;
 
     *vulkan_result = vk::Result::SUCCESS.as_raw();
     Result::SUCCESS
@@ -287,7 +287,7 @@ pub unsafe extern "system" fn create_session(
     let _ = SESSION.set(*session); // TODO: I'm not sure if it should be an error to create a new session again
     let graphics_binding = &*((*create_info).next as *const GraphicsBindingVulkanKHR);
     let (entry, instance) = PARTIAL_VULKAN.take().unwrap();
-    let physical_device = vk::PhysicalDevice::from_raw(transmute(graphics_binding.physical_device));
+    let physical_device = vk::PhysicalDevice::from_raw(graphics_binding.physical_device as u64);
     let device = ash::Device::load(instance.fp_v1_0(), transmute(graphics_binding.device));
     let queue_family_index = graphics_binding.queue_family_index;
 
@@ -359,11 +359,11 @@ pub unsafe extern "system" fn string_to_path(
             STRING_TO_PATH
                 .get_mut()
                 .unwrap()
-                .insert(path_string.to_string(), path.clone());
+                .insert(path_string.to_string(), path);
             PATH_TO_STRING
                 .get_mut()
                 .unwrap()
-                .insert(path.clone(), path_string.to_string());
+                .insert(path, path_string.to_string());
             *path_out = path;
             Result::SUCCESS
         }
@@ -496,7 +496,7 @@ pub unsafe extern "system" fn poll_event(
         return Result::SUCCESS;
     }
 
-    return Result::EVENT_UNAVAILABLE;
+    Result::EVENT_UNAVAILABLE
 }
 
 pub unsafe extern "system" fn begin_session(

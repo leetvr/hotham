@@ -2,13 +2,12 @@ use glam::Vec2;
 use hotham_editor_protocol::scene::EditorEntity;
 use yakui::widgets::{List, Pad};
 use yakui::{
-    column, image, label, pad, row, slider, text, textbox, use_state, CrossAxisAlignment, TextureId,
+    column, image, label, pad, row, slider, text, use_state, CrossAxisAlignment, TextureId,
 };
 
 pub fn gui(gui_state: &mut GuiState) {
     let scene = &gui_state.scene;
     let updates = &mut gui_state.updates;
-    let mut main_row = List::row();
     row(|| {
         column(|| {
             image(gui_state.texture_id, Vec2::new(500., 500.));

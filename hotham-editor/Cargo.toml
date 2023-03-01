@@ -13,10 +13,9 @@ lazy_vulkan = {git = "https://github.com/leetvr/lazy_vulkan", rev = "4e8b4982328
 log = "0.4.17"
 openxr-sys = "0.9.3"
 winit = "0.28.1"
-# yakui = {git = "https://github.com/LPGhatguy/yakui", rev = "0b7d6f7ded117525f0986476c3f34a03fd9391a8"}# main @ 20/02/2023
-yakui = {path = "../../yakui/crates/yakui"}
-yakui-vulkan = {path = "../../yakui/crates/yakui-vulkan"}
-yakui-winit = {path = "../../yakui/crates/yakui-winit"}
+yakui = {git = "https://github.com/leetvr/yakui", rev = "a562328"}#add-texture-from-image branch @ 1/3/23
+yakui-vulkan = {git = "https://github.com/leetvr/yakui", rev = "a562328"}#add-texture-from-image branch @ 1/3/23
+yakui-winit = {git = "https://github.com/leetvr/yakui", rev = "a562328"}#add-texture-from-image branch @ 1/3/23
 
 [target.'cfg(windows)'.dependencies]
 uds_windows = "1.0.2"
