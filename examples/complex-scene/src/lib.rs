@@ -49,6 +49,12 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
 }
 
 fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
+    if option_env!("HOTHAM_ASSET_SERVER_ADDRESS").is_some() {
+        #[cfg(target_os = "android")]
+        engine.watch_assets(vec!["test_assets/damaged_helmet_squished.glb".into()]);
+        #[cfg(not(target_os = "android"))]
+        engine.watch_assets(vec!["test_assets/damaged_helmet.glb".into()]);
+    }
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let world = &mut engine.world;

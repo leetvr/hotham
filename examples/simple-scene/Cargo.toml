@@ -47,7 +47,7 @@ orientation = "landscape"
 name = "android.permission.INTERNET"
 
 [[package.metadata.android.uses_permission]]
-name = "android.permission.access_network_state"
+name = "android.permission.ACCESS_NETWORK_STATE"
 
 [[package.metadata.android.application.meta_data]]
 name = "com.oculus.supportedDevices"

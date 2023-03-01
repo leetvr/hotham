@@ -23,7 +23,7 @@ pub mod visible;
 pub use animation_controller::AnimationController;
 pub use animation_target::AnimationTarget;
 pub use global_transform::GlobalTransform;
-pub use grabbable::Grabbable;
+pub use grabbable::*;
 pub use hand::Hand;
 pub use hmd::HMD;
 pub use info::Info;
