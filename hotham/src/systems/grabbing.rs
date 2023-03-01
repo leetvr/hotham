@@ -1,7 +1,9 @@
 use hecs::World;
 
 use crate::{
-    components::{physics::BodyType, Collider, Grabbable, Hand, RigidBody},
+    components::{
+        physics::BodyType, Collider, Grabbable, Grabbed, Hand, Parent, Released, RigidBody,
+    },
     Engine,
 };
 
@@ -13,6 +15,21 @@ pub fn grabbing_system(engine: &mut Engine) {
 }
 
 fn grabbing_system_inner(world: &mut World) {
+    // First, clean up any `Released` marker traits from the previous frame. This is important as otherwise
+    // any entity that was ever grabbed will still have a `Released` component
+    {
+        let entities_with_released = world
+            .query::<()>()
+            .with::<&Released>()
+            .into_iter()
+            .collect::<Vec<_>>();
+        for entity in &entities_with_released {
+            world.remove_one::<Released>(entity.0).unwrap();
+        }
+    }
+
+    let mut command_buffer = hecs::CommandBuffer::new();
+
     for (_, (hand, collider)) in world.query::<(&mut Hand, &Collider)>().iter() {
         // Check to see if we are currently gripping
         if hand.grip_value > 0.1 {
@@ -22,15 +39,27 @@ fn grabbing_system_inner(world: &mut World) {
             };
 
             // Check to see if we are colliding with an entity
-            for other_entity in collider.collisions_this_frame.iter() {
-                if world.get::<&Grabbable>(*other_entity).is_ok() {
+            for collided_entity in collider.collisions_this_frame.iter() {
+                if world.get::<&Grabbable>(*collided_entity).is_ok() {
                     // If what we're grabbing has a rigid-body, set its body type to kinematic position based so it can be updated with the hand
-                    if let Ok(mut rigid_body) = world.get::<&mut RigidBody>(*other_entity) {
+                    if let Ok(mut rigid_body) = world.get::<&mut RigidBody>(*collided_entity) {
                         rigid_body.body_type = BodyType::KinematicPositionBased;
                     }
 
+                    // If the item we're grabbing has a parent, remove it
+                    if world.entity(*collided_entity).unwrap().has::<Parent>() {
+                        println!(
+                            "Removing parent from grabbed entity: {:?}",
+                            *collided_entity
+                        );
+                        command_buffer.remove_one::<Parent>(*collided_entity);
+                    }
+
+                    // Add a "Grabbed" marker trait for other systems to read
+                    command_buffer.insert_one(*collided_entity, Grabbed);
+
                     // Store a reference to the grabbed entity
-                    hand.grabbed_entity.replace(*other_entity);
+                    hand.grabbed_entity.replace(*collided_entity);
 
                     break;
                 }
@@ -43,9 +72,15 @@ fn grabbing_system_inner(world: &mut World) {
                 if let Ok(mut rigid_body) = world.get::<&mut RigidBody>(grabbed_entity) {
                     rigid_body.body_type = BodyType::Dynamic;
                 }
+
+                // Add a marker trait for other systems to know that this item has at some point been grabbed
+                command_buffer.remove_one::<Grabbed>(grabbed_entity);
+                command_buffer.insert_one(grabbed_entity, Released);
             }
         }
     }
+
+    command_buffer.run_on(world);
 }
 
 #[cfg(test)]
