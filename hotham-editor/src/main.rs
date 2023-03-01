@@ -132,6 +132,9 @@ pub fn main() -> Result<()> {
     let mut winit_initializing = true;
     let mut focused = false;
     let mut right_mouse_clicked = false;
+    let mut updates = EditorUpdates {
+        entity_updates: vec![],
+    };
 
     event_loop.run_return(|event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -183,24 +186,12 @@ pub fn main() -> Result<()> {
                 openxr_server.send_response(&framebuffer_index).unwrap();
 
                 let scene: hotham_editor_protocol::scene::Scene = game_server.get_json().unwrap();
-
-                let entity_updates = if right_mouse_clicked {
-                    let mut helmet = scene
-                        .entities
-                        .iter()
-                        .find(|e| e.name.as_str() == "Damaged Helmet")
-                        .unwrap()
-                        .clone();
-                    helmet.transform.translation.y += 0.1;
-                    debug!("Sending update: {helmet:?}");
-                    vec![helmet]
-                } else {
-                    vec![]
-                };
-
+                let mut gui_state = GuiState { texture_id: yak_images[framebuffer_index as usize], scene, updates: vec![] };
                 game_server
-                    .send_json(&EditorUpdates { entity_updates })
+                    .send_json(&updates)
                     .unwrap();
+
+                updates.entity_updates.clear();
 
                 // game has finished rendering its frame here
 
@@ -210,14 +201,13 @@ pub fn main() -> Result<()> {
                 check_request(&mut openxr_server, RequestType::EndFrame).unwrap();
                 openxr_server.send_response(&0).unwrap();
 
-                let gui_state = GuiState {
-                    texture_id: yak_images[framebuffer_index as usize],
-                    scene,
-                };
 
                 yak.start();
-                gui(gui_state);
+                gui(&mut gui_state);
                 yak.finish();
+
+                updates.entity_updates = gui_state.updates;
+
 
                 let context = lazy_vulkan.context();
                 let yakui_vulkan_context = yakui_vulkan::VulkanContext::new(

@@ -24,3 +24,6 @@ sponza*
 
 # Checking in a socket is probably a terrible idea
 *.socket
+
+# Ignore vscode settings
+.vscode/settings.json

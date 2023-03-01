@@ -2,7 +2,7 @@ use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{
         hand::Handedness, physics::SharedShape, Collider, GlobalTransform, Info, LocalTransform,
-        Mesh, RigidBody, HMD,
+        Mesh,
     },
     hecs::World,
     systems::{
@@ -69,7 +69,7 @@ fn sync_with_editor(
     world: &mut World,
     editor: &mut hotham_editor_protocol::EditorClient<uds_windows::UnixStream>,
 ) -> HothamResult<()> {
-    use hotham::hecs::{Entity, Or};
+    use hotham::hecs::Entity;
     let entities = world
         .query_mut::<(&GlobalTransform, &Info)>()
         .with::<&Mesh>()
