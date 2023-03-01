@@ -32,8 +32,8 @@ async fn run_client(
         .await?;
     println!("[CLIENT] connected: addr={}", connection.remote_address());
 
-    asset_names.push("../../../hotham/hotham/src/shaders/pbr.frag.spv".into());
-    asset_names.push("../../../hotham/hotham/src/shaders/pbr.vert.spv".into());
+    asset_names.push("hotham/src/shaders/pbr.frag.spv".into());
+    asset_names.push("hotham/src/shaders/pbr.vert.spv".into());
 
     let _ = asset_names
         .drain(..)
@@ -197,6 +197,7 @@ mod tests {
 
         std::thread::spawn(move || {
             tokio::runtime::Builder::new_current_thread()
+                .enable_all()
                 .build()
                 .unwrap()
                 .block_on(watch(files, sender))
