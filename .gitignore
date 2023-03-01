@@ -22,6 +22,9 @@ sponza*
 # Ignore compiled shaders
 *.spv
 
+# ..except for the editor's, which are special and magic
+!hotham-editor/src/shaders/*.spv
+
 # Checking in a socket is probably a terrible idea
 *.socket
 
