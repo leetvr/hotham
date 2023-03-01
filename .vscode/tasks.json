@@ -98,8 +98,17 @@
 			"label": "Run Hotham simple scene on the simulator",
 			"group": {
 				"kind": "test",
-				"isDefault": true,
+				"isDefault": false,
 			}
 		},
+		{
+			"label": "Test OpenXR Client",
+			"type": "shell",
+			"command": "./hotham-openxr-client/test.ps1",
+			"group": {
+				"kind": "test",
+				"isDefault": true,
+			}
+		}
 	]
 }

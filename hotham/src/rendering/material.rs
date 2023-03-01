@@ -162,7 +162,7 @@ impl Material {
         }
     }
 
-    /// Create a simple, unlit, white coloured material.
+    /// Create a simple, unlit, white colored material.
     pub fn unlit_white() -> Material {
         Material {
             packed_flags_and_base_texture_id: MaterialFlags::UNLIT_WORKFLOW.bits,
