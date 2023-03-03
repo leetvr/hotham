@@ -62,7 +62,7 @@ f16vec3 getIBLContribution(f16vec3 F0, float16_t perceptualRoughness, f16vec3 di
     return diffuse + specular;
 }
 
-f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffuseColor, float16_t NdotV, Light light, float16_t ao) {
+f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffuseColor, float16_t NdotV, Light light) {
     // Get a vector between this point and the light.
     vec3 pointToLight;
     if (light.type != LightType_Directional) {
@@ -87,7 +87,7 @@ f16vec3 getLightContribution(f16vec3 f0, float16_t alphaRoughness, f16vec3 diffu
         f16vec3 specContrib = BRDF_specular(f0, alphaRoughness, V16(h), V16(n), NdotV, NdotL, NdotH, LdotH);
 
         // Finally, combine the diffuse and specular contributions
-        color = (diffuseContrib + specContrib) * (F16(light.intensity) * attenuation * NdotL * ao);
+        color = (diffuseContrib + specContrib) * (F16(light.intensity) * attenuation * NdotL);
     }
 
     return color;
@@ -148,16 +148,16 @@ f16vec3 getPBRMetallicRoughnessColor(f16vec3 baseColor) {
     // Qualcomm's documentation suggests that loops are undesirable, so we do branches instead.
     // Since these values are uniform, they shouldn't have too high of a penalty.
     if (sceneData.lights[0].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[0], ao);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[0]);
     }
     if (sceneData.lights[1].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[1], ao);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[1]);
     }
     if (sceneData.lights[2].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[2], ao);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[2]);
     }
     if (sceneData.lights[3].type != NOT_PRESENT) {
-        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[3], ao);
+        color += getLightContribution(f0, alphaRoughness, diffuseColor, NdotV, sceneData.lights[3]);
     }
 
     // Add emission, if present
