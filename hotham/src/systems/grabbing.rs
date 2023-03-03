@@ -30,7 +30,7 @@ fn grabbing_system_inner(world: &mut World) {
 
     let mut command_buffer = hecs::CommandBuffer::new();
 
-    for (_, (hand, collider)) in world.query::<(&mut Hand, &Collider)>().iter() {
+    for (hand_entity, (hand, collider)) in world.query::<(&mut Hand, &Collider)>().iter() {
         // Check to see if we are currently gripping
         if hand.grip_value > 0.1 {
             // If we already have a grabbed entity, no need to do anything.
@@ -56,7 +56,7 @@ fn grabbing_system_inner(world: &mut World) {
                     }
 
                     // Add a "Grabbed" marker trait for other systems to read
-                    command_buffer.insert_one(*collided_entity, Grabbed);
+                    command_buffer.insert_one(*collided_entity, Grabbed { hand: hand_entity });
 
                     // Store a reference to the grabbed entity
                     hand.grabbed_entity.replace(*collided_entity);
@@ -125,6 +125,11 @@ mod tests {
 
         let mut hand = world.get::<&mut Hand>(hand_entity).unwrap();
         assert_eq!(hand.grabbed_entity.unwrap(), grabbed_entity);
+        assert_eq!(
+            world.get::<&Grabbed>(grabbed_entity).unwrap().hand,
+            hand_entity
+        );
+
         hand.grip_value = 0.0;
         drop(hand);
 

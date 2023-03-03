@@ -140,7 +140,6 @@ mod tests {
 
         let expected_scale = Vec3::X * 1000.;
         let grabbed_entity = world.spawn((
-            Grabbed,
             RigidBody::default(),
             LocalTransform {
                 scale: expected_scale,
@@ -148,7 +147,8 @@ mod tests {
             },
             GlobalTransform::default(),
         ));
-        add_hand_to_world(&mut world, Some(grabbed_entity));
+        let hand = add_hand_to_world(&mut world, Some(grabbed_entity));
+        world.insert_one(grabbed_entity, Grabbed { hand }).unwrap();
 
         tick(&mut world, &input_context);
 
