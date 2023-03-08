@@ -1,3 +1,8 @@
+mod utils;
+mod xpbd;
+
+use std::time::{Duration, Instant};
+
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{
@@ -21,11 +26,74 @@ use hotham::{
     xr, Engine, HothamResult, TickData,
 };
 
-#[derive(Clone, Debug, Default)]
+use xpbd::{
+    create_points, create_shape_constraints, resolve_collisions,
+    resolve_shape_matching_constraints, Contact, ShapeConstraint,
+};
+
+const NX: usize = 10;
+const NY: usize = 10;
+const NZ: usize = 10;
+
+const RESET_SIMULATION_AFTER_SECS: u64 = 10;
+
+#[derive(Clone)]
 /// Most Hotham applications will want to keep track of some sort of state.
 /// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
 /// this is something you'd probably want to do!
-struct State {}
+struct State {
+    points_curr: Vec<Vec3>,
+    shape_constraints: Vec<ShapeConstraint>,
+    velocities: Vec<Vec3>,
+    active_collisions: Vec<Option<Contact>>,
+    wall_time: Instant,
+    simulation_time_epoch: Instant,
+    simulation_time_hare: Instant,
+    simulation_time_hound: Instant,
+    dt: f32,
+    acc: Vec3,             // Gravity or such
+    shape_compliance: f32, // Inverse of physical stiffness
+
+    mesh: Option<Mesh>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        let points_curr = create_default_points();
+        let shape_constraints = create_shape_constraints(&points_curr, NX, NY, NZ);
+        let velocities = vec![vec3(0.0, 0.0, 0.0); points_curr.len()];
+        let mut active_collisions = Vec::<Option<Contact>>::new();
+        active_collisions.resize_with(points_curr.len(), Default::default);
+
+        let dt = 0.005;
+        let acc = vec3(0.0, -9.82, 0.0);
+        let shape_compliance = 0.0001;
+
+        let mesh = None;
+
+        let wall_time = Instant::now();
+        let simulation_time_epoch = wall_time;
+
+        State {
+            points_curr,
+            shape_constraints,
+            velocities,
+            active_collisions,
+            simulation_time_hare: simulation_time_epoch,
+            simulation_time_hound: simulation_time_epoch,
+            wall_time,
+            simulation_time_epoch,
+            dt,
+            acc,
+            shape_compliance,
+            mesh,
+        }
+    }
+}
+
+fn create_default_points() -> Vec<Vec3> {
+    create_points(vec3(0.0, 2.0, 0.5), vec3(0.5, 0.5, 0.5), NX, NY, NZ)
+}
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
@@ -37,7 +105,7 @@ pub fn main() {
 pub fn real_main() -> HothamResult<()> {
     let mut engine = Engine::new();
     let mut state = Default::default();
-    init(&mut engine)?;
+    init(&mut engine, &mut state)?;
 
     while let Ok(tick_data) = engine.update() {
         tick(tick_data, &mut engine, &mut state);
@@ -47,8 +115,14 @@ pub fn real_main() -> HothamResult<()> {
     Ok(())
 }
 
-fn tick(tick_data: TickData, engine: &mut Engine, _state: &mut State) {
+fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
+    let time_now = Instant::now();
+    let time_passed = time_now.saturating_duration_since(state.wall_time);
+    state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
+        state.simulation_time_hare += time_passed;
+        auto_reset_system(state);
+        xpbd_system(state);
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
@@ -58,11 +132,71 @@ fn tick(tick_data: TickData, engine: &mut Engine, _state: &mut State) {
         skinning_system(engine);
         debug_system(engine);
     }
-
+    if let Some(mesh) = &state.mesh {
+        update_mesh(mesh, &mut engine.render_context, &state.points_curr);
+    }
     rendering_system(engine, tick_data.swapchain_image_index);
 }
 
-fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
+fn auto_reset_system(state: &mut State) {
+    if state
+        .simulation_time_hound
+        .duration_since(state.simulation_time_epoch)
+        >= Duration::new(RESET_SIMULATION_AFTER_SECS, 0)
+    {
+        state.simulation_time_hound = state.simulation_time_epoch;
+        state.simulation_time_hare = state.simulation_time_epoch;
+        state.points_curr = create_default_points();
+        state.velocities.iter_mut().for_each(|v| *v = Vec3::ZERO);
+    }
+}
+
+fn xpbd_system(state: &mut State) {
+    let timestep = Duration::from_nanos((state.dt * 1_000_000_000.0) as _);
+    while state.simulation_time_hound + timestep < state.simulation_time_hare {
+        state.simulation_time_hound += timestep;
+        xpbd_substep(state);
+    }
+}
+
+fn xpbd_substep(state: &mut State) {
+    // Update velocities
+    for vel in &mut state.velocities {
+        *vel += state.acc * state.dt;
+    }
+
+    // Predict new positions
+    let mut points_next = state
+        .points_curr
+        .iter()
+        .zip(&state.velocities)
+        .map(|(&curr, &vel)| curr + vel * state.dt)
+        .collect::<Vec<_>>();
+
+    // Resolve collisions
+    resolve_collisions(&mut points_next, &mut state.active_collisions);
+
+    // TODO: Resolve distance constraints
+
+    // Resolve shape matching constraints
+    resolve_shape_matching_constraints(
+        &mut points_next,
+        &state.shape_constraints,
+        state.shape_compliance,
+        state.dt,
+    );
+
+    // Update velocities
+    state.velocities = points_next
+        .iter()
+        .zip(&state.points_curr)
+        .map(|(&next, &curr)| (next - curr) / state.dt)
+        .collect::<Vec<_>>();
+
+    state.points_curr = points_next;
+}
+
+fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamError> {
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let world = &mut engine.world;
@@ -89,7 +223,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_helmet(&models, world);
     add_model_to_world("Cube", &models, world, None);
 
-    create_mesh(render_context, world);
+    state.mesh = Some(create_mesh(render_context, world));
 
     Ok(())
 }
@@ -112,7 +246,7 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
         .unwrap();
 }
 
-fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
+fn create_mesh(render_context: &mut RenderContext, world: &mut World) -> Mesh {
     let positions: Vec<Vec3> = vec![Default::default(); 1000];
     let vertices: Vec<Vertex> = vec![Default::default(); 1000];
     let mut indices: Vec<u32> = Vec::<u32>::new(); // with_capacity()
@@ -170,28 +304,29 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
         )]),
         render_context,
     );
-    update_mesh(&mesh, render_context);
+    update_mesh(&mesh, render_context, &positions);
     let local_transform = LocalTransform {
-        translation: [0., 1., -1.].into(),
+        translation: [0., 0., 0.].into(),
         ..Default::default()
     };
 
     world.spawn((
         Visible {},
-        mesh,
+        mesh.clone(),
         local_transform,
         GlobalTransform::default(),
     ));
+
+    mesh
 }
 
-fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext) {
+fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3]) {
     let n = 10;
-    let scale = 0.1;
     let mut positions = Vec::with_capacity(n * n * n);
     for i in 0..n {
         for j in 0..n {
             for k in 0..n {
-                positions.push(vec3(i as _, j as _, k as _) * scale);
+                positions.push(points[i * n * n + j * n + k]);
             }
         }
     }
