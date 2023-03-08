@@ -10,7 +10,7 @@ use hotham::{
         RigidBody, Visible,
     },
     contexts::RenderContext,
-    glam::{vec3, Vec3},
+    glam::{vec2, vec3, Vec3},
     hecs::World,
     rendering::{
         material::Material,
@@ -223,7 +223,7 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     add_helmet(&models, world);
     add_model_to_world("Cube", &models, world, None);
 
-    state.mesh = Some(create_mesh(render_context, world));
+    state.mesh = Some(create_mesh(render_context, world, &state.points_curr));
 
     Ok(())
 }
@@ -246,44 +246,26 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
         .unwrap();
 }
 
-fn create_mesh(render_context: &mut RenderContext, world: &mut World) -> Mesh {
-    let positions: Vec<Vec3> = vec![Default::default(); 1000];
-    let vertices: Vec<Vertex> = vec![Default::default(); 1000];
-    let mut indices: Vec<u32> = Vec::<u32>::new(); // with_capacity()
+fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[Vec3]) -> Mesh {
+    const N: u32 = 10_u32;
+    const M: u32 = N - 1;
+    const NUM_POINTS: usize = (N * N * N) as _;
+    assert_eq!(points.len(), NUM_POINTS);
+    const NUM_VERTICES: usize = (6 * N * N) as _;
+    const NUM_INDICES: usize = (6 * M * M * 2) as _;
+    let positions: Vec<Vec3> = vec![Default::default(); NUM_VERTICES];
+    let vertices: Vec<Vertex> = vec![Default::default(); NUM_VERTICES];
+    let mut indices: Vec<u32> = vec![Default::default(); NUM_INDICES];
 
-    let n = 10_i32;
-    let m = n - 1;
-    // Loop over blocks of vertices
     for side in 0..6 {
-        for i in 0..m {
-            for j in 0..m {
-                let (x, y, z, dxdi, dydi, dzdi, dxdj, dydj, dzdj) = match side {
-                    0 => (m, i, m - j, 0, 1, 0, 0, 0, -1),
-                    1 => (j, m, m - i, 0, 0, -1, 1, 0, 0),
-                    2 => (j, i, m, 0, 1, 0, 1, 0, 0),
-                    3 => (0, j, m - i, 0, 0, -1, 0, 1, 0),
-                    4 => (j, 0, i, 0, 0, 1, 1, 0, 0),
-                    5 => (m - j, i, 0, 0, 1, 0, -1, 0, 0),
-                    i32::MIN..=-1_i32 | 6_i32..=i32::MAX => todo!(),
-                };
-                let x0 = x;
-                let y0 = y;
-                let z0 = z;
-                let x1 = x + dxdi;
-                let y1 = y + dydi;
-                let z1 = z + dzdi;
-                let x2 = x + dxdi + dxdj;
-                let y2 = y + dydi + dydj;
-                let z2 = z + dzdi + dzdj;
-                let x3 = x + dxdj;
-                let y3 = y + dydj;
-                let z3 = z + dzdj;
-                indices.push((z0 * n * n + y0 * n + x0) as _);
-                indices.push((z1 * n * n + y1 * n + x1) as _);
-                indices.push((z2 * n * n + y2 * n + x2) as _);
-                indices.push((z0 * n * n + y0 * n + x0) as _);
-                indices.push((z2 * n * n + y2 * n + x2) as _);
-                indices.push((z3 * n * n + y3 * n + x3) as _);
+        for i in 0..M {
+            for j in 0..M {
+                indices.push(side * N * N + i * N + j);
+                indices.push(side * N * N + i * N + j + 1);
+                indices.push(side * N * N + i * N + j + 1 + N);
+                indices.push(side * N * N + i * N + j);
+                indices.push(side * N * N + i * N + j + 1 + N);
+                indices.push(side * N * N + i * N + j + N);
             }
         }
     }
@@ -304,7 +286,7 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) -> Mesh {
         )]),
         render_context,
     );
-    update_mesh(&mesh, render_context, &positions);
+    update_mesh(&mesh, render_context, &points);
     let local_transform = LocalTransform {
         translation: [0., 0., 0.].into(),
         ..Default::default()
@@ -321,12 +303,49 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) -> Mesh {
 }
 
 fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3]) {
-    let n = 10;
-    let mut positions = Vec::with_capacity(n * n * n);
-    for i in 0..n {
-        for j in 0..n {
-            for k in 0..n {
-                positions.push(points[i * n * n + j * n + k]);
+    const N: i32 = 10_i32;
+    const M: i32 = N - 1;
+    const NUM_VERTICES: usize = (6 * N * N) as _;
+    let mut positions: Vec<Vec3> = Vec::<Vec3>::with_capacity(NUM_VERTICES);
+    let mut vertices: Vec<Vertex> = Vec::<Vertex>::with_capacity(NUM_VERTICES);
+
+    for side in 0..6 {
+        for i in 0..N {
+            for j in 0..N {
+                let (x, y, z, dxdi, dydi, dzdi, dxdj, dydj, dzdj) = match side {
+                    0 => (M, i, M - j, 0, 1, 0, 0, 0, -1),
+                    1 => (j, M, M - i, 0, 0, -1, 1, 0, 0),
+                    2 => (j, i, M, 0, 1, 0, 1, 0, 0),
+                    3 => (0, j, M - i, 0, 0, -1, 0, 1, 0),
+                    4 => (j, 0, i, 0, 0, 1, 1, 0, 0),
+                    5 => (M - j, i, 0, 0, 1, 0, -1, 0, 0),
+                    i32::MIN..=-1_i32 | 6_i32..=i32::MAX => todo!(),
+                };
+                let center = points[(z * N * N + y * N + x) as usize];
+                positions.push(center);
+                let x0 = (x - dxdi).clamp(0, M);
+                let y0 = (y - dydi).clamp(0, M);
+                let z0 = (z - dzdi).clamp(0, M);
+                let x1 = (x + dxdi).clamp(0, M);
+                let y1 = (y + dydi).clamp(0, M);
+                let z1 = (z + dzdi).clamp(0, M);
+                let x2 = (x - dxdj).clamp(0, M);
+                let y2 = (y - dydj).clamp(0, M);
+                let z2 = (z - dzdj).clamp(0, M);
+                let x3 = (x + dxdj).clamp(0, M);
+                let y3 = (y + dydj).clamp(0, M);
+                let z3 = (z + dzdj).clamp(0, M);
+                let p_down = points[(z0 * N * N + y0 * N + x0) as usize];
+                let p_up = points[(z1 * N * N + y1 * N + x1) as usize];
+                let p_left = points[(z2 * N * N + y2 * N + x2) as usize];
+                let p_right = points[(z3 * N * N + y3 * N + x3) as usize];
+                let normal = (p_right - p_left).cross(p_up - p_down).normalize_or_zero();
+                let texture_coords = vec2(j as f32 / M as f32, i as f32 / M as f32);
+                vertices.push(Vertex {
+                    normal,
+                    texture_coords,
+                    ..Default::default()
+                });
             }
         }
     }
@@ -348,6 +367,16 @@ fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3])
                 .as_ptr()
                 .offset(mesh.primitives[0].vertex_buffer_offset as _),
             positions.len(),
+        );
+        std::ptr::copy_nonoverlapping(
+            vertices.as_ptr(),
+            render_context
+                .resources
+                .vertex_buffer
+                .memory_address
+                .as_ptr()
+                .offset(mesh.primitives[0].vertex_buffer_offset as _),
+            vertices.len(),
         );
     }
 }
