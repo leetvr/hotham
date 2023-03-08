@@ -1,7 +1,18 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, physics::SharedShape, Collider, LocalTransform, RigidBody},
+    components::{
+        hand::Handedness, physics::SharedShape, Collider, GlobalTransform, LocalTransform, Mesh,
+        RigidBody, Visible,
+    },
+    contexts::RenderContext,
+    glam::{vec3, Vec3},
     hecs::World,
+    rendering::{
+        material::Material,
+        mesh_data::MeshData,
+        primitive::{calculate_bounding_sphere, Primitive},
+        vertex::Vertex,
+    },
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, rendering::rendering_system, skinning::skinning_system,
@@ -78,6 +89,8 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_helmet(&models, world);
     add_model_to_world("Cube", &models, world, None);
 
+    create_mesh(render_context, world);
+
     Ok(())
 }
 
@@ -97,4 +110,109 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
     world
         .insert(helmet, (collider, RigidBody::default()))
         .unwrap();
+}
+
+fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
+    let positions: Vec<Vec3> = vec![Default::default(); 1000];
+    let vertices: Vec<Vertex> = vec![Default::default(); 1000];
+    let mut indices: Vec<u32> = Vec::<u32>::new(); // with_capacity()
+
+    let n = 10_i32;
+    let m = n - 1;
+    // Loop over blocks of vertices
+    for side in 0..6 {
+        for i in 0..m {
+            for j in 0..m {
+                let (x, y, z, dxdi, dydi, dzdi, dxdj, dydj, dzdj) = match side {
+                    0 => (m, i, m - j, 0, 1, 0, 0, 0, -1),
+                    1 => (j, m, m - i, 0, 0, -1, 1, 0, 0),
+                    2 => (j, i, m, 0, 1, 0, 1, 0, 0),
+                    3 => (0, j, m - i, 0, 0, -1, 0, 1, 0),
+                    4 => (j, 0, i, 0, 0, 1, 1, 0, 0),
+                    5 => (m - j, i, 0, 0, 1, 0, -1, 0, 0),
+                    i32::MIN..=-1_i32 | 6_i32..=i32::MAX => todo!(),
+                };
+                let x0 = x;
+                let y0 = y;
+                let z0 = z;
+                let x1 = x + dxdi;
+                let y1 = y + dydi;
+                let z1 = z + dzdi;
+                let x2 = x + dxdi + dxdj;
+                let y2 = y + dydi + dydj;
+                let z2 = z + dzdi + dzdj;
+                let x3 = x + dxdj;
+                let y3 = y + dydj;
+                let z3 = z + dzdj;
+                indices.push((z0 * n * n + y0 * n + x0) as _);
+                indices.push((z1 * n * n + y1 * n + x1) as _);
+                indices.push((z2 * n * n + y2 * n + x2) as _);
+                indices.push((z0 * n * n + y0 * n + x0) as _);
+                indices.push((z2 * n * n + y2 * n + x2) as _);
+                indices.push((z3 * n * n + y3 * n + x3) as _);
+            }
+        }
+    }
+
+    let material_id = unsafe {
+        render_context
+            .resources
+            .materials_buffer
+            .push(&Material::gltf_default())
+    };
+    let mesh = Mesh::new(
+        MeshData::new(vec![Primitive::new(
+            positions.as_slice(),
+            vertices.as_slice(),
+            indices.as_slice(),
+            material_id,
+            render_context,
+        )]),
+        render_context,
+    );
+    update_mesh(&mesh, render_context);
+    let local_transform = LocalTransform {
+        translation: [0., 1., -1.].into(),
+        ..Default::default()
+    };
+
+    world.spawn((
+        Visible {},
+        mesh,
+        local_transform,
+        GlobalTransform::default(),
+    ));
+}
+
+fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext) {
+    let n = 10;
+    let scale = 0.1;
+    let mut positions = Vec::with_capacity(n * n * n);
+    for i in 0..n {
+        for j in 0..n {
+            for k in 0..n {
+                positions.push(vec3(i as _, j as _, k as _) * scale);
+            }
+        }
+    }
+
+    let mesh = render_context
+        .resources
+        .mesh_data
+        .get_mut(mesh.handle)
+        .unwrap();
+    mesh.primitives[0].bounding_sphere = calculate_bounding_sphere(&positions);
+
+    unsafe {
+        std::ptr::copy_nonoverlapping(
+            positions.as_ptr(),
+            render_context
+                .resources
+                .position_buffer
+                .memory_address
+                .as_ptr()
+                .offset(mesh.primitives[0].vertex_buffer_offset as _),
+            positions.len(),
+        );
+    }
 }
