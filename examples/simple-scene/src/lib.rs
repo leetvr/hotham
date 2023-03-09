@@ -10,7 +10,7 @@ use hotham::{
         physics::{BodyType, SharedShape},
         Collider, GlobalTransform, Grabbable, LocalTransform, Mesh, RigidBody, Visible,
     },
-    contexts::RenderContext,
+    contexts::{InputContext, RenderContext},
     glam::{vec2, vec3, Vec3},
     hecs::{self, Without, World},
     na,
@@ -124,7 +124,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
         state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
-        auto_reset_system(state);
+        simulation_reset_system(&engine.input_context, state);
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
@@ -142,12 +142,8 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     rendering_system(engine, tick_data.swapchain_image_index);
 }
 
-fn auto_reset_system(state: &mut State) {
-    if state
-        .simulation_time_hound
-        .duration_since(state.simulation_time_epoch)
-        >= Duration::new(RESET_SIMULATION_AFTER_SECS, 0)
-    {
+fn simulation_reset_system(input_context: &InputContext, state: &mut State) {
+    if input_context.left.menu_button_just_pressed() {
         state.simulation_time_hound = state.simulation_time_epoch;
         state.simulation_time_hare = state.simulation_time_epoch;
         state.points_curr = create_default_points();
