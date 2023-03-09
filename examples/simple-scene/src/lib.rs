@@ -160,8 +160,7 @@ struct XpbdCollisions {
 }
 
 fn xpbd_system(engine: &mut Engine, state: &mut State) {
-    let dt = tweak!(0.005);
-    let shape_compliance = tweak!(0.00001);
+    let dt = tweak!(0.004);
 
     let mut command_buffer = hecs::CommandBuffer::new();
 
@@ -180,13 +179,15 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
     let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
     while state.simulation_time_hound + timestep < state.simulation_time_hare {
         state.simulation_time_hound += timestep;
-        xpbd_substep(&mut engine.world, state, dt, shape_compliance);
+        xpbd_substep(&mut engine.world, state, dt);
     }
 }
 
-fn xpbd_substep(world: &mut World, state: &mut State, dt: f32, shape_compliance: f32) {
+fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
     let acc = vec3(0.0, -9.82, 0.0);
-    let stiction_factor = tweak!(0.25); // Maximum tangential correction per correction along normal.
+    let particle_mass: f32 = tweak!(0.01);
+    let shape_compliance = tweak!(0.0000); // Inverse of physics stiffness
+    let stiction_factor = tweak!(1.5); // Maximum tangential correction per correction along normal.
 
     // Update velocities
     for vel in &mut state.velocities {
@@ -210,6 +211,7 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32, shape_compliance:
         &mut points_next,
         &state.shape_constraints,
         shape_compliance,
+        particle_mass.recip(),
         dt,
     );
 

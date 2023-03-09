@@ -1,4 +1,5 @@
 use hotham::glam::Vec3;
+use inline_tweak::tweak;
 use nalgebra::{self, Matrix3, Vector3};
 
 use crate::utils::grid;
@@ -144,10 +145,25 @@ pub fn resolve_collisions(
     }
 }
 
+// 𝛼 = compliance = inverse physical stiffness
+// C = constraint error (scalar)
+// ∇𝐶ᵢ = constraint gradient wrt particle i (vector) = How to move 𝐱ᵢ for a maximal increase of C
+// 𝐱ᵢ = position of particle i
+// ∆𝐱ᵢ = correction of particle i
+// 𝑤ᵢ = inverse mass of particle i
+//                      -C 𝑤ᵢ∇𝐶ᵢ
+// ∆𝐱ᵢ = ―――――――――――――――――――――――――――――――――――――――――――――
+//        𝑤₁|∇𝐶₁|² + 𝑤₂|∇𝐶₂|² + ⋯ + 𝑤ₙ|∇𝐶ₙ|² + 𝛼/∆𝑡²
+//                        -C
+// λ = ―――――――――――――――――――――――――――――――――――――――――――――
+//      𝑤₁|∇𝐶₁|² + 𝑤₂|∇𝐶₂|² + ⋯ + 𝑤ₙ|∇𝐶ₙ|² + 𝛼/∆𝑡²
+//
+// ∆𝐱ᵢ = λ 𝑤ᵢ∇𝐶ᵢ
 pub fn resolve_shape_matching_constraints(
     points_next: &mut Vec<Vec3>,
     shape_constraints: &[ShapeConstraint],
     shape_compliance: f32,
+    inv_particle_mass: f32,
     dt: f32,
 ) {
     let shape_compliance_per_dt2 = shape_compliance / (dt * dt);
@@ -171,7 +187,8 @@ pub fn resolve_shape_matching_constraints(
         for (i, ip) in ips.iter().enumerate() {
             let goal = Vec3::from(mean + rot * template_shape[i]);
             let delta = points_next[*ip] - goal;
-            let correction = delta * (-1.0 / (1.0 + shape_compliance_per_dt2));
+            let correction =
+                delta * (-inv_particle_mass / (inv_particle_mass + shape_compliance_per_dt2));
             points_next[*ip] += correction;
         }
     }
