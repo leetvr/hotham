@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 hotham = { path = "../../hotham" }
+inline_tweak = "1.0.8"
 nalgebra = { version = "0.32.1", features = ["convert-glam021"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
@@ -50,7 +51,10 @@ value = "vr_only"
 
 [[package.metadata.android.application.activity.intent_filter]]
 actions = ["android.intent.action.MAIN"]
-categories = ["com.oculus.intent.category.VR", "android.intent.category.LAUNCHER"]
+categories = [
+    "com.oculus.intent.category.VR",
+    "android.intent.category.LAUNCHER",
+]
 
 [[package.metadata.android.application.activity.meta_data]]
 name = "com.oculus.vr.focusaware"

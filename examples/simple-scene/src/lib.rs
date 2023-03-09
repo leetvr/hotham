@@ -26,6 +26,7 @@ use hotham::{
     xr, Engine, HothamResult, TickData,
 };
 
+use inline_tweak::tweak;
 use xpbd::{
     create_points, create_shape_constraints, resolve_collisions,
     resolve_shape_matching_constraints, Contact, ShapeConstraint,
@@ -50,10 +51,6 @@ struct State {
     simulation_time_epoch: Instant,
     simulation_time_hare: Instant,
     simulation_time_hound: Instant,
-    dt: f32,
-    acc: Vec3,             // Gravity or such
-    shape_compliance: f32, // Inverse of physical stiffness
-
     mesh: Option<Mesh>,
 }
 
@@ -64,10 +61,6 @@ impl Default for State {
         let velocities = vec![vec3(0.0, 0.0, 0.0); points_curr.len()];
         let mut active_collisions = Vec::<Option<Contact>>::new();
         active_collisions.resize_with(points_curr.len(), Default::default);
-
-        let dt = 0.005;
-        let acc = vec3(0.0, -9.82, 0.0);
-        let shape_compliance = 0.0001;
 
         let mesh = None;
 
@@ -83,9 +76,6 @@ impl Default for State {
             simulation_time_hound: simulation_time_epoch,
             wall_time,
             simulation_time_epoch,
-            dt,
-            acc,
-            shape_compliance,
             mesh,
         }
     }
@@ -120,7 +110,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     let time_passed = time_now.saturating_duration_since(state.wall_time);
     state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        state.simulation_time_hare += time_passed;
+        state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
         auto_reset_system(state);
         xpbd_system(state);
         hands_system(engine);
@@ -152,17 +142,22 @@ fn auto_reset_system(state: &mut State) {
 }
 
 fn xpbd_system(state: &mut State) {
-    let timestep = Duration::from_nanos((state.dt * 1_000_000_000.0) as _);
+    let dt = tweak!(0.005);
+    let shape_compliance = tweak!(0.00001);
+
+    let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
     while state.simulation_time_hound + timestep < state.simulation_time_hare {
         state.simulation_time_hound += timestep;
-        xpbd_substep(state);
+        xpbd_substep(state, dt, shape_compliance);
     }
 }
 
-fn xpbd_substep(state: &mut State) {
+fn xpbd_substep(state: &mut State, dt: f32, shape_compliance: f32) {
+    let acc = vec3(0.0, -9.82, 0.0);
+
     // Update velocities
     for vel in &mut state.velocities {
-        *vel += state.acc * state.dt;
+        *vel += acc * dt;
     }
 
     // Predict new positions
@@ -170,7 +165,7 @@ fn xpbd_substep(state: &mut State) {
         .points_curr
         .iter()
         .zip(&state.velocities)
-        .map(|(&curr, &vel)| curr + vel * state.dt)
+        .map(|(&curr, &vel)| curr + vel * dt)
         .collect::<Vec<_>>();
 
     // Resolve collisions
@@ -182,15 +177,15 @@ fn xpbd_substep(state: &mut State) {
     resolve_shape_matching_constraints(
         &mut points_next,
         &state.shape_constraints,
-        state.shape_compliance,
-        state.dt,
+        shape_compliance,
+        dt,
     );
 
     // Update velocities
     state.velocities = points_next
         .iter()
         .zip(&state.points_curr)
-        .map(|(&next, &curr)| (next - curr) / state.dt)
+        .map(|(&next, &curr)| (next - curr) / dt)
         .collect::<Vec<_>>();
 
     state.points_curr = points_next;

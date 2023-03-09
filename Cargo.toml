@@ -12,6 +12,9 @@ members = [
   "hotham",
 ]
 
+[profile.dev]
+opt-level = 3
+
 # Make performance critical packages compile with optimizations
 [profile.dev.package.rapier3d]
 opt-level = 3
