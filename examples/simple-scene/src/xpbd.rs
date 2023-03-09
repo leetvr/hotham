@@ -15,7 +15,7 @@ pub enum ContactState {
 
 #[derive(Clone)]
 pub struct Contact {
-    pub point: Vec3,
+    pub contact_in_local: Vec3,
     pub state: ContactState,
 }
 
@@ -89,7 +89,7 @@ pub fn resolve_collisions(
             let stiction_d = (inner_r - length) * stiction_factor;
             let stiction_d2 = stiction_d * stiction_d;
             if let Some(Contact {
-                point: contact_point,
+                contact_in_local: contact_point,
                 state: contact_state,
             }) = c
             {
@@ -105,7 +105,7 @@ pub fn resolve_collisions(
                 }
             } else {
                 *c = Some(Contact {
-                    point: *p,
+                    contact_in_local: *p,
                     state: ContactState::New,
                 });
             }
@@ -115,7 +115,7 @@ pub fn resolve_collisions(
             let stiction_d = (length - outer_r) * stiction_factor;
             let stiction_d2 = stiction_d * stiction_d;
             if let Some(Contact {
-                point: contact_point,
+                contact_in_local: contact_point,
                 state: contact_state,
             }) = c
             {
@@ -131,7 +131,7 @@ pub fn resolve_collisions(
                 }
             } else {
                 *c = Some(Contact {
-                    point: *p,
+                    contact_in_local: *p,
                     state: ContactState::New,
                 });
             }

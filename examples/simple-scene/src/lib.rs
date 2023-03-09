@@ -121,7 +121,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
         state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
-        // auto_reset_system(state);
+        auto_reset_system(state);
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
@@ -218,43 +218,49 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32, shape_compliance:
             Some(transform) => transform.to_isometry(),
             None => Default::default(),
         };
-        for (p, c) in points_next
+
+        for (p_global, c) in points_next
             .iter_mut()
             .zip(&mut collisions.active_collisions)
         {
-            let pt = na::Point3::new(p.x, p.y, p.z);
-            let proj = collider.shape.project_point(&m, &pt, false);
-            if proj.is_inside {
-                let point_on_surface = vec3(proj.point.x, proj.point.y, proj.point.z);
-                let d = p.distance(point_on_surface);
-                *p = point_on_surface;
+            let pt_local =
+                m.inverse_transform_point(&na::Point3::new(p_global.x, p_global.y, p_global.z));
+            let proj_local = collider.shape.project_local_point(&pt_local, false);
+            if proj_local.is_inside {
+                let mut p_local = vec3(pt_local.x, pt_local.y, pt_local.z);
+                let point_on_surface_in_local =
+                    vec3(proj_local.point.x, proj_local.point.y, proj_local.point.z);
+                let d = p_local.distance(point_on_surface_in_local);
+                p_local = point_on_surface_in_local;
                 if let Some(Contact {
-                    point: contact_point,
+                    contact_in_local,
                     state: contact_state,
                 }) = c
                 {
                     let stiction_d = d * stiction_factor;
                     let stiction_d2 = stiction_d * stiction_d;
-                    if p.distance_squared(*contact_point) > stiction_d2 {
-                        let delta = *p - *contact_point;
-                        *p -= delta * (stiction_d * delta.length_recip());
-                        let pt = na::Point3::new(p.x, p.y, p.z);
-                        let proj = collider.shape.project_point(&m, &pt, false);
+                    if p_local.distance_squared(*contact_in_local) > stiction_d2 {
+                        let delta = p_local - *contact_in_local;
+                        p_local -= delta * (stiction_d * delta.length_recip());
+                        let pt = na::Point3::new(p_local.x, p_local.y, p_local.z);
+                        let proj = collider.shape.project_local_point(&pt, false);
                         if proj.is_inside {
-                            *p = vec3(proj.point.x, proj.point.y, proj.point.z);
+                            p_local = vec3(proj.point.x, proj.point.y, proj.point.z);
                         }
-                        *contact_point = *p;
+                        *contact_in_local = p_local;
                         *contact_state = ContactState::Sliding;
                     } else {
-                        *p = *contact_point;
+                        p_local = *contact_in_local;
                         *contact_state = ContactState::Sticking;
                     }
                 } else {
                     *c = Some(Contact {
-                        point: *p,
+                        contact_in_local: p_local,
                         state: ContactState::New,
                     });
                 }
+                let pt = m.transform_point(&na::Point3::new(p_local.x, p_local.y, p_local.z));
+                *p_global = vec3(pt.x, pt.y, pt.z);
             }
         }
     }
