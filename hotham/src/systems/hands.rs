@@ -96,7 +96,7 @@ pub fn add_hand(
 
     // Give it a collider
     let collider = Collider {
-        shape: SharedShape::capsule_y(0.05, 0.02),
+        shape: SharedShape::ball(0.1),
         sensor: true,
         active_collision_types: ActiveCollisionTypes::all(),
         collision_groups: HAND_COLLISION_GROUP,
