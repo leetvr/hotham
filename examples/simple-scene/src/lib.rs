@@ -6,12 +6,14 @@ use std::time::{Duration, Instant};
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{
-        hand::Handedness, physics::SharedShape, Collider, GlobalTransform, LocalTransform, Mesh,
-        RigidBody, Visible,
+        hand::Handedness,
+        physics::{BodyType, SharedShape},
+        Collider, GlobalTransform, Grabbable, LocalTransform, Mesh, RigidBody, Visible,
     },
     contexts::RenderContext,
     glam::{vec2, vec3, Vec3},
-    hecs::World,
+    hecs::{self, Without, World},
+    na,
     rendering::{
         material::Material,
         mesh_data::MeshData,
@@ -31,6 +33,8 @@ use xpbd::{
     create_points, create_shape_constraints, resolve_collisions,
     resolve_shape_matching_constraints, Contact, ShapeConstraint,
 };
+
+use crate::xpbd::ContactState;
 
 const NX: usize = 10;
 const NY: usize = 10;
@@ -82,7 +86,13 @@ impl Default for State {
 }
 
 fn create_default_points() -> Vec<Vec3> {
-    create_points(vec3(0.0, 2.0, 0.5), vec3(0.5, 0.5, 0.5), NX, NY, NZ)
+    create_points(
+        vec3(tweak!(0.0), tweak!(2.0), tweak!(-0.5)),
+        vec3(0.5, 0.5, 0.5),
+        NX,
+        NY,
+        NZ,
+    )
 }
 
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
@@ -111,8 +121,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
         state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
-        auto_reset_system(state);
-        xpbd_system(state);
+        // auto_reset_system(state);
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
@@ -121,6 +130,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
         debug_system(engine);
+        xpbd_system(engine, state);
     }
     if let Some(mesh) = &state.mesh {
         update_mesh(mesh, &mut engine.render_context, &state.points_curr);
@@ -141,19 +151,38 @@ fn auto_reset_system(state: &mut State) {
     }
 }
 
-fn xpbd_system(state: &mut State) {
+struct XpbdCollisions {
+    active_collisions: Vec<Option<Contact>>,
+}
+
+fn xpbd_system(engine: &mut Engine, state: &mut State) {
     let dt = tweak!(0.005);
     let shape_compliance = tweak!(0.00001);
+
+    let mut command_buffer = hecs::CommandBuffer::new();
+
+    // Create XpbdCollisions if they are missing
+    for (entity, _) in engine
+        .world
+        .query::<Without<&Collider, &XpbdCollisions>>()
+        .iter()
+    {
+        let mut active_collisions = Vec::<Option<Contact>>::new();
+        active_collisions.resize_with(state.points_curr.len(), Default::default);
+        command_buffer.insert_one(entity, XpbdCollisions { active_collisions });
+    }
+    command_buffer.run_on(&mut engine.world);
 
     let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
     while state.simulation_time_hound + timestep < state.simulation_time_hare {
         state.simulation_time_hound += timestep;
-        xpbd_substep(state, dt, shape_compliance);
+        xpbd_substep(&mut engine.world, state, dt, shape_compliance);
     }
 }
 
-fn xpbd_substep(state: &mut State, dt: f32, shape_compliance: f32) {
+fn xpbd_substep(world: &mut World, state: &mut State, dt: f32, shape_compliance: f32) {
     let acc = vec3(0.0, -9.82, 0.0);
+    let stiction_factor = tweak!(0.25); // Maximum tangential correction per correction along normal.
 
     // Update velocities
     for vel in &mut state.velocities {
@@ -168,8 +197,7 @@ fn xpbd_substep(state: &mut State, dt: f32, shape_compliance: f32) {
         .map(|(&curr, &vel)| curr + vel * dt)
         .collect::<Vec<_>>();
 
-    // Resolve collisions
-    resolve_collisions(&mut points_next, &mut state.active_collisions);
+    // resolve_collisions(&mut points_next, &mut state.active_collisions);
 
     // TODO: Resolve distance constraints
 
@@ -180,6 +208,56 @@ fn xpbd_substep(state: &mut State, dt: f32, shape_compliance: f32) {
         shape_compliance,
         dt,
     );
+
+    // Resolve collisions
+    for (_, (transform, collider, collisions)) in world
+        .query_mut::<(Option<&GlobalTransform>, &Collider, &mut XpbdCollisions)>()
+        .into_iter()
+    {
+        let m = match transform {
+            Some(transform) => transform.to_isometry(),
+            None => Default::default(),
+        };
+        for (p, c) in points_next
+            .iter_mut()
+            .zip(&mut collisions.active_collisions)
+        {
+            let pt = na::Point3::new(p.x, p.y, p.z);
+            let proj = collider.shape.project_point(&m, &pt, false);
+            if proj.is_inside {
+                let point_on_surface = vec3(proj.point.x, proj.point.y, proj.point.z);
+                let d = p.distance(point_on_surface);
+                *p = point_on_surface;
+                if let Some(Contact {
+                    point: contact_point,
+                    state: contact_state,
+                }) = c
+                {
+                    let stiction_d = d * stiction_factor;
+                    let stiction_d2 = stiction_d * stiction_d;
+                    if p.distance_squared(*contact_point) > stiction_d2 {
+                        let delta = *p - *contact_point;
+                        *p -= delta * (stiction_d * delta.length_recip());
+                        let pt = na::Point3::new(p.x, p.y, p.z);
+                        let proj = collider.shape.project_point(&m, &pt, false);
+                        if proj.is_inside {
+                            *p = vec3(proj.point.x, proj.point.y, proj.point.z);
+                        }
+                        *contact_point = *p;
+                        *contact_state = ContactState::Sliding;
+                    } else {
+                        *p = *contact_point;
+                        *contact_state = ContactState::Sticking;
+                    }
+                } else {
+                    *c = Some(Contact {
+                        point: *p,
+                        state: ContactState::New,
+                    });
+                }
+            }
+        }
+    }
 
     // Update velocities
     state.velocities = points_next
@@ -195,6 +273,8 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     let render_context = &mut engine.render_context;
     let vulkan_context = &mut engine.vulkan_context;
     let world = &mut engine.world;
+
+    add_floor(world);
 
     let mut glb_buffers: Vec<&[u8]> = vec![
         include_bytes!("../../../test_assets/left_hand.glb"),
@@ -216,11 +296,21 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_helmet(&models, world);
-    add_model_to_world("Cube", &models, world, None);
+    // add_model_to_world("Cube", &models, world, None);
 
     state.mesh = Some(create_mesh(render_context, world, &state.points_curr));
 
     Ok(())
+}
+
+fn add_floor(world: &mut World) {
+    let entity = world.reserve_entity();
+    let collider = Collider::new(SharedShape::halfspace(na::Vector3::y_axis()));
+    let rigid_body = RigidBody {
+        body_type: BodyType::Fixed,
+        ..Default::default()
+    };
+    world.insert(entity, (collider, rigid_body)).unwrap();
 }
 
 fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut World) {
@@ -230,15 +320,13 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
     {
         let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
         local_transform.translation.z = -1.;
-        local_transform.translation.y = 1.4;
+        local_transform.translation.y = 0.4;
         local_transform.scale = [0.5, 0.5, 0.5].into();
     }
 
     let collider = Collider::new(SharedShape::ball(0.35));
 
-    world
-        .insert(helmet, (collider, RigidBody::default()))
-        .unwrap();
+    world.insert(helmet, (collider, Grabbable {})).unwrap();
 }
 
 fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[Vec3]) -> Mesh {

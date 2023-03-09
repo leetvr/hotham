@@ -15,8 +15,8 @@ pub enum ContactState {
 
 #[derive(Clone)]
 pub struct Contact {
-    point: Vec3,
-    state: ContactState,
+    pub point: Vec3,
+    pub state: ContactState,
 }
 
 pub fn create_points(center: Vec3, size: Vec3, nx: usize, ny: usize, nz: usize) -> Vec<Vec3> {
