@@ -27,6 +27,7 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
+use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
 use xpbd::{
@@ -56,6 +57,7 @@ struct State {
     simulation_time_hare: Instant,
     simulation_time_hound: Instant,
     mesh: Option<Mesh>,
+    navigation: NavigationState,
 }
 
 impl Default for State {
@@ -81,6 +83,7 @@ impl Default for State {
             wall_time,
             simulation_time_epoch,
             mesh,
+            navigation: Default::default(),
         }
     }
 }
@@ -126,6 +129,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         grabbing_system(engine);
         physics_system(engine);
         animation_system(engine);
+        navigation_system(engine, &mut state.navigation);
         update_global_transform_system(engine);
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
