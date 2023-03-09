@@ -117,7 +117,8 @@
     "vulkan",
     "wbrickner",
     "Willems",
-    "winit"
+    "winit",
+    "xpbd"
   ],
   "ignoreWords": [
     "Adreno",
