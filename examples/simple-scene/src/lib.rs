@@ -178,7 +178,7 @@ struct XpbdCollisions {
 
 fn xpbd_system(engine: &mut Engine, state: &mut State) {
     puffin::profile_function!();
-    let dt = tweak!(0.004);
+    let dt = tweak!(0.001);
 
     let mut command_buffer = hecs::CommandBuffer::new();
 
