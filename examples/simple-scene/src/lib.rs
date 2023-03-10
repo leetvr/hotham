@@ -1,5 +1,6 @@
 mod utils;
 mod xpbd;
+mod xpbd_collisions;
 
 use std::time::{Duration, Instant};
 
@@ -31,17 +32,15 @@ use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
 use xpbd::{
-    create_points, create_shape_constraints, resolve_collisions,
-    resolve_shape_matching_constraints, Contact, ShapeConstraint,
+    create_points, create_shape_constraints, resolve_shape_matching_constraints, ShapeConstraint,
 };
+use xpbd_collisions::{resolve_ecs_collisions, Contact};
 
-use crate::xpbd::ContactState;
+use crate::xpbd_collisions::XpbdCollisions;
 
 const NX: usize = 10;
 const NY: usize = 10;
 const NZ: usize = 10;
-
-const RESET_SIMULATION_AFTER_SECS: u64 = 10;
 
 #[derive(Clone)]
 /// Most Hotham applications will want to keep track of some sort of state.
@@ -51,7 +50,6 @@ struct State {
     points_curr: Vec<Vec3>,
     shape_constraints: Vec<ShapeConstraint>,
     velocities: Vec<Vec3>,
-    active_collisions: Vec<Option<Contact>>,
     wall_time: Instant,
     simulation_time_epoch: Instant,
     simulation_time_hare: Instant,
@@ -65,8 +63,6 @@ impl Default for State {
         let points_curr = create_default_points();
         let shape_constraints = create_shape_constraints(&points_curr, NX, NY, NZ);
         let velocities = vec![vec3(0.0, 0.0, 0.0); points_curr.len()];
-        let mut active_collisions = Vec::<Option<Contact>>::new();
-        active_collisions.resize_with(points_curr.len(), Default::default);
 
         let mesh = None;
 
@@ -77,7 +73,6 @@ impl Default for State {
             points_curr,
             shape_constraints,
             velocities,
-            active_collisions,
             simulation_time_hare: simulation_time_epoch,
             simulation_time_hound: simulation_time_epoch,
             wall_time,
@@ -172,10 +167,6 @@ fn simulation_reset_system(input_context: &InputContext, state: &mut State) {
     }
 }
 
-struct XpbdCollisions {
-    active_collisions: Vec<Option<Contact>>,
-}
-
 fn xpbd_system(engine: &mut Engine, state: &mut State) {
     puffin::profile_function!();
     let dt = tweak!(0.001);
@@ -205,7 +196,7 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
     puffin::profile_function!();
     let acc = vec3(0.0, -9.82, 0.0);
     let particle_mass: f32 = tweak!(0.01);
-    let shape_compliance = tweak!(0.0000); // Inverse of physics stiffness
+    let shape_compliance = tweak!(0.00001); // Inverse of physics stiffness
     let stiction_factor = tweak!(1.3); // Maximum tangential correction per correction along normal.
 
     // Update velocities
@@ -249,64 +240,6 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
     }
 
     state.points_curr = points_next;
-}
-
-fn resolve_ecs_collisions(world: &mut World, points_next: &mut Vec<Vec3>, stiction_factor: f32) {
-    puffin::profile_function!();
-    for (_, (transform, collider, collisions)) in world
-        .query_mut::<(Option<&GlobalTransform>, &Collider, &mut XpbdCollisions)>()
-        .into_iter()
-    {
-        let m = match transform {
-            Some(transform) => transform.to_isometry(),
-            None => Default::default(),
-        };
-
-        for (p_global, c) in points_next
-            .iter_mut()
-            .zip(&mut collisions.active_collisions)
-        {
-            let pt_local =
-                m.inverse_transform_point(&na::Point3::new(p_global.x, p_global.y, p_global.z));
-            let proj_local = collider.shape.project_local_point(&pt_local, false);
-            if proj_local.is_inside {
-                let mut p_local = vec3(pt_local.x, pt_local.y, pt_local.z);
-                let point_on_surface_in_local =
-                    vec3(proj_local.point.x, proj_local.point.y, proj_local.point.z);
-                let d = p_local.distance(point_on_surface_in_local);
-                p_local = point_on_surface_in_local;
-                if let Some(Contact {
-                    contact_in_local,
-                    state: contact_state,
-                }) = c
-                {
-                    let stiction_d = d * stiction_factor;
-                    let stiction_d2 = stiction_d * stiction_d;
-                    if p_local.distance_squared(*contact_in_local) > stiction_d2 {
-                        let delta = p_local - *contact_in_local;
-                        p_local -= delta * (stiction_d * delta.length_recip());
-                        let pt = na::Point3::new(p_local.x, p_local.y, p_local.z);
-                        let proj = collider.shape.project_local_point(&pt, false);
-                        if proj.is_inside {
-                            p_local = vec3(proj.point.x, proj.point.y, proj.point.z);
-                        }
-                        *contact_in_local = p_local;
-                        *contact_state = ContactState::Sliding;
-                    } else {
-                        p_local = *contact_in_local;
-                        *contact_state = ContactState::Sticking;
-                    }
-                } else {
-                    *c = Some(Contact {
-                        contact_in_local: p_local,
-                        state: ContactState::New,
-                    });
-                }
-                let pt = m.transform_point(&na::Point3::new(p_local.x, p_local.y, p_local.z));
-                *p_global = vec3(pt.x, pt.y, pt.z);
-            }
-        }
-    }
 }
 
 fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamError> {
@@ -409,7 +342,7 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[
         )]),
         render_context,
     );
-    update_mesh(&mesh, render_context, &points);
+    update_mesh(&mesh, render_context, points);
     let local_transform = LocalTransform {
         translation: [0., 0., 0.].into(),
         ..Default::default()
