@@ -206,7 +206,7 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
     let acc = vec3(0.0, -9.82, 0.0);
     let particle_mass: f32 = tweak!(0.01);
     let shape_compliance = tweak!(0.0000); // Inverse of physics stiffness
-    let stiction_factor = tweak!(1.5); // Maximum tangential correction per correction along normal.
+    let stiction_factor = tweak!(1.3); // Maximum tangential correction per correction along normal.
 
     // Update velocities
     for vel in &mut state.velocities {
