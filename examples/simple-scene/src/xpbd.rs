@@ -1,5 +1,4 @@
 use hotham::glam::Vec3;
-use inline_tweak::tweak;
 use nalgebra::{self, Matrix3, Vector3};
 
 use crate::utils::grid;
@@ -21,6 +20,7 @@ pub struct Contact {
 }
 
 pub fn create_points(center: Vec3, size: Vec3, nx: usize, ny: usize, nz: usize) -> Vec<Vec3> {
+    puffin::profile_function!();
     let half_size = size * 0.5;
     grid(center - half_size, center + half_size, nx, ny, nz).collect::<Vec<_>>()
 }
@@ -31,6 +31,7 @@ pub fn create_shape_constraints(
     ny: usize,
     nz: usize,
 ) -> Vec<ShapeConstraint> {
+    puffin::profile_function!();
     let mut constraints = Vec::<ShapeConstraint>::with_capacity(
         nx * ny * (nz - 1) + nx * (ny - 1) * nz + (nx - 1) * ny * nz,
     );
@@ -76,6 +77,7 @@ pub fn resolve_collisions(
     points_next: &mut Vec<Vec3>,
     active_collisions: &mut Vec<Option<Contact>>,
 ) {
+    puffin::profile_function!();
     let inner_r = 1.0;
     let inner_r2 = inner_r * inner_r;
     let outer_r = 5.0;
@@ -166,6 +168,7 @@ pub fn resolve_shape_matching_constraints(
     inv_particle_mass: f32,
     dt: f32,
 ) {
+    puffin::profile_function!();
     let shape_compliance_per_dt2 = shape_compliance / (dt * dt);
     for ShapeConstraint(ips, template_shape, a_qq_inv) in shape_constraints {
         let mean: Vector3<f32> = ips

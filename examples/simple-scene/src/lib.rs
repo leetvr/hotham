@@ -98,6 +98,24 @@ fn create_default_points() -> Vec<Vec3> {
     )
 }
 
+pub fn start_puffin_server() {
+    puffin::set_scopes_on(true); // Tell puffin to collect data
+
+    match puffin_http::Server::new("0.0.0.0:8585") {
+        Ok(puffin_server) => {
+            eprintln!("Run:  cargo install puffin_viewer && puffin_viewer --url 127.0.0.1:8585");
+
+            // We can store the server if we want, but in this case we just want
+            // it to keep running. Dropping it closes the server, so let's not drop it!
+            #[allow(clippy::mem_forget)]
+            std::mem::forget(puffin_server);
+        }
+        Err(err) => {
+            eprintln!("Failed to start puffin server: {}", err);
+        }
+    };
+}
+
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
     println!("[HOTHAM_SIMPLE_SCENE] MAIN!");
@@ -106,11 +124,13 @@ pub fn main() {
 }
 
 pub fn real_main() -> HothamResult<()> {
+    start_puffin_server();
     let mut engine = Engine::new();
     let mut state = Default::default();
     init(&mut engine, &mut state)?;
 
     while let Ok(tick_data) = engine.update() {
+        puffin::GlobalProfiler::lock().new_frame();
         tick(tick_data, &mut engine, &mut state);
         engine.finish()?;
     }
@@ -119,6 +139,7 @@ pub fn real_main() -> HothamResult<()> {
 }
 
 fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
+    puffin::profile_function!();
     let time_now = Instant::now();
     let time_passed = time_now.saturating_duration_since(state.wall_time);
     state.wall_time = time_now;
@@ -156,6 +177,7 @@ struct XpbdCollisions {
 }
 
 fn xpbd_system(engine: &mut Engine, state: &mut State) {
+    puffin::profile_function!();
     let dt = tweak!(0.004);
 
     let mut command_buffer = hecs::CommandBuffer::new();
@@ -180,6 +202,7 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
 }
 
 fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
+    puffin::profile_function!();
     let acc = vec3(0.0, -9.82, 0.0);
     let particle_mass: f32 = tweak!(0.01);
     let shape_compliance = tweak!(0.0000); // Inverse of physics stiffness

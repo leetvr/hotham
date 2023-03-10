@@ -16,6 +16,8 @@ hotham = { path = "../../hotham" }
 hotham-examples = { path = "../shared" }
 inline_tweak = "1.0.8"
 nalgebra = { version = "0.32.1", features = ["convert-glam021"] }
+puffin = "0.14.3"
+puffin_http = "0.11.1"
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.6"
