@@ -235,6 +235,24 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
     );
 
     // Resolve collisions
+    resolve_ecs_collisions(world, &mut points_next, stiction_factor);
+
+    // Update velocities
+    {
+        puffin::profile_scope!("update_velocities");
+
+        state.velocities = points_next
+            .iter()
+            .zip(&state.points_curr)
+            .map(|(&next, &curr)| (next - curr) / dt)
+            .collect::<Vec<_>>();
+    }
+
+    state.points_curr = points_next;
+}
+
+fn resolve_ecs_collisions(world: &mut World, points_next: &mut Vec<Vec3>, stiction_factor: f32) {
+    puffin::profile_function!();
     for (_, (transform, collider, collisions)) in world
         .query_mut::<(Option<&GlobalTransform>, &Collider, &mut XpbdCollisions)>()
         .into_iter()
@@ -289,15 +307,6 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
             }
         }
     }
-
-    // Update velocities
-    state.velocities = points_next
-        .iter()
-        .zip(&state.points_curr)
-        .map(|(&next, &curr)| (next - curr) / dt)
-        .collect::<Vec<_>>();
-
-    state.points_curr = points_next;
 }
 
 fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamError> {
