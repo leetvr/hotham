@@ -219,7 +219,7 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
     // Resolve shape matching constraints
     resolve_shape_matching_constraints(
         &mut points_next,
-        &state.shape_constraints,
+        &mut state.shape_constraints,
         shape_compliance,
         particle_mass.recip(),
         dt,

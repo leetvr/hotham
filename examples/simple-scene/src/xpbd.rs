@@ -1,10 +1,16 @@
 use hotham::glam::Vec3;
-use nalgebra::{self, Matrix3, Vector3};
+use inline_tweak::tweak;
+use nalgebra::{self, Matrix3, Unit, UnitQuaternion, Vector3};
 
 use crate::utils::grid;
 
 #[derive(Clone)]
-pub struct ShapeConstraint(Vec<usize>, Vec<Vector3<f32>>, Matrix3<f32>);
+pub struct ShapeConstraint {
+    point_indices: Vec<usize>,
+    template_shape: Vec<Vector3<f32>>,
+    a_qq_inv: Matrix3<f32>,
+    cached_rot: UnitQuaternion<f32>,
+}
 
 pub fn create_points(center: Vec3, size: Vec3, nx: usize, ny: usize, nz: usize) -> Vec<Vec3> {
     puffin::profile_function!();
@@ -53,7 +59,12 @@ pub fn create_shape_constraints(
                     .fold(Matrix3::zeros(), |acc, q| acc + q * q.transpose())
                     .try_inverse()
                     .unwrap();
-                constraints.push(ShapeConstraint(ips.to_vec(), shape, a_qq_inv));
+                constraints.push(ShapeConstraint {
+                    point_indices: ips.to_vec(),
+                    template_shape: shape,
+                    a_qq_inv,
+                    cached_rot: Default::default(),
+                });
             }
         }
     }
@@ -76,14 +87,22 @@ pub fn create_shape_constraints(
 // ∆𝐱ᵢ = λ 𝑤ᵢ∇𝐶ᵢ
 pub fn resolve_shape_matching_constraints(
     points_next: &mut [Vec3],
-    shape_constraints: &[ShapeConstraint],
+    shape_constraints: &mut [ShapeConstraint],
     shape_compliance: f32,
     inv_particle_mass: f32,
     dt: f32,
 ) {
     puffin::profile_function!();
+    let max_iter = tweak!(4);
+    let eps = tweak!(1.0e-8);
     let shape_compliance_per_dt2 = shape_compliance / (dt * dt);
-    for ShapeConstraint(ips, template_shape, a_qq_inv) in shape_constraints {
+    for ShapeConstraint {
+        point_indices: ips,
+        template_shape,
+        a_qq_inv,
+        cached_rot,
+    } in shape_constraints
+    {
         let mean: Vector3<f32> = ips
             .iter()
             .map(|&ip| Vector3::from(points_next[ip]))
@@ -92,14 +111,10 @@ pub fn resolve_shape_matching_constraints(
         let a_pq = ips
             .iter()
             .map(|&ip| Vector3::from(points_next[ip]) - mean)
-            .zip(template_shape)
+            .zip(template_shape.iter())
             .fold(Matrix3::zeros(), |acc, (p, q)| acc + p * q.transpose());
-        let mut svd = (a_pq * a_qq_inv).svd(true, true);
-        svd.singular_values[0] = 1.0;
-        svd.singular_values[1] = 1.0;
-        svd.singular_values[2] =
-            (svd.u.unwrap().determinant() * svd.v_t.unwrap().determinant()).signum();
-        let rot = svd.recompose().unwrap();
+        extract_rotation(&(a_pq * *a_qq_inv), cached_rot, max_iter, eps);
+        let rot = cached_rot.to_rotation_matrix();
         for (i, ip) in ips.iter().enumerate() {
             let goal = Vec3::from(mean + rot * template_shape[i]);
             let delta = points_next[*ip] - goal;
@@ -108,4 +123,28 @@ pub fn resolve_shape_matching_constraints(
             points_next[*ip] += correction;
         }
     }
+}
+
+// nalgebra has a similar implementation in UnitQuaternion::<f32>::from_matrix_eps but this is simpler and faster!
+fn extract_rotation(a: &Matrix3<f32>, q: &mut UnitQuaternion<f32>, max_iter: usize, eps: f32) {
+    // puffin::profile_function!();
+    for _iter in 0..max_iter {
+        let r = q.to_rotation_matrix();
+        let r = r.matrix();
+        let omega = (r.column(0).cross(&a.column(0))
+            + r.column(1).cross(&a.column(1))
+            + r.column(2).cross(&a.column(2)))
+            * (1.0
+                / (r.column(0).dot(&a.column(0))
+                    + r.column(1).dot(&a.column(1))
+                    + r.column(2).dot(&a.column(2)))
+                .abs()
+                + 1.0e-9);
+        let (omega, w) = Unit::new_and_get(omega);
+        if w < eps {
+            break;
+        }
+        *q = UnitQuaternion::<f32>::from_axis_angle(&omega, w) * *q;
+    }
+    q.renormalize();
 }
