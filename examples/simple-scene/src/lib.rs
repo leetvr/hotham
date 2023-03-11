@@ -167,9 +167,27 @@ fn simulation_reset_system(input_context: &InputContext, state: &mut State) {
     }
 }
 
+struct SimulationParams {
+    dt: f32,
+    acc: Vec3,
+    particle_mass: f32,
+    shape_compliance: f32, // Inverse of physics stiffness
+    stiction_factor: f32,  // Maximum tangential correction per correction along normal.
+}
+
 fn xpbd_system(engine: &mut Engine, state: &mut State) {
     puffin::profile_function!();
-    let dt = tweak!(0.001);
+    let simulation_params = {
+        puffin::profile_scope!("simulation params");
+        SimulationParams {
+            dt: tweak!(0.001),
+            acc: vec3(0.0, -9.82, 0.0),
+            particle_mass: tweak!(0.01),
+            shape_compliance: tweak!(0.00001), // Inverse of physics stiffness
+            stiction_factor: tweak!(1.3), // Maximum tangential correction per correction along normal.
+        }
+    };
+    let dt = simulation_params.dt;
 
     let mut command_buffer = hecs::CommandBuffer::new();
 
@@ -188,29 +206,40 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
     let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
     while state.simulation_time_hound + timestep < state.simulation_time_hare {
         state.simulation_time_hound += timestep;
-        xpbd_substep(&mut engine.world, state, dt);
+        xpbd_substep(&mut engine.world, state, &simulation_params);
     }
 }
 
-fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
+fn xpbd_substep(
+    world: &mut World,
+    state: &mut State,
+    &SimulationParams {
+        dt,
+        acc,
+        particle_mass,
+        shape_compliance,
+        stiction_factor,
+    }: &SimulationParams,
+) {
     puffin::profile_function!();
-    let acc = vec3(0.0, -9.82, 0.0);
-    let particle_mass: f32 = tweak!(0.01);
-    let shape_compliance = tweak!(0.00001); // Inverse of physics stiffness
-    let stiction_factor = tweak!(1.3); // Maximum tangential correction per correction along normal.
-
-    // Update velocities
-    for vel in &mut state.velocities {
-        *vel += acc * dt;
+    // Apply external forces
+    {
+        puffin::profile_scope!("Apply external forces");
+        for vel in &mut state.velocities {
+            *vel += acc * dt;
+        }
     }
 
     // Predict new positions
-    let mut points_next = state
-        .points_curr
-        .iter()
-        .zip(&state.velocities)
-        .map(|(&curr, &vel)| curr + vel * dt)
-        .collect::<Vec<_>>();
+    let mut points_next = {
+        puffin::profile_scope!("Predict new positions");
+        state
+            .points_curr
+            .iter()
+            .zip(&state.velocities)
+            .map(|(&curr, &vel)| curr + vel * dt)
+            .collect::<Vec<_>>()
+    };
 
     // resolve_collisions(&mut points_next, &mut state.active_collisions);
 
@@ -231,7 +260,6 @@ fn xpbd_substep(world: &mut World, state: &mut State, dt: f32) {
     // Update velocities
     {
         puffin::profile_scope!("update_velocities");
-
         state.velocities = points_next
             .iter()
             .zip(&state.points_curr)
