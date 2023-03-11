@@ -1,4 +1,4 @@
-use hotham::glam::{vec3, Mat3, Vec3};
+use hotham::glam::{mat3, vec3, Vec3};
 use inline_tweak::tweak;
 use nalgebra::{self, Matrix3, Unit, UnitQuaternion, Vector3};
 
@@ -171,22 +171,28 @@ pub fn damping_of_shape_matching_constraints(
             .fold(Vec3::ZERO, |acc, v| acc + v)
             / ips.len() as f32;
         let mut angular_momentum = Vec3::ZERO;
-        let mut angular_mass = Mat3::ZERO;
+        let mut acc_rx2 = 0.0;
+        let mut acc_ry2 = 0.0;
+        let mut acc_rz2 = 0.0;
+        let mut acc_rxy = 0.0;
+        let mut acc_rxz = 0.0;
+        let mut acc_ryz = 0.0;
         for &ip in ips {
             let r = points[ip] - mean_pos;
             let v = velocities[ip];
             angular_momentum += r.cross(v);
-            let mat_r_tr = Mat3::from_cols(
-                vec3(0.0, -r.z, r.y), //
-                vec3(r.z, 0.0, -r.x), //
-                vec3(-r.y, r.x, 0.0), //
-            );
-            angular_mass += mat_r_tr.transpose() * mat_r_tr;
-
-            // x: 0.0 * v.x    - r.z * v.y   + r.y * v.z,
-            // y: r.z * v.x    + 0.0 * v.y   - r.x * v.z,
-            // z: -r.y * v.x   + r.x * v.y   + 0.0 * v.z,
+            acc_rx2 += r.x * r.x;
+            acc_ry2 += r.y * r.y;
+            acc_rz2 += r.z * r.z;
+            acc_rxy += r.x * r.y;
+            acc_rxz += r.x * r.z;
+            acc_ryz += r.y * r.z;
         }
+        let angular_mass = mat3(
+            vec3(acc_ry2 + acc_rz2, -acc_rxy, -acc_rxz),
+            vec3(-acc_rxy, acc_rz2 + acc_rx2, -acc_ryz),
+            vec3(-acc_rxz, -acc_ryz, acc_rx2 + acc_ry2),
+        );
         let angular_velocity = angular_mass.inverse() * angular_momentum;
         for &ip in ips {
             let r = points[ip] - mean_pos;
