@@ -1,5 +1,4 @@
 use hotham::glam::{mat3, vec3, Vec3};
-use inline_tweak::tweak;
 use nalgebra::{self, Matrix3, Unit, UnitQuaternion, Vector3};
 
 use crate::utils::grid;
@@ -90,9 +89,8 @@ pub fn resolve_shape_matching_constraints(
     dt: f32,
 ) {
     puffin::profile_function!();
-    // TODO: Move or remove these tweaks because they impact performance!
-    let max_iter = tweak!(4);
-    let eps = tweak!(1.0e-8);
+    const MAX_ITER: usize = 4;
+    const EPS: f32 = 1.0e-8;
     let shape_compliance_per_dt2 = shape_compliance / (dt * dt);
     for ShapeConstraint {
         point_indices: ips,
@@ -111,7 +109,7 @@ pub fn resolve_shape_matching_constraints(
             .map(|&ip| Vector3::from(points_next[ip]) - mean)
             .zip(template_shape.iter())
             .fold(Matrix3::zeros(), |acc, (p, q)| acc + p * q.transpose());
-        extract_rotation(&(a_pq * *a_qq_inv), cached_rot, max_iter, eps);
+        extract_rotation(&(a_pq * *a_qq_inv), cached_rot, MAX_ITER, EPS);
         let rot = cached_rot.to_rotation_matrix();
         for (i, ip) in ips.iter().enumerate() {
             let goal = Vec3::from(mean + rot * template_shape[i]);
