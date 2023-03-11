@@ -6,8 +6,8 @@ use crate::utils::grid;
 
 #[derive(Clone)]
 pub struct ShapeConstraint {
-    point_indices: Vec<usize>,
-    template_shape: Vec<Vector3<f32>>,
+    point_indices: [usize; 8],
+    template_shape: [Vector3<f32>; 8],
     a_qq_inv: Matrix3<f32>,
     cached_rot: UnitQuaternion<f32>,
 }
@@ -50,17 +50,14 @@ pub fn create_shape_constraints(
                     .map(|&ip| Vector3::from(points[ip]))
                     .fold(Vector3::zeros(), |acc, p| acc + p)
                     / ips.len() as f32;
-                let shape: Vec<Vector3<f32>> = ips
-                    .iter()
-                    .map(|&ip| Vector3::from(points[ip]) - mean)
-                    .collect();
+                let shape = ips.map(|ip| Vector3::from(points[ip]) - mean);
                 let a_qq_inv = shape
                     .iter()
                     .fold(Matrix3::zeros(), |acc, q| acc + q * q.transpose())
                     .try_inverse()
                     .unwrap();
                 constraints.push(ShapeConstraint {
-                    point_indices: ips.to_vec(),
+                    point_indices: ips,
                     template_shape: shape,
                     a_qq_inv,
                     cached_rot: Default::default(),
