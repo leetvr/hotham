@@ -1,6 +1,7 @@
 mod utils;
 mod xpbd_collisions;
 mod xpbd_shape_constraints;
+mod xpbd_substep;
 
 use std::time::{Duration, Instant};
 
@@ -31,14 +32,12 @@ use hotham::{
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
-use xpbd_collisions::{resolve_ecs_collisions, Contact};
-use xpbd_shape_constraints::{
-    create_points, create_shape_constraints, resolve_shape_matching_constraints, ShapeConstraint,
-};
+use xpbd_collisions::Contact;
+use xpbd_collisions::XpbdCollisions;
+use xpbd_shape_constraints::{create_points, create_shape_constraints, ShapeConstraint};
+use xpbd_substep::xpbd_substep;
 
-use crate::{
-    xpbd_collisions::XpbdCollisions, xpbd_shape_constraints::damping_of_shape_matching_constraints,
-};
+use crate::xpbd_substep::SimulationParams;
 
 const NX: usize = 10;
 const NY: usize = 10;
@@ -169,15 +168,6 @@ fn simulation_reset_system(input_context: &InputContext, state: &mut State) {
     }
 }
 
-struct SimulationParams {
-    dt: f32,
-    acc: Vec3,
-    particle_mass: f32,
-    shape_compliance: f32, // Inverse of physical stiffness
-    shape_damping: f32,    // Linear damping towards rigid body motion, fraction of speed per second
-    stiction_factor: f32,  // Maximum tangential correction per correction along normal.
-}
-
 fn xpbd_system(engine: &mut Engine, state: &mut State) {
     puffin::profile_function!();
     let simulation_params = {
@@ -210,77 +200,14 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
     let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
     while state.simulation_time_hound + timestep < state.simulation_time_hare {
         state.simulation_time_hound += timestep;
-        xpbd_substep(&mut engine.world, state, &simulation_params);
+        xpbd_substep(
+            &mut engine.world,
+            &mut state.velocities,
+            &mut state.points_curr,
+            &mut state.shape_constraints,
+            &simulation_params,
+        );
     }
-}
-
-fn xpbd_substep(
-    world: &mut World,
-    state: &mut State,
-    &SimulationParams {
-        dt,
-        acc,
-        particle_mass,
-        shape_compliance,
-        shape_damping,
-        stiction_factor,
-    }: &SimulationParams,
-) {
-    puffin::profile_function!();
-    // Apply external forces
-    {
-        puffin::profile_scope!("Apply external forces");
-        for vel in &mut state.velocities {
-            *vel += acc * dt;
-        }
-    }
-
-    // Predict new positions
-    let mut points_next = {
-        puffin::profile_scope!("Predict new positions");
-        state
-            .points_curr
-            .iter()
-            .zip(&state.velocities)
-            .map(|(&curr, &vel)| curr + vel * dt)
-            .collect::<Vec<_>>()
-    };
-
-    // resolve_collisions(&mut points_next, &mut state.active_collisions);
-
-    // TODO: Resolve distance constraints
-
-    // Resolve shape matching constraints
-    resolve_shape_matching_constraints(
-        &mut points_next,
-        &mut state.shape_constraints,
-        shape_compliance,
-        particle_mass.recip(),
-        dt,
-    );
-
-    // Resolve collisions
-    resolve_ecs_collisions(world, &mut points_next, stiction_factor);
-
-    // Update velocities
-    {
-        puffin::profile_scope!("update_velocities");
-        state.velocities = points_next
-            .iter()
-            .zip(&state.points_curr)
-            .map(|(&next, &curr)| (next - curr) / dt)
-            .collect::<Vec<_>>();
-    }
-
-    damping_of_shape_matching_constraints(
-        &points_next,
-        &mut state.velocities,
-        &state.shape_constraints,
-        shape_damping,
-        dt,
-    );
-
-    state.points_curr = points_next;
 }
 
 fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamError> {
