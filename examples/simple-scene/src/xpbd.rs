@@ -1,4 +1,4 @@
-use hotham::glam::Vec3;
+use hotham::glam::{vec3, Mat3, Vec3};
 use inline_tweak::tweak;
 use nalgebra::{self, Matrix3, Unit, UnitQuaternion, Vector3};
 
@@ -90,6 +90,7 @@ pub fn resolve_shape_matching_constraints(
     dt: f32,
 ) {
     puffin::profile_function!();
+    // TODO: Move or remove these tweaks because they impact performance!
     let max_iter = tweak!(4);
     let eps = tweak!(1.0e-8);
     let shape_compliance_per_dt2 = shape_compliance / (dt * dt);
@@ -144,4 +145,54 @@ fn extract_rotation(a: &Matrix3<f32>, q: &mut UnitQuaternion<f32>, max_iter: usi
         *q = UnitQuaternion::<f32>::from_axis_angle(&omega, w) * *q;
     }
     q.renormalize();
+}
+
+pub fn damping_of_shape_matching_constraints(
+    points: &[Vec3],
+    velocities: &mut [Vec3],
+    shape_constraints: &[ShapeConstraint],
+    shape_damping: f32,
+    dt: f32,
+) {
+    puffin::profile_function!();
+    let shape_damping_times_dt = (shape_damping * dt).min(1.0);
+    for ShapeConstraint {
+        point_indices: ips, ..
+    } in shape_constraints
+    {
+        let mean_pos: Vec3 = ips
+            .iter()
+            .map(|&ip| points[ip])
+            .fold(Vec3::ZERO, |acc, p| acc + p)
+            / ips.len() as f32;
+        let mean_vel: Vec3 = ips
+            .iter()
+            .map(|&ip| velocities[ip])
+            .fold(Vec3::ZERO, |acc, v| acc + v)
+            / ips.len() as f32;
+        let mut angular_momentum = Vec3::ZERO;
+        let mut angular_mass = Mat3::ZERO;
+        for &ip in ips {
+            let r = points[ip] - mean_pos;
+            let v = velocities[ip];
+            angular_momentum += r.cross(v);
+            let mat_r_tr = Mat3::from_cols(
+                vec3(0.0, -r.z, r.y), //
+                vec3(r.z, 0.0, -r.x), //
+                vec3(-r.y, r.x, 0.0), //
+            );
+            angular_mass += mat_r_tr.transpose() * mat_r_tr;
+
+            // x: 0.0 * v.x    - r.z * v.y   + r.y * v.z,
+            // y: r.z * v.x    + 0.0 * v.y   - r.x * v.z,
+            // z: -r.y * v.x   + r.x * v.y   + 0.0 * v.z,
+        }
+        let angular_velocity = angular_mass.inverse() * angular_momentum;
+        for &ip in ips {
+            let r = points[ip] - mean_pos;
+            let v_bar = mean_vel + angular_velocity.cross(r);
+            let v = &mut velocities[ip];
+            *v += shape_damping_times_dt * (v_bar - *v);
+        }
+    }
 }

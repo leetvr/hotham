@@ -36,7 +36,7 @@ use xpbd::{
 };
 use xpbd_collisions::{resolve_ecs_collisions, Contact};
 
-use crate::xpbd_collisions::XpbdCollisions;
+use crate::{xpbd::damping_of_shape_matching_constraints, xpbd_collisions::XpbdCollisions};
 
 const NX: usize = 10;
 const NY: usize = 10;
@@ -171,7 +171,8 @@ struct SimulationParams {
     dt: f32,
     acc: Vec3,
     particle_mass: f32,
-    shape_compliance: f32, // Inverse of physics stiffness
+    shape_compliance: f32, // Inverse of physical stiffness
+    shape_damping: f32,    // Linear damping towards rigid body motion, fraction of speed per second
     stiction_factor: f32,  // Maximum tangential correction per correction along normal.
 }
 
@@ -183,7 +184,8 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
             dt: tweak!(0.001),
             acc: vec3(0.0, -9.82, 0.0),
             particle_mass: tweak!(0.01),
-            shape_compliance: tweak!(0.00001), // Inverse of physics stiffness
+            shape_compliance: tweak!(0.00001), // Inverse of physical stiffness
+            shape_damping: tweak!(100.0), // Linear damping towards rigid body motion, fraction of speed per second
             stiction_factor: tweak!(1.3), // Maximum tangential correction per correction along normal.
         }
     };
@@ -218,6 +220,7 @@ fn xpbd_substep(
         acc,
         particle_mass,
         shape_compliance,
+        shape_damping,
         stiction_factor,
     }: &SimulationParams,
 ) {
@@ -266,6 +269,14 @@ fn xpbd_substep(
             .map(|(&next, &curr)| (next - curr) / dt)
             .collect::<Vec<_>>();
     }
+
+    damping_of_shape_matching_constraints(
+        &points_next,
+        &mut state.velocities,
+        &state.shape_constraints,
+        shape_damping,
+        dt,
+    );
 
     state.points_curr = points_next;
 }
