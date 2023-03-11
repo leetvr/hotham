@@ -1,6 +1,6 @@
 mod utils;
-mod xpbd;
 mod xpbd_collisions;
+mod xpbd_shape_constraints;
 
 use std::time::{Duration, Instant};
 
@@ -31,12 +31,14 @@ use hotham::{
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
-use xpbd::{
+use xpbd_collisions::{resolve_ecs_collisions, Contact};
+use xpbd_shape_constraints::{
     create_points, create_shape_constraints, resolve_shape_matching_constraints, ShapeConstraint,
 };
-use xpbd_collisions::{resolve_ecs_collisions, Contact};
 
-use crate::{xpbd::damping_of_shape_matching_constraints, xpbd_collisions::XpbdCollisions};
+use crate::{
+    xpbd_collisions::XpbdCollisions, xpbd_shape_constraints::damping_of_shape_matching_constraints,
+};
 
 const NX: usize = 10;
 const NY: usize = 10;
