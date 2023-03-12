@@ -1,4 +1,6 @@
+mod audio_player;
 mod utils;
+mod xpbd_audio_bridge;
 mod xpbd_collisions;
 mod xpbd_shape_constraints;
 mod xpbd_substep;
@@ -32,6 +34,8 @@ use hotham::{
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
+use nalgebra::DVector;
+use xpbd_audio_bridge::AudioState;
 use xpbd_collisions::Contact;
 use xpbd_collisions::XpbdCollisions;
 use xpbd_shape_constraints::{create_points, create_shape_constraints, ShapeConstraint};
@@ -43,20 +47,21 @@ const NX: usize = 10;
 const NY: usize = 10;
 const NZ: usize = 10;
 
-#[derive(Clone)]
 /// Most Hotham applications will want to keep track of some sort of state.
 /// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
 /// this is something you'd probably want to do!
 struct State {
     points_curr: Vec<Vec3>,
-    shape_constraints: Vec<ShapeConstraint>,
     velocities: Vec<Vec3>,
+    shape_constraints: Vec<ShapeConstraint>,
+    audio_emitter_indices: Vec<usize>,
     wall_time: Instant,
     simulation_time_epoch: Instant,
     simulation_time_hare: Instant,
     simulation_time_hound: Instant,
     mesh: Option<Mesh>,
     navigation: NavigationState,
+    audio_state: AudioState,
 }
 
 impl Default for State {
@@ -70,16 +75,37 @@ impl Default for State {
         let wall_time = Instant::now();
         let simulation_time_epoch = wall_time;
 
+        // Pick the corners as audio emitters
+        let ix1 = 0;
+        let ix2 = NX - 1;
+        let iy1 = 0;
+        let iy2 = NY - 1;
+        let iz1 = 0;
+        let iz2 = NX - 1;
+
+        let audio_emitter_indices = vec![
+            iz1 * NX * NY + iy1 * NX + ix1,
+            iz1 * NX * NY + iy1 * NX + ix2,
+            iz1 * NX * NY + iy2 * NX + ix1,
+            iz1 * NX * NY + iy2 * NX + ix2,
+            iz2 * NX * NY + iy1 * NX + ix1,
+            iz2 * NX * NY + iy1 * NX + ix2,
+            iz2 * NX * NY + iy2 * NX + ix1,
+            iz2 * NX * NY + iy2 * NX + ix2,
+        ];
+
         State {
             points_curr,
-            shape_constraints,
             velocities,
+            shape_constraints,
+            audio_emitter_indices,
             simulation_time_hare: simulation_time_epoch,
             simulation_time_hound: simulation_time_epoch,
             wall_time,
             simulation_time_epoch,
             mesh,
             navigation: Default::default(),
+            audio_state: AudioState::init_audio(audio_emitter_indices.len()).unwrap(),
         }
     }
 }
@@ -207,6 +233,38 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
             &mut state.shape_constraints,
             &simulation_params,
         );
+        send_xpbd_state_to_audio(
+            &state.points_curr,
+            &state.velocities,
+            &state.audio_emitter_indices,
+            &mut state.audio_state,
+        );
+    }
+}
+
+fn send_xpbd_state_to_audio(
+    points_curr: &[Vec3],
+    velocities: &[Vec3],
+    audio_emitter_indices: &[usize],
+    audio_state: &mut AudioState,
+) {
+    let num_emitters = audio_emitter_indices.len();
+    let mut state_vector = DVector::<f32>::zeros(num_emitters * 3 * 2);
+    for (i, &ip) in audio_emitter_indices.iter().enumerate() {
+        state_vector[i * 3] = points_curr[i].x;
+        state_vector[i * 3 + 1] = points_curr[i].y;
+        state_vector[i * 3 + 2] = points_curr[i].z;
+        state_vector[(num_emitters + i) * 3] = velocities[i].x;
+        state_vector[(num_emitters + i) * 3 + 1] = velocities[i].y;
+        state_vector[(num_emitters + i) * 3 + 2] = velocities[i].z;
+    }
+    // Get old states from the audio thread and drop them here to avoid deallocating memory in the audio thread.
+    audio_state.to_audio_producer.push(state_vector);
+    loop {
+        if let Ok(_) = audio_state.to_ui_consumer.pop() {
+        } else {
+            break;
+        }
     }
 }
 
