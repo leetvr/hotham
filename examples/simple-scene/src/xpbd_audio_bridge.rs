@@ -64,7 +64,7 @@ impl AudioState {
                         );
                         index_of_newest = write_index;
                         num_states_recorded = SAMPLES_IN_BUFFER.min(num_states_recorded + 1);
-                        latest_audio_sample_timestamp = message.simulation_time;
+                        latest_simulation_timestamp += simulation_timestep;
                         // Send the message back to avoid deallocating it in this thread.
                         let _ = to_ui_producer.push(message);
                     }
