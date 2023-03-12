@@ -262,12 +262,12 @@ fn send_xpbd_state_to_audio(
     let num_emitters = audio_emitter_indices.len();
     let mut state_vector = DVector::<f32>::zeros(num_emitters * 3 * 2);
     for (i, &ip) in audio_emitter_indices.iter().enumerate() {
-        state_vector[i * 3] = points_curr[i].x;
-        state_vector[i * 3 + 1] = points_curr[i].y;
-        state_vector[i * 3 + 2] = points_curr[i].z;
-        state_vector[(num_emitters + i) * 3] = velocities[i].x;
-        state_vector[(num_emitters + i) * 3 + 1] = velocities[i].y;
-        state_vector[(num_emitters + i) * 3 + 2] = velocities[i].z;
+        state_vector[i * 3] = points_curr[ip].x;
+        state_vector[i * 3 + 1] = points_curr[ip].y;
+        state_vector[i * 3 + 2] = points_curr[ip].z;
+        state_vector[(num_emitters + i) * 3] = velocities[ip].x;
+        state_vector[(num_emitters + i) * 3 + 1] = velocities[ip].y;
+        state_vector[(num_emitters + i) * 3 + 2] = velocities[ip].z;
     }
     // Get old states from the audio thread and drop them here to avoid deallocating memory in the audio thread.
     audio_state
