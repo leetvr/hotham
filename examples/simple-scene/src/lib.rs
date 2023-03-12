@@ -35,7 +35,7 @@ use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
 use nalgebra::DVector;
-use xpbd_audio_bridge::AudioState;
+use xpbd_audio_bridge::{AudioSimulationUpdate, AudioState};
 use xpbd_collisions::Contact;
 use xpbd_collisions::XpbdCollisions;
 use xpbd_shape_constraints::{create_points, create_shape_constraints, ShapeConstraint};
@@ -93,6 +93,7 @@ impl Default for State {
             iz2 * NX * NY + iy2 * NX + ix1,
             iz2 * NX * NY + iy2 * NX + ix2,
         ];
+        let num_points = audio_emitter_indices.len();
 
         State {
             points_curr,
@@ -105,7 +106,7 @@ impl Default for State {
             simulation_time_epoch,
             mesh,
             navigation: Default::default(),
-            audio_state: AudioState::init_audio(audio_emitter_indices.len()).unwrap(),
+            audio_state: AudioState::init_audio(num_points, simulation_time_epoch).unwrap(),
         }
     }
 }
@@ -237,6 +238,7 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
             &state.points_curr,
             &state.velocities,
             &state.audio_emitter_indices,
+            state.simulation_time_hound,
             &mut state.audio_state,
         );
     }
@@ -246,6 +248,7 @@ fn send_xpbd_state_to_audio(
     points_curr: &[Vec3],
     velocities: &[Vec3],
     audio_emitter_indices: &[usize],
+    simulation_time: Instant,
     audio_state: &mut AudioState,
 ) {
     let num_emitters = audio_emitter_indices.len();
@@ -259,10 +262,15 @@ fn send_xpbd_state_to_audio(
         state_vector[(num_emitters + i) * 3 + 2] = velocities[i].z;
     }
     // Get old states from the audio thread and drop them here to avoid deallocating memory in the audio thread.
-    audio_state.to_audio_producer.push(state_vector);
+    audio_state
+        .to_audio_producer
+        .push(AudioSimulationUpdate {
+            state_vector,
+            simulation_time,
+        })
+        .unwrap();
     loop {
-        if let Ok(_) = audio_state.to_ui_consumer.pop() {
-        } else {
+        if audio_state.to_ui_consumer.pop().is_err() {
             break;
         }
     }
