@@ -33,7 +33,7 @@ impl AudioState {
         const SPEED_OF_SOUND: f32 = 343.0;
         const SIMULATION_RATE: f32 = 1000.0;
         let simulation_timestep = Duration::from_secs_f32(1.0 / SIMULATION_RATE);
-        let mut normal_audio_delay = Duration::from_millis(15);
+        let normal_audio_delay = Duration::from_millis(15);
 
         let mut state_history = DMatrix::<f32>::zeros(num_points * 3 * 2, SAMPLES_IN_BUFFER);
         let mut acc_history = DMatrix::<f32>::zeros(num_points * 3, SAMPLES_IN_BUFFER);
@@ -41,7 +41,7 @@ impl AudioState {
         let mut num_states_recorded: usize = 1;
         let mut latest_audio_sample_timestamp = simulation_time;
         let mut latest_simulation_timestamp = simulation_time;
-        let mut normal_time_per_audio_sample = Duration::from_secs_f32(1.0 / player_sample_rate);
+        let normal_time_per_audio_sample = Duration::from_secs_f32(1.0 / player_sample_rate);
         audio_player.play_audio(Box::new(
             move |update_state: bool, listener_pos: Point3<f32>| {
                 if update_state {
@@ -73,6 +73,13 @@ impl AudioState {
                     {
                         latest_audio_sample_timestamp += normal_time_per_audio_sample;
                     }
+                    // Skip ahead if we are too far back
+                    if latest_audio_sample_timestamp + 2 * normal_audio_delay
+                        < latest_simulation_timestamp
+                    {
+                        latest_audio_sample_timestamp =
+                            latest_simulation_timestamp - normal_audio_delay;
+                    }
                 }
                 // Traverse history to find the waves that are contributing to what the listener should be hearing right now.
                 puffin::profile_scope!("compute_audio_sample");
@@ -89,10 +96,9 @@ impl AudioState {
                             y[point_pos_loc + 2] - listener_pos[2],
                         );
                         let distance_by_state = relative_position.norm();
-                        let simulation_time_by_state = latest_audio_sample_timestamp
-                            + normal_audio_delay
-                            + Duration::from_secs_f32(distance_by_state / SPEED_OF_SOUND);
-                        let float_i = (latest_simulation_timestamp - simulation_time_by_state)
+                        let emission_time_by_state = latest_audio_sample_timestamp
+                            - Duration::from_secs_f32(distance_by_state / SPEED_OF_SOUND);
+                        let float_i = (latest_simulation_timestamp - emission_time_by_state)
                             .as_secs_f32()
                             / simulation_timestep.as_secs_f32();
                         let guess_i = (float_i).ceil() as usize;
@@ -109,16 +115,14 @@ impl AudioState {
                             y[point_pos_loc + 1] - listener_pos[1],
                             y[point_pos_loc + 2] - listener_pos[2],
                         );
-                        let simulation_time_of_i =
+                        let distance_to_i = relative_position.norm();
+                        let time_of_emission_of_i =
                             latest_simulation_timestamp - simulation_timestep * i as u32;
-                        let distance_by_time =
-                            (latest_audio_sample_timestamp - simulation_time_of_i).as_secs_f32()
-                                * SPEED_OF_SOUND;
-                        let distance_by_time_squared = distance_by_time * distance_by_time;
-                        let distance_by_state_squared = relative_position.norm_squared();
+                        let time_of_arrival_of_i = time_of_emission_of_i
+                            + Duration::from_secs_f32(distance_to_i / SPEED_OF_SOUND);
 
                         // Do we need to go further back in time?
-                        if distance_by_time_squared < distance_by_state_squared {
+                        if time_of_arrival_of_i > latest_audio_sample_timestamp {
                             i += 1;
                             if i >= num_states_recorded {
                                 break;
@@ -134,16 +138,13 @@ impl AudioState {
                             y_next[point_pos_loc + 1] - listener_pos[1],
                             y_next[point_pos_loc + 2] - listener_pos[2],
                         );
-                        let simulation_time_of_next = simulation_time_of_i + simulation_timestep;
-                        let distance_by_time_next =
-                            (latest_audio_sample_timestamp - simulation_time_of_next).as_secs_f32()
-                                * SPEED_OF_SOUND;
-                        let distance_by_time_next_squared =
-                            distance_by_time_next * distance_by_time_next;
-                        let distance_by_state_next_squared = relative_position_next.norm_squared();
+                        let distance_to_next = relative_position_next.norm();
+                        let time_of_emission_of_next = time_of_emission_of_i + simulation_timestep;
+                        let time_of_arrival_of_next = time_of_emission_of_next
+                            + Duration::from_secs_f32(distance_to_next / SPEED_OF_SOUND);
 
                         // Do we need to go forwards in time?
-                        if distance_by_time_next_squared > distance_by_state_next_squared {
+                        if latest_audio_sample_timestamp > time_of_arrival_of_next {
                             i -= 1;
                             if i < 2 {
                                 break;
@@ -152,12 +153,11 @@ impl AudioState {
                         }
 
                         // We should now have a sample before and after the information horizon.
+                        // time_of_arrival_of_i ≤ latest_audio_sample_timestamp ≤ time_of_arrival_of_next
                         // Interpolate between these to find the value at the horizon.
-                        let distance_by_state = distance_by_state_squared.sqrt();
-                        let distance_by_state_prev = distance_by_state_next_squared.sqrt();
-                        let t = (distance_by_time - distance_by_state)
-                            / (distance_by_state_prev - distance_by_state + meters_per_sample);
-
+                        let t = (latest_audio_sample_timestamp - time_of_arrival_of_i)
+                            .as_secs_f32()
+                            / simulation_timestep.as_secs_f32();
                         let acc_next =
                             &acc_history.fixed_view::<3, 1>(point_pos_loc, read_index_next);
                         let acc = &acc_history.fixed_view::<3, 1>(point_pos_loc, read_index);
