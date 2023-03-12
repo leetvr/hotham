@@ -62,6 +62,7 @@ struct State {
     mesh: Option<Mesh>,
     navigation: NavigationState,
     audio_state: AudioState,
+    audio_sample_counter: u64,
 }
 
 impl Default for State {
@@ -107,6 +108,7 @@ impl Default for State {
             mesh,
             navigation: Default::default(),
             audio_state: AudioState::init_audio(num_points, simulation_time_epoch).unwrap(),
+            audio_sample_counter: 0,
         }
     }
 }
@@ -179,6 +181,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         skinning_system(engine);
         debug_system(engine);
         xpbd_system(engine, state);
+        log_audio_system(state);
     }
     if let Some(mesh) = &state.mesh {
         update_mesh(mesh, &mut engine.render_context, &state.points_curr);
@@ -468,5 +471,16 @@ fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3])
                 .offset(mesh.primitives[0].vertex_buffer_offset as _),
             vertices.len(),
         );
+    }
+}
+
+fn log_audio_system(state: &mut State) {
+    let sample_rate = state.audio_state.audio_player.config.sample_rate().0 as u64;
+    let samples_per_log = sample_rate / 10;
+    while let Some(entry) = state.audio_state.audio_player.get_audio_history_entry() {
+        if state.audio_sample_counter % samples_per_log == 0 {
+            println!("{entry:?}");
+        }
+        state.audio_sample_counter += 1;
     }
 }

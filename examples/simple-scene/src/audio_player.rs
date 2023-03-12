@@ -135,6 +135,14 @@ impl AudioPlayer {
         }
         Ok(())
     }
+
+    pub fn get_audio_history_entry(&mut self) -> Option<(f32, f32, f32, f32)> {
+        if let Some(RingBuffersNonRealTimeSides { to_ui_consumer, .. }) = &mut self.ring_buffers {
+            to_ui_consumer.pop().ok()
+        } else {
+            None
+        }
+    }
 }
 
 fn run<T>(
