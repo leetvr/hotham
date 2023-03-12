@@ -7,7 +7,6 @@ use crate::{
     xpbd_shape_constraints::{
         damping_of_shape_matching_constraints, resolve_shape_matching_constraints, ShapeConstraint,
     },
-    State,
 };
 
 pub struct SimulationParams {
@@ -21,7 +20,9 @@ pub struct SimulationParams {
 
 pub fn xpbd_substep(
     world: &mut World,
-    state: &mut State,
+    velocities: &mut [Vec3],
+    points: &mut [Vec3],
+    shape_constraints: &mut [ShapeConstraint],
     &SimulationParams {
         dt,
         acc,
@@ -35,53 +36,41 @@ pub fn xpbd_substep(
     // Apply external forces
     {
         puffin::profile_scope!("Apply external forces");
-        for vel in &mut state.velocities {
+        for vel in velocities.iter_mut() {
             *vel += acc * dt;
         }
     }
 
     // Predict new positions
-    let mut points_next = {
+    let points_prev = points.to_vec();
+    {
         puffin::profile_scope!("Predict new positions");
-        state
-            .points_curr
-            .iter()
-            .zip(&state.velocities)
-            .map(|(&curr, &vel)| curr + vel * dt)
-            .collect::<Vec<_>>()
+        for (point, vel) in points.iter_mut().zip(velocities.iter()) {
+            *point += *vel * dt;
+        }
     };
 
     // TODO: Resolve distance constraints
 
     // Resolve shape matching constraints
     resolve_shape_matching_constraints(
-        &mut points_next,
-        &mut state.shape_constraints,
+        points,
+        shape_constraints,
         shape_compliance,
         particle_mass.recip(),
         dt,
     );
 
     // Resolve collisions
-    resolve_ecs_collisions(world, &mut points_next, stiction_factor);
+    resolve_ecs_collisions(world, points, stiction_factor);
 
     // Update velocities
     {
         puffin::profile_scope!("update_velocities");
-        state.velocities = points_next
-            .iter()
-            .zip(&state.points_curr)
-            .map(|(&next, &curr)| (next - curr) / dt)
-            .collect::<Vec<_>>();
+        for (vel, prev, point) in izip!(velocities.iter_mut(), points_prev.iter(), points.iter()) {
+            *vel = (*point - *prev) / dt;
+        }
     }
 
-    damping_of_shape_matching_constraints(
-        &points_next,
-        &mut state.velocities,
-        &state.shape_constraints,
-        shape_damping,
-        dt,
-    );
-
-    state.points_curr = points_next;
+    damping_of_shape_matching_constraints(points, velocities, shape_constraints, shape_damping, dt);
 }

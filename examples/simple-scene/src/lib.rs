@@ -47,16 +47,16 @@ const NZ: usize = 10;
 /// Most Hotham applications will want to keep track of some sort of state.
 /// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
 /// this is something you'd probably want to do!
-pub struct State {
-    pub points_curr: Vec<Vec3>,
-    pub shape_constraints: Vec<ShapeConstraint>,
-    pub velocities: Vec<Vec3>,
-    pub wall_time: Instant,
-    pub simulation_time_epoch: Instant,
-    pub simulation_time_hare: Instant,
-    pub simulation_time_hound: Instant,
-    pub mesh: Option<Mesh>,
-    pub navigation: NavigationState,
+struct State {
+    points_curr: Vec<Vec3>,
+    shape_constraints: Vec<ShapeConstraint>,
+    velocities: Vec<Vec3>,
+    wall_time: Instant,
+    simulation_time_epoch: Instant,
+    simulation_time_hare: Instant,
+    simulation_time_hound: Instant,
+    mesh: Option<Mesh>,
+    navigation: NavigationState,
 }
 
 impl Default for State {
@@ -200,7 +200,13 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
     let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
     while state.simulation_time_hound + timestep < state.simulation_time_hare {
         state.simulation_time_hound += timestep;
-        xpbd_substep(&mut engine.world, state, &simulation_params);
+        xpbd_substep(
+            &mut engine.world,
+            &mut state.velocities,
+            &mut state.points_curr,
+            &mut state.shape_constraints,
+            &simulation_params,
+        );
     }
 }
 
