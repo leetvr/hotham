@@ -190,11 +190,15 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
 }
 
 fn simulation_reset_system(input_context: &InputContext, state: &mut State) {
-    if input_context.left.menu_button_just_pressed() {
+    if input_context.left.menu_button_just_pressed() || input_context.right.a_button_just_pressed()
+    {
         state.simulation_time_hound = state.simulation_time_epoch;
         state.simulation_time_hare = state.simulation_time_epoch;
         state.points_curr = create_default_points();
         state.velocities.iter_mut().for_each(|v| *v = Vec3::ZERO);
+        for c in &mut state.shape_constraints {
+            c.cached_rot = Default::default();
+        }
     }
 }
 

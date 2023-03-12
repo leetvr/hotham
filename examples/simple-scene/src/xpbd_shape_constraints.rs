@@ -8,7 +8,7 @@ pub struct ShapeConstraint {
     point_indices: [usize; 8],
     template_shape: [Vector3<f32>; 8],
     a_qq_inv: Matrix3<f32>,
-    cached_rot: UnitQuaternion<f32>,
+    pub cached_rot: UnitQuaternion<f32>,
 }
 
 pub fn create_points(center: Vec3, size: Vec3, nx: usize, ny: usize, nz: usize) -> Vec<Vec3> {
