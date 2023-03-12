@@ -339,7 +339,7 @@ impl HmdInputContext {
     }
 
     /// The pose of the HMD in the real world (stage space)
-    pub(crate) fn hmd_in_stage(&self) -> Affine3A {
+    pub fn hmd_in_stage(&self) -> Affine3A {
         lerp_slerp(&self.left_eye_in_stage, &self.right_eye_in_stage, 0.5)
     }
 }

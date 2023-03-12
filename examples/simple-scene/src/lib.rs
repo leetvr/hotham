@@ -12,7 +12,7 @@ use hotham::{
     components::{
         hand::Handedness,
         physics::{BodyType, SharedShape},
-        Collider, GlobalTransform, Grabbable, LocalTransform, Mesh, RigidBody, Visible,
+        stage, Collider, GlobalTransform, Grabbable, LocalTransform, Mesh, RigidBody, Visible,
     },
     contexts::{InputContext, RenderContext},
     glam::{vec2, vec3, Vec3},
@@ -181,6 +181,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         skinning_system(engine);
         debug_system(engine);
         xpbd_system(engine, state);
+        update_listener_system(engine, state);
         log_audio_system(state);
     }
     if let Some(mesh) = &state.mesh {
@@ -476,6 +477,22 @@ fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3])
             vertices.len(),
         );
     }
+}
+
+fn update_listener_system(engine: &mut Engine, state: &mut State) {
+    puffin::profile_function!();
+    let listener_in_stage = engine
+        .input_context
+        .hmd
+        .hmd_in_stage()
+        .transform_point3(Vec3::ZERO);
+    let global_from_stage = stage::get_global_from_stage(&engine.world);
+    let listener_in_global = global_from_stage.transform_point3(listener_in_stage);
+    state
+        .audio_state
+        .audio_player
+        .set_listener_pos(listener_in_global.into())
+        .unwrap();
 }
 
 fn log_audio_system(state: &mut State) {
