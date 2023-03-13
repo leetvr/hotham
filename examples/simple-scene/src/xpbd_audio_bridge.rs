@@ -26,7 +26,6 @@ impl AudioState {
 
         let mut audio_player = AudioPlayer::new()?;
         let player_sample_rate = audio_player.config.sample_rate().0 as f32;
-        let meters_per_sample = SPEED_OF_SOUND / player_sample_rate;
 
         // Keep a history of states in a circular buffer so that we can create a waveform by combining contributions over time.
         const SAMPLES_IN_BUFFER: usize = 1024;
@@ -43,7 +42,7 @@ impl AudioState {
         let mut latest_simulation_timestamp = simulation_time;
         let normal_time_per_audio_sample = Duration::from_secs_f32(1.0 / player_sample_rate);
         audio_player.play_audio(Box::new(
-            move |update_state: bool, listener_pos: Point3<f32>| {
+            move |update_state: bool, listener_pos: &Point3<f32>| {
                 if update_state {
                     puffin::profile_scope!("update_state");
                     while let Ok(message) = to_audio_consumer.pop() {
@@ -170,7 +169,7 @@ impl AudioState {
                         break;
                     }
                 }
-                value as f32
+                value
             },
         ))?;
 

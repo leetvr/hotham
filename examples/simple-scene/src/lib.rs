@@ -34,14 +34,14 @@ use hotham::{
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
-use nalgebra::DVector;
+use nalgebra::{DVector, Quaternion, Translation3, UnitQuaternion};
 use xpbd_audio_bridge::{AudioSimulationUpdate, AudioState};
 use xpbd_collisions::Contact;
 use xpbd_collisions::XpbdCollisions;
 use xpbd_shape_constraints::{create_points, create_shape_constraints, ShapeConstraint};
 use xpbd_substep::xpbd_substep;
 
-use crate::xpbd_substep::SimulationParams;
+use crate::{audio_player::ListenerPose, xpbd_substep::SimulationParams};
 
 const NX: usize = 10;
 const NY: usize = 10;
@@ -481,17 +481,20 @@ fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3])
 
 fn update_listener_system(engine: &mut Engine, state: &mut State) {
     puffin::profile_function!();
-    let listener_in_stage = engine
-        .input_context
-        .hmd
-        .hmd_in_stage()
-        .transform_point3(Vec3::ZERO);
+    let stage_from_hmd = engine.input_context.hmd.hmd_in_stage();
     let global_from_stage = stage::get_global_from_stage(&engine.world);
-    let listener_in_global = global_from_stage.transform_point3(listener_in_stage);
+    let (_scale, rotation, translation) =
+        (global_from_stage * stage_from_hmd).to_scale_rotation_translation();
+    let global_from_listener = ListenerPose::from_parts(
+        Translation3::new(translation.x, translation.y, translation.z),
+        UnitQuaternion::new_unchecked(Quaternion::new(
+            rotation.w, rotation.x, rotation.y, rotation.z,
+        )),
+    );
     state
         .audio_state
         .audio_player
-        .set_listener_pos(listener_in_global.into())
+        .set_listener_pose(&global_from_listener)
         .unwrap();
 }
 

@@ -5,30 +5,30 @@ use std::sync::{
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use hotham::anyhow::{self, anyhow};
-use nalgebra::{self, Point3, Vector3};
+use nalgebra::{self, Isometry3, Point3, Unit, Vector3};
 use triple_buffer as tbuf;
 
-type SamplingFunction = Box<dyn Send + FnMut(bool, ListenerPos) -> f32>;
-type ListenerPos = Point3<f32>;
+pub type SamplingFunction = Box<dyn Send + FnMut(bool, &Point3<f32>) -> f32>;
+pub type ListenerPose = Isometry3<f32>;
 
 pub struct AudioPlayer {
     device: cpal::Device,
     pub config: cpal::SupportedStreamConfig,
     stream: Option<anyhow::Result<cpal::Stream>>,
-    listener_pos: ListenerPos,
+    global_from_listener: ListenerPose,
     pub enable_band_pass_filter: Arc<AtomicBool>,
     pub num_frames_per_callback: Arc<AtomicUsize>,
     ring_buffers: Option<RingBuffersNonRealTimeSides>,
 }
 
 struct RingBuffersNonRealTimeSides {
-    listener_pos_producer: rtrb::Producer<ListenerPos>,
+    global_from_listener_producer: rtrb::Producer<ListenerPose>,
     sampling_function_producer: tbuf::Input<Option<SamplingFunction>>,
     to_ui_consumer: rtrb::Consumer<(f32, f32, f32, f32)>,
 }
 
 struct RingBuffersRealTimeSides {
-    listener_pos_consumer: rtrb::Consumer<ListenerPos>,
+    global_from_listener_consumer: rtrb::Consumer<ListenerPose>,
     sampling_function_consumer: tbuf::Output<Option<SamplingFunction>>,
     to_ui_producer: rtrb::Producer<(f32, f32, f32, f32)>,
 }
@@ -53,7 +53,11 @@ impl AudioPlayer {
             config,
             stream: None,
             ring_buffers: None,
-            listener_pos: Point3::new(0.0, 1.0, 0.0),
+            global_from_listener: ListenerPose::face_towards(
+                &Point3::new(0.0, 1.0, 0.0),
+                &Point3::new(0.0, 1.0, 1.0),
+                &Vector3::new(0.0, 1.0, 0.0),
+            ),
             enable_band_pass_filter: Arc::new(AtomicBool::new(true)),
             num_frames_per_callback: Arc::new(AtomicUsize::new(0)),
         };
@@ -67,17 +71,20 @@ impl AudioPlayer {
             tbuf::TripleBuffer::<Option<SamplingFunction>>::default().split();
         // let (disposal_queue_producer, disposal_queue_consumer) = rtrb::RingBuffer::new(2);
         // let (sampling_function_producer, sampling_function_consumer) = rtrb::RingBuffer::new(2);
-        let (mut listener_pos_producer, listener_pos_consumer) = rtrb::RingBuffer::new(100);
-        listener_pos_producer.push(self.listener_pos).unwrap(); // Initialize listener position
+        let (mut global_from_listener_producer, global_from_listener_consumer) =
+            rtrb::RingBuffer::new(100);
+        global_from_listener_producer
+            .push(self.global_from_listener)
+            .unwrap(); // Initialize listener position
         let (to_ui_producer, to_ui_consumer) =
             rtrb::RingBuffer::new(self.config.sample_rate().0 as usize);
         self.ring_buffers = Some(RingBuffersNonRealTimeSides {
             sampling_function_producer,
-            listener_pos_producer,
+            global_from_listener_producer,
             to_ui_consumer,
         });
         let realtime_sides = RingBuffersRealTimeSides {
-            listener_pos_consumer,
+            global_from_listener_consumer,
             sampling_function_consumer,
             to_ui_producer,
         };
@@ -88,7 +95,7 @@ impl AudioPlayer {
                 self.enable_band_pass_filter.clone(),
                 self.num_frames_per_callback.clone(),
                 realtime_sides,
-                self.listener_pos,
+                self.global_from_listener,
             ),
             cpal::SampleFormat::I16 => run::<i16>(
                 &self.device,
@@ -96,7 +103,7 @@ impl AudioPlayer {
                 self.enable_band_pass_filter.clone(),
                 self.num_frames_per_callback.clone(),
                 realtime_sides,
-                self.listener_pos,
+                self.global_from_listener,
             ),
             cpal::SampleFormat::U16 => run::<u16>(
                 &self.device,
@@ -104,7 +111,7 @@ impl AudioPlayer {
                 self.enable_band_pass_filter.clone(),
                 self.num_frames_per_callback.clone(),
                 realtime_sides,
-                self.listener_pos,
+                self.global_from_listener,
             ),
         });
         Ok(())
@@ -124,14 +131,14 @@ impl AudioPlayer {
         }
     }
 
-    pub fn set_listener_pos(&mut self, listener_pos: ListenerPos) -> anyhow::Result<()> {
-        self.listener_pos = listener_pos;
+    pub fn set_listener_pose(&mut self, global_from_listener: &ListenerPose) -> anyhow::Result<()> {
+        self.global_from_listener = *global_from_listener;
         if let Some(RingBuffersNonRealTimeSides {
-            listener_pos_producer,
+            global_from_listener_producer,
             ..
         }) = &mut self.ring_buffers
         {
-            listener_pos_producer.push(self.listener_pos)?;
+            global_from_listener_producer.push(self.global_from_listener)?;
         }
         Ok(())
     }
@@ -152,10 +159,10 @@ fn run<T>(
     num_frames_per_callback: Arc<AtomicUsize>,
     RingBuffersRealTimeSides {
         mut sampling_function_consumer,
-        mut listener_pos_consumer,
+        mut global_from_listener_consumer,
         mut to_ui_producer,
     }: RingBuffersRealTimeSides,
-    listener_pos: ListenerPos,
+    listener_pos: ListenerPose,
 ) -> anyhow::Result<cpal::Stream>
 where
     T: cpal::Sample,
@@ -174,11 +181,11 @@ where
     const HEADROOM_FACTOR: f32 = 1.0 - HEADROOM_FRACTION;
     let mut moving_power_average_filtered = BASELINE;
     let mut moving_power_average_raw = BASELINE;
-    let mut listener_pos_after = listener_pos;
+    let mut global_from_listener_after = listener_pos;
 
-    let offsets_by_channel = match channels {
-        1 => vec![Vector3::zeros()],
-        2 => vec![Vector3::new(-0.1, 0.0, 0.0), Vector3::new(0.1, 0.0, 0.0)],
+    let offsets_by_channel: Vec<Point3<f32>> = match channels {
+        1 => vec![Point3::new(0.0, 0.0, 0.0)],
+        2 => vec![Point3::new(-0.1, 0.0, 0.0), Point3::new(0.1, 0.0, 0.0)],
         _ => panic!("Cannot handle {} channels", channels),
     };
     let mut sample_by_channel = vec![0.0; channels];
@@ -190,9 +197,9 @@ where
         config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
             puffin::profile_function!();
-            let listener_pos_before = listener_pos_after;
-            while let Ok(new_listener_pos) = listener_pos_consumer.pop() {
-                listener_pos_after = new_listener_pos;
+            let global_from_listener_before = global_from_listener_after;
+            while let Ok(new_global_from_listener) = global_from_listener_consumer.pop() {
+                global_from_listener_after = new_global_from_listener;
             }
 
             // Report num_frames_per_callback
@@ -207,15 +214,23 @@ where
                 for (i, frame) in data.chunks_mut(channels).enumerate() {
                     // Interpolate listener position
                     let t = i as f32 / num_frames as f32;
-                    let listener_pos =
-                        listener_pos_before * (1.0 - t) + listener_pos_after.coords * t;
+                    let global_from_listener = ListenerPose::from_parts(
+                        (global_from_listener_before.translation.vector * (1.0 - t)
+                            + global_from_listener_after.translation.vector * t)
+                            .into(),
+                        Unit::new_normalize(
+                            global_from_listener_before
+                                .rotation
+                                .lerp(&global_from_listener_after.rotation, t),
+                        ),
+                    );
 
                     // Sample each channel with offset on listener position
                     for channel in 0..channels {
                         sample_by_channel[channel] = {
                             let sample = sampling_function(
                                 channel == 0,
-                                listener_pos + offsets_by_channel[channel],
+                                &global_from_listener.transform_point(&offsets_by_channel[channel]),
                             );
                             if sample.is_finite() {
                                 sample
