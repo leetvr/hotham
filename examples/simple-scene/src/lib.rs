@@ -15,7 +15,7 @@ use hotham::{
         stage, Collider, GlobalTransform, Grabbable, LocalTransform, Mesh, RigidBody, Visible,
     },
     contexts::{InputContext, RenderContext},
-    glam::{vec2, vec3, Vec3},
+    glam::{dvec3, vec2, DVec3, Vec3},
     hecs::{self, Without, World},
     na,
     rendering::{
@@ -51,8 +51,8 @@ const NZ: usize = 10;
 /// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
 /// this is something you'd probably want to do!
 struct State {
-    points_curr: Vec<Vec3>,
-    velocities: Vec<Vec3>,
+    points_curr: Vec<DVec3>,
+    velocities: Vec<DVec3>,
     shape_constraints: Vec<ShapeConstraint>,
     audio_emitter_indices: Vec<usize>,
     wall_time: Instant,
@@ -69,7 +69,7 @@ impl Default for State {
     fn default() -> Self {
         let points_curr = create_default_points();
         let shape_constraints = create_shape_constraints(&points_curr, NX, NY, NZ);
-        let velocities = vec![vec3(0.0, 0.0, 0.0); points_curr.len()];
+        let velocities = vec![dvec3(0.0, 0.0, 0.0); points_curr.len()];
 
         let mesh = None;
 
@@ -113,10 +113,10 @@ impl Default for State {
     }
 }
 
-fn create_default_points() -> Vec<Vec3> {
+fn create_default_points() -> Vec<DVec3> {
     create_points(
-        vec3(tweak!(0.0), tweak!(2.0), tweak!(-0.5)),
-        vec3(0.5, 0.5, 0.5),
+        dvec3(tweak!(0.0), tweak!(2.0), tweak!(-0.5)),
+        dvec3(0.5, 0.5, 0.5),
         NX,
         NY,
         NZ,
@@ -196,7 +196,7 @@ fn simulation_reset_system(input_context: &InputContext, state: &mut State) {
         state.simulation_time_hound = state.simulation_time_epoch;
         state.simulation_time_hare = state.simulation_time_epoch;
         state.points_curr = create_default_points();
-        state.velocities.iter_mut().for_each(|v| *v = Vec3::ZERO);
+        state.velocities.iter_mut().for_each(|v| *v = DVec3::ZERO);
         for c in &mut state.shape_constraints {
             c.cached_rot = Default::default();
         }
@@ -209,7 +209,7 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
         puffin::profile_scope!("simulation params");
         SimulationParams {
             dt: tweak!(0.001),
-            acc: vec3(0.0, -9.82, 0.0),
+            acc: dvec3(0.0, -9.82, 0.0),
             particle_mass: tweak!(0.01),
             shape_compliance: tweak!(0.00001), // Inverse of physical stiffness
             shape_damping: tweak!(100.0), // Linear damping towards rigid body motion, fraction of speed per second
@@ -253,8 +253,8 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
 }
 
 fn send_xpbd_state_to_audio(
-    points_curr: &[Vec3],
-    velocities: &[Vec3],
+    points_curr: &[DVec3],
+    velocities: &[DVec3],
     audio_emitter_indices: &[usize],
     simulation_time: Instant,
     audio_state: &mut AudioState,
@@ -262,12 +262,12 @@ fn send_xpbd_state_to_audio(
     let num_emitters = audio_emitter_indices.len();
     let mut state_vector = DVector::<f32>::zeros(num_emitters * 3 * 2);
     for (i, &ip) in audio_emitter_indices.iter().enumerate() {
-        state_vector[i * 3] = points_curr[ip].x;
-        state_vector[i * 3 + 1] = points_curr[ip].y;
-        state_vector[i * 3 + 2] = points_curr[ip].z;
-        state_vector[(num_emitters + i) * 3] = velocities[ip].x;
-        state_vector[(num_emitters + i) * 3 + 1] = velocities[ip].y;
-        state_vector[(num_emitters + i) * 3 + 2] = velocities[ip].z;
+        state_vector[i * 3] = points_curr[ip].x as _;
+        state_vector[i * 3 + 1] = points_curr[ip].y as _;
+        state_vector[i * 3 + 2] = points_curr[ip].z as _;
+        state_vector[(num_emitters + i) * 3] = velocities[ip].x as _;
+        state_vector[(num_emitters + i) * 3 + 1] = velocities[ip].y as _;
+        state_vector[(num_emitters + i) * 3 + 2] = velocities[ip].z as _;
     }
     // Get old states from the audio thread and drop them here to avoid deallocating memory in the audio thread.
     audio_state
@@ -344,7 +344,7 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
     world.insert(helmet, (collider, Grabbable {})).unwrap();
 }
 
-fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[Vec3]) -> Mesh {
+fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[DVec3]) -> Mesh {
     const N: u32 = 10_u32;
     const M: u32 = N - 1;
     const NUM_POINTS: usize = (N * N * N) as _;
@@ -400,7 +400,7 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[
     mesh
 }
 
-fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3]) {
+fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[DVec3]) {
     const N: i32 = 10_i32;
     const M: i32 = N - 1;
     const NUM_VERTICES: usize = (6 * N * N) as _;
@@ -420,7 +420,7 @@ fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3])
                     i32::MIN..=-1_i32 | 6_i32..=i32::MAX => todo!(),
                 };
                 let center = points[(z * N * N + y * N + x) as usize];
-                positions.push(center);
+                positions.push(center.as_vec3());
                 let x0 = (x - dxdi).clamp(0, M);
                 let y0 = (y - dydi).clamp(0, M);
                 let z0 = (z - dzdi).clamp(0, M);
@@ -440,7 +440,7 @@ fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[Vec3])
                 let normal = (p_right - p_left).cross(p_up - p_down).normalize_or_zero();
                 let texture_coords = vec2(j as f32 / M as f32, i as f32 / M as f32);
                 vertices.push(Vertex {
-                    normal,
+                    normal: normal.as_vec3(),
                     texture_coords,
                     ..Default::default()
                 });

@@ -1,4 +1,4 @@
-use hotham::glam::{mat3, vec3, Vec3};
+use hotham::glam::{dmat3, dvec3, DVec3};
 use nalgebra::{self, Matrix3, Unit, UnitQuaternion, Vector3};
 
 use crate::utils::grid;
@@ -6,19 +6,19 @@ use crate::utils::grid;
 #[derive(Clone)]
 pub struct ShapeConstraint {
     point_indices: [usize; 8],
-    template_shape: [Vector3<f32>; 8],
-    a_qq_inv: Matrix3<f32>,
-    pub cached_rot: UnitQuaternion<f32>,
+    template_shape: [Vector3<f64>; 8],
+    a_qq_inv: Matrix3<f64>,
+    pub cached_rot: UnitQuaternion<f64>,
 }
 
-pub fn create_points(center: Vec3, size: Vec3, nx: usize, ny: usize, nz: usize) -> Vec<Vec3> {
+pub fn create_points(center: DVec3, size: DVec3, nx: usize, ny: usize, nz: usize) -> Vec<DVec3> {
     puffin::profile_function!();
     let half_size = size * 0.5;
     grid(center - half_size, center + half_size, nx, ny, nz).collect::<Vec<_>>()
 }
 
 pub fn create_shape_constraints(
-    points: &[Vec3],
+    points: &[DVec3],
     nx: usize,
     ny: usize,
     nz: usize,
@@ -44,11 +44,11 @@ pub fn create_shape_constraints(
                     iz2 * nx * ny + iy2 * nx + ix1,
                     iz2 * nx * ny + iy2 * nx + ix2,
                 ];
-                let mean: Vector3<f32> = ips
+                let mean: Vector3<f64> = ips
                     .iter()
                     .map(|&ip| Vector3::from(points[ip]))
                     .fold(Vector3::zeros(), |acc, p| acc + p)
-                    / ips.len() as f32;
+                    / ips.len() as f64;
                 let shape = ips.map(|ip| Vector3::from(points[ip]) - mean);
                 let a_qq_inv = shape
                     .iter()
@@ -82,15 +82,15 @@ pub fn create_shape_constraints(
 //
 // ∆𝐱ᵢ = λ 𝑤ᵢ∇𝐶ᵢ
 pub fn resolve_shape_matching_constraints(
-    points_next: &mut [Vec3],
+    points_next: &mut [DVec3],
     shape_constraints: &mut [ShapeConstraint],
-    shape_compliance: f32,
-    inv_particle_mass: f32,
-    dt: f32,
+    shape_compliance: f64,
+    inv_particle_mass: f64,
+    dt: f64,
 ) {
     puffin::profile_function!();
     const MAX_ITER: usize = 4;
-    const EPS: f32 = 1.0e-8;
+    const EPS: f64 = 1.0e-8;
     let shape_compliance_per_dt2 = shape_compliance / (dt * dt);
     for ShapeConstraint {
         point_indices: ips,
@@ -99,11 +99,11 @@ pub fn resolve_shape_matching_constraints(
         cached_rot,
     } in shape_constraints
     {
-        let mean: Vector3<f32> = ips
+        let mean: Vector3<f64> = ips
             .iter()
             .map(|&ip| Vector3::from(points_next[ip]))
             .fold(Vector3::zeros(), |acc, p| acc + p)
-            / ips.len() as f32;
+            / ips.len() as f64;
         let a_pq = ips
             .iter()
             .map(|&ip| Vector3::from(points_next[ip]) - mean)
@@ -112,7 +112,7 @@ pub fn resolve_shape_matching_constraints(
         extract_rotation(&(a_pq * *a_qq_inv), cached_rot, MAX_ITER, EPS);
         let rot = cached_rot.to_rotation_matrix();
         for (i, ip) in ips.iter().enumerate() {
-            let goal = Vec3::from(mean + rot * template_shape[i]);
+            let goal = DVec3::from(mean + rot * template_shape[i]);
             let delta = points_next[*ip] - goal;
             let correction =
                 delta * (-inv_particle_mass / (inv_particle_mass + shape_compliance_per_dt2));
@@ -121,8 +121,8 @@ pub fn resolve_shape_matching_constraints(
     }
 }
 
-// nalgebra has a similar implementation in UnitQuaternion::<f32>::from_matrix_eps but this is simpler and faster!
-fn extract_rotation(a: &Matrix3<f32>, q: &mut UnitQuaternion<f32>, max_iter: usize, eps: f32) {
+// nalgebra has a similar implementation in UnitQuaternion::<f64>::from_matrix_eps but this is simpler and faster!
+fn extract_rotation(a: &Matrix3<f64>, q: &mut UnitQuaternion<f64>, max_iter: usize, eps: f64) {
     // puffin::profile_function!();
     for _iter in 0..max_iter {
         let r = q.to_rotation_matrix();
@@ -140,17 +140,17 @@ fn extract_rotation(a: &Matrix3<f32>, q: &mut UnitQuaternion<f32>, max_iter: usi
         if w < eps {
             break;
         }
-        *q = UnitQuaternion::<f32>::from_axis_angle(&omega, w) * *q;
+        *q = UnitQuaternion::<f64>::from_axis_angle(&omega, w) * *q;
     }
     q.renormalize();
 }
 
 pub fn damping_of_shape_matching_constraints(
-    points: &[Vec3],
-    velocities: &mut [Vec3],
+    points: &[DVec3],
+    velocities: &mut [DVec3],
     shape_constraints: &[ShapeConstraint],
-    shape_damping: f32,
-    dt: f32,
+    shape_damping: f64,
+    dt: f64,
 ) {
     puffin::profile_function!();
     let shape_damping_times_dt = (shape_damping * dt).min(1.0);
@@ -158,17 +158,17 @@ pub fn damping_of_shape_matching_constraints(
         point_indices: ips, ..
     } in shape_constraints
     {
-        let mean_pos: Vec3 = ips
+        let mean_pos: DVec3 = ips
             .iter()
             .map(|&ip| points[ip])
-            .fold(Vec3::ZERO, |acc, p| acc + p)
-            / ips.len() as f32;
-        let mean_vel: Vec3 = ips
+            .fold(DVec3::ZERO, |acc, p| acc + p)
+            / ips.len() as f64;
+        let mean_vel: DVec3 = ips
             .iter()
             .map(|&ip| velocities[ip])
-            .fold(Vec3::ZERO, |acc, v| acc + v)
-            / ips.len() as f32;
-        let mut angular_momentum = Vec3::ZERO;
+            .fold(DVec3::ZERO, |acc, v| acc + v)
+            / ips.len() as f64;
+        let mut angular_momentum = DVec3::ZERO;
         let mut acc_rx2 = 0.0;
         let mut acc_ry2 = 0.0;
         let mut acc_rz2 = 0.0;
@@ -189,10 +189,10 @@ pub fn damping_of_shape_matching_constraints(
             acc_rxz += r.x * r.z;
             acc_ryz += r.y * r.z;
         }
-        let angular_mass = mat3(
-            vec3(acc_ry2 + acc_rz2, -acc_rxy, -acc_rxz),
-            vec3(-acc_rxy, acc_rz2 + acc_rx2, -acc_ryz),
-            vec3(-acc_rxz, -acc_ryz, acc_rx2 + acc_ry2),
+        let angular_mass = dmat3(
+            dvec3(acc_ry2 + acc_rz2, -acc_rxy, -acc_rxz),
+            dvec3(-acc_rxy, acc_rz2 + acc_rx2, -acc_ryz),
+            dvec3(-acc_rxz, -acc_ryz, acc_rx2 + acc_ry2),
         );
         let angular_velocity = angular_mass.inverse() * angular_momentum;
         for &ip in ips {

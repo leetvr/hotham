@@ -1,6 +1,6 @@
 use itertools::izip;
 
-use hotham::{glam::Vec3, hecs::World};
+use hotham::{glam::DVec3, hecs::World};
 
 use crate::{
     xpbd_collisions::resolve_ecs_collisions,
@@ -10,18 +10,18 @@ use crate::{
 };
 
 pub struct SimulationParams {
-    pub dt: f32,
-    pub acc: Vec3,
-    pub particle_mass: f32,
-    pub shape_compliance: f32, // Inverse of physical stiffness
-    pub shape_damping: f32, // Linear damping towards rigid body motion, fraction of speed per second
-    pub stiction_factor: f32, // Maximum tangential correction per correction along normal.
+    pub dt: f64,
+    pub acc: DVec3,
+    pub particle_mass: f64,
+    pub shape_compliance: f64, // Inverse of physical stiffness
+    pub shape_damping: f64, // Linear damping towards rigid body motion, fraction of speed per second
+    pub stiction_factor: f64, // Maximum tangential correction per correction along normal.
 }
 
 pub fn xpbd_substep(
     world: &mut World,
-    velocities: &mut [Vec3],
-    points: &mut [Vec3],
+    velocities: &mut [DVec3],
+    points: &mut [DVec3],
     shape_constraints: &mut [ShapeConstraint],
     &SimulationParams {
         dt,
