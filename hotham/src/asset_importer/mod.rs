@@ -324,7 +324,7 @@ fn get_collider_for_node(
 
     // If this is a wall collider, ensure it's not a sensor.
     let collider = if collider_node_name.ends_with(WALL_COLLIDER_TAG) {
-        println!("[HOTHAM_ASSET_IMPORTER] Created wall collider for model {collider_node_name}");
+        println!("[HOTHAM_ASSET_IMPORTER] Created wall collider for model {node_name} - {collider_node_name}");
         Collider {
             sensor: false,
             collision_groups: physics_context::WALL_COLLISION_GROUP,
