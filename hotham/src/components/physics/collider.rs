@@ -26,6 +26,8 @@ pub struct Collider {
     pub restitution: f32,
     /// What is the mass of this collider?
     pub mass: f32,
+    /// What's the friction co-efficient of this collider?
+    pub friction: f32,
 }
 
 impl Debug for Collider {
@@ -40,6 +42,7 @@ impl Debug for Collider {
             .field("offset_from_parent", &self.offset_from_parent)
             .field("restitution", &self.restitution)
             .field("mass", &self.mass)
+            .field("friction", &self.friction)
             .finish()
     }
 }
@@ -64,8 +67,9 @@ impl Default for Collider {
             collision_filter: DEFAULT_COLLISION_GROUP | HAND_COLLISION_GROUP,
             active_collision_types: ActiveCollisionTypes::default(),
             offset_from_parent: Default::default(),
-            restitution: 0.,
+            restitution: 0.5,
             mass: 0.,
+            friction: 0.5
         }
     }
 }

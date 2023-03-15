@@ -12,3 +12,8 @@ pub use impulse::Impulse;
 pub use rigid_body::BodyType;
 pub use rigid_body::RigidBody;
 pub use teleport::Teleport;
+
+#[derive(Debug, Clone, Default)]
+pub struct AngularVelocity(pub glam::Vec3);
+
+// TODO: Move smaller components into this file

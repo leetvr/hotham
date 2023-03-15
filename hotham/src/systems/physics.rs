@@ -4,7 +4,7 @@ use rapier3d::prelude::{ActiveEvents, ColliderBuilder, InteractionGroups, RigidB
 use crate::{
     components::{
         physics::Impulse,
-        physics::{AdditionalMass, BodyType, RigidBody, Teleport},
+        physics::{AdditionalMass, AngularVelocity, BodyType, RigidBody, Teleport},
         Collider, GlobalTransform, LocalTransform, Parent,
     },
     contexts::physics_context,
@@ -104,6 +104,9 @@ fn create_colliders(world: &mut hecs::World, physics_context: &mut PhysicsContex
         let mut collider = ColliderBuilder::new(c.shape.clone())
             .user_data(entity.to_bits().get() as _)
             .sensor(c.sensor)
+            .mass(c.mass)
+            .restitution(c.restitution)
+            .friction(c.friction)
             .active_collision_types(c.active_collision_types)
             .active_events(ActiveEvents::all())
             .collision_groups(InteractionGroups::new(
@@ -228,6 +231,15 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                         rigid_body.apply_impulse(na_vector_from_glam(impulse), true);
                     }
                 }
+
+                if let Ok(additional_angular_velocity) =
+                    world.get::<&AngularVelocity>(entity).map(|i| i.0)
+                {
+                    command_buffer.remove_one::<AngularVelocity>(entity);
+                    let new_angvel =
+                        rigid_body.angvel() + na_vector_from_glam(additional_angular_velocity);
+                    rigid_body.set_angvel(new_angvel, true);
+                }
             }
             _ => {}
         }
@@ -261,6 +273,7 @@ fn update_colliders_from_world(physics_context: &mut PhysicsContext, world: &mut
             offset_from_parent,
             restitution,
             collisions_this_frame: _, // we intentionally ignore this value to force us to handle all other properties
+            friction,
         } = collider_component;
 
         // Update the collider's other properties.
@@ -271,6 +284,7 @@ fn update_colliders_from_world(physics_context: &mut PhysicsContext, world: &mut
         collider.set_restitution(*restitution);
         collider.set_active_collision_types(*active_collision_types);
         collider.set_translation_wrt_parent(na_vector_from_glam(*offset_from_parent));
+        collider.set_friction(*friction);
     }
 }
 
