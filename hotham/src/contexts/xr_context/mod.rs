@@ -373,7 +373,7 @@ pub(crate) fn create_xr_swapchain(
             .unwrap();
 
         let foveation_profile = xr::FoveationLevelProfile {
-            level: xr::FoveationLevelFB::HIGH,
+            level: xr::FoveationLevelFB::MEDIUM,
             vertical_offset: 0.,
             dynamic: xr::FoveationDynamicFB::DISABLED,
         };
