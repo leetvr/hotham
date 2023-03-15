@@ -18,7 +18,7 @@ pub use ash::vk;
 pub use openxr as xr;
 pub use vk_shader_macros;
 
-pub use engine::{Engine, EngineBuilder, TickData};
+pub use engine::{create_tracking_entities, Engine, EngineBuilder, TickData};
 pub use glam;
 pub use hecs;
 pub use hotham_error::HothamError;

@@ -116,7 +116,8 @@ impl<'a> EngineBuilder<'a> {
     }
 }
 
-fn create_tracking_entities(world: &mut hecs::World) -> (hecs::Entity, hecs::Entity) {
+/// Create entities that can be used to help locate the player in physical and virtual space
+pub fn create_tracking_entities(world: &mut hecs::World) -> (hecs::Entity, hecs::Entity) {
     let stage_entity = world.spawn((
         Stage {},
         LocalTransform::default(),
