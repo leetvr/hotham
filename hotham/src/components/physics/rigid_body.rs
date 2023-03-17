@@ -53,3 +53,12 @@ impl Default for RigidBody {
         }
     }
 }
+
+impl RigidBody {
+    pub fn kinematic_position_based() -> Self {
+        Self {
+            body_type: BodyType::KinematicPositionBased,
+            ..Default::default()
+        }
+    }
+}

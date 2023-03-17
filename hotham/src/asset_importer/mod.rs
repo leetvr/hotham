@@ -329,6 +329,8 @@ fn get_collider_for_node(
             sensor: false,
             collision_groups: physics_context::WALL_COLLISION_GROUP,
             collision_filter: u32::MAX,
+            active_collision_types: ActiveCollisionTypes::all(),
+            mass: 10.0,
             shape,
             ..Default::default()
         }
@@ -400,7 +402,9 @@ fn get_shape_from_mesh(
 
     rapier3d::geometry::SharedShape::convex_mesh(positions.clone(), &indices).unwrap_or_else(|| {
         println!(
-            "[HOTHAM_ASSET_IMPORTER] ERROR! Unable to create convex mesh, attempting decomposition"
+            "[HOTHAM_ASSET_IMPORTER] ERROR! Unable to create convex mesh, attempting decomposition with {} positions and {} indicies",
+            positions.len(),
+            indices.len(),
         );
         rapier3d::geometry::SharedShape::convex_decomposition(&positions, &indices)
     })

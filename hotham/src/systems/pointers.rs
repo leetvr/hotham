@@ -3,7 +3,7 @@ use egui::Pos2;
 use glam::{Affine3A, Quat, Vec2, Vec3};
 use hecs::{With, World};
 use rapier3d::na::{Isometry3, Orthographic3, Point3};
-use rapier3d::prelude::{InteractionGroups, QueryFilter, Ray};
+use rapier3d::prelude::{Group, InteractionGroups, QueryFilter, Ray};
 
 pub const POSITION_OFFSET: Vec3 = Vec3::new(4.656613e-10, 0.029968515, 0.0741747);
 pub const ROTATION_OFFSET: Quat = Quat::from_xyzw(0.8274912, 0.03413791, -0.050611533, -0.5581499);
@@ -72,7 +72,10 @@ pub fn pointers_system_inner(
         let ray = Ray::new(ray_origin.into(), ray_direction);
         let max_toi = 40.0;
         let solid = true;
-        let groups = InteractionGroups::new(0b10, 0b10);
+        let groups = InteractionGroups::new(
+            Group::from_bits_truncate(0b10),
+            Group::from_bits_truncate(0b10),
+        );
         let filter = QueryFilter::new().groups(groups);
 
         if let Some((handle, toi)) = physics_context.query_pipeline.cast_ray(

@@ -1,5 +1,7 @@
 use physics_context::PhysicsContext;
-use rapier3d::prelude::{ActiveEvents, ColliderBuilder, InteractionGroups, RigidBodyBuilder};
+use rapier3d::prelude::{
+    ActiveEvents, ColliderBuilder, Group, InteractionGroups, RigidBodyBuilder,
+};
 
 use crate::{
     components::{
@@ -110,8 +112,8 @@ fn create_colliders(world: &mut hecs::World, physics_context: &mut PhysicsContex
             .active_collision_types(c.active_collision_types)
             .active_events(ActiveEvents::all())
             .collision_groups(InteractionGroups::new(
-                c.collision_groups,
-                c.collision_filter,
+                Group::from_bits_truncate(c.collision_groups),
+                Group::from_bits_truncate(c.collision_filter),
             ))
             .build();
 
@@ -279,7 +281,10 @@ fn update_colliders_from_world(physics_context: &mut PhysicsContext, world: &mut
         // Update the collider's other properties.
         collider.set_sensor(*sensor);
         collider.set_shape(shape.clone());
-        collider.set_collision_groups(InteractionGroups::new(*collision_groups, *collision_filter));
+        collider.set_collision_groups(InteractionGroups::new(
+            Group::from_bits_truncate(*collision_groups),
+            Group::from_bits_truncate(*collision_filter),
+        ));
         collider.set_mass(*mass);
         collider.set_restitution(*restitution);
         collider.set_active_collision_types(*active_collision_types);
