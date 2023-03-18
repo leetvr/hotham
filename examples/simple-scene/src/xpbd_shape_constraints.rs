@@ -177,7 +177,7 @@ pub fn damping_of_shape_matching_constraints(
         let mut acc_ryz = 0.0;
         for &ip in ips {
             let r = points[ip] - mean_pos;
-            let v = velocities[ip];
+            let v = velocities[ip] - mean_vel;
             angular_momentum += r.cross(v);
             //        | r.y²+r.z²   -r.x·r.y    -r.x·r.z  |
             //  RRᵀ = | -r.x·r.y    r.z²+r.x²   -r.yr.z   |
