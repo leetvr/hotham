@@ -20,17 +20,17 @@ impl AudioState {
     pub fn init_audio(num_points: usize, simulation_time: Instant) -> anyhow::Result<AudioState> {
         puffin::profile_function!();
         let (to_audio_producer, mut to_audio_consumer) =
-            rtrb::RingBuffer::<AudioSimulationUpdate>::new(100);
+            rtrb::RingBuffer::<AudioSimulationUpdate>::new(10000);
         let (mut to_ui_producer, to_ui_consumer) =
-            rtrb::RingBuffer::<AudioSimulationUpdate>::new(100);
+            rtrb::RingBuffer::<AudioSimulationUpdate>::new(10000);
 
         let mut audio_player = AudioPlayer::new()?;
         let player_sample_rate = audio_player.config.sample_rate().0 as f32;
 
         // Keep a history of states in a circular buffer so that we can create a waveform by combining contributions over time.
-        const SAMPLES_IN_BUFFER: usize = 1024;
+        const SAMPLES_IN_BUFFER: usize = 10240;
         const SPEED_OF_SOUND: f32 = 343.0;
-        const SIMULATION_RATE: f32 = 1000.0;
+        const SIMULATION_RATE: f32 = 10000.0;
         let simulation_timestep = Duration::from_secs_f32(1.0 / SIMULATION_RATE);
         let normal_audio_delay = Duration::from_millis(15);
 

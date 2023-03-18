@@ -43,9 +43,9 @@ use xpbd_substep::xpbd_substep;
 
 use crate::{audio_player::ListenerPose, xpbd_substep::SimulationParams};
 
-const NX: usize = 10;
-const NY: usize = 10;
-const NZ: usize = 10;
+const NX: usize = 5;
+const NY: usize = 5;
+const NZ: usize = 5;
 
 /// Most Hotham applications will want to keep track of some sort of state.
 /// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
@@ -94,6 +94,20 @@ impl Default for State {
             iz2 * NX * NY + iy2 * NX + ix1,
             iz2 * NX * NY + iy2 * NX + ix2,
         ];
+
+        // Pick the sides as audio emitters
+        // let mut audio_emitter_indices = Vec::new();
+        // for iz in 0..NZ {
+        //     for iy in 0..NY {
+        //         for ix in 0..NX {
+        //             if iz == 0 || iy == 0 || ix == 0 || ix == NX - 1 || iy == NY - 1 || iz == NZ - 1
+        //             {
+        //                 audio_emitter_indices.push(iz * NX * NY + iy * NX + ix);
+        //             }
+        //         }
+        //     }
+        // }
+
         let num_points = audio_emitter_indices.len();
 
         State {
@@ -116,7 +130,7 @@ impl Default for State {
 fn create_default_points() -> Vec<DVec3> {
     create_points(
         dvec3(tweak!(0.0), tweak!(2.0), tweak!(-0.5)),
-        dvec3(0.5, 0.5, 0.5),
+        dvec3(0.25, 0.25, 0.25),
         NX,
         NY,
         NZ,
@@ -208,10 +222,10 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
     let simulation_params = {
         puffin::profile_scope!("simulation params");
         SimulationParams {
-            dt: tweak!(0.001),
+            dt: tweak!(0.0001),
             acc: dvec3(0.0, -9.82, 0.0),
             particle_mass: tweak!(0.01),
-            shape_compliance: tweak!(0.00001), // Inverse of physical stiffness
+            shape_compliance: tweak!(0.0001), // Inverse of physical stiffness
             shape_damping: tweak!(100.0), // Linear damping towards rigid body motion, fraction of speed per second
             stiction_factor: tweak!(1.3), // Maximum tangential correction per correction along normal.
         }
@@ -345,7 +359,7 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
 }
 
 fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[DVec3]) -> Mesh {
-    const N: u32 = 10_u32;
+    const N: u32 = NX as _;
     const M: u32 = N - 1;
     const NUM_POINTS: usize = (N * N * N) as _;
     assert_eq!(points.len(), NUM_POINTS);
@@ -401,7 +415,7 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[
 }
 
 fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[DVec3]) {
-    const N: i32 = 10_i32;
+    const N: i32 = NX as _;
     const M: i32 = N - 1;
     const NUM_VERTICES: usize = (6 * N * N) as _;
     let mut positions: Vec<Vec3> = Vec::<Vec3>::with_capacity(NUM_VERTICES);
@@ -499,12 +513,18 @@ fn update_listener_system(engine: &mut Engine, state: &mut State) {
 }
 
 fn log_audio_system(state: &mut State) {
-    let sample_rate = state.audio_state.audio_player.config.sample_rate().0 as u64;
-    let samples_per_log = sample_rate / 10;
-    while let Some(entry) = state.audio_state.audio_player.get_audio_history_entry() {
-        if state.audio_sample_counter % samples_per_log == 0 {
-            println!("{entry:?}");
-        }
-        state.audio_sample_counter += 1;
-    }
+    // let sample_rate = state.audio_state.audio_player.config.sample_rate().0 as u64;
+    // let samples_per_log = sample_rate / 100;
+    // while let Some(entry) = state.audio_state.audio_player.get_audio_history_entry() {
+    //     if state.audio_sample_counter % samples_per_log == 0 {
+    //         println!("{entry:?}");
+    //     }
+    //     state.audio_sample_counter += 1;
+    // }
+    while state
+        .audio_state
+        .audio_player
+        .get_audio_history_entry()
+        .is_some()
+    {}
 }
