@@ -7,6 +7,7 @@ use crate::{
     contexts::{physics_context::HAND_COLLISION_GROUP, InputContext},
     Engine,
 };
+use glam::{Affine3A, Quat};
 use hecs::World;
 use rapier3d::prelude::{ActiveCollisionTypes, SharedShape};
 
@@ -57,8 +58,11 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
                 hand.grabbed_entity = None;
             } else {
                 // OK. We are sure that this entity exists, and is being grabbed.
+                let object_offset = get_object_offset(hand.handedness);
+
                 let mut local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
-                local_transform.update_rotation_translation_from_affine(&global_from_local);
+                local_transform
+                    .update_rotation_translation_from_affine(&(global_from_local * object_offset));
 
                 let mut global_transform =
                     world.get::<&mut GlobalTransform>(grabbed_entity).unwrap();
@@ -71,6 +75,37 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
 
         // Apply to AnimationController
         animation_controller.blend_amount = grip_value;
+    }
+}
+
+fn get_object_offset(handedness: Handedness) -> Affine3A {
+    use inline_tweak::release_tweak;
+    let left_rot_y = release_tweak!(0.);
+    let left_rot_x = release_tweak!(-1.);
+    let left_rot_z = release_tweak!(0.);
+    let left_rotation = Quat::from_euler(glam::EulerRot::YXZ, left_rot_y, left_rot_x, left_rot_z);
+
+    let left_x = release_tweak!(0.0);
+    let left_y = release_tweak!(0.03);
+    let left_z = release_tweak!(-0.02);
+    let left_offset =
+        Affine3A::from_rotation_translation(left_rotation, [left_x, left_y, left_z].into());
+
+    let right_rot_y = release_tweak!(0.);
+    let right_rot_x = release_tweak!(-1.);
+    let right_rot_z = release_tweak!(0.);
+    let right_rotation =
+        Quat::from_euler(glam::EulerRot::YXZ, right_rot_y, right_rot_x, right_rot_z);
+
+    let right_x = release_tweak!(0.);
+    let right_y = release_tweak!(0.03);
+    let right_z = release_tweak!(-0.02);
+    let right_offset =
+        Affine3A::from_rotation_translation(right_rotation, [right_x, right_y, right_z].into());
+
+    match handedness {
+        Handedness::Left => left_offset,
+        Handedness::Right => right_offset,
     }
 }
 

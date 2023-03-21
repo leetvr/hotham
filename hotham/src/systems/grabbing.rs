@@ -33,9 +33,9 @@ fn grabbing_system_inner(world: &mut World) {
     for (hand_entity, (hand, collider)) in world.query::<(&mut Hand, &Collider)>().iter() {
         // Check to see if we are currently gripping
         if hand.grip_value > 0.1 {
-            // If we already have a grabbed entity, no need to do anything.
+            // If we already have a grabbed entity, no need to do anything for this hand.
             if hand.grabbed_entity.is_some() {
-                return;
+                continue;
             };
 
             // Check to see if we are colliding with an entity

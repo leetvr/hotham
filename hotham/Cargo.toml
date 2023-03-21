@@ -24,6 +24,7 @@ hecs = "0.9.0"
 hotham-asset-client = {path = "../hotham-asset-client"}
 id-arena = "2.2.1"
 image = {version = "0.24.3", default-features = false, features = ["jpeg", "png"]}
+inline_tweak = {version = "1.0.8", features = ["release_tweak"]}
 itertools = "0.10.0"
 # ktx2 = "0.3"
 ktx2 = {git = "https://github.com/BVE-Reborn/ktx2"}
