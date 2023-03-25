@@ -5,7 +5,7 @@ use std::sync::{
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use hotham::anyhow::{self, anyhow};
-use nalgebra::{self, Isometry3, Point3, Unit, Vector3};
+use nalgebra::{self, DMatrix, DVector, Isometry3, Point3, Unit, Vector3};
 use triple_buffer as tbuf;
 
 pub type SamplingFunction = Box<dyn Send + FnMut(bool, &Point3<f32>) -> f32>;
@@ -171,6 +171,26 @@ where
     let channels = config.channels as usize;
     let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
 
+    const SPEED_OF_SOUND: f32 = 343.0;
+    const PLAYBACK_HISTORY_SIZE: usize = 5000;
+    let mut playback_history = DMatrix::<f32>::zeros(PLAYBACK_HISTORY_SIZE, channels);
+    let mut impulse_response = DVector::<f32>::zeros(PLAYBACK_HISTORY_SIZE);
+    let impulse_size = (config.sample_rate.0 as f32 * 0.5 / SPEED_OF_SOUND) as usize;
+    impulse_response
+        .rows_mut(PLAYBACK_HISTORY_SIZE - 1 - impulse_size, impulse_size)
+        .fill(1.0 / impulse_size as f32);
+    // let player_sample_rate = config.sample_rate.0 as f32;
+    // impulse_response[PLAYBACK_HISTORY_SIZE - 1] = 1.0;
+    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.002) as usize] = 0.5;
+    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.004) as usize] = 0.5;
+    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.006) as usize] = 0.5;
+    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.0075) as usize] = -0.5;
+    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.009) as usize] = 0.5;
+    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.011) as usize] = -0.5;
+    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.013) as usize] = -0.5;
+    let impulse_response = impulse_response;
+    let mut playback_write_index = 0;
+
     // Exponential moving average band-pass filtering
     const ALPHA1: f32 = 0.01;
     const ALPHA2: f32 = 0.001;
@@ -196,7 +216,7 @@ where
     let stream = device.build_output_stream(
         config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
-            puffin::profile_function!();
+            puffin::profile_scope!("data_callback");
             let global_from_listener_before = global_from_listener_after;
             while let Ok(new_global_from_listener) = global_from_listener_consumer.pop() {
                 global_from_listener_after = new_global_from_listener;
@@ -239,19 +259,38 @@ where
                             }
                         };
                     }
+                    {
+                        puffin::profile_scope!("filter_audio");
+                        // Convolve with impulse response
+                        for channel in 0..channels {
+                            playback_history[(playback_write_index, channel)] =
+                                sample_by_channel[channel];
+                        }
+                        playback_write_index = (playback_write_index + 1) % PLAYBACK_HISTORY_SIZE;
+                        for channel in 0..channels {
+                            let nrows = PLAYBACK_HISTORY_SIZE - playback_write_index;
+                            sample_by_channel[channel] = playback_history
+                                .column(channel)
+                                .rows(playback_write_index, nrows)
+                                .dot(&impulse_response.rows(0, nrows))
+                                + playback_history
+                                    .column(channel)
+                                    .rows(0, playback_write_index)
+                                    .dot(&impulse_response.rows(nrows, playback_write_index))
+                        }
 
-                    // Band-pass filter
-                    for channel in 0..channels {
-                        let value = sample_by_channel[channel];
-                        moving_average1[channel] =
-                            moving_average1[channel] * (1.0 - ALPHA1) + value * ALPHA1;
-                        moving_average2[channel] =
-                            moving_average2[channel] * (1.0 - ALPHA2) + value * ALPHA2;
-                        filtered_sample_by_channel[channel] =
-                            moving_average1[channel] - moving_average2[channel];
+                        // Band-pass filter
+                        for channel in 0..channels {
+                            let value = sample_by_channel[channel];
+                            moving_average1[channel] =
+                                moving_average1[channel] * (1.0 - ALPHA1) + value * ALPHA1;
+                            moving_average2[channel] =
+                                moving_average2[channel] * (1.0 - ALPHA2) + value * ALPHA2;
+                            filtered_sample_by_channel[channel] =
+                                moving_average1[channel] - moving_average2[channel];
+                        }
                     }
-
-                    puffin::profile_scope!("filter_audio");
+                    puffin::profile_scope!("normalize_audio");
                     // Adjust volume jointly over raw samples
                     let raw_tall_puppy = sample_by_channel
                         .iter()
