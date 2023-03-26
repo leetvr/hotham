@@ -11,6 +11,9 @@ use triple_buffer as tbuf;
 pub type SamplingFunction = Box<dyn Send + FnMut(bool, &Point3<f32>) -> f32>;
 pub type ListenerPose = Isometry3<f32>;
 
+const SPEED_OF_SOUND: f32 = 343.0;
+const PLAYBACK_HISTORY_SIZE: usize = 5000;
+
 pub struct AudioPlayer {
     device: cpal::Device,
     pub config: cpal::SupportedStreamConfig,
@@ -171,24 +174,8 @@ where
     let channels = config.channels as usize;
     let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
 
-    const SPEED_OF_SOUND: f32 = 343.0;
-    const PLAYBACK_HISTORY_SIZE: usize = 5000;
     let mut playback_history = DMatrix::<f32>::zeros(PLAYBACK_HISTORY_SIZE, channels);
-    let mut impulse_response = DVector::<f32>::zeros(PLAYBACK_HISTORY_SIZE);
-    let impulse_size = (config.sample_rate.0 as f32 * 0.5 / SPEED_OF_SOUND) as usize;
-    impulse_response
-        .rows_mut(PLAYBACK_HISTORY_SIZE - 1 - impulse_size, impulse_size)
-        .fill(1.0 / impulse_size as f32);
-    // let player_sample_rate = config.sample_rate.0 as f32;
-    // impulse_response[PLAYBACK_HISTORY_SIZE - 1] = 1.0;
-    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.002) as usize] = 0.5;
-    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.004) as usize] = 0.5;
-    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.006) as usize] = 0.5;
-    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.0075) as usize] = -0.5;
-    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.009) as usize] = 0.5;
-    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.011) as usize] = -0.5;
-    // impulse_response[PLAYBACK_HISTORY_SIZE - 1 - (player_sample_rate * 0.013) as usize] = -0.5;
-    let impulse_response = impulse_response;
+    let impulse_response = create_impulse_response_kernel(config.sample_rate.0);
     let mut playback_write_index = 0;
 
     // Exponential moving average band-pass filtering
@@ -359,4 +346,33 @@ where
     )?;
     stream.play()?;
     Ok(stream)
+}
+
+fn create_impulse_response_kernel(sample_rate: u32) -> DVector<f32> {
+    let sample_rate = sample_rate as f32;
+    let mut impulse_response = DVector::<f32>::zeros(PLAYBACK_HISTORY_SIZE);
+    let impulse_size = (sample_rate * 0.25 / SPEED_OF_SOUND) as usize;
+    let impulses = [
+        (0, 1.0),
+        ((sample_rate * 0.002) as usize, 0.5),
+        ((sample_rate * 0.004) as usize, 0.5),
+        ((sample_rate * 0.006) as usize, 0.5),
+        ((sample_rate * 0.0075) as usize, -0.5),
+        ((sample_rate * 0.009) as usize, 0.5),
+        ((sample_rate * 0.011) as usize, -0.5),
+        ((sample_rate * 0.013) as usize, -0.5),
+    ];
+    for (i, strength) in impulses {
+        impulse_response
+            .rows_mut(PLAYBACK_HISTORY_SIZE - 1 - impulse_size - i, impulse_size)
+            .add_scalar_mut(strength);
+    }
+    impulse_response
+}
+
+// Test create_impulse_response_kernel by printing the impulse response.
+#[test]
+fn test_create_impulse_response_kernel() {
+    let impulse_response = create_impulse_response_kernel(48_000);
+    println!("{:?}", impulse_response);
 }
