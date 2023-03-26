@@ -178,7 +178,7 @@ fn xpbd_system(engine: &mut Engine, state: &mut State, time_passed: Duration) {
     let simulation_params = {
         puffin::profile_scope!("simulation params");
         SimulationParams {
-            dt: tweak!(0.0001),
+            dt: tweak!(0.001),
             acc: dvec3(0.0, -9.82, 0.0),
             particle_mass: tweak!(0.01),
             shape_compliance: tweak!(0.0001), // Inverse of physical stiffness
