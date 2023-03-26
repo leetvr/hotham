@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use hotham::{
     components::Mesh,
     glam::{dvec3, DVec3},
@@ -11,10 +13,21 @@ pub struct XpbdState {
     pub shape_constraints: Vec<ShapeConstraint>,
     pub audio_emitter_indices: Vec<usize>,
     pub mesh: Option<Mesh>,
+
+    pub simulation_time_epoch: Instant,
+    pub simulation_time_hare: Instant,
+    pub simulation_time_hound: Instant,
 }
 
 impl XpbdState {
-    pub fn new(center: DVec3, size: DVec3, nx: usize, ny: usize, nz: usize) -> Self {
+    pub fn new(
+        center: DVec3,
+        size: DVec3,
+        nx: usize,
+        ny: usize,
+        nz: usize,
+        simulation_time: Instant,
+    ) -> Self {
         let points_curr = create_points(center, size, nx, ny, nz);
         let shape_constraints = create_shape_constraints(&points_curr, nx, ny, nz);
         let velocities = vec![dvec3(0.0, 0.0, 0.0); points_curr.len()];
@@ -53,12 +66,16 @@ impl XpbdState {
         //     }
         // }
 
+        let simulation_time_epoch = simulation_time;
         XpbdState {
             points_curr,
             velocities,
             shape_constraints,
             audio_emitter_indices,
             mesh,
+            simulation_time_hare: simulation_time_epoch,
+            simulation_time_hound: simulation_time_epoch,
+            simulation_time_epoch,
         }
     }
 }

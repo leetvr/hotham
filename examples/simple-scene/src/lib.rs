@@ -62,9 +62,6 @@ fn get_default_size() -> DVec3 {
 /// this is something you'd probably want to do!
 struct State {
     wall_time: Instant,
-    simulation_time_epoch: Instant,
-    simulation_time_hare: Instant,
-    simulation_time_hound: Instant,
     navigation: NavigationState,
     audio_state: AudioState,
     audio_sample_counter: u64,
@@ -74,16 +71,19 @@ struct State {
 impl Default for State {
     fn default() -> Self {
         let wall_time = Instant::now();
-        let simulation_time_epoch = wall_time;
-        let xpbd_state = XpbdState::new(get_default_center(), get_default_size(), NX, NY, NZ);
+        let xpbd_state = XpbdState::new(
+            get_default_center(),
+            get_default_size(),
+            NX,
+            NY,
+            NZ,
+            wall_time,
+        );
         let num_points = xpbd_state.audio_emitter_indices.len();
         State {
-            simulation_time_hare: simulation_time_epoch,
-            simulation_time_hound: simulation_time_epoch,
             wall_time,
-            simulation_time_epoch,
             navigation: Default::default(),
-            audio_state: AudioState::init_audio(num_points, simulation_time_epoch).unwrap(),
+            audio_state: AudioState::init_audio(num_points, wall_time).unwrap(),
             audio_sample_counter: 0,
             xpbd_state,
         }
@@ -136,7 +136,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     let time_passed = time_now.saturating_duration_since(state.wall_time);
     state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
+        state.xpbd_state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
         simulation_reset_system(engine, state);
         hands_system(engine);
         grabbing_system(engine);
@@ -165,8 +165,8 @@ fn simulation_reset_system(engine: &mut Engine, state: &mut State) {
     let input_context = &engine.input_context;
     if input_context.left.menu_button_just_pressed() || input_context.right.a_button_just_pressed()
     {
-        state.simulation_time_hound = state.simulation_time_epoch;
-        state.simulation_time_hare = state.simulation_time_epoch;
+        state.xpbd_state.simulation_time_hound = state.xpbd_state.simulation_time_epoch;
+        state.xpbd_state.simulation_time_hare = state.xpbd_state.simulation_time_epoch;
         state.xpbd_state.points_curr =
             create_points(get_default_center(), get_default_size(), NX, NY, NZ);
         state
@@ -210,8 +210,9 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
     command_buffer.run_on(&mut engine.world);
 
     let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
-    while state.simulation_time_hound + timestep < state.simulation_time_hare {
-        state.simulation_time_hound += timestep;
+    while state.xpbd_state.simulation_time_hound + timestep < state.xpbd_state.simulation_time_hare
+    {
+        state.xpbd_state.simulation_time_hound += timestep;
         xpbd_substep(
             &mut engine.world,
             &mut state.xpbd_state.velocities,
@@ -223,7 +224,7 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
             &state.xpbd_state.points_curr,
             &state.xpbd_state.velocities,
             &state.xpbd_state.audio_emitter_indices,
-            state.simulation_time_hound,
+            state.xpbd_state.simulation_time_hound,
             &mut state.audio_state,
         );
     }
