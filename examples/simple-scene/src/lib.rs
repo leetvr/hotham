@@ -3,6 +3,7 @@ mod utils;
 mod xpbd_audio_bridge;
 mod xpbd_collisions;
 mod xpbd_shape_constraints;
+mod xpbd_state;
 mod xpbd_substep;
 
 use std::time::{Duration, Instant};
@@ -14,7 +15,7 @@ use hotham::{
         physics::{BodyType, SharedShape},
         stage, Collider, GlobalTransform, Grabbable, LocalTransform, Mesh, RigidBody, Visible,
     },
-    contexts::{InputContext, RenderContext},
+    contexts::RenderContext,
     glam::{dvec3, vec2, DVec3, Vec3},
     hecs::{self, Without, World},
     na,
@@ -38,7 +39,8 @@ use nalgebra::{DVector, Quaternion, Translation3, UnitQuaternion};
 use xpbd_audio_bridge::{AudioSimulationUpdate, AudioState};
 use xpbd_collisions::Contact;
 use xpbd_collisions::XpbdCollisions;
-use xpbd_shape_constraints::{create_points, create_shape_constraints, ShapeConstraint};
+use xpbd_shape_constraints::create_points;
+use xpbd_state::XpbdState;
 use xpbd_substep::xpbd_substep;
 
 use crate::{audio_player::ListenerPose, xpbd_substep::SimulationParams};
@@ -47,94 +49,45 @@ const NX: usize = 5;
 const NY: usize = 5;
 const NZ: usize = 5;
 
+fn get_default_center() -> DVec3 {
+    dvec3(tweak!(0.0), tweak!(2.0), tweak!(-0.5))
+}
+
+fn get_default_size() -> DVec3 {
+    dvec3(0.25, 0.25, 0.25)
+}
+
 /// Most Hotham applications will want to keep track of some sort of state.
 /// However, this _simple_ scene doesn't have any, so this is just left here to let you know that
 /// this is something you'd probably want to do!
 struct State {
-    points_curr: Vec<DVec3>,
-    velocities: Vec<DVec3>,
-    shape_constraints: Vec<ShapeConstraint>,
-    audio_emitter_indices: Vec<usize>,
     wall_time: Instant,
     simulation_time_epoch: Instant,
     simulation_time_hare: Instant,
     simulation_time_hound: Instant,
-    mesh: Option<Mesh>,
     navigation: NavigationState,
     audio_state: AudioState,
     audio_sample_counter: u64,
+    xpbd_state: XpbdState,
 }
 
 impl Default for State {
     fn default() -> Self {
-        let points_curr = create_default_points();
-        let shape_constraints = create_shape_constraints(&points_curr, NX, NY, NZ);
-        let velocities = vec![dvec3(0.0, 0.0, 0.0); points_curr.len()];
-
-        let mesh = None;
-
         let wall_time = Instant::now();
         let simulation_time_epoch = wall_time;
-
-        // Pick the corners as audio emitters
-        let ix1 = 0;
-        let ix2 = NX - 1;
-        let iy1 = 0;
-        let iy2 = NY - 1;
-        let iz1 = 0;
-        let iz2 = NX - 1;
-
-        let audio_emitter_indices = vec![
-            iz1 * NX * NY + iy1 * NX + ix1,
-            iz1 * NX * NY + iy1 * NX + ix2,
-            iz1 * NX * NY + iy2 * NX + ix1,
-            iz1 * NX * NY + iy2 * NX + ix2,
-            iz2 * NX * NY + iy1 * NX + ix1,
-            iz2 * NX * NY + iy1 * NX + ix2,
-            iz2 * NX * NY + iy2 * NX + ix1,
-            iz2 * NX * NY + iy2 * NX + ix2,
-        ];
-
-        // Pick the sides as audio emitters
-        // let mut audio_emitter_indices = Vec::new();
-        // for iz in 0..NZ {
-        //     for iy in 0..NY {
-        //         for ix in 0..NX {
-        //             if iz == 0 || iy == 0 || ix == 0 || ix == NX - 1 || iy == NY - 1 || iz == NZ - 1
-        //             {
-        //                 audio_emitter_indices.push(iz * NX * NY + iy * NX + ix);
-        //             }
-        //         }
-        //     }
-        // }
-
-        let num_points = audio_emitter_indices.len();
-
+        let xpbd_state = XpbdState::new(get_default_center(), get_default_size(), NX, NY, NZ);
+        let num_points = xpbd_state.audio_emitter_indices.len();
         State {
-            points_curr,
-            velocities,
-            shape_constraints,
-            audio_emitter_indices,
             simulation_time_hare: simulation_time_epoch,
             simulation_time_hound: simulation_time_epoch,
             wall_time,
             simulation_time_epoch,
-            mesh,
             navigation: Default::default(),
             audio_state: AudioState::init_audio(num_points, simulation_time_epoch).unwrap(),
             audio_sample_counter: 0,
+            xpbd_state,
         }
     }
-}
-
-fn create_default_points() -> Vec<DVec3> {
-    create_points(
-        dvec3(tweak!(0.0), tweak!(2.0), tweak!(-0.5)),
-        dvec3(0.25, 0.25, 0.25),
-        NX,
-        NY,
-        NZ,
-    )
 }
 
 pub fn start_puffin_server() {
@@ -184,7 +137,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
         state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
-        simulation_reset_system(&engine.input_context, state);
+        simulation_reset_system(engine, state);
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
@@ -198,20 +151,30 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         update_listener_system(engine, state);
         log_audio_system(state);
     }
-    if let Some(mesh) = &state.mesh {
-        update_mesh(mesh, &mut engine.render_context, &state.points_curr);
+    if let Some(mesh) = &state.xpbd_state.mesh {
+        update_mesh(
+            mesh,
+            &mut engine.render_context,
+            &state.xpbd_state.points_curr,
+        );
     }
     rendering_system(engine, tick_data.swapchain_image_index);
 }
 
-fn simulation_reset_system(input_context: &InputContext, state: &mut State) {
+fn simulation_reset_system(engine: &mut Engine, state: &mut State) {
+    let input_context = &engine.input_context;
     if input_context.left.menu_button_just_pressed() || input_context.right.a_button_just_pressed()
     {
         state.simulation_time_hound = state.simulation_time_epoch;
         state.simulation_time_hare = state.simulation_time_epoch;
-        state.points_curr = create_default_points();
-        state.velocities.iter_mut().for_each(|v| *v = DVec3::ZERO);
-        for c in &mut state.shape_constraints {
+        state.xpbd_state.points_curr =
+            create_points(get_default_center(), get_default_size(), NX, NY, NZ);
+        state
+            .xpbd_state
+            .velocities
+            .iter_mut()
+            .for_each(|v| *v = DVec3::ZERO);
+        for c in &mut state.xpbd_state.shape_constraints {
             c.cached_rot = Default::default();
         }
     }
@@ -241,7 +204,7 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
         .iter()
     {
         let mut active_collisions = Vec::<Option<Contact>>::new();
-        active_collisions.resize_with(state.points_curr.len(), Default::default);
+        active_collisions.resize_with(state.xpbd_state.points_curr.len(), Default::default);
         command_buffer.insert_one(entity, XpbdCollisions { active_collisions });
     }
     command_buffer.run_on(&mut engine.world);
@@ -251,15 +214,15 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
         state.simulation_time_hound += timestep;
         xpbd_substep(
             &mut engine.world,
-            &mut state.velocities,
-            &mut state.points_curr,
-            &mut state.shape_constraints,
+            &mut state.xpbd_state.velocities,
+            &mut state.xpbd_state.points_curr,
+            &mut state.xpbd_state.shape_constraints,
             &simulation_params,
         );
         send_xpbd_state_to_audio(
-            &state.points_curr,
-            &state.velocities,
-            &state.audio_emitter_indices,
+            &state.xpbd_state.points_curr,
+            &state.xpbd_state.velocities,
+            &state.xpbd_state.audio_emitter_indices,
             state.simulation_time_hound,
             &mut state.audio_state,
         );
@@ -327,7 +290,11 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     add_helmet(&models, world);
     // add_model_to_world("Cube", &models, world, None);
 
-    state.mesh = Some(create_mesh(render_context, world, &state.points_curr));
+    state.xpbd_state.mesh = Some(create_mesh(
+        render_context,
+        world,
+        &state.xpbd_state.points_curr,
+    ));
 
     Ok(())
 }
