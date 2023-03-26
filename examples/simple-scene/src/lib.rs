@@ -13,18 +13,11 @@ use hotham::{
     components::{
         hand::Handedness,
         physics::{BodyType, SharedShape},
-        stage, Collider, GlobalTransform, Grabbable, LocalTransform, Mesh, RigidBody, Visible,
+        stage, Collider, Grabbable, LocalTransform, RigidBody,
     },
-    contexts::RenderContext,
-    glam::{dvec3, vec2, DVec3, Vec3},
+    glam::{dvec3, DVec3},
     hecs::{self, Without, World},
     na,
-    rendering::{
-        material::Material,
-        mesh_data::MeshData,
-        primitive::{calculate_bounding_sphere, Primitive},
-        vertex::Vertex,
-    },
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, rendering::rendering_system, skinning::skinning_system,
@@ -151,10 +144,11 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         log_audio_system(state);
     }
     if let Some(mesh) = &state.xpbd_state.mesh {
-        update_mesh(
+        xpbd_mesh::update_mesh(
             mesh,
             &mut engine.render_context,
             &state.xpbd_state.points_curr,
+            NX,
         );
     }
     rendering_system(engine, tick_data.swapchain_image_index);
@@ -291,10 +285,11 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     add_helmet(&models, world);
     // add_model_to_world("Cube", &models, world, None);
 
-    state.xpbd_state.mesh = Some(create_mesh(
+    state.xpbd_state.mesh = Some(xpbd_mesh::create_mesh(
         render_context,
         world,
         &state.xpbd_state.points_curr,
+        NX,
     ));
 
     Ok(())
@@ -326,140 +321,7 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
     world.insert(helmet, (collider, Grabbable {})).unwrap();
 }
 
-fn create_mesh(render_context: &mut RenderContext, world: &mut World, points: &[DVec3]) -> Mesh {
-    const N: u32 = NX as _;
-    const M: u32 = N - 1;
-    const NUM_POINTS: usize = (N * N * N) as _;
-    assert_eq!(points.len(), NUM_POINTS);
-    const NUM_VERTICES: usize = (6 * N * N) as _;
-    const NUM_INDICES: usize = (6 * M * M * 2) as _;
-    let positions: Vec<Vec3> = vec![Default::default(); NUM_VERTICES];
-    let vertices: Vec<Vertex> = vec![Default::default(); NUM_VERTICES];
-    let mut indices: Vec<u32> = vec![Default::default(); NUM_INDICES];
-
-    for side in 0..6 {
-        for i in 0..M {
-            for j in 0..M {
-                indices.push(side * N * N + i * N + j);
-                indices.push(side * N * N + i * N + j + 1);
-                indices.push(side * N * N + i * N + j + 1 + N);
-                indices.push(side * N * N + i * N + j);
-                indices.push(side * N * N + i * N + j + 1 + N);
-                indices.push(side * N * N + i * N + j + N);
-            }
-        }
-    }
-
-    let material_id = unsafe {
-        render_context
-            .resources
-            .materials_buffer
-            .push(&Material::gltf_default())
-    };
-    let mesh = Mesh::new(
-        MeshData::new(vec![Primitive::new(
-            positions.as_slice(),
-            vertices.as_slice(),
-            indices.as_slice(),
-            material_id,
-            render_context,
-        )]),
-        render_context,
-    );
-    update_mesh(&mesh, render_context, points);
-    let local_transform = LocalTransform {
-        translation: [0., 0., 0.].into(),
-        ..Default::default()
-    };
-
-    world.spawn((
-        Visible {},
-        mesh.clone(),
-        local_transform,
-        GlobalTransform::default(),
-    ));
-
-    mesh
-}
-
-fn update_mesh(mesh: &Mesh, render_context: &mut RenderContext, points: &[DVec3]) {
-    const N: i32 = NX as _;
-    const M: i32 = N - 1;
-    const NUM_VERTICES: usize = (6 * N * N) as _;
-    let mut positions: Vec<Vec3> = Vec::<Vec3>::with_capacity(NUM_VERTICES);
-    let mut vertices: Vec<Vertex> = Vec::<Vertex>::with_capacity(NUM_VERTICES);
-
-    for side in 0..6 {
-        for i in 0..N {
-            for j in 0..N {
-                let (x, y, z, dxdi, dydi, dzdi, dxdj, dydj, dzdj) = match side {
-                    0 => (M, i, M - j, 0, 1, 0, 0, 0, -1),
-                    1 => (j, M, M - i, 0, 0, -1, 1, 0, 0),
-                    2 => (j, i, M, 0, 1, 0, 1, 0, 0),
-                    3 => (0, j, M - i, 0, 0, -1, 0, 1, 0),
-                    4 => (j, 0, i, 0, 0, 1, 1, 0, 0),
-                    5 => (M - j, i, 0, 0, 1, 0, -1, 0, 0),
-                    i32::MIN..=-1_i32 | 6_i32..=i32::MAX => todo!(),
-                };
-                let center = points[(z * N * N + y * N + x) as usize];
-                positions.push(center.as_vec3());
-                let x0 = (x - dxdi).clamp(0, M);
-                let y0 = (y - dydi).clamp(0, M);
-                let z0 = (z - dzdi).clamp(0, M);
-                let x1 = (x + dxdi).clamp(0, M);
-                let y1 = (y + dydi).clamp(0, M);
-                let z1 = (z + dzdi).clamp(0, M);
-                let x2 = (x - dxdj).clamp(0, M);
-                let y2 = (y - dydj).clamp(0, M);
-                let z2 = (z - dzdj).clamp(0, M);
-                let x3 = (x + dxdj).clamp(0, M);
-                let y3 = (y + dydj).clamp(0, M);
-                let z3 = (z + dzdj).clamp(0, M);
-                let p_down = points[(z0 * N * N + y0 * N + x0) as usize];
-                let p_up = points[(z1 * N * N + y1 * N + x1) as usize];
-                let p_left = points[(z2 * N * N + y2 * N + x2) as usize];
-                let p_right = points[(z3 * N * N + y3 * N + x3) as usize];
-                let normal = (p_right - p_left).cross(p_up - p_down).normalize_or_zero();
-                let texture_coords = vec2(j as f32 / M as f32, i as f32 / M as f32);
-                vertices.push(Vertex {
-                    normal: normal.as_vec3(),
-                    texture_coords,
-                    ..Default::default()
-                });
-            }
-        }
-    }
-
-    let mesh = render_context
-        .resources
-        .mesh_data
-        .get_mut(mesh.handle)
-        .unwrap();
-    mesh.primitives[0].bounding_sphere = calculate_bounding_sphere(&positions);
-
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            positions.as_ptr(),
-            render_context
-                .resources
-                .position_buffer
-                .memory_address
-                .as_ptr()
-                .offset(mesh.primitives[0].vertex_buffer_offset as _),
-            positions.len(),
-        );
-        std::ptr::copy_nonoverlapping(
-            vertices.as_ptr(),
-            render_context
-                .resources
-                .vertex_buffer
-                .memory_address
-                .as_ptr()
-                .offset(mesh.primitives[0].vertex_buffer_offset as _),
-            vertices.len(),
-        );
-    }
-}
+mod xpbd_mesh;
 
 fn update_listener_system(engine: &mut Engine, state: &mut State) {
     puffin::profile_function!();
