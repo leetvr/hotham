@@ -494,5 +494,7 @@ fn log_audio_system(state: &mut State) {
         .audio_player
         .get_audio_history_entry()
         .is_some()
-    {}
+    {
+        state.audio_sample_counter += 1;
+    }
 }
