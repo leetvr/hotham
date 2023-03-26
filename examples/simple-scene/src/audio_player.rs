@@ -255,15 +255,26 @@ where
                         }
                         playback_write_index = (playback_write_index + 1) % PLAYBACK_HISTORY_SIZE;
                         for channel in 0..channels {
-                            let nrows = PLAYBACK_HISTORY_SIZE - playback_write_index;
-                            sample_by_channel[channel] = playback_history
-                                .column(channel)
-                                .rows(playback_write_index, nrows)
-                                .dot(&impulse_response.rows(0, nrows))
-                                + playback_history
+                            let start = (PLAYBACK_HISTORY_SIZE + playback_write_index
+                                - impulse_response.len())
+                                % PLAYBACK_HISTORY_SIZE;
+                            let end = playback_write_index;
+                            if start < end {
+                                sample_by_channel[channel] = playback_history
                                     .column(channel)
-                                    .rows(0, playback_write_index)
-                                    .dot(&impulse_response.rows(nrows, playback_write_index))
+                                    .rows(start, impulse_response.len())
+                                    .dot(&impulse_response);
+                            } else {
+                                let split = PLAYBACK_HISTORY_SIZE - start;
+                                sample_by_channel[channel] = playback_history
+                                    .column(channel)
+                                    .rows(start, split)
+                                    .dot(&impulse_response.rows(0, split))
+                                    + playback_history
+                                        .column(channel)
+                                        .rows(0, end)
+                                        .dot(&impulse_response.rows(split, end));
+                            }
                         }
 
                         // Band-pass filter
@@ -350,7 +361,6 @@ where
 
 fn create_impulse_response_kernel(sample_rate: u32) -> DVector<f32> {
     let sample_rate = sample_rate as f32;
-    let mut impulse_response = DVector::<f32>::zeros(PLAYBACK_HISTORY_SIZE);
     let impulse_size = (sample_rate * 0.25 / SPEED_OF_SOUND) as usize;
     let impulses = [
         (0, 1.0),
@@ -362,9 +372,16 @@ fn create_impulse_response_kernel(sample_rate: u32) -> DVector<f32> {
         ((sample_rate * 0.011) as usize, -0.5),
         ((sample_rate * 0.013) as usize, -0.5),
     ];
+    let size = impulses
+        .iter()
+        .map(|(i, _)| impulse_size + i)
+        .max()
+        .unwrap();
+    let mut impulse_response = DVector::<f32>::zeros(size);
     for (i, strength) in impulses {
+        let first_row = size - impulse_size - i;
         impulse_response
-            .rows_mut(PLAYBACK_HISTORY_SIZE - 1 - impulse_size - i, impulse_size)
+            .rows_mut(first_row, impulse_size)
             .add_scalar_mut(strength);
     }
     impulse_response
