@@ -136,7 +136,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     let time_passed = time_now.saturating_duration_since(state.wall_time);
     state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
-        state.xpbd_state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
         simulation_reset_system(engine, state);
         hands_system(engine);
         grabbing_system(engine);
@@ -147,7 +146,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
         debug_system(engine);
-        xpbd_system(engine, state);
+        xpbd_system(engine, state, time_passed);
         update_listener_system(engine, state);
         log_audio_system(state);
     }
@@ -180,7 +179,7 @@ fn simulation_reset_system(engine: &mut Engine, state: &mut State) {
     }
 }
 
-fn xpbd_system(engine: &mut Engine, state: &mut State) {
+fn xpbd_system(engine: &mut Engine, state: &mut State, time_passed: Duration) {
     puffin::profile_function!();
     let simulation_params = {
         puffin::profile_scope!("simulation params");
@@ -210,6 +209,7 @@ fn xpbd_system(engine: &mut Engine, state: &mut State) {
     command_buffer.run_on(&mut engine.world);
 
     let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
+    state.xpbd_state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
     while state.xpbd_state.simulation_time_hound + timestep < state.xpbd_state.simulation_time_hare
     {
         state.xpbd_state.simulation_time_hound += timestep;
