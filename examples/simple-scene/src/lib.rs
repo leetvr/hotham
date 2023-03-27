@@ -13,9 +13,9 @@ use hotham::{
     components::{
         hand::Handedness,
         physics::{BodyType, SharedShape},
-        stage, Collider, Grabbable, LocalTransform, RigidBody,
+        stage, Collider, GlobalTransform, Grabbable, LocalTransform, RigidBody,
     },
-    glam::{dvec3, DVec3},
+    glam::{dvec3, Affine3A, DVec3},
     hecs::{self, Without, World},
     na,
     systems::{
@@ -48,6 +48,46 @@ fn get_default_center() -> DVec3 {
 
 fn get_default_size() -> DVec3 {
     dvec3(0.25, 0.25, 0.25)
+}
+
+pub struct FrameStartTransform(pub Affine3A);
+
+pub struct InterpolatedTransform(pub Affine3A);
+
+impl InterpolatedTransform {
+    /// Convenience function to convert the [`GlobalTransform`] into a [`rapier3d::na::Isometry3`]
+    pub fn to_isometry(&self) -> hotham::na::Isometry3<f32> {
+        hotham::util::isometry_from_affine(&self.0)
+    }
+}
+
+fn store_transforms_pre_update_system(engine: &mut Engine) {
+    puffin::profile_function!();
+
+    let mut command_buffer = hecs::CommandBuffer::new();
+    for (entity, global_transform) in engine
+        .world
+        .query::<Without<&GlobalTransform, &FrameStartTransform>>()
+        .iter()
+    {
+        command_buffer.insert_one(entity, FrameStartTransform(global_transform.0));
+    }
+    for (entity, global_transform) in engine
+        .world
+        .query::<Without<&GlobalTransform, &InterpolatedTransform>>()
+        .iter()
+    {
+        command_buffer.insert_one(entity, InterpolatedTransform(global_transform.0));
+    }
+    command_buffer.run_on(&mut engine.world);
+
+    for (_, (global_transform, start_transform)) in engine
+        .world
+        .query_mut::<(&GlobalTransform, &mut FrameStartTransform)>()
+        .into_iter()
+    {
+        start_transform.0 = global_transform.0;
+    }
 }
 
 /// Most Hotham applications will want to keep track of some sort of state.
@@ -129,6 +169,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     let time_passed = time_now.saturating_duration_since(state.wall_time);
     state.wall_time = time_now;
     if tick_data.current_state == xr::SessionState::FOCUSED {
+        store_transforms_pre_update_system(engine);
         simulation_reset_system(engine, state);
         hands_system(engine);
         grabbing_system(engine);
@@ -202,11 +243,47 @@ fn xpbd_system(engine: &mut Engine, state: &mut State, time_passed: Duration) {
     }
     command_buffer.run_on(&mut engine.world);
 
-    let timestep = Duration::from_nanos((dt * 1_000_000_000.0) as _);
+    let substep = Duration::from_secs_f64(dt);
     state.xpbd_state.simulation_time_hare += time_passed.min(Duration::from_millis(100));
-    while state.xpbd_state.simulation_time_hound + timestep < state.xpbd_state.simulation_time_hare
-    {
-        state.xpbd_state.simulation_time_hound += timestep;
+
+    let time_start = state.xpbd_state.simulation_time_hound;
+    let all_substeps_secs = {
+        let mut time_end = state.xpbd_state.simulation_time_hound;
+        while time_end + substep < state.xpbd_state.simulation_time_hare {
+            time_end += substep;
+        }
+        (time_end - time_start).as_secs_f32()
+    };
+
+    while state.xpbd_state.simulation_time_hound + substep < state.xpbd_state.simulation_time_hare {
+        state.xpbd_state.simulation_time_hound += substep;
+        {
+            puffin::profile_scope!("Interpolate global transforms");
+            let timestep_fraction = (state.xpbd_state.simulation_time_hound - time_start)
+                .as_secs_f32()
+                / all_substeps_secs;
+            for (_, (start, end, interpolated)) in engine
+                .world
+                .query_mut::<(
+                    &FrameStartTransform,
+                    &GlobalTransform,
+                    &mut InterpolatedTransform,
+                )>()
+                .into_iter()
+            {
+                // The transform is global_from_local
+                let (start_scale, start_rotation, start_translation) =
+                    start.0.to_scale_rotation_translation();
+                let (end_scale, end_rotation, end_translation) =
+                    end.0.to_scale_rotation_translation();
+                interpolated.0 = Affine3A::from_scale_rotation_translation(
+                    start_scale.lerp(end_scale, timestep_fraction),
+                    start_rotation.slerp(end_rotation, timestep_fraction),
+                    start_translation.lerp(end_translation, timestep_fraction),
+                );
+            }
+        }
+
         xpbd_substep(
             &mut engine.world,
             &mut state.xpbd_state.velocities,

@@ -5,6 +5,8 @@ use hotham::{
     na,
 };
 
+use crate::InterpolatedTransform;
+
 #[derive(Clone)]
 pub enum ContactState {
     New,
@@ -24,13 +26,19 @@ pub struct XpbdCollisions {
 
 pub fn resolve_ecs_collisions(world: &mut World, points_next: &mut [DVec3], stiction_factor: f64) {
     puffin::profile_function!();
-    for (_, (transform, collider, collisions)) in world
-        .query_mut::<(Option<&GlobalTransform>, &Collider, &mut XpbdCollisions)>()
+    for (_, (interpolated_transform, global_transform, collider, collisions)) in world
+        .query_mut::<(
+            Option<&InterpolatedTransform>,
+            Option<&GlobalTransform>,
+            &Collider,
+            &mut XpbdCollisions,
+        )>()
         .into_iter()
     {
-        let m = match transform {
-            Some(transform) => transform.to_isometry(),
-            None => Default::default(),
+        let m = match (interpolated_transform, global_transform) {
+            (Some(transform), _) => transform.to_isometry(),
+            (_, Some(transform)) => transform.to_isometry(),
+            (None, None) => Default::default(),
         };
 
         for (p_global, c) in points_next
