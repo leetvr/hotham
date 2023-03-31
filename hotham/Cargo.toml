@@ -27,7 +27,7 @@ image = {version = "0.24.3", default-features = false, features = ["jpeg", "png"
 itertools = "0.10.0"
 # ktx2 = "0.3"
 ktx2 = {git = "https://github.com/BVE-Reborn/ktx2"}
-memoffset = "0.6.5"
+memoffset = "0.8.0"
 mint = "0.5.6"
 notify-debouncer-mini = "0.2.1"
 oddio = "0.5"
