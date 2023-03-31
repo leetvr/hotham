@@ -10,7 +10,7 @@ anyhow = "1.0"
 futures-util = {version = "0.3.11", default-features = false, features = ["io"]}
 hotham-asset-client = {path = "../hotham-asset-client"}
 notify-debouncer-mini = {version = "*", default-features = false}
-quinn = {version = "0.8.5", features = ["tls-rustls"]}
+quinn = {version = "0.9", features = ["tls-rustls"]}
 rcgen = "0.10.0"
 rustls = {version = "0.20.3", features = ["dangerous_configuration", "quic"]}
 tokio = {version = "1.21.2", features = ["full"]}
