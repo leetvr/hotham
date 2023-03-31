@@ -79,11 +79,9 @@ impl PhysicsContext {
             &mut self.impulse_joints,
             &mut self.multibody_joints,
             &mut self.ccd_solver,
+            Some(&mut self.query_pipeline),
             &(),
             &(),
         );
-
-        self.query_pipeline
-            .update(&self.island_manager, &self.rigid_bodies, &self.colliders);
     }
 }
