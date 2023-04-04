@@ -9,6 +9,7 @@ mod xpbd_substep;
 use std::time::{Duration, Instant};
 
 use hotham::{
+    anyhow,
     asset_importer::{self, add_model_to_world},
     components::{
         hand::Handedness,
@@ -99,6 +100,7 @@ struct State {
     audio_state: AudioState,
     audio_sample_counter: u64,
     xpbd_state: XpbdState,
+    rr_session: Option<rerun::Session>,
 }
 
 impl Default for State {
@@ -119,6 +121,7 @@ impl Default for State {
             audio_state: AudioState::init_audio(num_points, wall_time).unwrap(),
             audio_sample_counter: 0,
             xpbd_state,
+            rr_session: None,
         }
     }
 }
@@ -141,6 +144,18 @@ pub fn start_puffin_server() {
     };
 }
 
+fn init_rerun_session() -> anyhow::Result<rerun::Session> {
+    let mut session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
+    rerun::MsgSender::new("world")
+        .with_timeless(true)
+        .with_splat(rerun::components::ViewCoordinates::from_up_and_handedness(
+            rerun::coordinates::SignedAxis3::POSITIVE_Y,
+            rerun::coordinates::Handedness::Right,
+        ))?
+        .send(&mut session)?;
+    Ok(session)
+}
+
 #[cfg_attr(target_os = "android", ndk_glue::main(backtrace = "on"))]
 pub fn main() {
     println!("[HOTHAM_SIMPLE_SCENE] MAIN!");
@@ -151,7 +166,8 @@ pub fn main() {
 pub fn real_main() -> HothamResult<()> {
     start_puffin_server();
     let mut engine = Engine::new();
-    let mut state = Default::default();
+    let mut state = State::default();
+    state.rr_session = init_rerun_session().ok();
     init(&mut engine, &mut state)?;
 
     while let Ok(tick_data) = engine.update() {
@@ -298,6 +314,10 @@ fn xpbd_system(engine: &mut Engine, state: &mut State, time_passed: Duration) {
             state.xpbd_state.simulation_time_hound,
             &mut state.audio_state,
         );
+
+        if let Some(session) = state.rr_session.as_mut() {
+            send_xpbd_state_to_rendering(&state.xpbd_state, session);
+        }
     }
 }
 
@@ -331,6 +351,25 @@ fn send_xpbd_state_to_audio(
             break;
         }
     }
+}
+
+fn send_xpbd_state_to_rendering(
+    xpbd_state: &XpbdState,
+    session: &mut rerun::Session,
+) -> anyhow::Result<()> {
+    let radius = rerun::components::Radius(0.025);
+    let color = rerun::components::ColorRGBA::from_rgb(64, 64, 64);
+    let points = xpbd_state
+        .points_curr
+        .iter()
+        .map(|&p| rerun::components::Point3D::new(p.x as _, p.y as _, p.z as _))
+        .collect::<Vec<rerun::components::Point3D>>();
+    rerun::MsgSender::new("world/points")
+        .with_component(&points)?
+        .with_splat(color)?
+        .with_splat(radius)?
+        .send(session)?;
+    Ok(())
 }
 
 fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamError> {
