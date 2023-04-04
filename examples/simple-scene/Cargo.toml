@@ -17,9 +17,14 @@ hotham = { path = "../../hotham" }
 hotham-examples = { path = "../shared" }
 inline_tweak = "1.0.8"
 itertools = "0.10.0"
-nalgebra = { version = "0.32.1", features = ["convert-glam021"] }
+nalgebra = { version = "0.32.1", features = ["convert-glam022"] }
 puffin = "0.14.3"
 puffin_http = "0.11.1"
+rerun = { path = "../../../rerun/crates/rerun", features = [
+    "glam",
+    "sdk",
+], default-features = false }
+# re_sdk = "0.4"
 rtrb = "0.2.0"
 triple_buffer = "6.1.0"
 
