@@ -316,8 +316,14 @@ fn xpbd_system(engine: &mut Engine, state: &mut State, time_passed: Duration) {
         );
 
         if let Some(session) = state.rr_session.as_mut() {
-            send_xpbd_state_to_rendering(
+            send_xpbd_state_to_rerun(
                 &state.xpbd_state,
+                session,
+                state.xpbd_state.simulation_time_hound,
+                state.xpbd_state.simulation_time_epoch,
+            );
+            send_colliders_to_rerun(
+                &engine.world,
                 session,
                 state.xpbd_state.simulation_time_hound,
                 state.xpbd_state.simulation_time_epoch,
@@ -358,7 +364,7 @@ fn send_xpbd_state_to_audio(
     }
 }
 
-fn send_xpbd_state_to_rendering(
+fn send_xpbd_state_to_rerun(
     xpbd_state: &XpbdState,
     session: &mut rerun::Session,
     simulation_time: Instant,
@@ -382,6 +388,43 @@ fn send_xpbd_state_to_rendering(
         .with_component(&points)?
         .with_splat(color)?
         .with_splat(radius)?
+        .send(session)?;
+    Ok(())
+}
+
+fn send_colliders_to_rerun(
+    world: &World,
+    session: &mut rerun::Session,
+    simulation_time: Instant,
+    simulation_time_epoch: Instant,
+) -> anyhow::Result<()> {
+    let simulation_timeline =
+        rerun::time::Timeline::new("simulation_time", rerun::time::TimeType::Time);
+    let time_since_epoch = simulation_time - simulation_time_epoch;
+    let mut radii = Vec::new();
+    let color = rerun::components::ColorRGBA::from_rgb(128, 128, 64);
+    let mut points = Vec::new();
+    for (_, (collider, transform)) in world.query::<(&Collider, &InterpolatedTransform)>().iter() {
+        let p = transform.0.transform_point3(collider.offset_from_parent);
+        if let Some(ball) = collider.shape.as_ball() {
+            points.push(rerun::components::Point3D::new(
+                p.x as _, p.y as _, p.z as _,
+            ));
+            radii.push(rerun::components::Radius(ball.radius));
+        }
+    }
+    if points.is_empty() {
+        return Ok(());
+    }
+    assert_eq!(radii.len(), points.len());
+    rerun::MsgSender::new("world/colliders")
+        .with_time(
+            simulation_timeline,
+            rerun::time::Time::from_seconds_since_epoch(time_since_epoch.as_secs_f64()),
+        )
+        .with_component(&points)?
+        .with_splat(color)?
+        .with_component(&radii)?
         .send(session)?;
     Ok(())
 }
