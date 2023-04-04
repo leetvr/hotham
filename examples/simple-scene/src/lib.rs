@@ -316,7 +316,12 @@ fn xpbd_system(engine: &mut Engine, state: &mut State, time_passed: Duration) {
         );
 
         if let Some(session) = state.rr_session.as_mut() {
-            send_xpbd_state_to_rendering(&state.xpbd_state, session);
+            send_xpbd_state_to_rendering(
+                &state.xpbd_state,
+                session,
+                state.xpbd_state.simulation_time_hound,
+                state.xpbd_state.simulation_time_epoch,
+            );
         }
     }
 }
@@ -356,7 +361,12 @@ fn send_xpbd_state_to_audio(
 fn send_xpbd_state_to_rendering(
     xpbd_state: &XpbdState,
     session: &mut rerun::Session,
+    simulation_time: Instant,
+    simulation_time_epoch: Instant,
 ) -> anyhow::Result<()> {
+    let simulation_timeline =
+        rerun::time::Timeline::new("simulation_time", rerun::time::TimeType::Time);
+    let time_since_epoch = simulation_time - simulation_time_epoch;
     let radius = rerun::components::Radius(0.025);
     let color = rerun::components::ColorRGBA::from_rgb(64, 64, 64);
     let points = xpbd_state
@@ -365,6 +375,10 @@ fn send_xpbd_state_to_rendering(
         .map(|&p| rerun::components::Point3D::new(p.x as _, p.y as _, p.z as _))
         .collect::<Vec<rerun::components::Point3D>>();
     rerun::MsgSender::new("world/points")
+        .with_time(
+            simulation_timeline,
+            rerun::time::Time::from_seconds_since_epoch(time_since_epoch.as_secs_f64()),
+        )
         .with_component(&points)?
         .with_splat(color)?
         .with_splat(radius)?
