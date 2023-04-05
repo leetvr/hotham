@@ -1,7 +1,7 @@
 use crate::message::Message;
 use crate::AssetUpdatedMessage;
 use anyhow::{anyhow, bail, Context, Result};
-use futures_util::TryStreamExt;
+use futures_util::{StreamExt, TryStreamExt};
 use quinn::{ClientConfig, Endpoint};
 use std::sync::Arc;
 use tokio::sync::mpsc::Sender;
@@ -23,7 +23,11 @@ async fn run_client(
     endpoint.set_default_client_config(client_cfg);
 
     // connect to server
-    let connection = endpoint
+    let quinn::NewConnection {
+        connection,
+        bi_streams,
+        ..
+    } = endpoint
         .connect(server_addr, "hotham_asset_server")?
         .await?;
     println!("[CLIENT] connected: addr={}", connection.remote_address());
@@ -38,7 +42,7 @@ async fn run_client(
         .try_collect::<Vec<_>>()
         .await?;
 
-    wait_for_updates(connection.clone(), sender)
+    wait_for_updates(bi_streams, connection.clone(), sender)
         .await
         .context("Watching file")?;
 
@@ -51,11 +55,12 @@ async fn run_client(
 }
 
 async fn wait_for_updates(
+    mut bi_streams: quinn::IncomingBiStreams,
     connection: quinn::Connection,
     sender: Sender<AssetUpdatedMessage>,
 ) -> Result<()> {
-    loop {
-        let stream = match connection.accept_bi().await {
+    while let Some(stream) = bi_streams.next().await {
+        let stream = match stream {
             Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
                 println!("[CLIENT] Connection closed");
                 return Ok(());
@@ -67,6 +72,8 @@ async fn wait_for_updates(
         };
         tokio::spawn(handle_incoming(stream, connection.clone(), sender.clone()));
     }
+
+    Ok(())
 }
 
 async fn ask_for_watch(connection: quinn::Connection, asset_name: String) -> Result<()> {

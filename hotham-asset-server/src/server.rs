@@ -1,5 +1,5 @@
 use anyhow::{bail, Result};
-use futures_util::TryFutureExt;
+use futures_util::{StreamExt, TryFutureExt};
 use hotham_asset_client::message::Message;
 /// A simple server that serves assets to localhost or remote targets. It's great and has no flaws.
 // TODO:
@@ -8,7 +8,7 @@ use hotham_asset_client::message::Message;
 // 3. Watch for file updates
 // 4. Send a "file updated" message back to the client on update
 // 5. GOTO 2
-use quinn::{Endpoint, ServerConfig};
+use quinn::{Endpoint, Incoming, ServerConfig};
 use std::{
     error::Error,
     net::SocketAddr,
@@ -18,10 +18,11 @@ use std::{
 
 use crate::WatchList;
 
-pub async fn handle_connection(conn: quinn::Connection, watch_list: WatchList) -> Result<()> {
+pub async fn handle_connection(conn: quinn::NewConnection, watch_list: WatchList) -> Result<()> {
     println!("[SERVER] Connection established!");
-    loop {
-        let (send, recv) = match conn.accept_bi().await {
+    let mut bi_streams = conn.bi_streams;
+    while let Some(stream) = bi_streams.next().await {
+        let (send, recv) = match stream {
             Err(quinn::ConnectionError::ApplicationClosed { .. }) => {
                 println!("[SERVER] Connection closed");
                 return Ok(());
@@ -36,6 +37,7 @@ pub async fn handle_connection(conn: quinn::Connection, watch_list: WatchList) -
                 .map_err(|e| eprintln!("[SERVER] Error in incoming: {e:?}")),
         );
     }
+    Ok(())
 }
 
 pub async fn watch_files(connection: quinn::Connection, watch_list: WatchList) {
@@ -150,10 +152,10 @@ async fn get_last_updated(path: &str) -> anyhow::Result<SystemTime> {
     Ok(tokio::fs::metadata(path).await?.modified()?)
 }
 
-pub fn make_server_endpoint(bind_addr: SocketAddr) -> Result<(Endpoint, Vec<u8>), Box<dyn Error>> {
+pub fn make_server_endpoint(bind_addr: SocketAddr) -> Result<(Incoming, Vec<u8>), Box<dyn Error>> {
     let (server_config, server_cert) = configure_server()?;
-    let endpoint = Endpoint::server(server_config, bind_addr)?;
-    Ok((endpoint, server_cert))
+    let (_endpoint, incoming) = Endpoint::server(server_config, bind_addr)?;
+    Ok((incoming, server_cert))
 }
 
 /// Returns default server configuration along with its certificate.
