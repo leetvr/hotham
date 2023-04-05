@@ -95,6 +95,8 @@ pub fn resolve_ecs_collisions(world: &mut World, points_next: &mut [DVec3], stic
                     p_local.z as f32,
                 ));
                 *p_global = dvec3(pt.x as _, pt.y as _, pt.z as _);
+            } else {
+                *c = None;
             }
         }
     }
