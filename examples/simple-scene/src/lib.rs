@@ -309,18 +309,22 @@ fn xpbd_system(engine: &mut Engine, state: &mut State, time_passed: Duration) {
         );
 
         if let Some(session) = state.rr_session.as_mut() {
-            send_xpbd_state_to_rerun(
+            if let Err(err) = send_xpbd_state_to_rerun(
                 &state.xpbd_state,
                 session,
                 state.xpbd_state.simulation_time_hound,
                 state.xpbd_state.simulation_time_epoch,
-            );
-            send_colliders_to_rerun(
+            ) {
+                eprintln!("Error sending xpbd state to rerun: {err}");
+            }
+            if let Err(err) = send_colliders_to_rerun(
                 &engine.world,
                 session,
                 state.xpbd_state.simulation_time_hound,
                 state.xpbd_state.simulation_time_epoch,
-            );
+            ) {
+                eprintln!("Error sending colliders to rerun: {err}");
+            }
         }
     }
 }
