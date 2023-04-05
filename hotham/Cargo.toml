@@ -17,7 +17,7 @@ cpal = "0.13.5"
 ctrlc = {version = "3", features = ["termination"]}
 egui = "0.15"
 generational-arena = "0.2.8"
-glam = {features = ["mint", "serde", "approx"], version = "0.21.3"}
+glam = {features = ["mint", "serde", "approx"], version = "0.22"}
 gltf = {version = "1.0", features = ["KHR_lights_punctual", "KHR_materials_unlit", "names", "utils"], default-features = false}
 half = "2.1.0"
 hecs = "0.9.0"
