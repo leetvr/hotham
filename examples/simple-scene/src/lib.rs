@@ -160,7 +160,14 @@ pub fn real_main() -> HothamResult<()> {
     start_puffin_server();
     let mut engine = Engine::new();
     let mut state = State::default();
-    state.rr_session = init_rerun_session().ok();
+    match init_rerun_session() {
+        Ok(session) => {
+            state.rr_session = Some(session);
+        }
+        Err(err) => {
+            eprintln!("Failed to init rerun session: {err}");
+        }
+    }
     init(&mut engine, &mut state)?;
 
     while let Ok(tick_data) = engine.update() {
