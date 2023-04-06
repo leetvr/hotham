@@ -6,6 +6,7 @@ mod xpbd_rerun;
 mod xpbd_shape_constraints;
 mod xpbd_state;
 mod xpbd_substep;
+mod xr_inputs_rerun;
 
 use std::time::{Duration, Instant};
 
@@ -42,6 +43,7 @@ use crate::{
     audio_player::ListenerPose,
     xpbd_rerun::{send_colliders_to_rerun, send_xpbd_state_to_rerun},
     xpbd_substep::SimulationParams,
+    xr_inputs_rerun::send_xr_inputs_state_to_rerun,
 };
 
 const NX: usize = 5;
@@ -106,6 +108,7 @@ struct State {
     audio_sample_counter: u64,
     xpbd_state: XpbdState,
     rr_session: Option<rerun::Session>,
+    prev_xr_time: xr::Time,
 }
 
 impl Default for State {
@@ -127,6 +130,7 @@ impl Default for State {
             audio_sample_counter: 0,
             xpbd_state,
             rr_session: None,
+            prev_xr_time: xr::Time::from_nanos(0),
         }
     }
 }
@@ -199,6 +203,27 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         xpbd_system(engine, state, time_passed);
         update_listener_system(engine, state);
         log_audio_system(state);
+        if let Some(rr_session) = &state.rr_session {
+            if state.prev_xr_time != xr::Time::from_nanos(0) {
+                if let Err(err) = send_xr_inputs_state_to_rerun(
+                    &engine.xr_context,
+                    &rr_session,
+                    state.prev_xr_time,
+                    "hindsight",
+                ) {
+                    eprintln!("Failed to send xr inputs to rerun: {err}");
+                }
+            }
+            if let Err(err) = send_xr_inputs_state_to_rerun(
+                &engine.xr_context,
+                &rr_session,
+                engine.xr_context.frame_state.predicted_display_time,
+                "predicted",
+            ) {
+                eprintln!("Failed to send xr inputs to rerun: {err}");
+            }
+        }
+        state.prev_xr_time = engine.xr_context.frame_state.predicted_display_time;
     }
     if let Some(mesh) = &state.xpbd_state.mesh {
         xpbd_mesh::update_mesh(
