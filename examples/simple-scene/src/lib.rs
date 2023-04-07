@@ -25,7 +25,7 @@ use hotham::{
         physics_system, rendering::rendering_system, skinning::skinning_system,
         update_global_transform_system, update_global_transform_with_parent_system,
     },
-    xr, Engine, EngineBuilder, HothamResult, TickData,
+    xr, Engine, HothamResult, TickData,
 };
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
@@ -163,20 +163,7 @@ pub fn main() {
 pub fn real_main() -> HothamResult<()> {
     start_puffin_server();
 
-    let mut extensions = xr::ExtensionSet::default();
-    #[cfg(windows)]
-    {
-        extensions.khr_win32_convert_performance_counter_time = true;
-    }
-    #[cfg(not(windows))]
-    {
-        extensions.khr_convert_timespec_time = true;
-    }
-    let extensions = Some(extensions);
-    let mut engine_builder = EngineBuilder::new();
-    engine_builder.openxr_extensions(extensions);
-    let mut engine = engine_builder.build();
-
+    let mut engine = Engine::new();
     let mut state = State::default();
     match init_rerun_session() {
         Ok(session) => {
