@@ -1,4 +1,9 @@
-use hotham::{asset_importer::add_model_to_world, components::LocalTransform, hecs::World, Engine};
+use hotham::{
+    asset_importer::add_model_to_world,
+    components::{LocalTransform, Stage},
+    hecs::World,
+    Engine,
+};
 
 const AXES_SPACE: [AxesSpace; 5] = [
     AxesSpace::LeftGrip,
@@ -24,6 +29,17 @@ pub fn add_axes(models: &std::collections::HashMap<String, World>, world: &mut W
     for space in AXES_SPACE {
         let entity = add_model_to_world("Axes", models, world, None).unwrap();
         world.insert_one(entity, Axes { space }).unwrap();
+    }
+    let stages = world
+        .query::<&Stage>()
+        .iter()
+        .map(|(entity, _)| entity)
+        .collect::<Vec<_>>();
+    for parent in stages {
+        for space in AXES_SPACE {
+            let entity = add_model_to_world("Axes", models, world, Some(parent)).unwrap();
+            world.insert_one(entity, Axes { space }).unwrap();
+        }
     }
 }
 
