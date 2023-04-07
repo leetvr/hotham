@@ -364,7 +364,11 @@ impl InputContext {
         let session = &xr_context.session;
         let left_subaction_path = input.left_hand_subaction_path;
         let right_subaction_path = input.right_hand_subaction_path;
-        let time = xr_context.frame_state.predicted_display_time;
+        let time_now = xr_context.now().unwrap();
+        let predicted_display_time = xr_context.frame_state.predicted_display_time;
+        let time = xr::Time::from_nanos(
+            time_now.as_nanos() + (predicted_display_time.as_nanos() - time_now.as_nanos()) / 2,
+        );
 
         self.left.x_button_prev = self.left.x_button;
         self.left.y_button_prev = self.left.y_button;
