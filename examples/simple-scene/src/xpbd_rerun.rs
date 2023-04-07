@@ -13,6 +13,7 @@ pub fn init_rerun_session() -> anyhow::Result<rerun::Session> {
             rerun::coordinates::Handedness::Right,
         ))?
         .send(&session)?;
+    session.sink().drop_msgs_if_disconnected();
     Ok(session)
 }
 
