@@ -3,7 +3,7 @@ use crate::HothamResult;
 
 #[cfg(target_os = "windows")]
 impl XrContext {
-    pub fn now(self: &Self) -> HothamResult<openxr::Time> {
+    pub fn now(&self) -> HothamResult<openxr::Time> {
         if let Some(ext) = &self
             .instance
             .exts()
@@ -45,7 +45,7 @@ fn get_performance_counter() -> Result<i64, windows::core::Error> {
 
 #[cfg(not(target_os = "windows"))]
 impl XrContext {
-    pub fn now(self: &Self) -> HothamResult<openxr::Time> {
+    pub fn now(&self) -> HothamResult<openxr::Time> {
         if let Some(ext) = &self.instance.exts().khr_convert_timespec_time {
             let mut xr_time = openxr::Time::from_nanos(0);
             let timespec_time = now_monotonic();
