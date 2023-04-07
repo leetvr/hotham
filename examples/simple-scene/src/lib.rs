@@ -25,7 +25,7 @@ use hotham::{
         physics_system, rendering::rendering_system, skinning::skinning_system,
         update_global_transform_system, update_global_transform_with_parent_system,
     },
-    xr, Engine, HothamResult, TickData,
+    xr, Engine, EngineBuilder, HothamResult, TickData,
 };
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
@@ -162,7 +162,21 @@ pub fn main() {
 
 pub fn real_main() -> HothamResult<()> {
     start_puffin_server();
-    let mut engine = Engine::new();
+
+    let mut extensions = xr::ExtensionSet::default();
+    #[cfg(windows)]
+    {
+        extensions.khr_win32_convert_performance_counter_time = true;
+    }
+    #[cfg(not(windows))]
+    {
+        extensions.khr_convert_timespec_time = true;
+    }
+    let extensions = Some(extensions);
+    let mut engine_builder = EngineBuilder::new();
+    engine_builder.openxr_extensions(extensions);
+    let mut engine = engine_builder.build();
+
     let mut state = State::default();
     match init_rerun_session() {
         Ok(session) => {
@@ -203,20 +217,40 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         xpbd_system(engine, state, time_passed);
         update_listener_system(engine, state);
         log_audio_system(state);
+
         if let Some(rr_session) = &state.rr_session {
+            if let Ok(xr_time_now) = engine.xr_context.now() {
+                if let Err(err) = send_xr_inputs_state_to_rerun(
+                    &engine.xr_context,
+                    rr_session,
+                    xr_time_now,
+                    "now",
+                ) {
+                    eprintln!("Failed to send xr inputs to rerun: {err}");
+                }
+                let xr_time_50ms_ago = xr::Time::from_nanos(xr_time_now.as_nanos() - 50_000_000);
+                if let Err(err) = send_xr_inputs_state_to_rerun(
+                    &engine.xr_context,
+                    rr_session,
+                    xr_time_50ms_ago,
+                    "50ms_ago",
+                ) {
+                    eprintln!("Failed to send xr inputs to rerun: {err}");
+                }
+            }
             if state.prev_xr_time != xr::Time::from_nanos(0) {
                 if let Err(err) = send_xr_inputs_state_to_rerun(
                     &engine.xr_context,
-                    &rr_session,
+                    rr_session,
                     state.prev_xr_time,
-                    "hindsight",
+                    "prev_frame",
                 ) {
                     eprintln!("Failed to send xr inputs to rerun: {err}");
                 }
             }
             if let Err(err) = send_xr_inputs_state_to_rerun(
                 &engine.xr_context,
-                &rr_session,
+                rr_session,
                 engine.xr_context.frame_state.predicted_display_time,
                 "predicted",
             ) {

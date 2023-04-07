@@ -46,14 +46,15 @@ pub fn send_xr_inputs_state_to_rerun(
 
     let xr_timeline = rr::Timeline::new("xr_time", rr::TimeType::Time);
     let rerun_time = rr::Time::from_seconds_since_epoch(time.as_nanos() as f64 / 1e9);
-    let box3d = rr::Box3D::new(0.05, 0.05, 0.05);
-    let radius = rr::Radius(0.005);
+    let grip_box = rr::Box3D::new(0.015, 0.02, 0.05);
+    let aim_box = rr::Box3D::new(0.005, 0.005, 0.02);
+    let radius = rr::Radius(0.001);
 
     if is_space_valid(left_hand_grip) {
         rr::MsgSender::new(format!("stage/left_grip_{name}"))
             .with_time(xr_timeline, rerun_time)
             .with_component(&[transform_from_pose(left_hand_grip.pose)])?
-            .with_splat(box3d)?
+            .with_splat(grip_box)?
             .with_splat(radius)?
             .with_component(&[rr::ColorRGBA::from_rgb(255, 0, 0)])?
             .send(session)?;
@@ -63,7 +64,7 @@ pub fn send_xr_inputs_state_to_rerun(
         rr::MsgSender::new(format!("stage/left_aim_{name}"))
             .with_time(xr_timeline, rerun_time)
             .with_component(&[transform_from_pose(left_hand_aim.pose)])?
-            .with_splat(box3d)?
+            .with_splat(aim_box)?
             .with_splat(radius)?
             .with_component(&[rr::ColorRGBA::from_rgb(255, 255, 0)])?
             .send(session)?;
@@ -73,7 +74,7 @@ pub fn send_xr_inputs_state_to_rerun(
         rr::MsgSender::new(format!("stage/right_grip_{name}"))
             .with_time(xr_timeline, rerun_time)
             .with_component(&[transform_from_pose(right_hand_grip.pose)])?
-            .with_splat(box3d)?
+            .with_splat(grip_box)?
             .with_splat(radius)?
             .with_component(&[rr::ColorRGBA::from_rgb(0, 0, 255)])?
             .send(session)?;
@@ -83,7 +84,7 @@ pub fn send_xr_inputs_state_to_rerun(
         rr::MsgSender::new(format!("stage/right_aim_{name}"))
             .with_time(xr_timeline, rerun_time)
             .with_component(&[transform_from_pose(right_hand_aim.pose)])?
-            .with_splat(box3d)?
+            .with_splat(aim_box)?
             .with_splat(radius)?
             .with_component(&[rr::ColorRGBA::from_rgb(0, 255, 255)])?
             .send(session)?;
