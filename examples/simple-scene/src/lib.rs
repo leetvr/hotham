@@ -1,4 +1,5 @@
 mod audio_player;
+mod inverse_kinematics;
 mod utils;
 mod xpbd_audio_bridge;
 mod xpbd_collisions;
@@ -30,6 +31,7 @@ use hotham::{
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
+use inverse_kinematics::add_axes;
 use nalgebra::{DVector, Quaternion, Translation3, UnitQuaternion};
 use xpbd_audio_bridge::{AudioSimulationUpdate, AudioState};
 use xpbd_collisions::Contact;
@@ -41,6 +43,7 @@ use xpbd_substep::xpbd_substep;
 
 use crate::{
     audio_player::ListenerPose,
+    inverse_kinematics::inverse_kinematics_system,
     xpbd_rerun::{send_colliders_to_rerun, send_xpbd_state_to_rerun},
     xpbd_substep::SimulationParams,
     xr_inputs_rerun::send_xr_inputs_state_to_rerun,
@@ -192,6 +195,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     if tick_data.current_state == xr::SessionState::FOCUSED {
         store_transforms_pre_update_system(engine);
         simulation_reset_system(engine, state);
+        inverse_kinematics_system(engine);
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
@@ -420,6 +424,7 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     let world = &mut engine.world;
 
     let mut glb_buffers: Vec<&[u8]> = vec![
+        include_bytes!("../../../test_assets/axes.glb"),
         include_bytes!("../../../test_assets/floor.glb"),
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
@@ -427,6 +432,7 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_floor(&models, world);
+    add_axes(&models, world);
     add_hand(&models, Handedness::Left, world);
     add_hand(&models, Handedness::Right, world);
 
