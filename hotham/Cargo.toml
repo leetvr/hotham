@@ -51,3 +51,6 @@ serde_json = "1.0"
 jni = "0.19.0"
 ndk = "0.6"
 ndk-glue = "0.6"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = {version = "0.48", features = ["Win32_Foundation", "Win32_System_Performance"]}
