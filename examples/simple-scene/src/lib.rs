@@ -419,14 +419,14 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     let vulkan_context = &mut engine.vulkan_context;
     let world = &mut engine.world;
 
-    add_floor(world);
-
     let mut glb_buffers: Vec<&[u8]> = vec![
+        include_bytes!("../../../test_assets/floor.glb"),
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
     ];
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    add_floor(&models, world);
     add_hand(&models, Handedness::Left, world);
     add_hand(&models, Handedness::Right, world);
 
@@ -453,8 +453,8 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     Ok(())
 }
 
-fn add_floor(world: &mut World) {
-    let entity = world.reserve_entity();
+fn add_floor(models: &std::collections::HashMap<String, World>, world: &mut World) {
+    let entity = add_model_to_world("Floor", models, world, None).expect("Could not find Floor");
     let collider = Collider::new(SharedShape::halfspace(na::Vector3::y_axis()));
     let rigid_body = RigidBody {
         body_type: BodyType::Fixed,
