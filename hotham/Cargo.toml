@@ -54,3 +54,6 @@ ndk-glue = "0.6"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = {version = "0.48", features = ["Win32_Foundation", "Win32_System_Performance"]}
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+libc = "0.2"

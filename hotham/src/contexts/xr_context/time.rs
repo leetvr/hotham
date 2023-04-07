@@ -46,6 +46,36 @@ fn get_performance_counter() -> Result<i64, windows::core::Error> {
 #[cfg(not(target_os = "windows"))]
 impl XrContext {
     pub fn now(self: &Self) -> HothamResult<openxr::Time> {
-        todo!("XrContext::now() is not yet implemented for non-windows platforms.")
+        if let Some(ext) = &self.instance.exts().khr_convert_timespec_time {
+            let mut xr_time = openxr::Time::from_nanos(0);
+            let timespec_time = now_monotonic();
+            match unsafe {
+                (ext.convert_timespec_time_to_time)(
+                    self.instance.as_raw(),
+                    &timespec_time,
+                    &mut xr_time,
+                )
+            } {
+                openxr::sys::Result::SUCCESS => Ok(xr_time),
+                _ => Err(anyhow::anyhow!("OpenXR convert_timespec_time_to_time failed.").into()),
+            }
+        } else {
+            Err(anyhow::anyhow!(
+                "OpenXR extension khr_convert_timespec_time needs to be enabled. \
+                Enable it via XrContextBuilder::required_extensions()."
+            )
+            .into())
+        }
     }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn now_monotonic() -> libc::timespec {
+    let mut time = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    let ret = unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut time) };
+    assert!(ret == 0);
+    time
 }
