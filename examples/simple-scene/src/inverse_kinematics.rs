@@ -3,7 +3,7 @@ use enum_iterator::{all, Sequence};
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
-    glam::{vec3, vec3a, Affine3A, Quat, Vec3, Vec3A},
+    glam::{vec3, vec3a, Affine3A, Vec3A},
     hecs::World,
     Engine,
 };
@@ -14,9 +14,11 @@ pub enum IkNodeID {
     // LeftGrip,
     // LeftAim,
     LeftPalm,
+    LeftWrist,
     // RightGrip,
     // RightAim,
     RightPalm,
+    RightWrist,
     Hmd,
     HeadCenter,
     NeckRoot,
@@ -52,16 +54,12 @@ pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &m
 
 pub fn inverse_kinematics_system(engine: &mut Engine) {
     // Fixed transforms
-    let head_center_in_hmd = Affine3A::from_scale_rotation_translation(
-        Vec3::ONE,
-        Quat::IDENTITY,
-        vec3(0.0, tweak!(0.0), tweak!(0.10)),
-    );
-    let neck_root_in_head_center = Affine3A::from_scale_rotation_translation(
-        Vec3::ONE,
-        Quat::IDENTITY,
-        vec3(0.0, tweak!(-0.1), tweak!(0.0)),
-    );
+    let head_center_in_hmd = Affine3A::from_translation(vec3(0.0, tweak!(0.0), tweak!(0.10)));
+    let neck_root_in_head_center = Affine3A::from_translation(vec3(0.0, tweak!(-0.1), tweak!(0.0)));
+    let left_wrist_in_palm =
+        Affine3A::from_translation(vec3(tweak!(-0.015), tweak!(-0.01), tweak!(0.065)));
+    let right_wrist_in_palm =
+        Affine3A::from_translation((left_wrist_in_palm.translation * vec3a(-1.0, 1.0, 1.0)).into());
 
     // Dynamic transforms
     let world = &mut engine.world;
@@ -98,6 +96,8 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
         right_palm_in_stage.matrix3 = right_aim_in_stage.matrix3;
         right_palm_in_stage
     };
+    let left_wrist_in_stage = left_palm_in_stage * left_wrist_in_palm;
+    let right_wrist_in_stage = right_palm_in_stage * right_wrist_in_palm;
 
     // Update entity transforms
     for (_, (local_transform, node)) in world
@@ -108,9 +108,11 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
             // IkNodeID::LeftGrip => left_grip_in_stage,
             // IkNodeID::LeftAim => left_aim_in_stage,
             IkNodeID::LeftPalm => left_palm_in_stage,
+            IkNodeID::LeftWrist => left_wrist_in_stage,
             // IkNodeID::RightGrip => right_grip_in_stage,
             // IkNodeID::RightAim => right_aim_in_stage,
             IkNodeID::RightPalm => right_palm_in_stage,
+            IkNodeID::RightWrist => right_wrist_in_stage,
             IkNodeID::Hmd => hmd_in_stage,
             IkNodeID::HeadCenter => head_center_in_stage,
             IkNodeID::NeckRoot => neck_root_in_stage,
