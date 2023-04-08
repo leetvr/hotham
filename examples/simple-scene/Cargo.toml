@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 cpal = { version = "0.13.5", features = ["wasm-bindgen"] }
+enum-iterator = "1.4.0"
 hotham = { path = "../../hotham" }
 hotham-examples = { path = "../shared" }
 inline_tweak = "1.0.8"

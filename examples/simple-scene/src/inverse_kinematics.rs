@@ -1,3 +1,5 @@
+use enum_iterator::{all, Sequence};
+
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
@@ -6,15 +8,7 @@ use hotham::{
     Engine,
 };
 
-const IK_NODE_IDS: [IkNodeID; 6] = [
-    IkNodeID::LeftGrip,
-    IkNodeID::LeftAim,
-    IkNodeID::RightGrip,
-    IkNodeID::RightAim,
-    IkNodeID::Hmd,
-    IkNodeID::Root,
-];
-
+#[derive(Debug, PartialEq, Sequence)]
 pub enum IkNodeID {
     LeftGrip,
     LeftAim,
@@ -30,7 +24,7 @@ pub struct IkNode {
 
 pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &mut World) {
     let collider = Collider::new(SharedShape::ball(0.1));
-    for node_id in IK_NODE_IDS {
+    for node_id in all::<IkNodeID>() {
         let entity = add_model_to_world("Axes", models, world, None).unwrap();
         world
             .insert(entity, (collider.clone(), IkNode { node_id }))
@@ -42,7 +36,7 @@ pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &m
         .map(|(entity, _)| entity)
         .collect::<Vec<_>>();
     for parent in stages {
-        for node_id in IK_NODE_IDS {
+        for node_id in all::<IkNodeID>() {
             let entity = add_model_to_world("Axes", models, world, Some(parent)).unwrap();
             world
                 .insert(entity, (collider.clone(), IkNode { node_id }))
