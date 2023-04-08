@@ -1,16 +1,18 @@
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
+    glam::{vec3a, Vec3A},
     hecs::World,
     Engine,
 };
 
-const AXES_SPACE: [AxesSpace; 5] = [
+const AXES_SPACE: [AxesSpace; 6] = [
     AxesSpace::LeftGrip,
     AxesSpace::LeftAim,
     AxesSpace::RightGrip,
     AxesSpace::RightAim,
     AxesSpace::Hmd,
+    AxesSpace::Root,
 ];
 
 pub enum AxesSpace {
@@ -19,6 +21,7 @@ pub enum AxesSpace {
     RightGrip,
     RightAim,
     Hmd,
+    Root,
 }
 
 pub struct Axes {
@@ -51,6 +54,22 @@ pub fn add_axes(models: &std::collections::HashMap<String, World>, world: &mut W
 pub fn inverse_kinematics_system(engine: &mut Engine) {
     let world = &mut engine.world;
     let input_context = &engine.input_context;
+    let root_in_stage = {
+        let hmd_in_stage = input_context.hmd.hmd_in_stage();
+        let mut root_in_stage = hmd_in_stage;
+        root_in_stage.translation.y = 0.0;
+        let x_dir_in_stage = vec3a(
+            root_in_stage.matrix3.x_axis.x,
+            0.0,
+            root_in_stage.matrix3.x_axis.z,
+        )
+        .normalize();
+        root_in_stage.matrix3.x_axis = x_dir_in_stage;
+        root_in_stage.matrix3.y_axis = Vec3A::Y;
+        root_in_stage.matrix3.z_axis = x_dir_in_stage.cross(Vec3A::Y);
+        root_in_stage
+    };
+
     for (_, (local_transform, axes)) in world
         .query_mut::<(&mut LocalTransform, &Axes)>()
         .into_iter()
@@ -61,6 +80,7 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
             AxesSpace::RightGrip => input_context.right.stage_from_grip(),
             AxesSpace::RightAim => input_context.right.stage_from_aim(),
             AxesSpace::Hmd => input_context.hmd.hmd_in_stage(),
+            AxesSpace::Root => root_in_stage,
         });
     }
 }
