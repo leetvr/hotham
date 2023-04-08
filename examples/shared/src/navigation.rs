@@ -1,7 +1,9 @@
+use std::ops::Mul;
+
 use hotham::{
     components::LocalTransform,
     contexts::InputContext,
-    glam::{Affine3A, Vec3},
+    glam::{Affine3A, Quat, Vec3, Vec3A},
     hecs::{self, World},
     Engine,
 };
@@ -67,6 +69,11 @@ fn navigation_system_inner(
             stage_transform.update_from_affine(
                 &(global_from_stored_left_grip * stage_from_left_grip.inverse()),
             );
+            constrain_up_axis(
+                &mut stage_transform,
+                &global_from_stored_left_grip,
+                &stage_from_left_grip,
+            );
         }
         (Some(global_from_stored_left_grip), None, Some(scale)) => {
             stage_transform.update_from_affine(
@@ -74,10 +81,20 @@ fn navigation_system_inner(
                     * Affine3A::from_scale(Vec3::new(scale, scale, scale))
                     * stage_from_left_grip.inverse()),
             );
+            constrain_up_axis(
+                &mut stage_transform,
+                &global_from_stored_left_grip,
+                &stage_from_left_grip,
+            );
         }
         (None, Some(global_from_stored_right_grip), _) => {
             stage_transform.update_from_affine(
                 &(global_from_stored_right_grip * stage_from_right_grip.inverse()),
+            );
+            constrain_up_axis(
+                &mut stage_transform,
+                &global_from_stored_right_grip,
+                &stage_from_right_grip,
             );
         }
         (Some(global_from_stored_left_grip), Some(global_from_stored_right_grip), _) => {
@@ -112,7 +129,34 @@ fn navigation_system_inner(
                     * stored_left_grip_from_left_grip
                     * stage_from_left_grip.inverse()),
             );
+            constrain_up_axis(
+                &mut stage_transform,
+                &global_from_stored_left_grip,
+                &stage_from_left_grip,
+            );
         }
         (None, None, _) => (),
     };
+}
+
+fn constrain_up_axis(
+    stage_transform: &mut LocalTransform,
+    global_from_stored_grip: &Affine3A,
+    stage_from_grip: &Affine3A,
+) {
+    let transformed_y = stage_transform.rotation.mul_vec3a(Vec3A::Y);
+    let angle = transformed_y.dot(Vec3A::Y).acos();
+    if angle.abs() > 0.0001 {
+        let axis = transformed_y.cross(Vec3A::Y).normalize();
+        let rotation_compensation = Quat::from_axis_angle(axis.into(), angle);
+        let constrained_rotation = rotation_compensation * stage_transform.rotation;
+        let constrained_translation = global_from_stored_grip.translation
+            + constrained_rotation
+                * (-stage_from_grip
+                    .translation
+                    .mul(Vec3A::from(stage_transform.scale)));
+
+        stage_transform.rotation = constrained_rotation;
+        stage_transform.translation = constrained_translation.into();
+    }
 }
