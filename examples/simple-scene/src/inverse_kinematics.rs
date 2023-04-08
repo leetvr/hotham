@@ -65,8 +65,10 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
     let world = &mut engine.world;
     let input_context = &engine.input_context;
     let hmd_in_stage = input_context.hmd.hmd_in_stage();
+    let head_center_in_stage = hmd_in_stage * head_center_in_hmd;
+    let neck_root_in_stage = head_center_in_stage * neck_root_in_head_center;
     let root_in_stage = {
-        let mut root_in_stage = hmd_in_stage;
+        let mut root_in_stage = neck_root_in_stage;
         root_in_stage.translation.y = 0.0;
         let x_dir_in_stage = vec3a(
             root_in_stage.matrix3.x_axis.x,
@@ -79,9 +81,6 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
         root_in_stage.matrix3.z_axis = x_dir_in_stage.cross(Vec3A::Y);
         root_in_stage
     };
-
-    let head_center_in_stage = hmd_in_stage * head_center_in_hmd;
-    let neck_root_in_stage = head_center_in_stage * neck_root_in_head_center;
 
     // Update entity transforms
     for (_, (local_transform, node)) in world
