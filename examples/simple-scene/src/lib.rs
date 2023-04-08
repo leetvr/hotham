@@ -31,7 +31,7 @@ use hotham::{
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
-use inverse_kinematics::add_ik_nodes;
+use inverse_kinematics::{add_ik_nodes, IkState};
 use nalgebra::{DVector, Quaternion, Translation3, UnitQuaternion};
 use xpbd_audio_bridge::{AudioSimulationUpdate, AudioState};
 use xpbd_collisions::Contact;
@@ -109,6 +109,7 @@ struct State {
     navigation: NavigationState,
     audio_state: AudioState,
     audio_sample_counter: u64,
+    ik_state: IkState,
     xpbd_state: XpbdState,
     rr_session: Option<rerun::Session>,
     prev_xr_time: xr::Time,
@@ -131,6 +132,7 @@ impl Default for State {
             navigation: Default::default(),
             audio_state: AudioState::init_audio(num_points, wall_time).unwrap(),
             audio_sample_counter: 0,
+            ik_state: Default::default(),
             xpbd_state,
             rr_session: None,
             prev_xr_time: xr::Time::from_nanos(0),
@@ -195,7 +197,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     if tick_data.current_state == xr::SessionState::FOCUSED {
         store_transforms_pre_update_system(engine);
         simulation_reset_system(engine, state);
-        inverse_kinematics_system(engine);
+        inverse_kinematics_system(engine, &mut state.ik_state);
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);

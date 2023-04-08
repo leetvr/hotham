@@ -3,7 +3,7 @@ use enum_iterator::{all, Sequence};
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
-    glam::{vec3, vec3a, Affine3A, Vec3A},
+    glam::{vec3, vec3a, Affine3A, Vec3, Vec3A},
     hecs::World,
     Engine,
 };
@@ -23,10 +23,32 @@ pub enum IkNodeID {
     HeadCenter,
     NeckRoot,
     Root,
+    LeftFoot,
+    RightFoot,
 }
 
 pub struct IkNode {
     node_id: IkNodeID,
+}
+
+#[derive(Default)]
+pub struct IkState {
+    pub left_foot_in_stage: Option<Affine3A>,
+    pub right_foot_in_stage: Option<Affine3A>,
+    pub floating_foot: LeftRightOrNone,
+}
+
+#[derive(Clone, Copy)]
+pub enum LeftRightOrNone {
+    Left,
+    Right,
+    None,
+}
+
+impl Default for LeftRightOrNone {
+    fn default() -> Self {
+        Self::None
+    }
 }
 
 pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &mut World) {
@@ -52,7 +74,7 @@ pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &m
     }
 }
 
-pub fn inverse_kinematics_system(engine: &mut Engine) {
+pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
     // Fixed transforms
     let head_center_in_hmd = Affine3A::from_translation(vec3(0.0, tweak!(0.0), tweak!(0.10)));
     let neck_root_in_head_center = Affine3A::from_translation(vec3(0.0, tweak!(-0.1), tweak!(0.0)));
@@ -99,6 +121,55 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
     let left_wrist_in_stage = left_palm_in_stage * left_wrist_in_palm;
     let right_wrist_in_stage = right_palm_in_stage * right_wrist_in_palm;
 
+    let foot_radius = tweak!(0.1);
+    let left_foot_in_stage = state
+        .left_foot_in_stage
+        .unwrap_or_else(|| root_in_stage * Affine3A::from_translation(vec3(-0.2, 0.0, 0.0)));
+    let right_foot_in_stage = state
+        .right_foot_in_stage
+        .unwrap_or_else(|| root_in_stage * Affine3A::from_translation(vec3(0.2, 0.0, 0.0)));
+    let root_from_stage = root_in_stage.inverse();
+    let left_foot_in_root = root_from_stage * left_foot_in_stage;
+    let right_foot_in_root = root_from_stage * right_foot_in_stage;
+    let step_multiplier = tweak!(3.0);
+    state.floating_foot = match (
+        left_foot_in_root.translation.length() < foot_radius,
+        right_foot_in_root.translation.length() < foot_radius,
+    ) {
+        (true, true) => state.floating_foot,
+        (true, false) => LeftRightOrNone::Right,
+        (false, true) => LeftRightOrNone::Left,
+        (false, false) => LeftRightOrNone::None,
+    };
+    match state.floating_foot {
+        LeftRightOrNone::Left => {
+            state.left_foot_in_stage = Some(
+                root_in_stage
+                    * Affine3A::from_mat3_translation(
+                        right_foot_in_root.matrix3.inverse().into(),
+                        Vec3::from(right_foot_in_root.translation)
+                            * vec3(-step_multiplier, -step_multiplier, -step_multiplier),
+                    ),
+            );
+            state.right_foot_in_stage = Some(right_foot_in_stage);
+        }
+        LeftRightOrNone::Right => {
+            state.left_foot_in_stage = Some(left_foot_in_stage);
+            state.right_foot_in_stage = Some(
+                root_in_stage
+                    * Affine3A::from_mat3_translation(
+                        left_foot_in_root.matrix3.inverse().into(),
+                        Vec3::from(left_foot_in_root.translation)
+                            * vec3(-step_multiplier, -step_multiplier, -step_multiplier),
+                    ),
+            );
+        }
+        LeftRightOrNone::None => {
+            state.left_foot_in_stage = Some(left_foot_in_stage);
+            state.right_foot_in_stage = Some(right_foot_in_stage);
+        }
+    }
+
     // Update entity transforms
     for (_, (local_transform, node)) in world
         .query_mut::<(&mut LocalTransform, &IkNode)>()
@@ -117,6 +188,8 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
             IkNodeID::HeadCenter => head_center_in_stage,
             IkNodeID::NeckRoot => neck_root_in_stage,
             IkNodeID::Root => root_in_stage,
+            IkNodeID::LeftFoot => state.left_foot_in_stage.unwrap(),
+            IkNodeID::RightFoot => state.right_foot_in_stage.unwrap(),
         });
     }
 }
