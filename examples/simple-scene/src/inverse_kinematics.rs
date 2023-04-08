@@ -3,10 +3,11 @@ use enum_iterator::{all, Sequence};
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
-    glam::{vec3a, Vec3A},
+    glam::{vec3, vec3a, Affine3A, Quat, Vec3, Vec3A},
     hecs::World,
     Engine,
 };
+use inline_tweak::tweak;
 
 #[derive(Debug, PartialEq, Sequence)]
 pub enum IkNodeID {
@@ -15,6 +16,8 @@ pub enum IkNodeID {
     RightGrip,
     RightAim,
     Hmd,
+    HeadCenter,
+    NeckRoot,
     Root,
 }
 
@@ -46,10 +49,23 @@ pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &m
 }
 
 pub fn inverse_kinematics_system(engine: &mut Engine) {
+    // Fixed transforms
+    let head_center_in_hmd = Affine3A::from_scale_rotation_translation(
+        Vec3::ONE,
+        Quat::IDENTITY,
+        vec3(0.0, tweak!(0.0), tweak!(0.10)),
+    );
+    let neck_root_in_head_center = Affine3A::from_scale_rotation_translation(
+        Vec3::ONE,
+        Quat::IDENTITY,
+        vec3(0.0, tweak!(-0.1), tweak!(0.0)),
+    );
+
+    // Dynamic transforms
     let world = &mut engine.world;
     let input_context = &engine.input_context;
+    let hmd_in_stage = input_context.hmd.hmd_in_stage();
     let root_in_stage = {
-        let hmd_in_stage = input_context.hmd.hmd_in_stage();
         let mut root_in_stage = hmd_in_stage;
         root_in_stage.translation.y = 0.0;
         let x_dir_in_stage = vec3a(
@@ -64,6 +80,10 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
         root_in_stage
     };
 
+    let head_center_in_stage = hmd_in_stage * head_center_in_hmd;
+    let neck_root_in_stage = head_center_in_stage * neck_root_in_head_center;
+
+    // Update entity transforms
     for (_, (local_transform, node)) in world
         .query_mut::<(&mut LocalTransform, &IkNode)>()
         .into_iter()
@@ -73,7 +93,9 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
             IkNodeID::LeftAim => input_context.left.stage_from_aim(),
             IkNodeID::RightGrip => input_context.right.stage_from_grip(),
             IkNodeID::RightAim => input_context.right.stage_from_aim(),
-            IkNodeID::Hmd => input_context.hmd.hmd_in_stage(),
+            IkNodeID::Hmd => hmd_in_stage,
+            IkNodeID::HeadCenter => head_center_in_stage,
+            IkNodeID::NeckRoot => neck_root_in_stage,
             IkNodeID::Root => root_in_stage,
         });
     }
