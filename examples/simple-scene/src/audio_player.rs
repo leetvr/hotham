@@ -254,6 +254,7 @@ where
                                 sample_by_channel[channel];
                         }
                         playback_write_index = (playback_write_index + 1) % PLAYBACK_HISTORY_SIZE;
+                        #[allow(clippy::needless_range_loop)]
                         for channel in 0..channels {
                             let start = (PLAYBACK_HISTORY_SIZE + playback_write_index
                                 - impulse_response.len())
