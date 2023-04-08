@@ -31,7 +31,7 @@ use hotham::{
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
 use inline_tweak::tweak;
-use inverse_kinematics::add_axes;
+use inverse_kinematics::add_ik_nodes;
 use nalgebra::{DVector, Quaternion, Translation3, UnitQuaternion};
 use xpbd_audio_bridge::{AudioSimulationUpdate, AudioState};
 use xpbd_collisions::Contact;
@@ -431,7 +431,7 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
     add_floor(&models, world);
-    add_axes(&models, world);
+    add_ik_nodes(&models, world);
     add_hand(&models, Handedness::Left, world);
     add_hand(&models, Handedness::Right, world);
 

@@ -6,16 +6,16 @@ use hotham::{
     Engine,
 };
 
-const AXES_SPACE: [AxesSpace; 6] = [
-    AxesSpace::LeftGrip,
-    AxesSpace::LeftAim,
-    AxesSpace::RightGrip,
-    AxesSpace::RightAim,
-    AxesSpace::Hmd,
-    AxesSpace::Root,
+const IK_NODE_IDS: [IkNodeID; 6] = [
+    IkNodeID::LeftGrip,
+    IkNodeID::LeftAim,
+    IkNodeID::RightGrip,
+    IkNodeID::RightAim,
+    IkNodeID::Hmd,
+    IkNodeID::Root,
 ];
 
-pub enum AxesSpace {
+pub enum IkNodeID {
     LeftGrip,
     LeftAim,
     RightGrip,
@@ -24,16 +24,16 @@ pub enum AxesSpace {
     Root,
 }
 
-pub struct Axes {
-    space: AxesSpace,
+pub struct IkNode {
+    node_id: IkNodeID,
 }
 
-pub fn add_axes(models: &std::collections::HashMap<String, World>, world: &mut World) {
+pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &mut World) {
     let collider = Collider::new(SharedShape::ball(0.1));
-    for space in AXES_SPACE {
+    for node_id in IK_NODE_IDS {
         let entity = add_model_to_world("Axes", models, world, None).unwrap();
         world
-            .insert(entity, (collider.clone(), Axes { space }))
+            .insert(entity, (collider.clone(), IkNode { node_id }))
             .unwrap();
     }
     let stages = world
@@ -42,10 +42,10 @@ pub fn add_axes(models: &std::collections::HashMap<String, World>, world: &mut W
         .map(|(entity, _)| entity)
         .collect::<Vec<_>>();
     for parent in stages {
-        for space in AXES_SPACE {
+        for node_id in IK_NODE_IDS {
             let entity = add_model_to_world("Axes", models, world, Some(parent)).unwrap();
             world
-                .insert(entity, (collider.clone(), Axes { space }))
+                .insert(entity, (collider.clone(), IkNode { node_id }))
                 .unwrap();
         }
     }
@@ -70,17 +70,17 @@ pub fn inverse_kinematics_system(engine: &mut Engine) {
         root_in_stage
     };
 
-    for (_, (local_transform, axes)) in world
-        .query_mut::<(&mut LocalTransform, &Axes)>()
+    for (_, (local_transform, node)) in world
+        .query_mut::<(&mut LocalTransform, &IkNode)>()
         .into_iter()
     {
-        local_transform.update_from_affine(&match axes.space {
-            AxesSpace::LeftGrip => input_context.left.stage_from_grip(),
-            AxesSpace::LeftAim => input_context.left.stage_from_aim(),
-            AxesSpace::RightGrip => input_context.right.stage_from_grip(),
-            AxesSpace::RightAim => input_context.right.stage_from_aim(),
-            AxesSpace::Hmd => input_context.hmd.hmd_in_stage(),
-            AxesSpace::Root => root_in_stage,
+        local_transform.update_from_affine(&match node.node_id {
+            IkNodeID::LeftGrip => input_context.left.stage_from_grip(),
+            IkNodeID::LeftAim => input_context.left.stage_from_aim(),
+            IkNodeID::RightGrip => input_context.right.stage_from_grip(),
+            IkNodeID::RightAim => input_context.right.stage_from_aim(),
+            IkNodeID::Hmd => input_context.hmd.hmd_in_stage(),
+            IkNodeID::Root => root_in_stage,
         });
     }
 }
