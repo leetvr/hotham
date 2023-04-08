@@ -1,5 +1,5 @@
 use hotham::{
-    components::{Collider, Hand, LocalTransform},
+    components::LocalTransform,
     contexts::InputContext,
     glam::{Affine3A, Vec3},
     hecs::{self, World},
@@ -28,18 +28,6 @@ fn navigation_system_inner(
     stage_entity: hecs::Entity,
     state: &mut State,
 ) {
-    // First, check to see if either of the hands have collided with anything.
-    let hands_have_collisions = world
-        .query::<&Collider>()
-        .with::<&Hand>()
-        .iter()
-        .any(|(_, collider)| !collider.collisions_this_frame.is_empty());
-
-    // If they have, then just return.
-    if hands_have_collisions {
-        return;
-    }
-
     // Get the stage transform.
     let mut stage_transform = world.get::<&mut LocalTransform>(stage_entity).unwrap();
     let global_from_stage = stage_transform.to_affine();
@@ -49,21 +37,21 @@ fn navigation_system_inner(
     let stage_from_right_grip = input_context.right.stage_from_grip();
 
     // Update grip states.
-    if input_context.left.grip_button_just_pressed() {
+    if input_context.left.y_button_just_pressed() {
         state.global_from_left_grip = Some(global_from_stage * stage_from_left_grip);
     }
-    if input_context.right.grip_button_just_pressed() {
+    if input_context.right.b_button_just_pressed() {
         state.global_from_right_grip = Some(global_from_stage * stage_from_right_grip);
     }
-    if input_context.right.grip_button() && input_context.left.grip_button_just_released() {
+    if input_context.right.b_button() && input_context.left.y_button_just_released() {
         // Handle when going from two grips to one
         state.global_from_right_grip = Some(global_from_stage * stage_from_right_grip);
     }
-    if !input_context.left.grip_button() {
+    if !input_context.left.y_button() {
         state.global_from_left_grip = None;
         state.scale = None;
     }
-    if !input_context.right.grip_button() {
+    if !input_context.right.b_button() {
         state.global_from_right_grip = None;
     }
 

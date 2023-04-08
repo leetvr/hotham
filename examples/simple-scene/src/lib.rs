@@ -22,9 +22,9 @@ use hotham::{
     hecs::{self, Without, World},
     na,
     systems::{
-        animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
-        physics_system, rendering::rendering_system, skinning::skinning_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
+        animation_system, grabbing_system, hands::add_hand, hands_system, physics_system,
+        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
+        update_global_transform_with_parent_system,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -204,7 +204,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         update_global_transform_system(engine);
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
-        debug_system(engine);
         xpbd_system(engine, state, time_passed);
         update_listener_system(engine, state);
         log_audio_system(state);
