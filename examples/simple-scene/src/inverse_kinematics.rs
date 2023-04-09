@@ -57,7 +57,8 @@ impl Default for LeftRightOrNone {
 pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &mut World) {
     let collider = Collider::new(SharedShape::ball(0.1));
     for node_id in all::<IkNodeID>() {
-        let entity = add_model_to_world("Axes", models, world, None).unwrap();
+        let entity =
+            add_model_to_world(model_name_from_node_id(node_id), models, world, None).unwrap();
         world
             .insert(entity, (collider.clone(), IkNode { node_id }))
             .unwrap();
@@ -69,11 +70,31 @@ pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &m
         .collect::<Vec<_>>();
     for parent in stages {
         for node_id in all::<IkNodeID>() {
-            let entity = add_model_to_world("Axes", models, world, Some(parent)).unwrap();
+            let entity = add_model_to_world(
+                model_name_from_node_id(node_id),
+                models,
+                world,
+                Some(parent),
+            )
+            .unwrap();
             world
                 .insert(entity, (collider.clone(), IkNode { node_id }))
                 .unwrap();
         }
+    }
+}
+
+fn model_name_from_node_id(node_id: IkNodeID) -> &'static str {
+    match node_id {
+        IkNodeID::LeftGrip | IkNodeID::RightGrip => "SmallAxes",
+        IkNodeID::LeftAim | IkNodeID::RightAim => "TinyAxes",
+        IkNodeID::LeftPalm | IkNodeID::RightPalm => "SmallAxes",
+        IkNodeID::LeftWrist | IkNodeID::RightWrist => "CrossAxes",
+        IkNodeID::Hmd => "Axes",
+        IkNodeID::HeadCenter => "SmallAxes",
+        IkNodeID::NeckRoot => "SmallAxes",
+        IkNodeID::Root => "CrossAxes",
+        IkNodeID::LeftFoot | IkNodeID::RightFoot => "CrossAxes",
     }
 }
 
