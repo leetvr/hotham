@@ -1,4 +1,7 @@
+use std::collections::HashMap;
+
 use enum_iterator::{all, Sequence};
+use serde::{Deserialize, Serialize};
 
 use hotham::{
     asset_importer::add_model_to_world,
@@ -9,14 +12,14 @@ use hotham::{
 };
 use inline_tweak::tweak;
 
-#[derive(Debug, PartialEq, Sequence)]
+#[derive(Copy, Clone, Eq, Hash, Debug, PartialEq, Sequence, Deserialize, Serialize)]
 pub enum IkNodeID {
-    // LeftGrip,
-    // LeftAim,
+    LeftGrip,
+    LeftAim,
     LeftPalm,
     LeftWrist,
-    // RightGrip,
-    // RightAim,
+    RightGrip,
+    RightAim,
     RightPalm,
     RightWrist,
     Hmd,
@@ -145,8 +148,7 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
         LeftRightOrNone::Left => {
             state.left_foot_in_stage = Some(
                 root_in_stage
-                    * Affine3A::from_mat3_translation(
-                        right_foot_in_root.matrix3.inverse().into(),
+                    * Affine3A::from_translation(
                         Vec3::from(right_foot_in_root.translation)
                             * vec3(-step_multiplier, -step_multiplier, -step_multiplier),
                     ),
@@ -157,8 +159,7 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
             state.left_foot_in_stage = Some(left_foot_in_stage);
             state.right_foot_in_stage = Some(
                 root_in_stage
-                    * Affine3A::from_mat3_translation(
-                        left_foot_in_root.matrix3.inverse().into(),
+                    * Affine3A::from_translation(
                         Vec3::from(left_foot_in_root.translation)
                             * vec3(-step_multiplier, -step_multiplier, -step_multiplier),
                     ),
@@ -171,25 +172,41 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
     }
 
     // Update entity transforms
+    let transform_of_node = |node_id: IkNodeID| match node_id {
+        IkNodeID::LeftGrip => left_grip_in_stage,
+        IkNodeID::LeftAim => left_aim_in_stage,
+        IkNodeID::LeftPalm => left_palm_in_stage,
+        IkNodeID::LeftWrist => left_wrist_in_stage,
+        IkNodeID::RightGrip => right_grip_in_stage,
+        IkNodeID::RightAim => right_aim_in_stage,
+        IkNodeID::RightPalm => right_palm_in_stage,
+        IkNodeID::RightWrist => right_wrist_in_stage,
+        IkNodeID::Hmd => hmd_in_stage,
+        IkNodeID::HeadCenter => head_center_in_stage,
+        IkNodeID::NeckRoot => neck_root_in_stage,
+        IkNodeID::Root => root_in_stage,
+        IkNodeID::LeftFoot => state.left_foot_in_stage.unwrap(),
+        IkNodeID::RightFoot => state.right_foot_in_stage.unwrap(),
+    };
     for (_, (local_transform, node)) in world
         .query_mut::<(&mut LocalTransform, &IkNode)>()
         .into_iter()
     {
-        local_transform.update_from_affine(&match node.node_id {
-            // IkNodeID::LeftGrip => left_grip_in_stage,
-            // IkNodeID::LeftAim => left_aim_in_stage,
-            IkNodeID::LeftPalm => left_palm_in_stage,
-            IkNodeID::LeftWrist => left_wrist_in_stage,
-            // IkNodeID::RightGrip => right_grip_in_stage,
-            // IkNodeID::RightAim => right_aim_in_stage,
-            IkNodeID::RightPalm => right_palm_in_stage,
-            IkNodeID::RightWrist => right_wrist_in_stage,
-            IkNodeID::Hmd => hmd_in_stage,
-            IkNodeID::HeadCenter => head_center_in_stage,
-            IkNodeID::NeckRoot => neck_root_in_stage,
-            IkNodeID::Root => root_in_stage,
-            IkNodeID::LeftFoot => state.left_foot_in_stage.unwrap(),
-            IkNodeID::RightFoot => state.right_foot_in_stage.unwrap(),
-        });
+        local_transform.update_from_affine(&transform_of_node(node.node_id));
+    }
+
+    // Store snapshot of current state if menu button is pressed
+    if input_context.left.menu_button_just_pressed() {
+        let mut summary = HashMap::<IkNodeID, Affine3A>::new();
+        for node_id in all::<IkNodeID>() {
+            summary.insert(node_id, transform_of_node(node_id));
+        }
+        let serialized = serde_json::to_string(&summary).unwrap();
+        let date_time = chrono::Local::now().naive_local();
+        let filename = date_time
+            .format("inverse_kinematics_snapshot_%Y-%m-%d_%H.%M.%S.json")
+            .to_string();
+        println!("[INVERSE_KINEMATICS] Storing snapshot to '{}'", filename);
+        std::fs::write(&filename, serialized).expect(&format!("failed to write to '{filename}'"));
     }
 }
