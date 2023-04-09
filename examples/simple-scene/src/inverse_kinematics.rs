@@ -26,6 +26,7 @@ pub enum IkNodeID {
     HeadCenter,
     NeckRoot,
     Root,
+    Hip,
     LeftFoot,
     RightFoot,
 }
@@ -38,19 +39,19 @@ pub struct IkNode {
 pub struct IkState {
     pub left_foot_in_stage: Option<Affine3A>,
     pub right_foot_in_stage: Option<Affine3A>,
-    pub floating_foot: LeftRightOrNone,
+    pub weight_distribution: WeightDistribution,
 }
 
 #[derive(Clone, Copy)]
-pub enum LeftRightOrNone {
-    Left,
-    Right,
-    None,
+pub enum WeightDistribution {
+    LeftPlanted,
+    RightPlanted,
+    SharedWeight,
 }
 
-impl Default for LeftRightOrNone {
+impl Default for WeightDistribution {
     fn default() -> Self {
-        Self::None
+        Self::SharedWeight
     }
 }
 
@@ -93,7 +94,8 @@ fn model_name_from_node_id(node_id: IkNodeID) -> &'static str {
         IkNodeID::Hmd => "Axes",
         IkNodeID::HeadCenter => "SmallAxes",
         IkNodeID::NeckRoot => "SmallAxes",
-        IkNodeID::Root => "CrossAxes",
+        IkNodeID::Root => "SmallAxes",
+        IkNodeID::Hip => "Axes",
         IkNodeID::LeftFoot | IkNodeID::RightFoot => "CrossAxes",
     }
 }
@@ -106,6 +108,8 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
         Affine3A::from_translation(vec3(tweak!(-0.015), tweak!(-0.01), tweak!(0.065)));
     let right_wrist_in_palm =
         Affine3A::from_translation((left_wrist_in_palm.translation * vec3a(-1.0, 1.0, 1.0)).into());
+    let step_multiplier = tweak!(3.0);
+    let hip_bias = tweak!(0.15);
 
     // Dynamic transforms
     let world = &mut engine.world;
@@ -155,38 +159,48 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
     let root_from_stage = root_in_stage.inverse();
     let left_foot_in_root = root_from_stage * left_foot_in_stage;
     let right_foot_in_root = root_from_stage * right_foot_in_stage;
-    let step_multiplier = tweak!(3.0);
-    state.floating_foot = match (
+    state.weight_distribution = match (
         left_foot_in_root.translation.length() < foot_radius,
         right_foot_in_root.translation.length() < foot_radius,
     ) {
-        (true, true) => state.floating_foot,
-        (true, false) => LeftRightOrNone::Right,
-        (false, true) => LeftRightOrNone::Left,
-        (false, false) => LeftRightOrNone::None,
+        (true, true) => state.weight_distribution,
+        (true, false) => WeightDistribution::LeftPlanted,
+        (false, true) => WeightDistribution::RightPlanted,
+        (false, false) => WeightDistribution::SharedWeight,
     };
-    match state.floating_foot {
-        LeftRightOrNone::Left => {
+    let hip_in_root = {
+        let a = left_foot_in_root.translation;
+        let b = right_foot_in_root.translation;
+        let c = Vec3A::ZERO;
+        let v = b - a;
+        let t = ((c - a).dot(v) / v.dot(v));
+        let p = a + v * t.clamp(0.0, 1.0);
+        Affine3A::from_translation(p.into())
+    };
+    match state.weight_distribution {
+        WeightDistribution::RightPlanted => {
             state.left_foot_in_stage = Some(
                 root_in_stage
-                    * Affine3A::from_translation(
-                        Vec3::from(right_foot_in_root.translation)
-                            * vec3(-step_multiplier, -step_multiplier, -step_multiplier),
-                    ),
+                    * Affine3A::from_translation(vec3(
+                        -step_multiplier * right_foot_in_root.translation.x,
+                        -step_multiplier * right_foot_in_root.translation.y,
+                        -step_multiplier * right_foot_in_root.translation.z,
+                    )),
             );
             state.right_foot_in_stage = Some(right_foot_in_stage);
         }
-        LeftRightOrNone::Right => {
+        WeightDistribution::LeftPlanted => {
             state.left_foot_in_stage = Some(left_foot_in_stage);
             state.right_foot_in_stage = Some(
                 root_in_stage
-                    * Affine3A::from_translation(
-                        Vec3::from(left_foot_in_root.translation)
-                            * vec3(-step_multiplier, -step_multiplier, -step_multiplier),
-                    ),
+                    * Affine3A::from_translation(vec3(
+                        -step_multiplier * left_foot_in_root.translation.x,
+                        -step_multiplier * left_foot_in_root.translation.y,
+                        -step_multiplier * left_foot_in_root.translation.z,
+                    )),
             );
         }
-        LeftRightOrNone::None => {
+        WeightDistribution::SharedWeight => {
             state.left_foot_in_stage = Some(left_foot_in_stage);
             state.right_foot_in_stage = Some(right_foot_in_stage);
         }
@@ -206,6 +220,7 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
         IkNodeID::HeadCenter => head_center_in_stage,
         IkNodeID::NeckRoot => neck_root_in_stage,
         IkNodeID::Root => root_in_stage,
+        IkNodeID::Hip => root_in_stage * hip_in_root,
         IkNodeID::LeftFoot => state.left_foot_in_stage.unwrap(),
         IkNodeID::RightFoot => state.right_foot_in_stage.unwrap(),
     };
