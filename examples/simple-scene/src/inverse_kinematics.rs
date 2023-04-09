@@ -8,6 +8,7 @@ use hotham::{
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
     glam::{vec3, vec3a, Affine3A, Vec3, Vec3A},
     hecs::World,
+    na::Translation,
     Engine,
 };
 use inline_tweak::tweak;
@@ -96,18 +97,19 @@ fn model_name_from_node_id(node_id: IkNodeID) -> &'static str {
         IkNodeID::NeckRoot => "SmallAxes",
         IkNodeID::Root => "SmallAxes",
         IkNodeID::Hip => "Axes",
-        IkNodeID::LeftFoot | IkNodeID::RightFoot => "CrossAxes",
+        IkNodeID::LeftFoot | IkNodeID::RightFoot => "DiscXZ",
     }
 }
 
 pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
-    // Fixed transforms
+    // Fixed transforms and parameters
     let head_center_in_hmd = Affine3A::from_translation(vec3(0.0, tweak!(0.0), tweak!(0.10)));
     let neck_root_in_head_center = Affine3A::from_translation(vec3(0.0, tweak!(-0.1), tweak!(0.0)));
     let left_wrist_in_palm =
         Affine3A::from_translation(vec3(tweak!(-0.015), tweak!(-0.01), tweak!(0.065)));
     let right_wrist_in_palm =
         Affine3A::from_translation((left_wrist_in_palm.translation * vec3a(-1.0, 1.0, 1.0)).into());
+    let foot_radius = tweak!(0.1);
     let step_multiplier = tweak!(3.0);
     let hip_bias = tweak!(0.15);
 
@@ -149,7 +151,6 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
     let left_wrist_in_stage = left_palm_in_stage * left_wrist_in_palm;
     let right_wrist_in_stage = right_palm_in_stage * right_wrist_in_palm;
 
-    let foot_radius = tweak!(0.1);
     let left_foot_in_stage = state
         .left_foot_in_stage
         .unwrap_or_else(|| root_in_stage * Affine3A::from_translation(vec3(-0.2, 0.0, 0.0)));
@@ -173,7 +174,7 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
         let b = right_foot_in_root.translation;
         let c = Vec3A::ZERO;
         let v = b - a;
-        let t = ((c - a).dot(v) / v.dot(v));
+        let t = (c - a).dot(v) / v.dot(v);
         let p = a + v * t.clamp(0.0, 1.0);
         Affine3A::from_translation(p.into())
     };
@@ -201,8 +202,37 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
             );
         }
         WeightDistribution::SharedWeight => {
-            state.left_foot_in_stage = Some(left_foot_in_stage);
-            state.right_foot_in_stage = Some(right_foot_in_stage);
+            if hip_in_root.translation.length() > foot_radius * step_multiplier {
+                // Stagger step
+                let v1 = hip_in_root.translation - left_foot_in_root.translation;
+                let v2 = hip_in_root.translation - right_foot_in_root.translation;
+                if v1.length_squared() < v2.length_squared() {
+                    state.left_foot_in_stage = Some(left_foot_in_stage);
+                    state.right_foot_in_stage = Some(
+                        root_in_stage
+                            * Affine3A::from_translation(vec3(
+                                -left_foot_in_root.translation.x / step_multiplier,
+                                -left_foot_in_root.translation.y / step_multiplier,
+                                -left_foot_in_root.translation.z / step_multiplier,
+                            )),
+                    );
+                    state.weight_distribution = WeightDistribution::LeftPlanted;
+                } else {
+                    state.left_foot_in_stage = Some(
+                        root_in_stage
+                            * Affine3A::from_translation(vec3(
+                                -right_foot_in_root.translation.x / step_multiplier,
+                                -right_foot_in_root.translation.y / step_multiplier,
+                                -right_foot_in_root.translation.z / step_multiplier,
+                            )),
+                    );
+                    state.right_foot_in_stage = Some(right_foot_in_stage);
+                    state.weight_distribution = WeightDistribution::RightPlanted;
+                }
+            } else {
+                state.left_foot_in_stage = Some(left_foot_in_stage);
+                state.right_foot_in_stage = Some(right_foot_in_stage);
+            }
         }
     }
 
