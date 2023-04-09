@@ -85,6 +85,10 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_helmet(&models, world);
     add_model_to_world("Cube", &models, world, None);
 
+    // Update global transforms from local transforms before physics_system gets confused
+    update_global_transform_system(engine);
+    update_global_transform_with_parent_system(engine);
+
     Ok(())
 }
 
