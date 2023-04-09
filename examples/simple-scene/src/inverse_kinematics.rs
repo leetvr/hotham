@@ -111,6 +111,8 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
         Affine3A::from_translation((left_wrist_in_palm.translation * vec3a(-1.0, 1.0, 1.0)).into());
     let foot_radius = tweak!(0.1);
     let step_multiplier = tweak!(3.0);
+    let step_size = foot_radius * (step_multiplier + 1.0);
+    let stagger_threshold = foot_radius * tweak!(2.0);
     let hip_bias = tweak!(0.15);
 
     // Dynamic transforms
@@ -202,32 +204,28 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
             );
         }
         WeightDistribution::SharedWeight => {
-            if hip_in_root.translation.length() > foot_radius * step_multiplier {
-                // Stagger step
+            if hip_in_root.translation.length() > stagger_threshold {
+                // Stagger step, lift the foot that is loaded the least.
                 let v1 = hip_in_root.translation - left_foot_in_root.translation;
                 let v2 = hip_in_root.translation - right_foot_in_root.translation;
                 if v1.length_squared() < v2.length_squared() {
+                    let dir = -left_foot_in_root.translation.normalize();
                     state.left_foot_in_stage = Some(left_foot_in_stage);
                     state.right_foot_in_stage = Some(
                         root_in_stage
-                            * Affine3A::from_translation(vec3(
-                                -left_foot_in_root.translation.x / step_multiplier,
-                                -left_foot_in_root.translation.y / step_multiplier,
-                                -left_foot_in_root.translation.z / step_multiplier,
-                            )),
+                            * Affine3A::from_translation(
+                                (left_foot_in_root.translation + dir * step_size).into(),
+                            ),
                     );
-                    state.weight_distribution = WeightDistribution::LeftPlanted;
                 } else {
+                    let dir = -right_foot_in_root.translation.normalize();
                     state.left_foot_in_stage = Some(
                         root_in_stage
-                            * Affine3A::from_translation(vec3(
-                                -right_foot_in_root.translation.x / step_multiplier,
-                                -right_foot_in_root.translation.y / step_multiplier,
-                                -right_foot_in_root.translation.z / step_multiplier,
-                            )),
+                            * Affine3A::from_translation(
+                                (right_foot_in_root.translation + dir * step_size).into(),
+                            ),
                     );
                     state.right_foot_in_stage = Some(right_foot_in_stage);
-                    state.weight_distribution = WeightDistribution::RightPlanted;
                 }
             } else {
                 state.left_foot_in_stage = Some(left_foot_in_stage);
