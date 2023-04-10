@@ -1,7 +1,12 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, physics::SharedShape, Collider, LocalTransform, RigidBody},
+    components::{
+        hand::Handedness,
+        physics::{BodyType, SharedShape},
+        Collider, LocalTransform, RigidBody,
+    },
     hecs::World,
+    na,
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, rendering::rendering_system, skinning::skinning_system,
@@ -57,11 +62,13 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let world = &mut engine.world;
 
     let mut glb_buffers: Vec<&[u8]> = vec![
+        include_bytes!("../../../test_assets/floor.glb"),
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
     ];
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
+    add_floor(&models, world);
     add_hand(&models, Handedness::Left, world);
     add_hand(&models, Handedness::Right, world);
 
@@ -78,7 +85,21 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_helmet(&models, world);
     add_model_to_world("Cube", &models, world, None);
 
+    // Update global transforms from local transforms before physics_system gets confused
+    update_global_transform_system(engine);
+    update_global_transform_with_parent_system(engine);
+
     Ok(())
+}
+
+fn add_floor(models: &std::collections::HashMap<String, World>, world: &mut World) {
+    let entity = add_model_to_world("Floor", models, world, None).expect("Could not find Floor");
+    let collider = Collider::new(SharedShape::halfspace(na::Vector3::y_axis()));
+    let rigid_body = RigidBody {
+        body_type: BodyType::Fixed,
+        ..Default::default()
+    };
+    world.insert(entity, (collider, rigid_body)).unwrap();
 }
 
 fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut World) {
