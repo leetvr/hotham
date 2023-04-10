@@ -22,20 +22,20 @@ mod rr {
 
 #[derive(Copy, Clone, Eq, Hash, Debug, PartialEq, Sequence, Deserialize, Serialize)]
 pub enum IkNodeID {
-    LeftGrip,
-    LeftAim,
-    LeftPalm,
-    LeftWrist,
-    RightGrip,
-    RightAim,
-    RightPalm,
-    RightWrist,
     Hmd,
     HeadCenter,
     NeckRoot,
-    Root,
-    Hip,
+    Base,
+    BalancePoint,
+    LeftAim,
+    LeftGrip,
+    LeftPalm,
+    LeftWrist,
     LeftFoot,
+    RightAim,
+    RightGrip,
+    RightPalm,
+    RightWrist,
     RightFoot,
 }
 
@@ -95,15 +95,15 @@ pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &m
 
 fn model_name_from_node_id(node_id: IkNodeID) -> &'static str {
     match node_id {
+        IkNodeID::Hmd => "Axes",
+        IkNodeID::HeadCenter => "SmallAxes",
+        IkNodeID::NeckRoot => "SmallAxes",
+        IkNodeID::Base => "Axes",
+        IkNodeID::BalancePoint => "SmallAxes",
         IkNodeID::LeftGrip | IkNodeID::RightGrip => "SmallAxes",
         IkNodeID::LeftAim | IkNodeID::RightAim => "TinyAxes",
         IkNodeID::LeftPalm | IkNodeID::RightPalm => "SmallAxes",
         IkNodeID::LeftWrist | IkNodeID::RightWrist => "CrossAxes",
-        IkNodeID::Hmd => "Axes",
-        IkNodeID::HeadCenter => "SmallAxes",
-        IkNodeID::NeckRoot => "SmallAxes",
-        IkNodeID::Root => "SmallAxes",
-        IkNodeID::Hip => "Axes",
         IkNodeID::LeftFoot | IkNodeID::RightFoot => "DiscXZ",
     }
 }
@@ -136,19 +136,19 @@ pub fn inverse_kinematics_system(
     let right_aim_in_stage = input_context.right.stage_from_aim();
     let head_center_in_stage = hmd_in_stage * head_center_in_hmd;
     let neck_root_in_stage = head_center_in_stage * neck_root_in_head_center;
-    let root_in_stage = {
-        let mut root_in_stage = neck_root_in_stage;
-        root_in_stage.translation.y = 0.0;
+    let base_in_stage = {
+        let mut base_in_stage = neck_root_in_stage;
+        base_in_stage.translation.y = 0.0;
         let x_dir_in_stage = vec3a(
-            root_in_stage.matrix3.x_axis.x,
+            base_in_stage.matrix3.x_axis.x,
             0.0,
-            root_in_stage.matrix3.x_axis.z,
+            base_in_stage.matrix3.x_axis.z,
         )
         .normalize();
-        root_in_stage.matrix3.x_axis = x_dir_in_stage;
-        root_in_stage.matrix3.y_axis = Vec3A::Y;
-        root_in_stage.matrix3.z_axis = x_dir_in_stage.cross(Vec3A::Y);
-        root_in_stage
+        base_in_stage.matrix3.x_axis = x_dir_in_stage;
+        base_in_stage.matrix3.y_axis = Vec3A::Y;
+        base_in_stage.matrix3.z_axis = x_dir_in_stage.cross(Vec3A::Y);
+        base_in_stage
     };
 
     let left_palm_in_stage = {
@@ -166,39 +166,39 @@ pub fn inverse_kinematics_system(
 
     let left_foot_in_stage = state
         .left_foot_in_stage
-        .unwrap_or_else(|| root_in_stage * Affine3A::from_translation(vec3(-0.2, 0.0, 0.0)));
+        .unwrap_or_else(|| base_in_stage * Affine3A::from_translation(vec3(-0.2, 0.0, 0.0)));
     let right_foot_in_stage = state
         .right_foot_in_stage
-        .unwrap_or_else(|| root_in_stage * Affine3A::from_translation(vec3(0.2, 0.0, 0.0)));
-    let root_from_stage = root_in_stage.inverse();
-    let left_foot_in_root = root_from_stage * left_foot_in_stage;
-    let right_foot_in_root = root_from_stage * right_foot_in_stage;
+        .unwrap_or_else(|| base_in_stage * Affine3A::from_translation(vec3(0.2, 0.0, 0.0)));
+    let base_from_stage = base_in_stage.inverse();
+    let left_foot_in_base = base_from_stage * left_foot_in_stage;
+    let right_foot_in_base = base_from_stage * right_foot_in_stage;
     state.weight_distribution = match (
-        left_foot_in_root.translation.length() < foot_radius,
-        right_foot_in_root.translation.length() < foot_radius,
+        left_foot_in_base.translation.length() < foot_radius,
+        right_foot_in_base.translation.length() < foot_radius,
     ) {
         (true, true) => state.weight_distribution,
         (true, false) => WeightDistribution::LeftPlanted,
         (false, true) => WeightDistribution::RightPlanted,
         (false, false) => WeightDistribution::SharedWeight,
     };
-    let hip_in_root = {
-        let a = left_foot_in_root.translation;
-        let b = right_foot_in_root.translation;
+    let balance_point_in_base = {
+        let a = left_foot_in_base.translation;
+        let b = right_foot_in_base.translation;
         let c = Vec3A::ZERO;
         let v = b - a;
         let t = (c - a).dot(v) / v.dot(v);
         let p = a + v * t.clamp(0.0, 1.0);
-        Affine3A::from_translation(p.into())
+        p
     };
     match state.weight_distribution {
         WeightDistribution::RightPlanted => {
             state.left_foot_in_stage = Some(
-                root_in_stage
+                base_in_stage
                     * Affine3A::from_translation(vec3(
-                        -step_multiplier * right_foot_in_root.translation.x,
-                        -step_multiplier * right_foot_in_root.translation.y,
-                        -step_multiplier * right_foot_in_root.translation.z,
+                        -step_multiplier * right_foot_in_base.translation.x,
+                        -step_multiplier * right_foot_in_base.translation.y,
+                        -step_multiplier * right_foot_in_base.translation.z,
                     )),
             );
             state.right_foot_in_stage = Some(right_foot_in_stage);
@@ -206,34 +206,34 @@ pub fn inverse_kinematics_system(
         WeightDistribution::LeftPlanted => {
             state.left_foot_in_stage = Some(left_foot_in_stage);
             state.right_foot_in_stage = Some(
-                root_in_stage
+                base_in_stage
                     * Affine3A::from_translation(vec3(
-                        -step_multiplier * left_foot_in_root.translation.x,
-                        -step_multiplier * left_foot_in_root.translation.y,
-                        -step_multiplier * left_foot_in_root.translation.z,
+                        -step_multiplier * left_foot_in_base.translation.x,
+                        -step_multiplier * left_foot_in_base.translation.y,
+                        -step_multiplier * left_foot_in_base.translation.z,
                     )),
             );
         }
         WeightDistribution::SharedWeight => {
-            if hip_in_root.translation.length() > stagger_threshold {
+            if balance_point_in_base.length() > stagger_threshold {
                 // Stagger step, lift the foot that is loaded the least.
-                let v1 = hip_in_root.translation - left_foot_in_root.translation;
-                let v2 = hip_in_root.translation - right_foot_in_root.translation;
+                let v1 = balance_point_in_base - left_foot_in_base.translation;
+                let v2 = balance_point_in_base - right_foot_in_base.translation;
                 if v1.length_squared() < v2.length_squared() {
-                    let dir = -left_foot_in_root.translation.normalize();
+                    let dir = -left_foot_in_base.translation.normalize();
                     state.left_foot_in_stage = Some(left_foot_in_stage);
                     state.right_foot_in_stage = Some(
-                        root_in_stage
+                        base_in_stage
                             * Affine3A::from_translation(
-                                (left_foot_in_root.translation + dir * step_size).into(),
+                                (left_foot_in_base.translation + dir * step_size).into(),
                             ),
                     );
                 } else {
-                    let dir = -right_foot_in_root.translation.normalize();
+                    let dir = -right_foot_in_base.translation.normalize();
                     state.left_foot_in_stage = Some(
-                        root_in_stage
+                        base_in_stage
                             * Affine3A::from_translation(
-                                (right_foot_in_root.translation + dir * step_size).into(),
+                                (right_foot_in_base.translation + dir * step_size).into(),
                             ),
                     );
                     state.right_foot_in_stage = Some(right_foot_in_stage);
@@ -247,6 +247,13 @@ pub fn inverse_kinematics_system(
 
     // Update entity transforms
     let transform_of_node = |node_id: IkNodeID| match node_id {
+        IkNodeID::Hmd => hmd_in_stage,
+        IkNodeID::HeadCenter => head_center_in_stage,
+        IkNodeID::NeckRoot => neck_root_in_stage,
+        IkNodeID::Base => base_in_stage,
+        IkNodeID::BalancePoint => {
+            base_in_stage * Affine3A::from_translation(balance_point_in_base.into())
+        }
         IkNodeID::LeftGrip => left_grip_in_stage,
         IkNodeID::LeftAim => left_aim_in_stage,
         IkNodeID::LeftPalm => left_palm_in_stage,
@@ -255,11 +262,6 @@ pub fn inverse_kinematics_system(
         IkNodeID::RightAim => right_aim_in_stage,
         IkNodeID::RightPalm => right_palm_in_stage,
         IkNodeID::RightWrist => right_wrist_in_stage,
-        IkNodeID::Hmd => hmd_in_stage,
-        IkNodeID::HeadCenter => head_center_in_stage,
-        IkNodeID::NeckRoot => neck_root_in_stage,
-        IkNodeID::Root => root_in_stage,
-        IkNodeID::Hip => root_in_stage * hip_in_root,
         IkNodeID::LeftFoot => state.left_foot_in_stage.unwrap(),
         IkNodeID::RightFoot => state.right_foot_in_stage.unwrap(),
     };
