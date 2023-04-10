@@ -6,12 +6,19 @@ use serde::{Deserialize, Serialize};
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
-    glam::{vec3, vec3a, Affine3A, Vec3, Vec3A},
+    glam::{vec3, vec3a, Affine3A, Vec3A},
     hecs::World,
-    na::Translation,
     Engine,
 };
 use inline_tweak::tweak;
+
+mod rr {
+    pub use rerun::{
+        components::{Box3D, ColorRGBA, Quaternion, Radius, Rigid3, Transform, Vec3D},
+        time::{Time, TimeType, Timeline},
+        MsgSender, Session,
+    };
+}
 
 #[derive(Copy, Clone, Eq, Hash, Debug, PartialEq, Sequence, Deserialize, Serialize)]
 pub enum IkNodeID {
@@ -101,7 +108,11 @@ fn model_name_from_node_id(node_id: IkNodeID) -> &'static str {
     }
 }
 
-pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
+pub fn inverse_kinematics_system(
+    engine: &mut Engine,
+    state: &mut IkState,
+    session: Option<&mut rr::Session>,
+) {
     // Fixed transforms and parameters
     let head_center_in_hmd = Affine3A::from_translation(vec3(0.0, tweak!(0.0), tweak!(0.10)));
     let neck_root_in_head_center = Affine3A::from_translation(vec3(0.0, tweak!(-0.1), tweak!(0.0)));
@@ -272,5 +283,35 @@ pub fn inverse_kinematics_system(engine: &mut Engine, state: &mut IkState) {
             .to_string();
         println!("[INVERSE_KINEMATICS] Storing snapshot to '{}'", filename);
         std::fs::write(&filename, serialized).expect(&format!("failed to write to '{filename}'"));
+    }
+
+    // Send poses to rerun
+    if let Some(session) = session {
+        let xz_box = rr::Box3D::new(0.05, 0.001, 0.05);
+        let radius = rr::Radius(0.001);
+        let log_fn = || -> hotham::anyhow::Result<()> {
+            for node_id in all::<IkNodeID>() {
+                let (_, rotation, translation) =
+                    transform_of_node(node_id).to_scale_rotation_translation();
+                rr::MsgSender::new(format!("stage/{:?}", node_id))
+                    .with_component(&[rr::Transform::Rigid3(rr::Rigid3 {
+                        rotation: rr::Quaternion {
+                            w: rotation.w,
+                            x: rotation.x,
+                            y: rotation.y,
+                            z: rotation.z,
+                        },
+                        translation: rr::Vec3D([translation.x, translation.y, translation.z]),
+                    })])?
+                    .with_splat(xz_box)?
+                    .with_splat(radius)?
+                    .with_component(&[rr::ColorRGBA::from_rgb(255, 0, 0)])?
+                    .send(session)?;
+            }
+            Ok(())
+        };
+        log_fn().unwrap_or_else(|e| {
+            eprintln!("Failed to send poses to rerun: {e}");
+        });
     }
 }

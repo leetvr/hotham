@@ -197,7 +197,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     if tick_data.current_state == xr::SessionState::FOCUSED {
         store_transforms_pre_update_system(engine);
         simulation_reset_system(engine, state);
-        inverse_kinematics_system(engine, &mut state.ik_state);
+        inverse_kinematics_system(engine, &mut state.ik_state, state.rr_session.as_mut());
         hands_system(engine);
         grabbing_system(engine);
         physics_system(engine);
