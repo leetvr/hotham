@@ -15,6 +15,8 @@
 pub use anyhow;
 pub use ash;
 pub use ash::vk;
+#[cfg(target_os = "android")]
+pub use ndk;
 pub use openxr as xr;
 pub use vk_shader_macros;
 
