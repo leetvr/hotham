@@ -16,4 +16,7 @@ pub use teleport::Teleport;
 #[derive(Debug, Clone, Default)]
 pub struct AngularVelocity(pub glam::Vec3);
 
+#[derive(Debug, Clone, Default)]
+pub struct LinearVelocity(pub glam::Vec3);
+
 // TODO: Move smaller components into this file

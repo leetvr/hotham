@@ -6,7 +6,7 @@ use rapier3d::prelude::{
 use crate::{
     components::{
         physics::Impulse,
-        physics::{AdditionalMass, AngularVelocity, BodyType, RigidBody, Teleport},
+        physics::{AdditionalMass, AngularVelocity, BodyType, LinearVelocity, RigidBody, Teleport},
         Collider, GlobalTransform, LocalTransform, Parent,
     },
     contexts::physics_context,
@@ -209,14 +209,12 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                 if world.get::<&Teleport>(entity).is_ok() {
                     command_buffer.remove_one::<Teleport>(entity);
                     let next_position = global_transform.to_isometry();
-                    println!("[HOTHAM_PHYSICS] Teleporting entity to {next_position:?}");
                     rigid_body.set_position(next_position, true);
                 }
 
                 // Apply one-shot components
                 if let Ok(additional_mass) = world.get::<&AdditionalMass>(entity).map(|a| a.value) {
                     command_buffer.remove_one::<AdditionalMass>(entity);
-                    println!("[HOTHAM_PHYSICS] Applying additional mass of {additional_mass:?}");
                     rigid_body.set_additional_mass(additional_mass, true);
                     rigid_body.recompute_mass_properties_from_colliders(&physics_context.colliders);
                 }
@@ -227,11 +225,14 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
                     if mass == 0. {
                         println!("[HOTHAM_PHYSICS] Attempted to apply impulse to rigid body with infinite mass. This is stupid and will do nothing.");
                     } else {
-                        println!(
-                            "[HOTHAM_PHYSICS] Applying impulse of {impulse:?} to rigid body with {mass} mass"
-                        );
                         rigid_body.apply_impulse(na_vector_from_glam(impulse), true);
                     }
+                }
+
+                if let Ok(linear_velocity) = world.get::<&LinearVelocity>(entity).map(|i| i.0) {
+                    command_buffer.remove_one::<LinearVelocity>(entity);
+                    let linvel = na_vector_from_glam(linear_velocity);
+                    rigid_body.set_linvel(linvel, true);
                 }
 
                 if let Ok(additional_angular_velocity) =
