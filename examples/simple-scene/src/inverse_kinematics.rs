@@ -155,6 +155,72 @@ pub fn inverse_kinematics_system(
     session: Option<&mut rr::Session>,
 ) {
     puffin::profile_function!();
+    let world = &mut engine.world;
+    let input_context = &engine.input_context;
+    let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
+        state,
+        input_context.hmd.hmd_in_stage(),
+        input_context.left.stage_from_grip(),
+        input_context.left.stage_from_aim(),
+        input_context.right.stage_from_grip(),
+        input_context.right.stage_from_aim(),
+    );
+
+    // Update entity transforms
+    for (_, (local_transform, node)) in world
+        .query_mut::<(&mut LocalTransform, &IkNode)>()
+        .into_iter()
+    {
+        let node_id = node.node_id as usize;
+        local_transform.translation = state.node_positions[node_id].into();
+        local_transform.rotation = state.node_rotations[node_id];
+    }
+
+    // Store snapshot of current state if menu button is pressed
+    if input_context.left.menu_button_just_pressed() {
+        let date_time = chrono::Local::now().naive_local();
+        let filename = date_time
+            .format("inverse_kinematics_snapshot_%Y-%m-%d_%H.%M.%S.json")
+            .to_string();
+        println!("[INVERSE_KINEMATICS] Storing snapshot to '{}'", filename);
+        store_snapshot(state, &filename);
+    }
+
+    // Send poses to rerun
+    send_poses_to_rerun(
+        session,
+        state,
+        shoulder_width,
+        sternum_height_in_torso,
+        hip_width,
+        hip_height_in_pelvis,
+    );
+}
+
+fn store_snapshot(state: &mut IkState, filename: &str) {
+    let mut summary = HashMap::<IkNodeID, (Vec3A, Quat)>::new();
+    for node_id in all::<IkNodeID>() {
+        summary.insert(
+            node_id,
+            (
+                state.node_positions[node_id as usize],
+                state.node_rotations[node_id as usize],
+            ),
+        );
+    }
+    let serialized = serde_json::to_string(&summary).unwrap();
+    std::fs::write(&filename, serialized).expect(&format!("failed to write to '{filename}'"));
+}
+
+fn solve_ik(
+    state: &mut IkState,
+    hmd_in_stage: Affine3A,
+    left_grip_in_stage: Affine3A,
+    left_aim_in_stage: Affine3A,
+    right_grip_in_stage: Affine3A,
+    right_aim_in_stage: Affine3A,
+) -> (f32, f32, f32, f32) {
+    puffin::profile_function!();
     // Fixed transforms and parameters
     let head_center_in_hmd = Affine3A::from_translation(vec3(0.0, tweak!(0.0), tweak!(0.10)));
     let neck_root_in_head_center = Affine3A::from_translation(vec3(0.0, tweak!(-0.1), tweak!(0.0)));
@@ -363,13 +429,6 @@ pub fn inverse_kinematics_system(
     ];
 
     // Dynamic transforms
-    let world = &mut engine.world;
-    let input_context = &engine.input_context;
-    let hmd_in_stage = input_context.hmd.hmd_in_stage();
-    let left_grip_in_stage = input_context.left.stage_from_grip();
-    let left_aim_in_stage = input_context.left.stage_from_aim();
-    let right_grip_in_stage = input_context.right.stage_from_grip();
-    let right_aim_in_stage = input_context.right.stage_from_aim();
     let head_center_in_stage = hmd_in_stage * head_center_in_hmd;
     let neck_root_in_stage = head_center_in_stage * neck_root_in_head_center;
     let base_in_stage = {
@@ -603,39 +662,23 @@ pub fn inverse_kinematics_system(
             state.node_rotations[node_b] = delta2 * state.node_rotations[node_b];
         }
     }
+    (
+        shoulder_width,
+        hip_width,
+        sternum_height_in_torso,
+        hip_height_in_pelvis,
+    )
+}
 
-    // Update entity transforms
-    for (_, (local_transform, node)) in world
-        .query_mut::<(&mut LocalTransform, &IkNode)>()
-        .into_iter()
-    {
-        let node_id = node.node_id as usize;
-        local_transform.translation = state.node_positions[node_id].into();
-        local_transform.rotation = state.node_rotations[node_id];
-    }
-
-    // Store snapshot of current state if menu button is pressed
-    if input_context.left.menu_button_just_pressed() {
-        let mut summary = HashMap::<IkNodeID, (Vec3A, Quat)>::new();
-        for node_id in all::<IkNodeID>() {
-            summary.insert(
-                node_id,
-                (
-                    state.node_positions[node_id as usize],
-                    state.node_rotations[node_id as usize],
-                ),
-            );
-        }
-        let serialized = serde_json::to_string(&summary).unwrap();
-        let date_time = chrono::Local::now().naive_local();
-        let filename = date_time
-            .format("inverse_kinematics_snapshot_%Y-%m-%d_%H.%M.%S.json")
-            .to_string();
-        println!("[INVERSE_KINEMATICS] Storing snapshot to '{}'", filename);
-        std::fs::write(&filename, serialized).expect(&format!("failed to write to '{filename}'"));
-    }
-
-    // Send poses to rerun
+fn send_poses_to_rerun(
+    session: Option<&mut rerun::Session>,
+    state: &mut IkState,
+    shoulder_width: f32,
+    sternum_height_in_torso: f32,
+    hip_width: f32,
+    hip_height_in_pelvis: f32,
+) {
+    puffin::profile_function!();
     if let Some(session) = session {
         let radius = rr::Radius(0.001);
         let log_fn = || -> hotham::anyhow::Result<()> {
