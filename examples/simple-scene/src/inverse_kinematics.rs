@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    f32::consts::{FRAC_1_SQRT_2, SQRT_2},
+};
 
 use enum_iterator::{all, cardinality, Sequence};
 use serde::{Deserialize, Serialize};
@@ -89,6 +92,15 @@ struct DistanceConstraint {
     point_in_a: Vec3A,
     point_in_b: Vec3A,
     distance: f32,
+}
+
+// The angular part of a cardan (universal) joint.
+// Should be combined with a spherical constraint for a regular cardan joint.
+struct AngularCardanConstraint {
+    node_a: IkNodeID,
+    node_b: IkNodeID,
+    axis_in_a: Vec3A,
+    axis_in_b: Vec3A,
 }
 
 pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &mut World) {
@@ -289,6 +301,64 @@ pub fn inverse_kinematics_system(
             point_in_a: shoulder_in_upper_arm,
             point_in_b: right_sc_joint_in_torso,
             distance: collarbone_length,
+        },
+    ];
+    let cardan_constraints = [
+        AngularCardanConstraint {
+            // Left knee
+            node_a: IkNodeID::LeftUpperLeg,
+            node_b: IkNodeID::LeftLowerLeg,
+            axis_in_a: Vec3A::X,
+            axis_in_b: Vec3A::Y,
+        },
+        AngularCardanConstraint {
+            // Right knee
+            node_a: IkNodeID::RightUpperLeg,
+            node_b: IkNodeID::RightLowerLeg,
+            axis_in_a: Vec3A::X,
+            axis_in_b: Vec3A::Y,
+        },
+        AngularCardanConstraint {
+            // Left ankle
+            node_a: IkNodeID::LeftLowerLeg,
+            node_b: IkNodeID::LeftFoot,
+            axis_in_a: Vec3A::X,
+            axis_in_b: vec3a(0.0, FRAC_1_SQRT_2, FRAC_1_SQRT_2),
+        },
+        AngularCardanConstraint {
+            // Right ankle
+            node_a: IkNodeID::RightLowerLeg,
+            node_b: IkNodeID::RightFoot,
+            axis_in_a: Vec3A::X,
+            axis_in_b: vec3a(0.0, FRAC_1_SQRT_2, FRAC_1_SQRT_2),
+        },
+        AngularCardanConstraint {
+            // Left elbow
+            node_a: IkNodeID::LeftLowerArm,
+            node_b: IkNodeID::LeftUpperArm,
+            axis_in_a: Vec3A::Z,
+            axis_in_b: Vec3A::X,
+        },
+        AngularCardanConstraint {
+            // Right elbow
+            node_a: IkNodeID::RightLowerArm,
+            node_b: IkNodeID::RightUpperArm,
+            axis_in_a: Vec3A::Z,
+            axis_in_b: Vec3A::X,
+        },
+        AngularCardanConstraint {
+            // Left wrist
+            node_a: IkNodeID::LeftPalm,
+            node_b: IkNodeID::LeftLowerArm,
+            axis_in_a: Vec3A::X,
+            axis_in_b: Vec3A::Y,
+        },
+        AngularCardanConstraint {
+            // Right wrist
+            node_a: IkNodeID::RightPalm,
+            node_b: IkNodeID::RightLowerArm,
+            axis_in_a: Vec3A::X,
+            axis_in_b: Vec3A::Y,
         },
     ];
 
@@ -516,6 +586,17 @@ pub fn inverse_kinematics_system(
             )
             .normalize();
         }
+        for constraint in &cardan_constraints {
+            let node_a = constraint.node_a as usize;
+            let node_b = constraint.node_b as usize;
+            let axis_1 = state.node_rotations[node_a] * constraint.axis_in_a;
+            let axis_2 = state.node_rotations[node_b] * constraint.axis_in_b;
+            // let delta = tweak!(0.1) * axis_1.dot(axis_2) * axis_1.cross(axis_2).normalize();
+            let delta1 = Quat::from_vec4(axis_2.cross(axis_1).extend(axis_1.dot(axis_2)));
+            let delta2 = Quat::from_vec4(axis_1.cross(axis_2).extend(axis_1.dot(axis_2)));
+            state.node_rotations[node_a] = delta1 * state.node_rotations[node_a];
+            state.node_rotations[node_b] = delta2 * state.node_rotations[node_b];
+        }
     }
 
     // Update entity transforms
@@ -582,7 +663,7 @@ pub fn inverse_kinematics_system(
                     IkNodeID::LeftUpperLeg
                     | IkNodeID::LeftLowerLeg
                     | IkNodeID::RightUpperLeg
-                    | IkNodeID::RightLowerLeg => rr::Box3D::new(0.075, 0.075, 0.20),
+                    | IkNodeID::RightLowerLeg => rr::Box3D::new(0.075, 0.20, 0.075),
                 };
                 rr::MsgSender::new(format!("stage/{:?}", node_id))
                     .with_component(&[rr::Transform::Rigid3(rr::Rigid3 {
@@ -609,4 +690,10 @@ pub fn inverse_kinematics_system(
 fn to_pos_rot(transform: &Affine3A) -> (Vec3A, Quat) {
     let (_scale, rotation, translation) = transform.to_scale_rotation_translation();
     (translation.into(), rotation)
+}
+
+fn apply_rotation(q: &mut Quat, delta: &Vec3A) {
+    *q =
+        Quat::from_vec4(Vec4::from(*q) + 0.5 * Vec4::from(Quat::from_vec4(delta.extend(0.0)) * *q))
+            .normalize();
 }
