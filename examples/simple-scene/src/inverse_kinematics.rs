@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    f32::consts::{FRAC_1_SQRT_2, SQRT_2},
+    f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2},
 };
 
 use enum_iterator::{all, cardinality, Sequence};
@@ -589,11 +589,16 @@ pub fn inverse_kinematics_system(
         for constraint in &cardan_constraints {
             let node_a = constraint.node_a as usize;
             let node_b = constraint.node_b as usize;
-            let axis_1 = state.node_rotations[node_a] * constraint.axis_in_a;
-            let axis_2 = state.node_rotations[node_b] * constraint.axis_in_b;
-            // let delta = tweak!(0.1) * axis_1.dot(axis_2) * axis_1.cross(axis_2).normalize();
-            let delta1 = Quat::from_vec4(axis_2.cross(axis_1).extend(axis_1.dot(axis_2)));
-            let delta2 = Quat::from_vec4(axis_1.cross(axis_2).extend(axis_1.dot(axis_2)));
+            let axis1 = state.node_rotations[node_a] * constraint.axis_in_a;
+            let axis2 = state.node_rotations[node_b] * constraint.axis_in_b;
+            // The constraint is satisfied when the axes are perpendicular
+            let angle = axis1.dot(axis2).acos() - FRAC_PI_2;
+            let axis = axis1.cross(axis2).normalize();
+            // The correction is applied symmetrically
+            let (s, c) = (angle * 0.25).sin_cos();
+            let v = axis * s;
+            let delta1 = Quat::from_xyzw(v.x, v.y, v.z, c);
+            let delta2 = Quat::from_xyzw(-v.x, -v.y, -v.z, c);
             state.node_rotations[node_a] = delta1 * state.node_rotations[node_a];
             state.node_rotations[node_b] = delta2 * state.node_rotations[node_b];
         }
@@ -692,8 +697,20 @@ fn to_pos_rot(transform: &Affine3A) -> (Vec3A, Quat) {
     (translation.into(), rotation)
 }
 
-fn apply_rotation(q: &mut Quat, delta: &Vec3A) {
-    *q =
-        Quat::from_vec4(Vec4::from(*q) + 0.5 * Vec4::from(Quat::from_vec4(delta.extend(0.0)) * *q))
-            .normalize();
+#[test]
+fn test_cardan() {
+    let axis1 = Vec3A::X;
+    let axis2 = vec3a(0.5, 1.0, 0.2).normalize();
+
+    let angle = axis1.dot(axis2).acos() - FRAC_PI_2;
+    let axis = axis1.cross(axis2).normalize();
+    let (s, c) = (angle * 0.25).sin_cos();
+    let v = axis * s;
+    let delta1 = Quat::from_xyzw(v.x, v.y, v.z, c);
+    let delta2 = Quat::from_xyzw(-v.x, -v.y, -v.z, c);
+
+    let axis1_after = delta1 * axis1;
+    let axis2_after = delta2 * axis2;
+    let scalar = axis1_after.dot(axis2_after);
+    println!("{scalar}");
 }
