@@ -112,6 +112,14 @@ struct AngularCardanConstraint {
     axis_in_b: Vec3A,
 }
 
+struct CompliantSphericalConstraint {
+    node_a: IkNodeID,
+    node_b: IkNodeID,
+    point_in_a: Vec3A,
+    point_in_b: Vec3A,
+    compliance: f32,
+}
+
 pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &mut World) {
     let collider = Collider::new(SharedShape::ball(0.1));
     for node_id in all::<IkNodeID>() {
@@ -287,6 +295,7 @@ fn solve_ik(
     let step_multiplier = tweak!(3.0);
     let step_size = foot_radius * (step_multiplier + 1.0);
     let stagger_threshold = foot_radius * tweak!(2.0);
+    let shoulder_compliance = tweak!(0.1);
 
     let spherical_constraints = [
         SphericalConstraint {
@@ -448,6 +457,24 @@ fn solve_ik(
             node_b: IkNodeID::RightLowerArm,
             axis_in_a: Vec3A::X,
             axis_in_b: Vec3A::Y,
+        },
+    ];
+    let compliant_spherical_constraints = [
+        CompliantSphericalConstraint {
+            // Left shoulder
+            node_a: IkNodeID::Torso,
+            node_b: IkNodeID::LeftUpperArm,
+            point_in_a: left_shoulder_in_torso,
+            point_in_b: shoulder_in_upper_arm,
+            compliance: shoulder_compliance,
+        },
+        CompliantSphericalConstraint {
+            // Right shoulder
+            node_a: IkNodeID::Torso,
+            node_b: IkNodeID::RightUpperArm,
+            point_in_a: right_shoulder_in_torso,
+            point_in_b: shoulder_in_upper_arm,
+            compliance: shoulder_compliance,
         },
     ];
 
@@ -684,6 +711,45 @@ fn solve_ik(
             state.node_rotations[node_a] = delta1 * state.node_rotations[node_a];
             state.node_rotations[node_b] = delta2 * state.node_rotations[node_b];
         }
+        for constraint in &compliant_spherical_constraints {
+            let node_a = constraint.node_a as usize;
+            let node_b = constraint.node_b as usize;
+            let r1 = state.node_rotations[node_a] * constraint.point_in_a;
+            let r2 = state.node_rotations[node_b] * constraint.point_in_b;
+            // w = inv_mass + p.cross(n)ᵀ * inv_inertia * p.cross(n)
+            let r1_squares = r1 * r1;
+            let w1 = vec3a(
+                1.0 + r1_squares.y + r1_squares.z,
+                1.0 + r1_squares.z + r1_squares.x,
+                1.0 + r1_squares.x + r1_squares.y,
+            );
+            let r2_squares = r2 * r2;
+            let w2 = vec3a(
+                1.0 + r2_squares.y + r2_squares.z,
+                1.0 + r2_squares.z + r2_squares.x,
+                1.0 + r2_squares.x + r2_squares.y,
+            );
+            let p1 = state.node_positions[node_a] + r1;
+            let p2 = state.node_positions[node_b] + r2;
+            let c = p1 - p2;
+            let correction = -c / (w1 + w2 + constraint.compliance);
+            state.node_positions[node_a] += correction;
+            state.node_positions[node_b] -= correction;
+            // q1 <- q1 + 0.5 * (p1.cross(correction) * q1)
+            let q1 = &mut state.node_rotations[node_a];
+            let omega = r1.cross(correction);
+            *q1 = Quat::from_vec4(
+                Vec4::from(*q1) + 0.5 * Vec4::from(Quat::from_vec4(omega.extend(0.0)) * *q1),
+            )
+            .normalize();
+            // q2 <- q2 - 0.5 * (p1.cross(correction) * q2)
+            let q2 = &mut state.node_rotations[node_b];
+            let omega = r2.cross(correction);
+            *q2 = Quat::from_vec4(
+                Vec4::from(*q2) - 0.5 * Vec4::from(Quat::from_vec4(omega.extend(0.0)) * *q2),
+            )
+            .normalize();
+        }
     }
     (
         shoulder_width,
@@ -795,22 +861,24 @@ fn test_ik_solver() -> hotham::anyhow::Result<()> {
     let mut state = IkState::default();
     load_snapshot(&mut state, &data);
 
-    let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
-        state.get_affine(IkNodeID::Hmd),
-        state.get_affine(IkNodeID::LeftGrip),
-        state.get_affine(IkNodeID::LeftAim),
-        state.get_affine(IkNodeID::RightGrip),
-        state.get_affine(IkNodeID::RightAim),
-        &mut state,
-    );
+    for _ in 0..100 {
+        let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
+            state.get_affine(IkNodeID::Hmd),
+            state.get_affine(IkNodeID::LeftGrip),
+            state.get_affine(IkNodeID::LeftAim),
+            state.get_affine(IkNodeID::RightGrip),
+            state.get_affine(IkNodeID::RightAim),
+            &mut state,
+        );
 
-    send_poses_to_rerun(
-        &session,
-        &state,
-        shoulder_width,
-        sternum_height_in_torso,
-        hip_width,
-        hip_height_in_pelvis,
-    );
+        send_poses_to_rerun(
+            &session,
+            &state,
+            shoulder_width,
+            sternum_height_in_torso,
+            hip_width,
+            hip_height_in_pelvis,
+        );
+    }
     Ok(())
 }
