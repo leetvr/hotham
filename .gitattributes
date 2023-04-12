@@ -4,6 +4,7 @@
 *.mp3 filter=lfs diff=lfs merge=lfs -text
 *.jpg filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
+*.rrd filter=lfs diff=lfs merge=lfs -text
 test_assets/Quartet[[:space:]]14[[:space:]]-[[:space:]]Clip.mp3 filter=lfs diff=lfs merge=lfs -text
 test_assets/culling_stress_test.glb filter=lfs diff=lfs merge=lfs -text
 hotham/data/brdf_lut.ktx2 filter=lfs diff=lfs merge=lfs -text
