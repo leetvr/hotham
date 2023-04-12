@@ -13,6 +13,13 @@ pub fn init_rerun_session() -> anyhow::Result<rerun::Session> {
             rerun::coordinates::Handedness::Right,
         ))?
         .send(&session)?;
+    rerun::MsgSender::new("stage")
+        .with_timeless(true)
+        .with_splat(rerun::components::ViewCoordinates::from_up_and_handedness(
+            rerun::coordinates::SignedAxis3::POSITIVE_Y,
+            rerun::coordinates::Handedness::Right,
+        ))?
+        .send(&session)?;
     session.sink().drop_msgs_if_disconnected();
     Ok(session)
 }
