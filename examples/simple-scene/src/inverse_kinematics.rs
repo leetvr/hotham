@@ -66,6 +66,15 @@ pub struct IkState {
     pub node_rotations: [Quat; cardinality::<IkNodeID>()],
 }
 
+impl IkState {
+    fn get_affine(&self, node_id: IkNodeID) -> Affine3A {
+        Affine3A::from_rotation_translation(
+            self.node_rotations[node_id as usize],
+            self.node_positions[node_id as usize].into(),
+        )
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum WeightDistribution {
     LeftPlanted,
@@ -158,12 +167,12 @@ pub fn inverse_kinematics_system(
     let world = &mut engine.world;
     let input_context = &engine.input_context;
     let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
-        state,
         input_context.hmd.hmd_in_stage(),
         input_context.left.stage_from_grip(),
         input_context.left.stage_from_aim(),
         input_context.right.stage_from_grip(),
         input_context.right.stage_from_aim(),
+        state,
     );
 
     // Update entity transforms
@@ -187,17 +196,19 @@ pub fn inverse_kinematics_system(
     }
 
     // Send poses to rerun
-    send_poses_to_rerun(
-        session,
-        state,
-        shoulder_width,
-        sternum_height_in_torso,
-        hip_width,
-        hip_height_in_pelvis,
-    );
+    if let Some(session) = session {
+        send_poses_to_rerun(
+            session,
+            state,
+            shoulder_width,
+            sternum_height_in_torso,
+            hip_width,
+            hip_height_in_pelvis,
+        );
+    }
 }
 
-fn store_snapshot(state: &mut IkState, filename: &str) {
+fn store_snapshot(state: &IkState, filename: &str) {
     let mut summary = HashMap::<IkNodeID, (Vec3A, Quat)>::new();
     for node_id in all::<IkNodeID>() {
         summary.insert(
@@ -212,13 +223,38 @@ fn store_snapshot(state: &mut IkState, filename: &str) {
     std::fs::write(&filename, serialized).expect(&format!("failed to write to '{filename}'"));
 }
 
+fn load_snapshot(state: &mut IkState, data: &str) {
+    let summary: HashMap<IkNodeID, (Vec3A, Quat)> =
+        serde_json::from_str(&data).expect("JSON does not have correct format.");
+
+    for node_id in all::<IkNodeID>() {
+        if let Some((pos, rot)) = summary.get(&node_id) {
+            state.node_positions[node_id as usize] = *pos;
+            state.node_rotations[node_id as usize] = *rot;
+        }
+    }
+}
+
+fn load_legacy_snapshot(state: &mut IkState, data: &str) {
+    let summary: HashMap<IkNodeID, Affine3A> =
+        serde_json::from_str(&data).expect("JSON does not have correct format.");
+
+    for node_id in all::<IkNodeID>() {
+        if let Some(affine) = summary.get(&node_id) {
+            let (_scale, rot, pos) = affine.to_scale_rotation_translation();
+            state.node_positions[node_id as usize] = pos.into();
+            state.node_rotations[node_id as usize] = rot;
+        }
+    }
+}
+
 fn solve_ik(
-    state: &mut IkState,
     hmd_in_stage: Affine3A,
     left_grip_in_stage: Affine3A,
     left_aim_in_stage: Affine3A,
     right_grip_in_stage: Affine3A,
     right_aim_in_stage: Affine3A,
+    state: &mut IkState,
 ) -> (f32, f32, f32, f32) {
     puffin::profile_function!();
     // Fixed transforms and parameters
@@ -671,68 +707,66 @@ fn solve_ik(
 }
 
 fn send_poses_to_rerun(
-    session: Option<&mut rerun::Session>,
-    state: &mut IkState,
+    session: &rerun::Session,
+    state: &IkState,
     shoulder_width: f32,
     sternum_height_in_torso: f32,
     hip_width: f32,
     hip_height_in_pelvis: f32,
 ) {
     puffin::profile_function!();
-    if let Some(session) = session {
-        let radius = rr::Radius(0.001);
-        let log_fn = || -> hotham::anyhow::Result<()> {
-            for node_id in all::<IkNodeID>() {
-                let translation = &state.node_positions[node_id as usize];
-                let rotation = &state.node_rotations[node_id as usize];
-                let box_shape = match node_id {
-                    IkNodeID::HeadCenter => rr::Box3D::new(0.08, 0.11, 0.11),
-                    IkNodeID::Hmd => rr::Box3D::new(0.08, 0.04, 0.05),
-                    IkNodeID::LeftAim
-                    | IkNodeID::LeftGrip
-                    | IkNodeID::LeftWrist
-                    | IkNodeID::RightAim
-                    | IkNodeID::RightGrip
-                    | IkNodeID::RightWrist
-                    | IkNodeID::BalancePoint
-                    | IkNodeID::NeckRoot => rr::Box3D::new(0.01, 0.01, 0.01),
-                    IkNodeID::Torso => {
-                        rr::Box3D::new(shoulder_width / 2.0, sternum_height_in_torso, 0.10)
-                    }
-                    IkNodeID::Pelvis => rr::Box3D::new(hip_width / 2.0, hip_height_in_pelvis, 0.10),
-                    IkNodeID::LeftFoot | IkNodeID::RightFoot | IkNodeID::Base => {
-                        rr::Box3D::new(0.05, 0.001, 0.05)
-                    }
-                    IkNodeID::LeftPalm | IkNodeID::RightPalm => rr::Box3D::new(0.025, 0.05, 0.10),
-                    IkNodeID::LeftLowerArm
-                    | IkNodeID::LeftUpperArm
-                    | IkNodeID::RightLowerArm
-                    | IkNodeID::RightUpperArm => rr::Box3D::new(0.05, 0.05, 0.14),
-                    IkNodeID::LeftUpperLeg
-                    | IkNodeID::LeftLowerLeg
-                    | IkNodeID::RightUpperLeg
-                    | IkNodeID::RightLowerLeg => rr::Box3D::new(0.075, 0.20, 0.075),
-                };
-                rr::MsgSender::new(format!("stage/{:?}", node_id))
-                    .with_component(&[rr::Transform::Rigid3(rr::Rigid3 {
-                        rotation: rr::Quaternion {
-                            w: rotation.w,
-                            x: rotation.x,
-                            y: rotation.y,
-                            z: rotation.z,
-                        },
-                        translation: rr::Vec3D([translation.x, translation.y, translation.z]),
-                    })])?
-                    .with_splat(box_shape)?
-                    .with_splat(radius)?
-                    .send(session)?;
-            }
-            Ok(())
-        };
-        log_fn().unwrap_or_else(|e| {
-            eprintln!("Failed to send poses to rerun: {e}");
-        });
-    }
+    let radius = rr::Radius(0.001);
+    let log_fn = || -> hotham::anyhow::Result<()> {
+        for node_id in all::<IkNodeID>() {
+            let translation = &state.node_positions[node_id as usize];
+            let rotation = &state.node_rotations[node_id as usize];
+            let box_shape = match node_id {
+                IkNodeID::HeadCenter => rr::Box3D::new(0.08, 0.11, 0.11),
+                IkNodeID::Hmd => rr::Box3D::new(0.08, 0.04, 0.05),
+                IkNodeID::LeftAim
+                | IkNodeID::LeftGrip
+                | IkNodeID::LeftWrist
+                | IkNodeID::RightAim
+                | IkNodeID::RightGrip
+                | IkNodeID::RightWrist
+                | IkNodeID::BalancePoint
+                | IkNodeID::NeckRoot => rr::Box3D::new(0.01, 0.01, 0.01),
+                IkNodeID::Torso => {
+                    rr::Box3D::new(shoulder_width / 2.0, sternum_height_in_torso, 0.10)
+                }
+                IkNodeID::Pelvis => rr::Box3D::new(hip_width / 2.0, hip_height_in_pelvis, 0.10),
+                IkNodeID::LeftFoot | IkNodeID::RightFoot | IkNodeID::Base => {
+                    rr::Box3D::new(0.05, 0.001, 0.05)
+                }
+                IkNodeID::LeftPalm | IkNodeID::RightPalm => rr::Box3D::new(0.025, 0.05, 0.10),
+                IkNodeID::LeftLowerArm
+                | IkNodeID::LeftUpperArm
+                | IkNodeID::RightLowerArm
+                | IkNodeID::RightUpperArm => rr::Box3D::new(0.05, 0.05, 0.14),
+                IkNodeID::LeftUpperLeg
+                | IkNodeID::LeftLowerLeg
+                | IkNodeID::RightUpperLeg
+                | IkNodeID::RightLowerLeg => rr::Box3D::new(0.075, 0.20, 0.075),
+            };
+            rr::MsgSender::new(format!("stage/{:?}", node_id))
+                .with_component(&[rr::Transform::Rigid3(rr::Rigid3 {
+                    rotation: rr::Quaternion {
+                        w: rotation.w,
+                        x: rotation.x,
+                        y: rotation.y,
+                        z: rotation.z,
+                    },
+                    translation: rr::Vec3D([translation.x, translation.y, translation.z]),
+                })])?
+                .with_splat(box_shape)?
+                .with_splat(radius)?
+                .send(session)?;
+        }
+        Ok(())
+    };
+    log_fn().unwrap_or_else(|e| {
+        eprintln!("Failed to send poses to rerun: {e}");
+    });
 }
 
 fn to_pos_rot(transform: &Affine3A) -> (Vec3A, Quat) {
@@ -756,4 +790,44 @@ fn test_cardan() {
     let axis2_after = delta2 * axis2;
     let scalar = axis1_after.dot(axis2_after);
     println!("{scalar}");
+}
+
+#[test]
+fn test_ik_solver() -> hotham::anyhow::Result<()> {
+    let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
+    rerun::MsgSender::new("stage")
+        .with_timeless(true)
+        .with_splat(rerun::components::ViewCoordinates::from_up_and_handedness(
+            rerun::coordinates::SignedAxis3::POSITIVE_Y,
+            rerun::coordinates::Handedness::Right,
+        ))?
+        .send(&session)?;
+    session.sink().drop_msgs_if_disconnected();
+
+    let data = include_str!("../inverse_kinematics_snapshot_2023-04-09_12.12.52.json");
+    let mut state = IkState::default();
+    load_snapshot(&mut state, &data);
+    store_snapshot(
+        &state,
+        "inverse_kinematics_snapshot_2023-04-09_12.12.52.json",
+    );
+
+    let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
+        state.get_affine(IkNodeID::Hmd),
+        state.get_affine(IkNodeID::LeftGrip),
+        state.get_affine(IkNodeID::LeftAim),
+        state.get_affine(IkNodeID::RightGrip),
+        state.get_affine(IkNodeID::RightAim),
+        &mut state,
+    );
+
+    send_poses_to_rerun(
+        &session,
+        &state,
+        shoulder_width,
+        sternum_height_in_torso,
+        hip_width,
+        hip_height_in_pelvis,
+    );
+    Ok(())
 }
