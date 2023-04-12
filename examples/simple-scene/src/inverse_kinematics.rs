@@ -235,19 +235,6 @@ fn load_snapshot(state: &mut IkState, data: &str) {
     }
 }
 
-fn load_legacy_snapshot(state: &mut IkState, data: &str) {
-    let summary: HashMap<IkNodeID, Affine3A> =
-        serde_json::from_str(&data).expect("JSON does not have correct format.");
-
-    for node_id in all::<IkNodeID>() {
-        if let Some(affine) = summary.get(&node_id) {
-            let (_scale, rot, pos) = affine.to_scale_rotation_translation();
-            state.node_positions[node_id as usize] = pos.into();
-            state.node_rotations[node_id as usize] = rot;
-        }
-    }
-}
-
 fn solve_ik(
     hmd_in_stage: Affine3A,
     left_grip_in_stage: Affine3A,
@@ -804,13 +791,9 @@ fn test_ik_solver() -> hotham::anyhow::Result<()> {
         .send(&session)?;
     session.sink().drop_msgs_if_disconnected();
 
-    let data = include_str!("../inverse_kinematics_snapshot_2023-04-09_12.12.52.json");
+    let data = include_str!("../../../inverse_kinematics_snapshot_2023-04-12_22.23.47.json");
     let mut state = IkState::default();
     load_snapshot(&mut state, &data);
-    store_snapshot(
-        &state,
-        "inverse_kinematics_snapshot_2023-04-09_12.12.52.json",
-    );
 
     let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
         state.get_affine(IkNodeID::Hmd),
