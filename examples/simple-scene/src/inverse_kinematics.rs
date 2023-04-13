@@ -314,14 +314,15 @@ fn solve_ik(
     let step_multiplier = tweak!(3.0);
     let step_size = foot_radius * (step_multiplier + 1.0);
     let stagger_threshold = foot_radius * tweak!(2.0);
-    let shoulder_compliance = tweak!(1.0);
-    let elbow_compliance = tweak!(100.1);
-    let lower_back_compliance = tweak!(10.1);
-    let hip_compliance = tweak!(200.1);
-    let knee_compliance = tweak!(200.1);
-    let ankle_compliance = tweak!(10.1);
-    let head_compliance = tweak!(10.1);
-    let wrist_compliance = tweak!(10.1);
+
+    let shoulder_compliance = tweak!(10.0);
+    let elbow_compliance = tweak!(1000.1);
+    let lower_back_compliance = tweak!(100.1);
+    let hip_compliance = tweak!(2000.1);
+    let knee_compliance = tweak!(2000.1);
+    let ankle_compliance = tweak!(100.1);
+    let head_compliance = tweak!(100.1);
+    let wrist_compliance = tweak!(100.1);
 
     let spherical_constraints = [
         SphericalConstraint {
@@ -1121,5 +1122,12 @@ mod tests {
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.18.json"),
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.20.json"),
         )
+    }
+
+    #[test]
+    fn test_ik_solver_hands_bent_up() -> hotham::anyhow::Result<()> {
+        test_ik_solver(include_str!(
+            "../../../inverse_kinematics_snapshot_2023-04-13_22.04.18.json"
+        ))
     }
 }
