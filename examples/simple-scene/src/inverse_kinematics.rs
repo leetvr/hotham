@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2},
+    f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, FRAC_PI_4},
 };
 
 use enum_iterator::{all, cardinality, Sequence};
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
-    glam::{vec3, vec3a, Affine3A, Quat, Vec3A, Vec4},
+    glam::{vec3, vec3a, Affine3A, Quat, Vec3, Vec3A, Vec4},
     hecs::World,
     Engine,
 };
@@ -117,6 +117,13 @@ struct CompliantSphericalConstraint {
     node_b: IkNodeID,
     point_in_a: Vec3A,
     point_in_b: Vec3A,
+    compliance: f32,
+}
+
+struct CompliantFixedAngleConstraint {
+    node_a: IkNodeID,
+    node_b: IkNodeID,
+    b_in_a: Quat,
     compliance: f32,
 }
 
@@ -228,12 +235,12 @@ fn store_snapshot(state: &IkState, filename: &str) {
         );
     }
     let serialized = serde_json::to_string(&summary).unwrap();
-    std::fs::write(&filename, serialized).expect(&format!("failed to write to '{filename}'"));
+    std::fs::write(filename, serialized).expect(&format!("failed to write to '{filename}'"));
 }
 
 fn load_snapshot(state: &mut IkState, data: &str) {
     let summary: HashMap<IkNodeID, (Vec3A, Quat)> =
-        serde_json::from_str(&data).expect("JSON does not have correct format.");
+        serde_json::from_str(data).expect("JSON does not have correct format.");
 
     for node_id in all::<IkNodeID>() {
         if let Some((pos, rot)) = summary.get(&node_id) {
@@ -295,7 +302,14 @@ fn solve_ik(
     let step_multiplier = tweak!(3.0);
     let step_size = foot_radius * (step_multiplier + 1.0);
     let stagger_threshold = foot_radius * tweak!(2.0);
-    let shoulder_compliance = tweak!(0.1);
+    let shoulder_compliance = tweak!(1.0);
+    let elbow_compliance = tweak!(100.1);
+    let lower_back_compliance = tweak!(10.1);
+    let hip_compliance = tweak!(200.1);
+    let knee_compliance = tweak!(200.1);
+    let ankle_compliance = tweak!(10.1);
+    let head_compliance = tweak!(10.1);
+    let wrist_compliance = tweak!(10.1);
 
     let spherical_constraints = [
         SphericalConstraint {
@@ -475,6 +489,92 @@ fn solve_ik(
             point_in_a: right_shoulder_in_torso,
             point_in_b: shoulder_in_upper_arm,
             compliance: shoulder_compliance,
+        },
+    ];
+    let compliant_fixed_angle_constraints = [
+        CompliantFixedAngleConstraint {
+            // Left wrist
+            node_a: IkNodeID::LeftLowerArm,
+            node_b: IkNodeID::LeftPalm,
+            b_in_a: Quat::IDENTITY,
+            compliance: wrist_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Right wrist
+            node_a: IkNodeID::RightLowerArm,
+            node_b: IkNodeID::RightPalm,
+            b_in_a: Quat::IDENTITY,
+            compliance: wrist_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Left ankle
+            node_a: IkNodeID::LeftLowerLeg,
+            node_b: IkNodeID::LeftFoot,
+            b_in_a: Quat::IDENTITY,
+            compliance: ankle_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Right ankle
+            node_a: IkNodeID::RightLowerLeg,
+            node_b: IkNodeID::RightFoot,
+            b_in_a: Quat::IDENTITY,
+            compliance: ankle_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Left knee
+            node_a: IkNodeID::LeftUpperLeg,
+            node_b: IkNodeID::LeftLowerLeg,
+            b_in_a: Quat::from_axis_angle(Vec3::X, -FRAC_PI_2),
+            compliance: knee_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Right knee
+            node_a: IkNodeID::RightUpperLeg,
+            node_b: IkNodeID::RightLowerLeg,
+            b_in_a: Quat::from_axis_angle(Vec3::X, -FRAC_PI_2),
+            compliance: knee_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Left elbow
+            node_a: IkNodeID::LeftUpperArm,
+            node_b: IkNodeID::LeftLowerArm,
+            b_in_a: Quat::from_axis_angle(Vec3::X, FRAC_PI_2),
+            compliance: elbow_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Right elbow
+            node_a: IkNodeID::RightUpperArm,
+            node_b: IkNodeID::RightLowerArm,
+            b_in_a: Quat::from_axis_angle(Vec3::X, FRAC_PI_2),
+            compliance: elbow_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Lower back
+            node_a: IkNodeID::Torso,
+            node_b: IkNodeID::Pelvis,
+            b_in_a: Quat::IDENTITY,
+            compliance: lower_back_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Left hip
+            node_a: IkNodeID::Pelvis,
+            node_b: IkNodeID::LeftUpperLeg,
+            b_in_a: Quat::from_axis_angle(Vec3::X, -FRAC_PI_4),
+            compliance: hip_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Right hip
+            node_a: IkNodeID::Pelvis,
+            node_b: IkNodeID::RightUpperLeg,
+            b_in_a: Quat::from_axis_angle(Vec3::X, -FRAC_PI_4),
+            compliance: hip_compliance,
+        },
+        CompliantFixedAngleConstraint {
+            // Head
+            node_a: IkNodeID::HeadCenter,
+            node_b: IkNodeID::Torso,
+            b_in_a: Quat::IDENTITY,
+            compliance: head_compliance,
         },
     ];
 
@@ -750,6 +850,21 @@ fn solve_ik(
             )
             .normalize();
         }
+        for constraint in &compliant_fixed_angle_constraints {
+            let node_a = constraint.node_a as usize;
+            let node_b = constraint.node_b as usize;
+            let stage_from_a = state.node_rotations[node_a];
+            let stage_from_b = state.node_rotations[node_b];
+            let stage_from_wanted_b = stage_from_a * constraint.b_in_a;
+            let delta = stage_from_b * stage_from_wanted_b.inverse();
+            let (axis, angle) = delta.to_axis_angle();
+            let (s, c) = (angle * 0.5 / (2.0 + constraint.compliance)).sin_cos();
+            let v = axis * s;
+            let delta1 = Quat::from_xyzw(v.x, v.y, v.z, c);
+            let delta2 = Quat::from_xyzw(-v.x, -v.y, -v.z, c);
+            state.node_rotations[node_a] = delta1 * state.node_rotations[node_a];
+            state.node_rotations[node_b] = delta2 * state.node_rotations[node_b];
+        }
     }
     (
         shoulder_width,
@@ -845,40 +960,58 @@ fn test_cardan() {
     println!("{scalar}");
 }
 
-#[test]
-fn test_ik_solver() -> hotham::anyhow::Result<()> {
-    let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
-    rerun::MsgSender::new("stage")
-        .with_timeless(true)
-        .with_splat(rerun::components::ViewCoordinates::from_up_and_handedness(
-            rerun::coordinates::SignedAxis3::POSITIVE_Y,
-            rerun::coordinates::Handedness::Right,
-        ))?
-        .send(&session)?;
-    session.sink().drop_msgs_if_disconnected();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let data = include_str!("../../../inverse_kinematics_snapshot_2023-04-12_22.23.47.json");
-    let mut state = IkState::default();
-    load_snapshot(&mut state, &data);
+    fn test_ik_solver(data: &str) -> Result<(), hotham::anyhow::Error> {
+        let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
+        rerun::MsgSender::new("stage")
+            .with_timeless(true)
+            .with_splat(rerun::components::ViewCoordinates::from_up_and_handedness(
+                rerun::coordinates::SignedAxis3::POSITIVE_Y,
+                rerun::coordinates::Handedness::Right,
+            ))?
+            .send(&session)?;
+        session.sink().drop_msgs_if_disconnected();
 
-    for _ in 0..100 {
-        let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
-            state.get_affine(IkNodeID::Hmd),
-            state.get_affine(IkNodeID::LeftGrip),
-            state.get_affine(IkNodeID::LeftAim),
-            state.get_affine(IkNodeID::RightGrip),
-            state.get_affine(IkNodeID::RightAim),
-            &mut state,
-        );
+        let mut state = IkState::default();
+        load_snapshot(&mut state, data);
 
-        send_poses_to_rerun(
-            &session,
-            &state,
-            shoulder_width,
-            sternum_height_in_torso,
-            hip_width,
-            hip_height_in_pelvis,
-        );
+        for _ in 0..100 {
+            let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) =
+                solve_ik(
+                    state.get_affine(IkNodeID::Hmd),
+                    state.get_affine(IkNodeID::LeftGrip),
+                    state.get_affine(IkNodeID::LeftAim),
+                    state.get_affine(IkNodeID::RightGrip),
+                    state.get_affine(IkNodeID::RightAim),
+                    &mut state,
+                );
+
+            send_poses_to_rerun(
+                &session,
+                &state,
+                shoulder_width,
+                sternum_height_in_torso,
+                hip_width,
+                hip_height_in_pelvis,
+            );
+        }
+        Ok(())
     }
-    Ok(())
+
+    #[test]
+    fn test_ik_solver_neutral() -> hotham::anyhow::Result<()> {
+        test_ik_solver(include_str!(
+            "../../../inverse_kinematics_snapshot_2023-04-12_22.23.47.json"
+        ))
+    }
+
+    #[test]
+    fn test_ik_solver_facing_x_dir() -> hotham::anyhow::Result<()> {
+        test_ik_solver(include_str!(
+            "../../../inverse_kinematics_snapshot_2023-04-13_21.06.56.json"
+        ))
+    }
 }
