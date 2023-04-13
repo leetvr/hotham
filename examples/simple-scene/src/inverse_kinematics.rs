@@ -1,6 +1,6 @@
 use std::{
     collections::HashMap,
-    f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, FRAC_PI_4},
+    f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, FRAC_PI_4, PI, TAU},
 };
 
 use enum_iterator::{all, cardinality, Sequence};
@@ -243,6 +243,18 @@ fn load_snapshot(state: &mut IkState, data: &str) {
         serde_json::from_str(data).expect("JSON does not have correct format.");
 
     for node_id in all::<IkNodeID>() {
+        if let Some((pos, rot)) = summary.get(&node_id) {
+            state.node_positions[node_id as usize] = *pos;
+            state.node_rotations[node_id as usize] = *rot;
+        }
+    }
+}
+
+fn load_snapshot_subset(state: &mut IkState, data: &str, subset: &[IkNodeID]) {
+    let summary: HashMap<IkNodeID, (Vec3A, Quat)> =
+        serde_json::from_str(data).expect("JSON does not have correct format.");
+
+    for &node_id in subset {
         if let Some((pos, rot)) = summary.get(&node_id) {
             state.node_positions[node_id as usize] = *pos;
             state.node_rotations[node_id as usize] = *rot;
@@ -857,7 +869,10 @@ fn solve_ik(
             let stage_from_b = state.node_rotations[node_b];
             let stage_from_wanted_b = stage_from_a * constraint.b_in_a;
             let delta = stage_from_b * stage_from_wanted_b.inverse();
-            let (axis, angle) = delta.to_axis_angle();
+            let (axis, mut angle) = delta.to_axis_angle();
+            if angle > PI {
+                angle -= TAU;
+            }
             let (s, c) = (angle * 0.5 / (2.0 + constraint.compliance)).sin_cos();
             let v = axis * s;
             let delta1 = Quat::from_xyzw(v.x, v.y, v.z, c);
@@ -1001,6 +1016,77 @@ mod tests {
         Ok(())
     }
 
+    fn test_ik_solver_transition(data1: &str, data2: &str) -> Result<(), hotham::anyhow::Error> {
+        let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
+        rerun::MsgSender::new("stage")
+            .with_timeless(true)
+            .with_splat(rerun::components::ViewCoordinates::from_up_and_handedness(
+                rerun::coordinates::SignedAxis3::POSITIVE_Y,
+                rerun::coordinates::Handedness::Right,
+            ))?
+            .send(&session)?;
+        session.sink().drop_msgs_if_disconnected();
+
+        let mut state = IkState::default();
+        load_snapshot(&mut state, data1);
+
+        for _ in 0..100 {
+            let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) =
+                solve_ik(
+                    state.get_affine(IkNodeID::Hmd),
+                    state.get_affine(IkNodeID::LeftGrip),
+                    state.get_affine(IkNodeID::LeftAim),
+                    state.get_affine(IkNodeID::RightGrip),
+                    state.get_affine(IkNodeID::RightAim),
+                    &mut state,
+                );
+
+            send_poses_to_rerun(
+                &session,
+                &state,
+                shoulder_width,
+                sternum_height_in_torso,
+                hip_width,
+                hip_height_in_pelvis,
+            );
+        }
+
+        load_snapshot_subset(
+            &mut state,
+            data2,
+            &[
+                IkNodeID::Hmd,
+                IkNodeID::LeftGrip,
+                IkNodeID::LeftAim,
+                IkNodeID::RightGrip,
+                IkNodeID::RightAim,
+            ],
+        );
+
+        for _ in 0..100 {
+            let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) =
+                solve_ik(
+                    state.get_affine(IkNodeID::Hmd),
+                    state.get_affine(IkNodeID::LeftGrip),
+                    state.get_affine(IkNodeID::LeftAim),
+                    state.get_affine(IkNodeID::RightGrip),
+                    state.get_affine(IkNodeID::RightAim),
+                    &mut state,
+                );
+
+            send_poses_to_rerun(
+                &session,
+                &state,
+                shoulder_width,
+                sternum_height_in_torso,
+                hip_width,
+                hip_height_in_pelvis,
+            );
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_ik_solver_neutral() -> hotham::anyhow::Result<()> {
         test_ik_solver(include_str!(
@@ -1013,5 +1099,27 @@ mod tests {
         test_ik_solver(include_str!(
             "../../../inverse_kinematics_snapshot_2023-04-13_21.06.56.json"
         ))
+    }
+
+    #[test]
+    fn test_ik_solver_arms_up1() -> hotham::anyhow::Result<()> {
+        test_ik_solver(include_str!(
+            "../../../inverse_kinematics_snapshot_2023-04-13_21.40.18.json"
+        ))
+    }
+
+    #[test]
+    fn test_ik_solver_arms_up2() -> hotham::anyhow::Result<()> {
+        test_ik_solver(include_str!(
+            "../../../inverse_kinematics_snapshot_2023-04-13_21.40.20.json"
+        ))
+    }
+
+    #[test]
+    fn test_ik_solver_arms_up_transition() -> hotham::anyhow::Result<()> {
+        test_ik_solver_transition(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.18.json"),
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.20.json"),
+        )
     }
 }
