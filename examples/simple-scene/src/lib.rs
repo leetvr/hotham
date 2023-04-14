@@ -1,4 +1,5 @@
 mod audio_player;
+mod ik_selector;
 mod inverse_kinematics;
 mod utils;
 mod xpbd_audio_bridge;
@@ -30,6 +31,7 @@ use hotham::{
 };
 use hotham_examples::navigation::{navigation_system, State as NavigationState};
 
+use ik_selector::add_ik_selectors;
 use inline_tweak::tweak;
 use inverse_kinematics::{add_ik_nodes, IkState};
 use nalgebra::{DVector, Quaternion, Translation3, UnitQuaternion};
@@ -43,6 +45,7 @@ use xpbd_substep::xpbd_substep;
 
 use crate::{
     audio_player::ListenerPose,
+    ik_selector::ik_selector_system,
     inverse_kinematics::inverse_kinematics_system,
     xpbd_rerun::{send_colliders_to_rerun, send_xpbd_state_to_rerun},
     xpbd_substep::SimulationParams,
@@ -199,6 +202,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         simulation_reset_system(engine, state);
         inverse_kinematics_system(engine, &mut state.ik_state, state.rr_session.as_mut());
         hands_system(engine);
+        ik_selector_system(engine);
         grabbing_system(engine);
         physics_system(engine);
         animation_system(engine);
@@ -429,6 +433,7 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
         include_bytes!("../../../test_assets/floor.glb"),
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
+        include_bytes!("../../../test_assets/ik_selector.glb"),
     ];
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
@@ -456,6 +461,8 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
         &state.xpbd_state.points_curr,
         NX,
     ));
+
+    add_ik_selectors(&models, world);
 
     Ok(())
 }
