@@ -27,7 +27,7 @@ mod rr {
 #[repr(u8)]
 pub enum IkNodeID {
     Hmd,
-    HeadCenter,
+    Head,
     NeckRoot,
     Torso,
     Pelvis,
@@ -160,16 +160,27 @@ pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &m
 fn model_name_from_node_id(node_id: IkNodeID) -> &'static str {
     match node_id {
         IkNodeID::Hmd => "Axes",
-        IkNodeID::HeadCenter => "SmallAxes",
         IkNodeID::NeckRoot => "SmallAxes",
         IkNodeID::Base => "Axes",
         IkNodeID::BalancePoint => "SmallAxes",
         IkNodeID::LeftGrip | IkNodeID::RightGrip => "SmallAxes",
         IkNodeID::LeftAim | IkNodeID::RightAim => "TinyAxes",
-        IkNodeID::LeftPalm | IkNodeID::RightPalm => "SmallAxes",
         IkNodeID::LeftWrist | IkNodeID::RightWrist => "CrossAxes",
-        IkNodeID::LeftFoot | IkNodeID::RightFoot => "DiscXZ",
-        _ => "SmallAxes",
+        IkNodeID::Head => "Head",
+        IkNodeID::Torso => "Torso",
+        IkNodeID::Pelvis => "Pelvis",
+        IkNodeID::LeftPalm => "LeftPalm",
+        IkNodeID::LeftLowerArm => "LeftLowerArm",
+        IkNodeID::LeftUpperArm => "LeftUpperArm",
+        IkNodeID::LeftUpperLeg => "LeftUpperLeg",
+        IkNodeID::LeftLowerLeg => "LeftLowerLeg",
+        IkNodeID::RightPalm => "RightPalm",
+        IkNodeID::RightLowerArm => "RightLowerArm",
+        IkNodeID::RightUpperArm => "RightUpperArm",
+        IkNodeID::RightUpperLeg => "RightUpperLeg",
+        IkNodeID::RightLowerLeg => "RightLowerLeg",
+        IkNodeID::LeftFoot => "LeftFoot",
+        IkNodeID::RightFoot => "RightFoot",
     }
 }
 
@@ -355,7 +366,7 @@ fn solve_ik(
         },
         SphericalConstraint {
             // Neck
-            node_a: IkNodeID::HeadCenter,
+            node_a: IkNodeID::Head,
             node_b: IkNodeID::Torso,
             point_in_a: neck_root_in_head_center.translation,
             point_in_b: neck_root_in_torso,
@@ -584,7 +595,7 @@ fn solve_ik(
         },
         CompliantFixedAngleConstraint {
             // Head
-            node_a: IkNodeID::HeadCenter,
+            node_a: IkNodeID::Head,
             node_b: IkNodeID::Torso,
             b_in_a: Quat::IDENTITY,
             compliance: head_compliance,
@@ -705,7 +716,7 @@ fn solve_ik(
     // Solve IK
     let fixed_nodes: [(IkNodeID, (Vec3A, Quat)); 15] = [
         (IkNodeID::Hmd, to_pos_rot(&hmd_in_stage)),
-        (IkNodeID::HeadCenter, to_pos_rot(&head_center_in_stage)),
+        (IkNodeID::Head, to_pos_rot(&head_center_in_stage)),
         (IkNodeID::NeckRoot, to_pos_rot(&neck_root_in_stage)),
         (IkNodeID::Base, to_pos_rot(&base_in_stage)),
         (
@@ -905,7 +916,7 @@ fn send_poses_to_rerun(
             let translation = &state.node_positions[node_id as usize];
             let rotation = &state.node_rotations[node_id as usize];
             let box_shape = match node_id {
-                IkNodeID::HeadCenter => rr::Box3D::new(0.08, 0.11, 0.11),
+                IkNodeID::Head => rr::Box3D::new(0.08, 0.11, 0.11),
                 IkNodeID::Hmd => rr::Box3D::new(0.08, 0.04, 0.05),
                 IkNodeID::LeftAim
                 | IkNodeID::LeftGrip

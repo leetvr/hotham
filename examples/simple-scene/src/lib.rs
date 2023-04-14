@@ -434,6 +434,7 @@ fn init(engine: &mut Engine, state: &mut State) -> Result<(), hotham::HothamErro
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
         include_bytes!("../../../test_assets/ik_selector.glb"),
+        include_bytes!("../../../test_assets/ik_body.glb"),
     ];
     let models =
         asset_importer::load_models_from_glb(&glb_buffers, vulkan_context, render_context)?;
