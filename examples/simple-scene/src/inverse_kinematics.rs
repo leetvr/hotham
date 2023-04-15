@@ -1133,7 +1133,10 @@ fn test_cardan() {
 mod tests {
     use super::*;
 
-    fn test_ik_solver(data: &str) -> Result<(), hotham::anyhow::Error> {
+    fn test_ik_solver(
+        data: &str,
+        thumbsticks: Option<(Vec2, Vec2)>,
+    ) -> Result<(), hotham::anyhow::Error> {
         let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
         rerun::MsgSender::new("stage")
             .with_timeless(true)
@@ -1146,7 +1149,7 @@ mod tests {
 
         let mut state = IkState::default();
         load_snapshot(&mut state, data);
-
+        let (left_thumbstick, right_thumbstick) = thumbsticks.unwrap_or((Vec2::ZERO, Vec2::ZERO));
         for _ in 0..100 {
             let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) =
                 solve_ik(
@@ -1155,8 +1158,8 @@ mod tests {
                     state.get_affine(IkNodeID::LeftAim),
                     state.get_affine(IkNodeID::RightGrip),
                     state.get_affine(IkNodeID::RightAim),
-                    Vec2::ZERO,
-                    Vec2::ZERO,
+                    left_thumbstick,
+                    right_thumbstick,
                     &mut state,
                 );
 
@@ -1249,30 +1252,34 @@ mod tests {
 
     #[test]
     fn test_ik_solver_neutral() -> hotham::anyhow::Result<()> {
-        test_ik_solver(include_str!(
-            "../../../inverse_kinematics_snapshot_2023-04-12_22.23.47.json"
-        ))
+        test_ik_solver(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-12_22.23.47.json"),
+            None,
+        )
     }
 
     #[test]
     fn test_ik_solver_facing_x_dir() -> hotham::anyhow::Result<()> {
-        test_ik_solver(include_str!(
-            "../../../inverse_kinematics_snapshot_2023-04-13_21.06.56.json"
-        ))
+        test_ik_solver(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.06.56.json"),
+            None,
+        )
     }
 
     #[test]
     fn test_ik_solver_arms_up1() -> hotham::anyhow::Result<()> {
-        test_ik_solver(include_str!(
-            "../../../inverse_kinematics_snapshot_2023-04-13_21.40.18.json"
-        ))
+        test_ik_solver(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.18.json"),
+            None,
+        )
     }
 
     #[test]
     fn test_ik_solver_arms_up2() -> hotham::anyhow::Result<()> {
-        test_ik_solver(include_str!(
-            "../../../inverse_kinematics_snapshot_2023-04-13_21.40.20.json"
-        ))
+        test_ik_solver(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.20.json"),
+            None,
+        )
     }
 
     #[test]
@@ -1285,9 +1292,10 @@ mod tests {
 
     #[test]
     fn test_ik_solver_hands_bent_up() -> hotham::anyhow::Result<()> {
-        test_ik_solver(include_str!(
-            "../../../inverse_kinematics_snapshot_2023-04-13_22.04.18.json"
-        ))
+        test_ik_solver(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-13_22.04.18.json"),
+            None,
+        )
     }
 
     #[test]
@@ -1295,5 +1303,13 @@ mod tests {
         assert_eq!(thumbstick_influence(Vec2::ZERO, vec2(0.0, -1.0)), 0.0);
         assert_eq!(thumbstick_influence(vec2(0.0, 1.0), vec2(0.0, -1.0)), 0.0);
         assert_eq!(thumbstick_influence(vec2(0.0, -1.0), vec2(0.0, -1.0)), 1.0);
+    }
+
+    #[test]
+    fn test_ik_solver_right_hand_punch() -> hotham::anyhow::Result<()> {
+        test_ik_solver(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_00.14.45.json"),
+            Some((vec2(0.0, 0.0), vec2(0.0, 1.0))),
+        )
     }
 }
