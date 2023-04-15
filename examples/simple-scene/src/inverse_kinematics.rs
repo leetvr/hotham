@@ -754,42 +754,47 @@ fn solve_ik(
     }
 
     let rot_x_90 = Affine3A::from_rotation_x(std::f32::consts::FRAC_PI_2);
+    let left_thumbstick_forwards_response = thumbstick_influence(left_thumbstick, vec2(0.0, 1.0));
+    let right_thumbstick_forwards_response = thumbstick_influence(right_thumbstick, vec2(0.0, 1.0));
+    let left_thumbstick_backwards_response = thumbstick_influence(left_thumbstick, vec2(0.0, -1.0));
+    let right_thumbstick_backwards_response =
+        thumbstick_influence(right_thumbstick, vec2(0.0, -1.0));
     let anchor_constraints = [
         AnchorConstraint::from_affine(
             IkNodeID::LeftPalm,
             &Vec3A::ZERO,
             &left_palm_in_stage,
-            1.0 - thumbstick_influence(left_thumbstick, vec2(0.0, 1.0)),
+            1.0 - left_thumbstick_forwards_response,
         ),
         AnchorConstraint::from_affine(
             IkNodeID::RightPalm,
             &Vec3A::ZERO,
             &right_palm_in_stage,
-            1.0 - thumbstick_influence(right_thumbstick, vec2(0.0, 1.0)),
+            1.0 - right_thumbstick_forwards_response,
         ),
         AnchorConstraint::from_affine(
             IkNodeID::LeftLowerArm,
             &vec3a(0.0, 0.0, lower_arm_length / 2.0),
             &left_palm_in_stage,
-            thumbstick_influence(left_thumbstick, vec2(0.0, 1.0)),
+            left_thumbstick_forwards_response,
         ),
         AnchorConstraint::from_affine(
             IkNodeID::RightLowerArm,
             &vec3a(0.0, 0.0, lower_arm_length / 2.0),
             &right_palm_in_stage,
-            thumbstick_influence(right_thumbstick, vec2(0.0, 1.0)),
+            right_thumbstick_forwards_response,
         ),
         AnchorConstraint::from_affine(
             IkNodeID::LeftFoot,
             &Vec3A::ZERO,
             &left_foot_in_stage,
-            1.0 - thumbstick_influence(left_thumbstick, vec2(0.0, -1.0)),
+            1.0 - left_thumbstick_backwards_response,
         ),
         AnchorConstraint::from_affine(
             IkNodeID::RightFoot,
             &Vec3A::ZERO,
             &right_foot_in_stage,
-            1.0 - thumbstick_influence(right_thumbstick, vec2(0.0, -1.0)),
+            1.0 - right_thumbstick_backwards_response,
         ),
         AnchorConstraint::from_affine(
             IkNodeID::HeadCenter,
@@ -801,13 +806,13 @@ fn solve_ik(
             IkNodeID::LeftLowerLeg,
             &vec3a(0.0, lower_leg_length / 2.0, 0.0),
             &(left_palm_in_stage * rot_x_90),
-            thumbstick_influence(left_thumbstick, vec2(0.0, -1.0)),
+            left_thumbstick_backwards_response,
         ),
         AnchorConstraint::from_affine(
             IkNodeID::RightLowerLeg,
             &vec3a(0.0, lower_leg_length / 2.0, 0.0),
             &(right_palm_in_stage * rot_x_90),
-            thumbstick_influence(right_thumbstick, vec2(0.0, -1.0)),
+            right_thumbstick_backwards_response,
         ),
     ];
 
