@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
-    glam::{vec3, vec3a, Affine3A, Quat, Vec3, Vec3A, Vec4},
+    glam::{vec2, vec3, vec3a, Affine3A, Quat, Vec2, Vec3, Vec3A, Vec4},
     hecs::World,
     Engine,
 };
@@ -26,30 +26,35 @@ mod rr {
 #[derive(Copy, Clone, Eq, Hash, Debug, PartialEq, Sequence, Deserialize, Serialize)]
 #[repr(u8)]
 pub enum IkNodeID {
+    // Inputs
     Hmd,
-    Head,
-    NeckRoot,
-    Torso,
-    Pelvis,
-    Base,
-    BalancePoint,
     LeftAim,
     LeftGrip,
-    LeftPalm,
-    LeftWrist,
-    LeftLowerArm,
-    LeftUpperArm,
-    LeftUpperLeg,
-    LeftLowerLeg,
-    LeftFoot,
     RightAim,
     RightGrip,
-    RightPalm,
+    // Helpers
+    NeckRoot,
+    LeftWrist,
     RightWrist,
+    Base,
+    BalancePoint,
+    LeftFootTarget,
+    RightFootTarget,
+    // Body
+    HeadCenter,
+    Torso,
+    Pelvis,
+    LeftPalm,
+    LeftLowerArm,
+    LeftUpperArm,
+    LeftLowerLeg,
+    LeftUpperLeg,
+    LeftFoot,
+    RightPalm,
     RightLowerArm,
     RightUpperArm,
-    RightUpperLeg,
     RightLowerLeg,
+    RightUpperLeg,
     RightFoot,
 }
 
@@ -85,6 +90,33 @@ pub enum WeightDistribution {
 impl Default for WeightDistribution {
     fn default() -> Self {
         Self::SharedWeight
+    }
+}
+
+struct AnchorConstraint {
+    node_a: IkNodeID,
+    point_in_a: Vec3A,
+    target_point_in_stage: Vec3A,
+    target_rot_in_stage: Quat,
+    strength: f32, // 0.0 to 1.0
+}
+
+impl AnchorConstraint {
+    pub fn from_affine(
+        node_a: IkNodeID,
+        point_in_a: &Vec3A,
+        target_in_stage: &Affine3A,
+        strength: f32,
+    ) -> Self {
+        let (_scale, target_rot_in_stage, target_point_in_stage) =
+            target_in_stage.to_scale_rotation_translation();
+        Self {
+            node_a,
+            point_in_a: *point_in_a,
+            target_point_in_stage: target_point_in_stage.into(),
+            target_rot_in_stage,
+            strength,
+        }
     }
 }
 
@@ -159,14 +191,18 @@ pub fn add_ik_nodes(models: &std::collections::HashMap<String, World>, world: &m
 
 fn model_name_from_node_id(node_id: IkNodeID) -> &'static str {
     match node_id {
+        // Inputs
         IkNodeID::Hmd => "Axes",
+        IkNodeID::LeftGrip | IkNodeID::RightGrip => "SmallAxes",
+        IkNodeID::LeftAim | IkNodeID::RightAim => "TinyAxes",
+        // Helpers
         IkNodeID::NeckRoot => "SmallAxes",
         IkNodeID::Base => "Axes",
         IkNodeID::BalancePoint => "SmallAxes",
-        IkNodeID::LeftGrip | IkNodeID::RightGrip => "SmallAxes",
-        IkNodeID::LeftAim | IkNodeID::RightAim => "TinyAxes",
         IkNodeID::LeftWrist | IkNodeID::RightWrist => "CrossAxes",
-        IkNodeID::Head => "Head",
+        IkNodeID::LeftFootTarget | IkNodeID::RightFootTarget => "DiscXZ",
+        // Body
+        IkNodeID::HeadCenter => "Head",
         IkNodeID::Torso => "Torso",
         IkNodeID::Pelvis => "Pelvis",
         IkNodeID::LeftPalm => "LeftPalm",
@@ -198,6 +234,8 @@ pub fn inverse_kinematics_system(
         input_context.left.stage_from_aim(),
         input_context.right.stage_from_grip(),
         input_context.right.stage_from_aim(),
+        input_context.left.thumbstick_xy(),
+        input_context.right.thumbstick_xy(),
         state,
     );
 
@@ -279,6 +317,8 @@ fn solve_ik(
     left_aim_in_stage: Affine3A,
     right_grip_in_stage: Affine3A,
     right_aim_in_stage: Affine3A,
+    left_thumbstick: Vec2,
+    right_thumbstick: Vec2,
     state: &mut IkState,
 ) -> (f32, f32, f32, f32) {
     puffin::profile_function!();
@@ -366,7 +406,7 @@ fn solve_ik(
         },
         SphericalConstraint {
             // Neck
-            node_a: IkNodeID::Head,
+            node_a: IkNodeID::HeadCenter,
             node_b: IkNodeID::Torso,
             point_in_a: neck_root_in_head_center.translation,
             point_in_b: neck_root_in_torso,
@@ -595,7 +635,7 @@ fn solve_ik(
         },
         CompliantFixedAngleConstraint {
             // Head
-            node_a: IkNodeID::Head,
+            node_a: IkNodeID::HeadCenter,
             node_b: IkNodeID::Torso,
             b_in_a: Quat::IDENTITY,
             compliance: head_compliance,
@@ -713,31 +753,114 @@ fn solve_ik(
         }
     }
 
-    // Solve IK
-    let fixed_nodes: [(IkNodeID, (Vec3A, Quat)); 15] = [
-        (IkNodeID::Hmd, to_pos_rot(&hmd_in_stage)),
-        (IkNodeID::Head, to_pos_rot(&head_center_in_stage)),
-        (IkNodeID::NeckRoot, to_pos_rot(&neck_root_in_stage)),
-        (IkNodeID::Base, to_pos_rot(&base_in_stage)),
+    let rot_x_90 = Affine3A::from_rotation_x(std::f32::consts::FRAC_PI_2);
+    let anchor_constraints = [
+        AnchorConstraint::from_affine(
+            IkNodeID::LeftPalm,
+            &Vec3A::ZERO,
+            &left_palm_in_stage,
+            1.0 - thumbstick_influence(left_thumbstick, vec2(0.0, 1.0)),
+        ),
+        AnchorConstraint::from_affine(
+            IkNodeID::RightPalm,
+            &Vec3A::ZERO,
+            &right_palm_in_stage,
+            1.0 - thumbstick_influence(right_thumbstick, vec2(0.0, 1.0)),
+        ),
+        AnchorConstraint::from_affine(
+            IkNodeID::LeftLowerArm,
+            &vec3a(0.0, 0.0, lower_arm_length / 2.0),
+            &left_palm_in_stage,
+            thumbstick_influence(left_thumbstick, vec2(0.0, 1.0)),
+        ),
+        AnchorConstraint::from_affine(
+            IkNodeID::RightLowerArm,
+            &vec3a(0.0, 0.0, lower_arm_length / 2.0),
+            &right_palm_in_stage,
+            thumbstick_influence(right_thumbstick, vec2(0.0, 1.0)),
+        ),
+        AnchorConstraint::from_affine(
+            IkNodeID::LeftFoot,
+            &Vec3A::ZERO,
+            &left_foot_in_stage,
+            1.0 - thumbstick_influence(left_thumbstick, vec2(0.0, -1.0)),
+        ),
+        AnchorConstraint::from_affine(
+            IkNodeID::RightFoot,
+            &Vec3A::ZERO,
+            &right_foot_in_stage,
+            1.0 - thumbstick_influence(right_thumbstick, vec2(0.0, -1.0)),
+        ),
+        AnchorConstraint::from_affine(
+            IkNodeID::HeadCenter,
+            &Vec3A::ZERO,
+            &head_center_in_stage,
+            1.0,
+        ),
+        AnchorConstraint::from_affine(
+            IkNodeID::LeftLowerLeg,
+            &vec3a(0.0, lower_leg_length / 2.0, 0.0),
+            &(left_palm_in_stage * rot_x_90),
+            thumbstick_influence(left_thumbstick, vec2(0.0, -1.0)),
+        ),
+        AnchorConstraint::from_affine(
+            IkNodeID::RightLowerLeg,
+            &vec3a(0.0, lower_leg_length / 2.0, 0.0),
+            &(right_palm_in_stage * rot_x_90),
+            thumbstick_influence(right_thumbstick, vec2(0.0, -1.0)),
+        ),
+    ];
+
+    // Update input nodes
+    let fixed_nodes = [
+        (IkNodeID::Hmd, hmd_in_stage),
+        (IkNodeID::LeftGrip, left_grip_in_stage),
+        (IkNodeID::LeftAim, left_aim_in_stage),
+        (IkNodeID::RightGrip, right_grip_in_stage),
+        (IkNodeID::RightAim, right_aim_in_stage),
+        // Helpers
+        (IkNodeID::NeckRoot, neck_root_in_stage),
+        (IkNodeID::Base, base_in_stage),
         (
             IkNodeID::BalancePoint,
-            to_pos_rot(&(base_in_stage * Affine3A::from_translation(balance_point_in_base.into()))),
+            base_in_stage * Affine3A::from_translation(balance_point_in_base.into()),
         ),
-        (IkNodeID::LeftGrip, to_pos_rot(&left_grip_in_stage)),
-        (IkNodeID::LeftAim, to_pos_rot(&left_aim_in_stage)),
-        (IkNodeID::LeftPalm, to_pos_rot(&left_palm_in_stage)),
-        (IkNodeID::LeftWrist, to_pos_rot(&left_wrist_in_stage)),
-        (IkNodeID::RightGrip, to_pos_rot(&right_grip_in_stage)),
-        (IkNodeID::RightAim, to_pos_rot(&right_aim_in_stage)),
-        (IkNodeID::RightPalm, to_pos_rot(&right_palm_in_stage)),
-        (IkNodeID::RightWrist, to_pos_rot(&right_wrist_in_stage)),
-        (IkNodeID::LeftFoot, to_pos_rot(&left_foot_in_stage)),
-        (IkNodeID::RightFoot, to_pos_rot(&right_foot_in_stage)),
+        (IkNodeID::LeftFootTarget, left_foot_in_stage),
+        (IkNodeID::RightFootTarget, right_foot_in_stage),
+        (IkNodeID::LeftWrist, left_wrist_in_stage),
+        (IkNodeID::RightWrist, right_wrist_in_stage),
     ];
-    for _ in 0..tweak!(10) {
-        for (node_id, (pos, rot)) in fixed_nodes.iter() {
-            state.node_positions[*node_id as usize] = *pos;
-            state.node_rotations[*node_id as usize] = *rot;
+    for (node_id, node_in_stage) in fixed_nodes.iter() {
+        set_ik_node_from_affine(state, node_id, node_in_stage);
+    }
+    // Solve IK
+    for _ in 0..tweak!(100) {
+        for constraint in &anchor_constraints {
+            let node_a = constraint.node_a as usize;
+            let r1 = state.node_rotations[node_a] * constraint.point_in_a;
+            // w = inv_mass + p.cross(n)ᵀ * inv_inertia * p.cross(n)
+            let r1_squares = r1 * r1;
+            let w1 = vec3a(
+                1.0 + r1_squares.y + r1_squares.z,
+                1.0 + r1_squares.z + r1_squares.x,
+                1.0 + r1_squares.x + r1_squares.y,
+            );
+            let p1 = state.node_positions[node_a] + r1;
+            let p2 = constraint.target_point_in_stage;
+            let c = p1 - p2;
+            let correction = constraint.strength * -c / w1;
+            state.node_positions[node_a] += correction;
+            // q1 <- q1 + 0.5 * (p1.cross(correction) * q1)
+            let q1 = &mut state.node_rotations[node_a];
+            let omega = r1.cross(correction);
+            *q1 = Quat::from_vec4(
+                Vec4::from(*q1) + 0.5 * Vec4::from(Quat::from_vec4(omega.extend(0.0)) * *q1),
+            )
+            .normalize();
+
+            // Rotational part
+            state.node_rotations[node_a] = state.node_rotations[node_a]
+                .lerp(constraint.target_rot_in_stage, constraint.strength);
         }
         for constraint in &spherical_constraints {
             let node_a = constraint.node_a as usize;
@@ -901,6 +1024,19 @@ fn solve_ik(
     )
 }
 
+fn thumbstick_influence(thumbstick: Vec2, target: Vec2) -> f32 {
+    let d = thumbstick.dot(target);
+    let r1 = tweak!(0.25);
+    let r2 = tweak!(0.95);
+    ((d - r1) / (r2 - r1)).clamp(0.0, 1.0)
+}
+
+fn set_ik_node_from_affine(state: &mut IkState, node_id: &IkNodeID, node_in_stage: &Affine3A) {
+    let (pos, rot) = to_pos_rot(node_in_stage);
+    state.node_positions[*node_id as usize] = pos;
+    state.node_rotations[*node_id as usize] = rot;
+}
+
 fn send_poses_to_rerun(
     session: &rerun::Session,
     state: &IkState,
@@ -916,7 +1052,7 @@ fn send_poses_to_rerun(
             let translation = &state.node_positions[node_id as usize];
             let rotation = &state.node_rotations[node_id as usize];
             let box_shape = match node_id {
-                IkNodeID::Head => rr::Box3D::new(0.08, 0.11, 0.11),
+                IkNodeID::HeadCenter => rr::Box3D::new(0.08, 0.11, 0.11),
                 IkNodeID::Hmd => rr::Box3D::new(0.08, 0.04, 0.05),
                 IkNodeID::LeftAim
                 | IkNodeID::LeftGrip
@@ -930,7 +1066,7 @@ fn send_poses_to_rerun(
                     rr::Box3D::new(shoulder_width / 2.0, sternum_height_in_torso, 0.10)
                 }
                 IkNodeID::Pelvis => rr::Box3D::new(hip_width / 2.0, hip_height_in_pelvis, 0.10),
-                IkNodeID::LeftFoot | IkNodeID::RightFoot | IkNodeID::Base => {
+                IkNodeID::LeftFootTarget | IkNodeID::RightFootTarget | IkNodeID::Base => {
                     rr::Box3D::new(0.05, 0.001, 0.05)
                 }
                 IkNodeID::LeftPalm | IkNodeID::RightPalm => rr::Box3D::new(0.025, 0.05, 0.10),
@@ -942,6 +1078,7 @@ fn send_poses_to_rerun(
                 | IkNodeID::LeftLowerLeg
                 | IkNodeID::RightUpperLeg
                 | IkNodeID::RightLowerLeg => rr::Box3D::new(0.075, 0.20, 0.075),
+                IkNodeID::LeftFoot | IkNodeID::RightFoot => rr::Box3D::new(0.05, 0.025, 0.075),
             };
             rr::MsgSender::new(format!("stage/{:?}", node_id))
                 .with_component(&[rr::Transform::Rigid3(rr::Rigid3 {
@@ -1013,6 +1150,8 @@ mod tests {
                     state.get_affine(IkNodeID::LeftAim),
                     state.get_affine(IkNodeID::RightGrip),
                     state.get_affine(IkNodeID::RightAim),
+                    Vec2::ZERO,
+                    Vec2::ZERO,
                     &mut state,
                 );
 
@@ -1050,6 +1189,8 @@ mod tests {
                     state.get_affine(IkNodeID::LeftAim),
                     state.get_affine(IkNodeID::RightGrip),
                     state.get_affine(IkNodeID::RightAim),
+                    Vec2::ZERO,
+                    Vec2::ZERO,
                     &mut state,
                 );
 
@@ -1083,6 +1224,8 @@ mod tests {
                     state.get_affine(IkNodeID::LeftAim),
                     state.get_affine(IkNodeID::RightGrip),
                     state.get_affine(IkNodeID::RightAim),
+                    Vec2::ZERO,
+                    Vec2::ZERO,
                     &mut state,
                 );
 
@@ -1140,5 +1283,12 @@ mod tests {
         test_ik_solver(include_str!(
             "../../../inverse_kinematics_snapshot_2023-04-13_22.04.18.json"
         ))
+    }
+
+    #[test]
+    fn test_thumbstick_influence() {
+        assert_eq!(thumbstick_influence(Vec2::ZERO, vec2(0.0, -1.0)), 0.0);
+        assert_eq!(thumbstick_influence(vec2(0.0, 1.0), vec2(0.0, -1.0)), 0.0);
+        assert_eq!(thumbstick_influence(vec2(0.0, -1.0), vec2(0.0, -1.0)), 1.0);
     }
 }
