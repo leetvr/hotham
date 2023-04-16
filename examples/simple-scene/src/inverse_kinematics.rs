@@ -755,7 +755,7 @@ fn solve_ik(
     }
 
     let foot_in_palm = Affine3A::from_rotation_x(std::f32::consts::FRAC_PI_2)
-        * Affine3A::from_translation(vec3(0.0, -lower_leg_length, 0.0));
+        * Affine3A::from_translation(vec3(0.0, tweak!(-0.6), 0.0));
     let left_thumbstick_forwards_response = thumbstick_influence(left_thumbstick, vec2(0.0, 1.0));
     let right_thumbstick_forwards_response = thumbstick_influence(right_thumbstick, vec2(0.0, 1.0));
     let left_thumbstick_backwards_response = thumbstick_influence(left_thumbstick, vec2(0.0, -1.0));
@@ -1427,7 +1427,7 @@ mod tests {
     }
 
     #[test]
-    fn test_ik_solver_kick_transition() -> hotham::anyhow::Result<()> {
+    fn test_ik_solver_kick_transition1() -> hotham::anyhow::Result<()> {
         let _ = start_puffin_server();
         puffin::profile_function!();
         test_ik_solver_transition(
@@ -1435,6 +1435,18 @@ mod tests {
             include_str!("../../../inverse_kinematics_snapshot_2023-04-16_21.57.01.json"),
             Some((vec2(0.0, 0.0), vec2(0.0, -1.0))),
             Some((vec2(0.0, 0.0), vec2(0.0, 0.0))),
+        )
+    }
+
+    #[test]
+    fn test_ik_solver_kick_transition2() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
+        test_ik_solver_transition(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
+            Some((vec2(0.0, 0.0), vec2(0.0, 0.0))),
+            Some((vec2(0.0, -1.0), vec2(0.0, 0.0))),
         )
     }
 }
