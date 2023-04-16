@@ -754,7 +754,8 @@ fn solve_ik(
         }
     }
 
-    let rot_x_90 = Affine3A::from_rotation_x(std::f32::consts::FRAC_PI_2);
+    let foot_in_palm = Affine3A::from_rotation_x(std::f32::consts::FRAC_PI_2)
+        * Affine3A::from_translation(vec3(0.0, -lower_leg_length, 0.0));
     let left_thumbstick_forwards_response = thumbstick_influence(left_thumbstick, vec2(0.0, 1.0));
     let right_thumbstick_forwards_response = thumbstick_influence(right_thumbstick, vec2(0.0, 1.0));
     let left_thumbstick_backwards_response = thumbstick_influence(left_thumbstick, vec2(0.0, -1.0));
@@ -804,15 +805,15 @@ fn solve_ik(
             1.0,
         ),
         AnchorConstraint::from_affine(
-            IkNodeID::LeftLowerLeg,
-            &vec3a(0.0, lower_leg_length / 2.0, 0.0),
-            &(left_palm_in_stage * rot_x_90),
+            IkNodeID::LeftFoot,
+            &Vec3A::ZERO,
+            &(left_palm_in_stage * foot_in_palm),
             left_thumbstick_backwards_response,
         ),
         AnchorConstraint::from_affine(
-            IkNodeID::RightLowerLeg,
-            &vec3a(0.0, lower_leg_length / 2.0, 0.0),
-            &(right_palm_in_stage * rot_x_90),
+            IkNodeID::RightFoot,
+            &Vec3A::ZERO,
+            &(right_palm_in_stage * foot_in_palm),
             right_thumbstick_backwards_response,
         ),
     ];
@@ -1256,7 +1257,12 @@ mod tests {
         Ok(())
     }
 
-    fn test_ik_solver_transition(data1: &str, data2: &str) -> Result<(), hotham::anyhow::Error> {
+    fn test_ik_solver_transition(
+        data1: &str,
+        data2: &str,
+        thumbsticks1: Option<(Vec2, Vec2)>,
+        thumbsticks2: Option<(Vec2, Vec2)>,
+    ) -> Result<(), hotham::anyhow::Error> {
         puffin::profile_function!();
         let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
         rerun::MsgSender::new("stage")
@@ -1271,6 +1277,9 @@ mod tests {
         let mut state = IkState::default();
         load_snapshot(&mut state, data1);
 
+        let (left_thumbstick1, right_thumbstick1) =
+            thumbsticks1.unwrap_or((Vec2::ZERO, Vec2::ZERO));
+
         for _ in 0..100 {
             let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) =
                 solve_ik(
@@ -1279,8 +1288,8 @@ mod tests {
                     state.get_affine(IkNodeID::LeftAim),
                     state.get_affine(IkNodeID::RightGrip),
                     state.get_affine(IkNodeID::RightAim),
-                    Vec2::ZERO,
-                    Vec2::ZERO,
+                    left_thumbstick1,
+                    right_thumbstick1,
                     &mut state,
                 );
 
@@ -1306,7 +1315,11 @@ mod tests {
             ],
         );
 
-        for _ in 0..100 {
+        let (left_thumbstick2, right_thumbstick2) =
+            thumbsticks2.unwrap_or((Vec2::ZERO, Vec2::ZERO));
+
+        for i in 0..100 {
+            let t = (i as f32 / 50.0).min(1.0);
             let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) =
                 solve_ik(
                     state.get_affine(IkNodeID::Hmd),
@@ -1314,8 +1327,8 @@ mod tests {
                     state.get_affine(IkNodeID::LeftAim),
                     state.get_affine(IkNodeID::RightGrip),
                     state.get_affine(IkNodeID::RightAim),
-                    Vec2::ZERO,
-                    Vec2::ZERO,
+                    left_thumbstick1.lerp(left_thumbstick2, t),
+                    right_thumbstick1.lerp(right_thumbstick2, t),
                     &mut state,
                 );
 
@@ -1379,6 +1392,8 @@ mod tests {
         test_ik_solver_transition(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.18.json"),
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.20.json"),
+            None,
+            None,
         )
     }
 
@@ -1408,6 +1423,18 @@ mod tests {
         test_ik_solver(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-16_00.14.45.json"),
             Some((vec2(0.0, 0.0), vec2(0.0, 1.0))),
+        )
+    }
+
+    #[test]
+    fn test_ik_solver_kick_transition() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
+        test_ik_solver_transition(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_21.56.59.json"),
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_21.57.01.json"),
+            Some((vec2(0.0, 0.0), vec2(0.0, -1.0))),
+            Some((vec2(0.0, 0.0), vec2(0.0, 0.0))),
         )
     }
 }
