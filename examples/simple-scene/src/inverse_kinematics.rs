@@ -288,6 +288,7 @@ fn store_snapshot(state: &IkState, filename: &str) {
 }
 
 fn load_snapshot(state: &mut IkState, data: &str) {
+    puffin::profile_function!();
     let summary: HashMap<IkNodeID, (Vec3A, Quat)> =
         serde_json::from_str(data).expect("JSON does not have correct format.");
 
@@ -839,7 +840,9 @@ fn solve_ik(
         set_ik_node_from_affine(state, node_id, node_in_stage);
     }
     // Solve IK
+    puffin::profile_scope!("solve ik iterations");
     for _ in 0..tweak!(100) {
+        puffin::profile_scope!("solve ik iteration");
         for constraint in &anchor_constraints {
             let node_a = constraint.node_a as usize;
             let r1 = state.node_rotations[node_a] * constraint.point_in_a;
@@ -1132,11 +1135,89 @@ fn test_cardan() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use lazy_static::*;
+    use std::sync::{atomic::AtomicIsize, Mutex};
+
+    struct PuffinServerManager {
+        server: Option<puffin_http::Server>,
+    }
+
+    impl PuffinServerManager {
+        fn new() -> Self {
+            eprintln!("Starting puffin server");
+            puffin::set_scopes_on(true); // Tell puffin to collect data
+            puffin::GlobalProfiler::lock().new_frame();
+
+            Self {
+                server: match puffin_http::Server::new("0.0.0.0:8585") {
+                    Ok(server) => {
+                        eprintln!(
+                        "Run:  cargo install puffin_viewer && puffin_viewer --url 127.0.0.1:8585"
+                    );
+                        Some(server)
+                    }
+                    Err(err) => {
+                        eprintln!("Failed to start puffin server: {}", err);
+                        None
+                    }
+                },
+            }
+        }
+    }
+
+    impl Drop for PuffinServerManager {
+        fn drop(&mut self) {
+            eprintln!("Stopping puffin server");
+            if let Some(ref server) = self.server {
+                // Wait for up to 2 seconds for the puffin viewer to connect
+                for _ in 0..20 {
+                    if server.num_clients() != 0 {
+                        return;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+            }
+            puffin::GlobalProfiler::lock().new_frame();
+        }
+    }
+
+    struct PuffinServerUser {}
+
+    impl PuffinServerUser {
+        fn new() -> Self {
+            if PUFFIN_USERS.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                let mut puffin_server = PUFFIN_SERVER.lock().unwrap();
+                if puffin_server.is_none() {
+                    *puffin_server = Some(PuffinServerManager::new());
+                }
+            }
+            Self {}
+        }
+    }
+
+    impl Drop for PuffinServerUser {
+        fn drop(&mut self) {
+            if PUFFIN_USERS.fetch_sub(1, std::sync::atomic::Ordering::SeqCst) == 1 {
+                *PUFFIN_SERVER.lock().unwrap() = None;
+            }
+        }
+    }
+
+    lazy_static! {
+        static ref PUFFIN_SERVER: Mutex<Option<PuffinServerManager>> = Default::default();
+        static ref PUFFIN_USERS: AtomicIsize = Default::default();
+    }
+
+    #[must_use]
+    fn start_puffin_server() -> PuffinServerUser {
+        PuffinServerUser::new()
+    }
 
     fn test_ik_solver(
         data: &str,
         thumbsticks: Option<(Vec2, Vec2)>,
     ) -> Result<(), hotham::anyhow::Error> {
+        puffin::profile_function!();
         let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
         rerun::MsgSender::new("stage")
             .with_timeless(true)
@@ -1176,6 +1257,7 @@ mod tests {
     }
 
     fn test_ik_solver_transition(data1: &str, data2: &str) -> Result<(), hotham::anyhow::Error> {
+        puffin::profile_function!();
         let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
         rerun::MsgSender::new("stage")
             .with_timeless(true)
@@ -1252,6 +1334,8 @@ mod tests {
 
     #[test]
     fn test_ik_solver_neutral() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
         test_ik_solver(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-12_22.23.47.json"),
             None,
@@ -1260,6 +1344,8 @@ mod tests {
 
     #[test]
     fn test_ik_solver_facing_x_dir() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
         test_ik_solver(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.06.56.json"),
             None,
@@ -1268,6 +1354,8 @@ mod tests {
 
     #[test]
     fn test_ik_solver_arms_up1() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
         test_ik_solver(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.18.json"),
             None,
@@ -1276,6 +1364,8 @@ mod tests {
 
     #[test]
     fn test_ik_solver_arms_up2() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
         test_ik_solver(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.20.json"),
             None,
@@ -1284,6 +1374,8 @@ mod tests {
 
     #[test]
     fn test_ik_solver_arms_up_transition() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
         test_ik_solver_transition(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.18.json"),
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_21.40.20.json"),
@@ -1292,6 +1384,8 @@ mod tests {
 
     #[test]
     fn test_ik_solver_hands_bent_up() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
         test_ik_solver(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_22.04.18.json"),
             None,
@@ -1300,6 +1394,8 @@ mod tests {
 
     #[test]
     fn test_thumbstick_influence() {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
         assert_eq!(thumbstick_influence(Vec2::ZERO, vec2(0.0, -1.0)), 0.0);
         assert_eq!(thumbstick_influence(vec2(0.0, 1.0), vec2(0.0, -1.0)), 0.0);
         assert_eq!(thumbstick_influence(vec2(0.0, -1.0), vec2(0.0, -1.0)), 1.0);
@@ -1307,6 +1403,8 @@ mod tests {
 
     #[test]
     fn test_ik_solver_right_hand_punch() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
         test_ik_solver(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-16_00.14.45.json"),
             Some((vec2(0.0, 0.0), vec2(0.0, 1.0))),
