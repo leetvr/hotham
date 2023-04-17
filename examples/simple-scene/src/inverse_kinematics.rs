@@ -67,6 +67,7 @@ pub struct IkState {
     pub left_foot_in_stage: Option<Affine3A>,
     pub right_foot_in_stage: Option<Affine3A>,
     pub weight_distribution: WeightDistribution,
+    pub balance_offset: Vec3A,
     pub node_positions: [Vec3A; cardinality::<IkNodeID>()],
     pub node_rotations: [Quat; cardinality::<IkNodeID>()],
 }
@@ -681,11 +682,11 @@ fn solve_ik(
         .right_foot_in_stage
         .unwrap_or_else(|| base_in_stage * Affine3A::from_translation(vec3(0.2, 0.0, 0.0)));
     let base_from_stage = base_in_stage.inverse();
-    let left_foot_in_base = base_from_stage * left_foot_in_stage;
-    let right_foot_in_base = base_from_stage * right_foot_in_stage;
+    let left_foot_in_base = (base_from_stage * left_foot_in_stage).translation;
+    let right_foot_in_base = (base_from_stage * right_foot_in_stage).translation;
     state.weight_distribution = match (
-        left_foot_in_base.translation.length() < foot_radius,
-        right_foot_in_base.translation.length() < foot_radius,
+        left_foot_in_base.length() < foot_radius,
+        right_foot_in_base.length() < foot_radius,
     ) {
         (true, true) => state.weight_distribution,
         (true, false) => WeightDistribution::LeftPlanted,
@@ -693,8 +694,8 @@ fn solve_ik(
         (false, false) => WeightDistribution::SharedWeight,
     };
     let balance_point_in_base = {
-        let a = left_foot_in_base.translation;
-        let b = right_foot_in_base.translation;
+        let a = left_foot_in_base;
+        let b = right_foot_in_base;
         let c = Vec3A::ZERO;
         let v = b - a;
         let t = (c - a).dot(v) / v.dot(v);
@@ -705,9 +706,9 @@ fn solve_ik(
             state.left_foot_in_stage = Some(
                 base_in_stage
                     * Affine3A::from_translation(vec3(
-                        -step_multiplier * right_foot_in_base.translation.x,
-                        -step_multiplier * right_foot_in_base.translation.y,
-                        -step_multiplier * right_foot_in_base.translation.z,
+                        -step_multiplier * right_foot_in_base.x,
+                        -step_multiplier * right_foot_in_base.y,
+                        -step_multiplier * right_foot_in_base.z,
                     )),
             );
             state.right_foot_in_stage = Some(right_foot_in_stage);
@@ -717,32 +718,32 @@ fn solve_ik(
             state.right_foot_in_stage = Some(
                 base_in_stage
                     * Affine3A::from_translation(vec3(
-                        -step_multiplier * left_foot_in_base.translation.x,
-                        -step_multiplier * left_foot_in_base.translation.y,
-                        -step_multiplier * left_foot_in_base.translation.z,
+                        -step_multiplier * left_foot_in_base.x,
+                        -step_multiplier * left_foot_in_base.y,
+                        -step_multiplier * left_foot_in_base.z,
                     )),
             );
         }
         WeightDistribution::SharedWeight => {
             if balance_point_in_base.length() > stagger_threshold {
                 // Stagger step, lift the foot that is loaded the least.
-                let v1 = balance_point_in_base - left_foot_in_base.translation;
-                let v2 = balance_point_in_base - right_foot_in_base.translation;
+                let v1 = balance_point_in_base - left_foot_in_base;
+                let v2 = balance_point_in_base - right_foot_in_base;
                 if v1.length_squared() < v2.length_squared() {
-                    let dir = -left_foot_in_base.translation.normalize();
+                    let dir = -left_foot_in_base.normalize();
                     state.left_foot_in_stage = Some(left_foot_in_stage);
                     state.right_foot_in_stage = Some(
                         base_in_stage
                             * Affine3A::from_translation(
-                                (left_foot_in_base.translation + dir * step_size).into(),
+                                (left_foot_in_base + dir * step_size).into(),
                             ),
                     );
                 } else {
-                    let dir = -right_foot_in_base.translation.normalize();
+                    let dir = -right_foot_in_base.normalize();
                     state.left_foot_in_stage = Some(
                         base_in_stage
                             * Affine3A::from_translation(
-                                (right_foot_in_base.translation + dir * step_size).into(),
+                                (right_foot_in_base + dir * step_size).into(),
                             ),
                     );
                     state.right_foot_in_stage = Some(right_foot_in_stage);
