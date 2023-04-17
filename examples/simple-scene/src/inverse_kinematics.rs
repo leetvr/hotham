@@ -15,7 +15,7 @@ use hotham::{
 };
 use inline_tweak::tweak;
 
-use crate::thumbstick_influence::thumbstick_influence;
+use crate::thumbstick_influence::{left_thumbstick_influence, right_thumbstick_influence};
 
 mod rr {
     pub use rerun::{
@@ -757,67 +757,119 @@ fn solve_ik(
         }
     }
 
-    let foot_in_palm = Affine3A::from_rotation_x(std::f32::consts::FRAC_PI_2)
+    let knee_strength = tweak!(0.1);
+    let kick_action_in_palm = Affine3A::from_rotation_x(std::f32::consts::FRAC_PI_2)
         * Affine3A::from_translation(vec3(0.0, tweak!(-0.6), 0.0));
-    let left_thumbstick_forwards_response = thumbstick_influence(left_thumbstick, vec2(0.0, 1.0));
-    let right_thumbstick_forwards_response = thumbstick_influence(right_thumbstick, vec2(0.0, 1.0));
-    let left_thumbstick_backwards_response = thumbstick_influence(left_thumbstick, vec2(0.0, -1.0));
-    let right_thumbstick_backwards_response =
-        thumbstick_influence(right_thumbstick, vec2(0.0, -1.0));
+    let knee_action_in_palm = Affine3A::from_rotation_x(tweak!(0.0))
+        * Affine3A::from_translation(vec3(0.0, tweak!(-0.6), tweak!(0.0)));
+    let elbow_action_in_palm = Affine3A::from_rotation_x(tweak!(std::f32::consts::FRAC_PI_2))
+        * Affine3A::from_translation(vec3(0.0, tweak!(0.0), 0.0));
+    let left_thumbstick_influence = left_thumbstick_influence(left_thumbstick);
+    let right_thumbstick_influence = right_thumbstick_influence(right_thumbstick);
     let anchor_constraints = [
         AnchorConstraint::from_affine(
+            // Neutral
             IkNodeID::LeftPalm,
             &Vec3A::ZERO,
             &left_palm_in_stage,
-            1.0 - left_thumbstick_forwards_response,
+            left_thumbstick_influence.hand.x,
         ),
         AnchorConstraint::from_affine(
+            // Neutral
             IkNodeID::RightPalm,
             &Vec3A::ZERO,
             &right_palm_in_stage,
-            1.0 - right_thumbstick_forwards_response,
+            right_thumbstick_influence.hand.x,
         ),
         AnchorConstraint::from_affine(
+            // Punch
             IkNodeID::LeftLowerArm,
             &vec3a(0.0, 0.0, lower_arm_length / 2.0),
             &left_palm_in_stage,
-            left_thumbstick_forwards_response,
+            left_thumbstick_influence.hand.y,
         ),
         AnchorConstraint::from_affine(
+            // Punch
             IkNodeID::RightLowerArm,
             &vec3a(0.0, 0.0, lower_arm_length / 2.0),
             &right_palm_in_stage,
-            right_thumbstick_forwards_response,
+            right_thumbstick_influence.hand.y,
         ),
         AnchorConstraint::from_affine(
+            // Elbow
+            IkNodeID::LeftLowerArm,
+            &vec3a(0.0, 0.0, lower_arm_length / 2.0),
+            &(left_palm_in_stage * elbow_action_in_palm),
+            left_thumbstick_influence.hand.z,
+        ),
+        AnchorConstraint::from_affine(
+            // Elbow
+            IkNodeID::RightLowerArm,
+            &vec3a(0.0, 0.0, lower_arm_length / 2.0),
+            &(right_palm_in_stage * elbow_action_in_palm),
+            right_thumbstick_influence.hand.z,
+        ),
+        AnchorConstraint::from_affine(
+            // Neutral
             IkNodeID::LeftFoot,
             &Vec3A::ZERO,
             &left_foot_in_stage,
-            1.0 - left_thumbstick_backwards_response,
+            left_thumbstick_influence.foot.x,
         ),
         AnchorConstraint::from_affine(
+            // Neutral
             IkNodeID::RightFoot,
             &Vec3A::ZERO,
             &right_foot_in_stage,
-            1.0 - right_thumbstick_backwards_response,
+            right_thumbstick_influence.foot.x,
+        ),
+        AnchorConstraint::from_affine(
+            // Kick
+            IkNodeID::LeftFoot,
+            &Vec3A::ZERO,
+            &(left_palm_in_stage * kick_action_in_palm),
+            left_thumbstick_influence.foot.y,
+        ),
+        AnchorConstraint::from_affine(
+            // Kick
+            IkNodeID::RightFoot,
+            &Vec3A::ZERO,
+            &(right_palm_in_stage * kick_action_in_palm),
+            right_thumbstick_influence.foot.y,
+        ),
+        AnchorConstraint::from_affine(
+            // Knee
+            IkNodeID::LeftFoot,
+            &Vec3A::ZERO,
+            &(left_palm_in_stage * knee_action_in_palm),
+            left_thumbstick_influence.foot.z,
+        ),
+        AnchorConstraint::from_affine(
+            // Knee
+            IkNodeID::RightFoot,
+            &Vec3A::ZERO,
+            &(right_palm_in_stage * knee_action_in_palm),
+            right_thumbstick_influence.foot.z,
+        ),
+        AnchorConstraint::from_affine(
+            // Knee
+            IkNodeID::LeftLowerLeg,
+            &vec3a(0.0, 0.0, lower_leg_length / 2.0),
+            &(left_palm_in_stage * knee_action_in_palm),
+            left_thumbstick_influence.foot.z.powi(2) * knee_strength,
+        ),
+        AnchorConstraint::from_affine(
+            // Knee
+            IkNodeID::RightLowerLeg,
+            &vec3a(0.0, 0.0, lower_leg_length / 2.0),
+            &(right_palm_in_stage * knee_action_in_palm),
+            right_thumbstick_influence.foot.z.powi(2) * knee_strength,
         ),
         AnchorConstraint::from_affine(
             IkNodeID::HeadCenter,
             &Vec3A::ZERO,
             &head_center_in_stage,
             1.0,
-        ),
-        AnchorConstraint::from_affine(
-            IkNodeID::LeftFoot,
-            &Vec3A::ZERO,
-            &(left_palm_in_stage * foot_in_palm),
-            left_thumbstick_backwards_response,
-        ),
-        AnchorConstraint::from_affine(
-            IkNodeID::RightFoot,
-            &Vec3A::ZERO,
-            &(right_palm_in_stage * foot_in_palm),
-            right_thumbstick_backwards_response,
         ),
     ];
 
