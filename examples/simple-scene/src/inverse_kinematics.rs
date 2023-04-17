@@ -627,14 +627,14 @@ fn solve_ik(
             // Left hip
             node_a: IkNodeID::Pelvis,
             node_b: IkNodeID::LeftUpperLeg,
-            b_in_a: Quat::from_axis_angle(Vec3::X, -FRAC_PI_4),
+            b_in_a: Quat::from_axis_angle(Vec3::X, FRAC_PI_4),
             compliance: hip_compliance,
         },
         CompliantFixedAngleConstraint {
             // Right hip
             node_a: IkNodeID::Pelvis,
             node_b: IkNodeID::RightUpperLeg,
-            b_in_a: Quat::from_axis_angle(Vec3::X, -FRAC_PI_4),
+            b_in_a: Quat::from_axis_angle(Vec3::X, FRAC_PI_4),
             compliance: hip_compliance,
         },
         CompliantFixedAngleConstraint {
