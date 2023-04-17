@@ -15,6 +15,8 @@ use hotham::{
 };
 use inline_tweak::tweak;
 
+use crate::thumbstick_influence::thumbstick_influence;
+
 mod rr {
     pub use rerun::{
         components::{Box3D, ColorRGBA, Quaternion, Radius, Rigid3, Transform, Vec3D},
@@ -1034,13 +1036,6 @@ fn solve_ik(
     )
 }
 
-fn thumbstick_influence(thumbstick: Vec2, target: Vec2) -> f32 {
-    let d = thumbstick.dot(target);
-    let r1 = tweak!(0.25);
-    let r2 = tweak!(0.95);
-    ((d - r1) / (r2 - r1)).clamp(0.0, 1.0)
-}
-
 fn set_ik_node_from_affine(state: &mut IkState, node_id: &IkNodeID, node_in_stage: &Affine3A) {
     let (pos, rot) = to_pos_rot(node_in_stage);
     state.node_positions[*node_id as usize] = pos;
@@ -1406,15 +1401,6 @@ mod tests {
             include_str!("../../../inverse_kinematics_snapshot_2023-04-13_22.04.18.json"),
             None,
         )
-    }
-
-    #[test]
-    fn test_thumbstick_influence() {
-        let _ = start_puffin_server();
-        puffin::profile_function!();
-        assert_eq!(thumbstick_influence(Vec2::ZERO, vec2(0.0, -1.0)), 0.0);
-        assert_eq!(thumbstick_influence(vec2(0.0, 1.0), vec2(0.0, -1.0)), 0.0);
-        assert_eq!(thumbstick_influence(vec2(0.0, -1.0), vec2(0.0, -1.0)), 1.0);
     }
 
     #[test]

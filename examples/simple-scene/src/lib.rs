@@ -1,6 +1,7 @@
 mod audio_player;
 mod ik_selector;
 mod inverse_kinematics;
+mod thumbstick_influence;
 mod utils;
 mod xpbd_audio_bridge;
 mod xpbd_collisions;
