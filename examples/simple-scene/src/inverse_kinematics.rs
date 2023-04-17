@@ -761,7 +761,7 @@ fn solve_ik(
     let kick_action_in_palm = Affine3A::from_rotation_x(std::f32::consts::FRAC_PI_2)
         * Affine3A::from_translation(vec3(0.0, tweak!(-0.6), 0.0));
     let knee_action_in_palm = Affine3A::from_rotation_x(tweak!(0.0))
-        * Affine3A::from_translation(vec3(0.0, tweak!(-0.6), tweak!(0.0)));
+        * Affine3A::from_translation(vec3(0.0, tweak!(-0.5), tweak!(0.0)));
     let elbow_action_in_palm = Affine3A::from_rotation_x(tweak!(std::f32::consts::FRAC_PI_2))
         * Affine3A::from_translation(vec3(0.0, tweak!(0.0), 0.0));
     let left_thumbstick_influence = left_thumbstick_influence(left_thumbstick);
@@ -1472,7 +1472,7 @@ mod tests {
         test_ik_solver_transition(
             include_str!("../../../inverse_kinematics_snapshot_2023-04-16_21.56.59.json"),
             include_str!("../../../inverse_kinematics_snapshot_2023-04-16_21.57.01.json"),
-            Some((vec2(0.0, 0.0), vec2(0.0, -1.0))),
+            Some((vec2(0.0, 0.0), vec2(1.0, 0.0))),
             Some((vec2(0.0, 0.0), vec2(0.0, 0.0))),
         )
     }
@@ -1485,7 +1485,68 @@ mod tests {
             include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
             include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
             Some((vec2(0.0, 0.0), vec2(0.0, 0.0))),
+            Some((vec2(-1.0, 0.0), vec2(0.0, 0.0))),
+        )
+    }
+
+    #[test]
+    fn test_ik_solver_kick_transition3() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
+        test_ik_solver_transition(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
             Some((vec2(0.0, -1.0), vec2(0.0, 0.0))),
+            Some((vec2(-1.0, 0.0), vec2(0.0, 0.0))),
+        )
+    }
+
+    #[test]
+    fn test_ik_solver_kick_transition4() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
+        test_ik_solver_transition(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-17_21.49.35.json"),
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-17_21.49.35.json"),
+            Some((vec2(0.0, 0.0), vec2(0.0, -1.0))),
+            Some((vec2(0.0, 0.0), vec2(1.0, 0.0))),
+        )
+    }
+
+    #[test]
+    fn test_ik_solver_punch_kick_mix() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
+        test_ik_solver_transition(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-17_21.49.35.json"),
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-17_21.49.35.json"),
+            Some((vec2(0.0, 0.0), vec2(0.0, 0.0))),
+            Some((vec2(0.0, 0.0), vec2(FRAC_1_SQRT_2, FRAC_1_SQRT_2))),
+        )
+    }
+
+    #[test]
+    fn test_ik_solver_elbow_knee_transition1() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
+        test_ik_solver_transition(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
+            Some((vec2(0.0, 0.0), vec2(0.0, 0.0))),
+            Some((vec2(FRAC_1_SQRT_2, -FRAC_1_SQRT_2), vec2(0.0, 0.0))),
+        )
+    }
+
+    #[test]
+    fn test_ik_solver_elbow_knee_soft1() -> hotham::anyhow::Result<()> {
+        let _ = start_puffin_server();
+        puffin::profile_function!();
+        test_ik_solver(
+            include_str!("../../../inverse_kinematics_snapshot_2023-04-16_22.13.45.json"),
+            Some((
+                vec2(FRAC_1_SQRT_2 * 0.5, -FRAC_1_SQRT_2 * 0.5),
+                vec2(0.0, 0.0),
+            )),
         )
     }
 }
