@@ -1262,6 +1262,22 @@ mod tests {
         PuffinServerUser::new()
     }
 
+    trait Slerp {
+        fn slerp(self, other: Self, t: f32) -> Self;
+    }
+
+    impl Slerp for Vec2 {
+        fn slerp(self, b: Vec2, t: f32) -> Vec2 {
+            let dot = self.dot(b);
+            let theta = dot.acos();
+            let sin_theta = theta.sin();
+            let inv_sin_theta = 1.0 / sin_theta;
+            let a_factor = (theta * (1.0 - t)).sin() * inv_sin_theta;
+            let b_factor = (theta * t).sin() * inv_sin_theta;
+            self * a_factor + b * b_factor
+        }
+    }
+
     fn test_ik_solver(
         data: &str,
         thumbsticks: Option<(Vec2, Vec2)>,
@@ -1375,8 +1391,8 @@ mod tests {
                     state.get_affine(IkNodeID::LeftAim),
                     state.get_affine(IkNodeID::RightGrip),
                     state.get_affine(IkNodeID::RightAim),
-                    left_thumbstick1.lerp(left_thumbstick2, t),
-                    right_thumbstick1.lerp(right_thumbstick2, t),
+                    left_thumbstick1.slerp(left_thumbstick2, t),
+                    right_thumbstick1.slerp(right_thumbstick2, t),
                     &mut state,
                 );
 
