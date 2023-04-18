@@ -258,8 +258,13 @@ pub fn inverse_kinematics_system(
         let filename = date_time
             .format("inverse_kinematics_snapshot_%Y-%m-%d_%H.%M.%S.json")
             .to_string();
-        println!("[INVERSE_KINEMATICS] Storing snapshot to '{}'", filename);
+        println!("[INVERSE_KINEMATICS] Storing snapshot to '{filename}'");
         store_snapshot(state, &filename);
+        let thumbsticks = (
+            input_context.left.thumbstick_xy(),
+            input_context.right.thumbstick_xy(),
+        );
+        println!("[INVERSE_KINEMATICS] Thumbsticks are {thumbsticks:?}");
     }
 
     // Send poses to rerun
