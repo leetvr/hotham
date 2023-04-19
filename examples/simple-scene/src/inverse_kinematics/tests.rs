@@ -381,3 +381,13 @@ fn test_ik_solver_elbow_knee_soft1() -> hotham::anyhow::Result<()> {
         )),
     )
 }
+
+#[test]
+fn test_ik_solver_elbow1() -> hotham::anyhow::Result<()> {
+    let _ = start_puffin_server();
+    puffin::profile_function!();
+    test_ik_solver(
+        include_str!("../../../../inverse_kinematics_snapshot_2023-04-19_00.13.58.json"),
+        Some((vec2(0.0, 0.0), vec2(-1.0, 0.0))),
+    )
+}

@@ -4,8 +4,8 @@ use hotham::glam::{vec3, Vec2, Vec3};
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 pub struct InfluenceFactors {
-    pub hand: Vec3,
-    pub foot: Vec3,
+    pub hand: Vec3, // hand neutral, hand forward, hand upward
+    pub foot: Vec3, // foot neutral, foot forward, foot downward
 }
 
 impl InfluenceFactors {
