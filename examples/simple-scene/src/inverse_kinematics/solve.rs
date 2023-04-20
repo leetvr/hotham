@@ -63,8 +63,6 @@ pub fn solve_ik(
     let step_size = foot_radius * (step_multiplier + 1.0);
     let stagger_threshold = foot_radius * tweak!(2.0);
 
-    let knee_hinge_compliance = tweak!(10000.0);
-    let elbow_hinge_compliance = tweak!(10000.0);
     let shoulder_compliance = tweak!(25.0);
     let elbow_fixed_angle_compliance = tweak!(100000.0);
     let lower_back_compliance = tweak!(1000.0);
@@ -343,40 +341,7 @@ pub fn solve_ik(
             compliance: head_fixed_angle_compliance,
         },
     ];
-    let compliant_hinge_angle_constraints = [
-        CompliantHingeAngleConstraint {
-            // Left knee
-            node_a: IkNodeID::LeftUpperLeg,
-            node_b: IkNodeID::LeftLowerLeg,
-            axis_in_a: Vec3A::X,
-            axis_in_b: Vec3A::X,
-            compliance: knee_hinge_compliance,
-        },
-        CompliantHingeAngleConstraint {
-            // Right knee
-            node_a: IkNodeID::RightUpperLeg,
-            node_b: IkNodeID::RightLowerLeg,
-            axis_in_a: Vec3A::X,
-            axis_in_b: Vec3A::X,
-            compliance: knee_hinge_compliance,
-        },
-        CompliantHingeAngleConstraint {
-            // Left elbow
-            node_a: IkNodeID::LeftUpperArm,
-            node_b: IkNodeID::LeftLowerArm,
-            axis_in_a: Vec3A::X,
-            axis_in_b: Vec3A::X,
-            compliance: elbow_hinge_compliance,
-        },
-        CompliantHingeAngleConstraint {
-            // Right elbow
-            node_a: IkNodeID::RightUpperArm,
-            node_b: IkNodeID::RightLowerArm,
-            axis_in_a: Vec3A::X,
-            axis_in_b: Vec3A::X,
-            compliance: elbow_hinge_compliance,
-        },
-    ];
+    let compliant_hinge_angle_constraints: [CompliantHingeAngleConstraint; 0] = [];
 
     // Dynamic transforms
     let head_center_in_stage = hmd_in_stage * head_center_in_hmd;
