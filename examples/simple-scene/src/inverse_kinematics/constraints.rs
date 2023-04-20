@@ -71,3 +71,11 @@ pub struct CompliantFixedAngleConstraint {
     pub b_in_a: Quat,
     pub compliance: f32,
 }
+
+pub struct CompliantHingeAngleConstraint {
+    pub node_a: IkNodeID,
+    pub node_b: IkNodeID,
+    pub axis_in_a: Vec3A,
+    pub axis_in_b: Vec3A,
+    pub compliance: f32,
+}

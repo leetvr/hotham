@@ -63,14 +63,16 @@ pub fn solve_ik(
     let step_size = foot_radius * (step_multiplier + 1.0);
     let stagger_threshold = foot_radius * tweak!(2.0);
 
+    let knee_hinge_compliance = tweak!(10000.0);
+    let elbow_hinge_compliance = tweak!(10000.0);
     let shoulder_compliance = tweak!(25.0);
-    let elbow_compliance = tweak!(100000.0);
+    let elbow_fixed_angle_compliance = tweak!(100000.0);
     let lower_back_compliance = tweak!(1000.0);
-    let hip_compliance = tweak!(10000.0);
-    let knee_compliance = tweak!(10000.0);
-    let ankle_compliance = tweak!(1000.0);
-    let head_compliance = tweak!(1000.0);
-    let wrist_compliance = tweak!(1000.0);
+    let hip_fixed_angle_compliance = tweak!(10000.0);
+    let knee_fixed_angle_compliance = tweak!(10000.0);
+    let ankle_fixed_angle_compliance = tweak!(1000.0);
+    let head_fixed_angle_compliance = tweak!(1000.0);
+    let wrist_fixed_angle_compliance = tweak!(1000.0);
 
     let anchor_strength = tweak!(0.25);
     let knee_strength = tweak!(0.1);
@@ -261,56 +263,56 @@ pub fn solve_ik(
             node_a: IkNodeID::LeftLowerArm,
             node_b: IkNodeID::LeftPalm,
             b_in_a: Quat::IDENTITY,
-            compliance: wrist_compliance,
+            compliance: wrist_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Right wrist
             node_a: IkNodeID::RightLowerArm,
             node_b: IkNodeID::RightPalm,
             b_in_a: Quat::IDENTITY,
-            compliance: wrist_compliance,
+            compliance: wrist_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Left ankle
             node_a: IkNodeID::LeftLowerLeg,
             node_b: IkNodeID::LeftFoot,
             b_in_a: Quat::IDENTITY,
-            compliance: ankle_compliance,
+            compliance: ankle_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Right ankle
             node_a: IkNodeID::RightLowerLeg,
             node_b: IkNodeID::RightFoot,
             b_in_a: Quat::IDENTITY,
-            compliance: ankle_compliance,
+            compliance: ankle_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Left knee
             node_a: IkNodeID::LeftUpperLeg,
             node_b: IkNodeID::LeftLowerLeg,
             b_in_a: Quat::from_axis_angle(Vec3::X, -FRAC_PI_2),
-            compliance: knee_compliance,
+            compliance: knee_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Right knee
             node_a: IkNodeID::RightUpperLeg,
             node_b: IkNodeID::RightLowerLeg,
             b_in_a: Quat::from_axis_angle(Vec3::X, -FRAC_PI_2),
-            compliance: knee_compliance,
+            compliance: knee_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Left elbow
             node_a: IkNodeID::LeftUpperArm,
             node_b: IkNodeID::LeftLowerArm,
             b_in_a: Quat::from_axis_angle(Vec3::X, FRAC_PI_2),
-            compliance: elbow_compliance,
+            compliance: elbow_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Right elbow
             node_a: IkNodeID::RightUpperArm,
             node_b: IkNodeID::RightLowerArm,
             b_in_a: Quat::from_axis_angle(Vec3::X, FRAC_PI_2),
-            compliance: elbow_compliance,
+            compliance: elbow_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Lower back
@@ -324,21 +326,55 @@ pub fn solve_ik(
             node_a: IkNodeID::Pelvis,
             node_b: IkNodeID::LeftUpperLeg,
             b_in_a: Quat::from_axis_angle(Vec3::X, FRAC_PI_4),
-            compliance: hip_compliance,
+            compliance: hip_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Right hip
             node_a: IkNodeID::Pelvis,
             node_b: IkNodeID::RightUpperLeg,
             b_in_a: Quat::from_axis_angle(Vec3::X, FRAC_PI_4),
-            compliance: hip_compliance,
+            compliance: hip_fixed_angle_compliance,
         },
         CompliantFixedAngleConstraint {
             // Head
             node_a: IkNodeID::HeadCenter,
             node_b: IkNodeID::Torso,
             b_in_a: Quat::IDENTITY,
-            compliance: head_compliance,
+            compliance: head_fixed_angle_compliance,
+        },
+    ];
+    let compliant_hinge_angle_constraints = [
+        CompliantHingeAngleConstraint {
+            // Left knee
+            node_a: IkNodeID::LeftUpperLeg,
+            node_b: IkNodeID::LeftLowerLeg,
+            axis_in_a: Vec3A::X,
+            axis_in_b: Vec3A::X,
+            compliance: knee_hinge_compliance,
+        },
+        CompliantHingeAngleConstraint {
+            // Right knee
+            node_a: IkNodeID::RightUpperLeg,
+            node_b: IkNodeID::RightLowerLeg,
+            axis_in_a: Vec3A::X,
+            axis_in_b: Vec3A::X,
+            compliance: knee_hinge_compliance,
+        },
+        CompliantHingeAngleConstraint {
+            // Left elbow
+            node_a: IkNodeID::LeftUpperArm,
+            node_b: IkNodeID::LeftLowerArm,
+            axis_in_a: Vec3A::X,
+            axis_in_b: Vec3A::X,
+            compliance: elbow_hinge_compliance,
+        },
+        CompliantHingeAngleConstraint {
+            // Right elbow
+            node_a: IkNodeID::RightUpperArm,
+            node_b: IkNodeID::RightLowerArm,
+            axis_in_a: Vec3A::X,
+            axis_in_b: Vec3A::X,
+            compliance: elbow_hinge_compliance,
         },
     ];
 
@@ -802,6 +838,27 @@ pub fn solve_ik(
             let delta2 = Quat::from_xyzw(-v.x, -v.y, -v.z, c);
             state.node_rotations[node_a] = delta1 * state.node_rotations[node_a];
             state.node_rotations[node_b] = delta2 * state.node_rotations[node_b];
+        }
+        for constraint in &compliant_hinge_angle_constraints {
+            let node_a = constraint.node_a as usize;
+            let node_b = constraint.node_b as usize;
+            let axis1 = state.node_rotations[node_a] * constraint.axis_in_a;
+            let axis2 = state.node_rotations[node_b] * constraint.axis_in_b;
+            // The constraint is satisfied when the axes are aligned
+            let omega = axis1.cross(axis2);
+            let factor = 1.0 / (2.0 + constraint.compliance);
+            // q1 <- q1 + 0.5 * (axis1.cross(axis2) * q1)
+            let q1 = &mut state.node_rotations[node_a];
+            *q1 = Quat::from_vec4(
+                Vec4::from(*q1) + factor * Vec4::from(Quat::from_vec4(omega.extend(0.0)) * *q1),
+            )
+            .normalize();
+            // q2 <- q2 - 0.5 * (axis1.cross(axis2) * q2)
+            let q2 = &mut state.node_rotations[node_b];
+            *q2 = Quat::from_vec4(
+                Vec4::from(*q2) - factor * Vec4::from(Quat::from_vec4(omega.extend(0.0)) * *q2),
+            )
+            .normalize();
         }
     }
     (
