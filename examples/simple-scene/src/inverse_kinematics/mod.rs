@@ -304,7 +304,7 @@ fn send_poses_to_rerun(
                 | IkNodeID::LeftLowerLeg
                 | IkNodeID::RightUpperLeg
                 | IkNodeID::RightLowerLeg => rr::Box3D::new(0.075, 0.20, 0.075),
-                IkNodeID::LeftFoot | IkNodeID::RightFoot => rr::Box3D::new(0.05, 0.025, 0.075),
+                IkNodeID::LeftFoot | IkNodeID::RightFoot => rr::Box3D::new(0.05, 0.025, 0.14),
             };
             rr::MsgSender::new(format!("stage/{:?}", node_id))
                 .with_component(&[rr::Transform::Rigid3(rr::Rigid3 {

@@ -40,6 +40,7 @@ pub fn solve_ik(
     let upper_leg_length = tweak!(0.40);
     let lower_leg_length = tweak!(0.40);
     let ankle_height = tweak!(0.10);
+    let foot_height = tweak!(0.05);
     let wrist_in_lower_arm = vec3a(0.0, 0.0, -lower_arm_length / 2.0);
     let elbow_in_lower_arm = vec3a(0.0, 0.0, lower_arm_length / 2.0);
     let elbow_in_upper_arm = vec3a(0.0, 0.0, -upper_arm_length / 2.0);
@@ -57,7 +58,8 @@ pub fn solve_ik(
     let knee_in_upper_leg = vec3a(0.0, -upper_leg_length / 2.0, 0.0);
     let knee_in_lower_leg = vec3a(0.0, lower_leg_length / 2.0, 0.0);
     let ankle_in_lower_leg = vec3a(0.0, -lower_leg_length / 2.0, 0.0);
-    let ankle_in_foot = vec3a(0.0, ankle_height, 0.0);
+    let ankle_in_foot = vec3a(0.0, ankle_height - foot_height / 2.0, tweak!(0.05));
+    let foot_target_in_foot = vec3a(0.0, -foot_height / 2.0, tweak!(0.0));
     let foot_radius = tweak!(0.1);
     let step_multiplier = tweak!(3.0);
     let step_size = foot_radius * (step_multiplier + 1.0);
@@ -537,42 +539,42 @@ pub fn solve_ik(
         AnchorConstraint::from_affine(
             // Neutral
             IkNodeID::LeftFoot,
-            &Vec3A::ZERO,
+            &foot_target_in_foot,
             &left_foot_in_stage,
             anchor_strength * left_action_blend.foot.x,
         ),
         AnchorConstraint::from_affine(
             // Neutral
             IkNodeID::RightFoot,
-            &Vec3A::ZERO,
+            &foot_target_in_foot,
             &right_foot_in_stage,
             anchor_strength * right_action_blend.foot.x,
         ),
         AnchorConstraint::from_affine(
             // Kick
             IkNodeID::LeftFoot,
-            &Vec3A::ZERO,
+            &foot_target_in_foot,
             &left_foot_action_in_stage,
             anchor_strength * left_action_blend.foot.y,
         ),
         AnchorConstraint::from_affine(
             // Kick
             IkNodeID::RightFoot,
-            &Vec3A::ZERO,
+            &foot_target_in_foot,
             &right_foot_action_in_stage,
             anchor_strength * right_action_blend.foot.y,
         ),
         AnchorConstraint::from_affine(
             // Knee
             IkNodeID::LeftFoot,
-            &Vec3A::ZERO,
+            &foot_target_in_foot,
             &left_foot_action_in_stage,
             anchor_strength * left_action_blend.foot.z,
         ),
         AnchorConstraint::from_affine(
             // Knee
             IkNodeID::RightFoot,
-            &Vec3A::ZERO,
+            &foot_target_in_foot,
             &right_foot_action_in_stage,
             anchor_strength * right_action_blend.foot.z,
         ),
