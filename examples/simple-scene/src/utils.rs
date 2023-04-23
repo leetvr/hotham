@@ -14,6 +14,18 @@ where
     (1.0 - t) * a + t * b
 }
 
+/// Linear interpolator.
+#[inline]
+pub fn lerp32<T>(a: T, b: T, t: f32) -> <<f32 as Mul<T>>::Output as std::ops::Add>::Output
+where
+    T: Mul<f32>,
+    f32: Mul<T>,
+    <T as Mul<f32>>::Output: Add<<f32 as Mul<T>>::Output>,
+    <f32 as Mul<T>>::Output: Add,
+{
+    (1.0 - t) * a + t * b
+}
+
 /// Linearly interpolates from `a` through `b` in `n` steps, returning the intermediate result at
 /// each step.
 #[inline]

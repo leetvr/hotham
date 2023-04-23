@@ -3,6 +3,8 @@ use std::f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, FRAC_PI_4, PI, TAU};
 use hotham::glam::{vec3, vec3a, Affine3A, Quat, Vec2, Vec3, Vec3A, Vec4};
 use inline_tweak::tweak;
 
+use crate::utils::lerp32;
+
 use super::{
     constraints::*, left_thumbstick_influence, right_thumbstick_influence, set_ik_node_from_affine,
     IkNodeID, IkState, WeightDistribution,
@@ -456,30 +458,26 @@ pub fn solve_ik(
         }
     }
 
+    let hand_action_max_angle: f32 = std::f32::consts::FRAC_PI_2 * tweak!(0.5);
+    let foot_action_kick_angle: f32 = std::f32::consts::FRAC_PI_2 * tweak!(1.0);
+    let foot_action_knee_angle: f32 = std::f32::consts::FRAC_PI_2 * tweak!(-0.5);
     let left_action_blend = left_thumbstick_influence(left_thumbstick);
     let right_action_blend = right_thumbstick_influence(right_thumbstick);
-    let left_hand_angle = std::f32::consts::FRAC_PI_2 * left_action_blend.hand.z;
-    let right_hand_angle = std::f32::consts::FRAC_PI_2 * right_action_blend.hand.z;
-    let left_foot_angle = std::f32::consts::FRAC_PI_2
-        * (1.0
-            - left_action_blend.foot.z
-                / (left_action_blend.foot.y + left_action_blend.foot.z).max(0.001));
-    let right_foot_angle = std::f32::consts::FRAC_PI_2
-        * (1.0
-            - right_action_blend.foot.z
-                / (right_action_blend.foot.y + right_action_blend.foot.z).max(0.001));
-    let left_hand_action_in_palm = Affine3A::from_translation(vec3(
-        0.0,
-        tweak!(0.0),
-        tweak!(-0.15 * left_action_blend.hand.z),
-    )) * Affine3A::from_rotation_x(left_hand_angle)
-        * Affine3A::from_translation(vec3(0.0, tweak!(0.0), 0.0));
-    let right_hand_action_in_palm = Affine3A::from_translation(vec3(
-        0.0,
-        tweak!(0.0),
-        tweak!(-0.15 * right_action_blend.hand.z),
-    )) * Affine3A::from_rotation_x(right_hand_angle)
-        * Affine3A::from_translation(vec3(0.0, tweak!(0.0), 0.0));
+    let left_hand_angle = hand_action_max_angle * left_action_blend.hand.z;
+    let right_hand_angle = hand_action_max_angle * right_action_blend.hand.z;
+    let left_foot_angle = lerp32(
+        foot_action_kick_angle,
+        foot_action_knee_angle,
+        left_action_blend.foot.z / (left_action_blend.foot.y + left_action_blend.foot.z).max(0.001),
+    );
+    let right_foot_angle = lerp32(
+        foot_action_kick_angle,
+        foot_action_knee_angle,
+        right_action_blend.foot.z
+            / (right_action_blend.foot.y + right_action_blend.foot.z).max(0.001),
+    );
+    let left_hand_action_in_palm = Affine3A::from_rotation_x(left_hand_angle);
+    let right_hand_action_in_palm = Affine3A::from_rotation_x(right_hand_angle);
     let left_foot_action_in_palm = Affine3A::from_translation(vec3(0.0, tweak!(0.0), tweak!(-0.1)))
         * Affine3A::from_rotation_x(left_foot_angle)
         * Affine3A::from_translation(vec3(0.0, tweak!(-0.5), tweak!(0.0)));
