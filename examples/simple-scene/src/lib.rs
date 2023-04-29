@@ -3,12 +3,8 @@ mod ik_selector;
 mod inverse_kinematics;
 mod thumbstick_influence;
 mod utils;
-mod xpbd_audio_bridge;
-mod xpbd_collisions;
-mod xpbd_rerun;
-mod xpbd_shape_constraints;
-mod xpbd_state;
-mod xpbd_substep;
+mod xpbd;
+#[cfg(test)]
 mod xr_inputs_rerun;
 
 use std::time::{Duration, Instant};
@@ -36,21 +32,25 @@ use ik_selector::add_ik_selectors;
 use inline_tweak::tweak;
 use inverse_kinematics::{add_ik_nodes, IkState};
 use nalgebra::{DVector, Quaternion, Translation3, UnitQuaternion};
-use xpbd_audio_bridge::{AudioSimulationUpdate, AudioState};
-use xpbd_collisions::Contact;
-use xpbd_collisions::XpbdCollisions;
-use xpbd_rerun::init_rerun_session;
-use xpbd_shape_constraints::create_points;
-use xpbd_state::XpbdState;
-use xpbd_substep::xpbd_substep;
+use xpbd::{
+    xpbd_audio_bridge::{AudioSimulationUpdate, AudioState},
+    xpbd_collisions::{Contact, XpbdCollisions},
+    xpbd_mesh,
+    xpbd_shape_constraints::create_points,
+    xpbd_state::XpbdState,
+    xpbd_substep::xpbd_substep,
+    xpbd_substep::SimulationParams,
+};
+
+#[cfg(test)]
+use crate::{
+    xpbd::xpbd_rerun::{send_colliders_to_rerun, send_xpbd_state_to_rerun},
+    xr_inputs_rerun::send_xr_inputs_state_to_rerun,
+};
 
 use crate::{
-    audio_player::ListenerPose,
-    ik_selector::ik_selector_system,
+    audio_player::ListenerPose, ik_selector::ik_selector_system,
     inverse_kinematics::inverse_kinematics_system,
-    xpbd_rerun::{send_colliders_to_rerun, send_xpbd_state_to_rerun},
-    xpbd_substep::SimulationParams,
-    xr_inputs_rerun::send_xr_inputs_state_to_rerun,
 };
 
 const NX: usize = 5;
@@ -115,6 +115,7 @@ struct State {
     audio_sample_counter: u64,
     ik_state: IkState,
     xpbd_state: XpbdState,
+    #[cfg(test)]
     rr_session: Option<rerun::Session>,
     prev_xr_time: xr::Time,
 }
@@ -138,6 +139,7 @@ impl Default for State {
             audio_sample_counter: 0,
             ik_state: Default::default(),
             xpbd_state,
+            #[cfg(test)]
             rr_session: None,
             prev_xr_time: xr::Time::from_nanos(0),
         }
@@ -174,14 +176,6 @@ pub fn real_main() -> HothamResult<()> {
 
     let mut engine = Engine::new();
     let mut state = State::default();
-    match init_rerun_session() {
-        Ok(session) => {
-            state.rr_session = Some(session);
-        }
-        Err(err) => {
-            eprintln!("Failed to init rerun session: {err}");
-        }
-    }
     init(&mut engine, &mut state)?;
 
     while let Ok(tick_data) = engine.update() {
@@ -201,7 +195,12 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
     if tick_data.current_state == xr::SessionState::FOCUSED {
         store_transforms_pre_update_system(engine);
         simulation_reset_system(engine, state);
-        inverse_kinematics_system(engine, &mut state.ik_state, state.rr_session.as_mut());
+        inverse_kinematics_system(
+            engine,
+            &mut state.ik_state,
+            #[cfg(test)]
+            state.rr_session.as_mut(),
+        );
         hands_system(engine);
         ik_selector_system(engine);
         grabbing_system(engine);
@@ -215,6 +214,7 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         update_listener_system(engine, state);
         log_audio_system(state);
 
+        #[cfg(test)]
         if let Some(rr_session) = &state.rr_session {
             if let Ok(xr_time_now) = engine.xr_context.now() {
                 if let Err(err) = send_xr_inputs_state_to_rerun(
@@ -371,6 +371,7 @@ fn xpbd_system(engine: &mut Engine, state: &mut State, time_passed: Duration) {
             &mut state.audio_state,
         );
 
+        #[cfg(test)]
         if let Some(session) = state.rr_session.as_mut() {
             if let Err(err) = send_xpbd_state_to_rerun(
                 &state.xpbd_state,
@@ -494,8 +495,6 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
 
     world.insert(helmet, (collider, Grabbable {})).unwrap();
 }
-
-mod xpbd_mesh;
 
 fn update_listener_system(engine: &mut Engine, state: &mut State) {
     puffin::profile_function!();

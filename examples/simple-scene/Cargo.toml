@@ -23,14 +23,16 @@ lazy_static = "1.4.0"
 nalgebra = { version = "0.32.1", features = ["convert-glam022"] }
 puffin = "0.14.3"
 puffin_http = "0.11.1"
-rerun = { version = "0.5", features = [
-    "glam",
-    "sdk",
-], default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rtrb = "0.2.0"
 triple_buffer = "6.1.0"
+
+[dev-dependencies]
+rerun = { version = "0.5", features = [
+    "glam",
+    "sdk",
+], default-features = false }
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.6"

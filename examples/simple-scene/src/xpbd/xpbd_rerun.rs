@@ -2,7 +2,8 @@ use std::time::Instant;
 
 use hotham::{anyhow, components::Collider, hecs::World};
 
-use crate::{xpbd_state::XpbdState, InterpolatedTransform};
+use super::xpbd_state::XpbdState;
+use crate::InterpolatedTransform;
 
 pub fn init_rerun_session() -> anyhow::Result<rerun::Session> {
     let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());

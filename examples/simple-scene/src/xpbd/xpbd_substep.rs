@@ -2,7 +2,7 @@ use itertools::izip;
 
 use hotham::{glam::DVec3, hecs::World};
 
-use crate::{
+use super::{
     xpbd_collisions::resolve_ecs_collisions,
     xpbd_shape_constraints::{
         damping_of_shape_matching_constraints, resolve_shape_matching_constraints, ShapeConstraint,

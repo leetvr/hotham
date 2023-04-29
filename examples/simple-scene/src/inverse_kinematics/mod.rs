@@ -20,6 +20,7 @@ use hotham::{
 
 use crate::thumbstick_influence::{left_thumbstick_influence, right_thumbstick_influence};
 
+#[cfg(test)]
 mod rr {
     pub use rerun::{
         components::{Box3D, ColorRGBA, Quaternion, Radius, Rigid3, Transform, Vec3D},
@@ -163,7 +164,7 @@ fn model_name_from_node_id(node_id: IkNodeID) -> &'static str {
 pub fn inverse_kinematics_system(
     engine: &mut Engine,
     state: &mut IkState,
-    session: Option<&mut rr::Session>,
+    #[cfg(test)] session: Option<&mut rr::Session>,
 ) {
     puffin::profile_function!();
     let world = &mut engine.world;
@@ -205,6 +206,7 @@ pub fn inverse_kinematics_system(
     }
 
     // Send poses to rerun
+    #[cfg(test)]
     if let Some(session) = session {
         send_poses_to_rerun(
             session,
@@ -232,6 +234,7 @@ fn store_snapshot(state: &IkState, filename: &str) {
     std::fs::write(filename, serialized).expect(&format!("failed to write to '{filename}'"));
 }
 
+#[cfg(test)]
 fn load_snapshot(state: &mut IkState, data: &str) {
     puffin::profile_function!();
     let summary: HashMap<IkNodeID, (Vec3A, Quat)> =
@@ -245,6 +248,7 @@ fn load_snapshot(state: &mut IkState, data: &str) {
     }
 }
 
+#[cfg(test)]
 fn load_snapshot_subset(state: &mut IkState, data: &str, subset: &[IkNodeID]) {
     let summary: HashMap<IkNodeID, (Vec3A, Quat)> =
         serde_json::from_str(data).expect("JSON does not have correct format.");
@@ -263,8 +267,9 @@ fn set_ik_node_from_affine(state: &mut IkState, node_id: &IkNodeID, node_in_stag
     state.node_rotations[*node_id as usize] = rot;
 }
 
+#[cfg(test)]
 fn send_poses_to_rerun(
-    session: &rerun::Session,
+    #[cfg(test)] session: &rerun::Session,
     state: &IkState,
     shoulder_width: f32,
     sternum_height_in_torso: f32,

@@ -5,7 +5,7 @@ use hotham::{
     glam::{dvec3, DVec3},
 };
 
-use crate::xpbd_shape_constraints::{create_points, create_shape_constraints, ShapeConstraint};
+use super::xpbd_shape_constraints::{create_points, create_shape_constraints, ShapeConstraint};
 
 pub struct XpbdState {
     pub points_curr: Vec<DVec3>,
