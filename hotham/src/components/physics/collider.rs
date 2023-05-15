@@ -55,6 +55,18 @@ impl Collider {
             ..Default::default()
         }
     }
+
+    /// Create a new sensor collider
+    pub fn sensor(shape: SharedShape) -> Collider {
+        Collider {
+            shape,
+            sensor: true,
+            collision_groups: u32::MAX,
+            active_collision_types: ActiveCollisionTypes::all(),
+            collision_filter: u32::MAX,
+            ..Default::default()
+        }
+    }
 }
 
 impl Default for Collider {
@@ -69,7 +81,7 @@ impl Default for Collider {
             offset_from_parent: Default::default(),
             restitution: 0.5,
             mass: 0.,
-            friction: 0.5
+            friction: 0.5,
         }
     }
 }
