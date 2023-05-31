@@ -1,7 +1,6 @@
 use hotham::{
     asset_importer::add_model_to_world,
     components::{hand::Handedness, LocalTransform, Stage},
-    contexts::InputContext,
     glam::{vec3, Affine3A, Quat, Vec3},
     hecs::World,
     Engine,
