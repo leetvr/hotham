@@ -7,8 +7,28 @@ use crate::utils::lerp32;
 
 use super::{
     constraints::*, left_thumbstick_influence, right_thumbstick_influence, set_ik_node_from_affine,
-    IkNodeID, IkState, WeightDistribution,
+    BodyParameters, IkNodeID, IkState, WeightDistribution,
 };
+
+pub fn get_body_parameters() -> BodyParameters {
+    BodyParameters {
+        lower_arm_length: tweak!(0.28),
+        upper_arm_length: tweak!(0.28),
+        collarbone_length: tweak!(0.17),
+        shoulder_width: tweak!(0.40),
+        sternum_width: tweak!(0.06),
+        hip_width: tweak!(0.26),
+        sternum_height_in_torso: tweak!(0.20),
+        neck_root_height_in_torso: tweak!(0.22),
+        lower_back_height_in_torso: tweak!(-0.20),
+        lower_back_height_in_pelvis: tweak!(0.10),
+        hip_height_in_pelvis: tweak!(-0.07),
+        upper_leg_length: tweak!(0.40),
+        lower_leg_length: tweak!(0.40),
+        ankle_height: tweak!(0.10),
+        foot_height: tweak!(0.05),
+    }
+}
 
 pub fn solve_ik(
     hmd_in_stage: Affine3A,
@@ -18,9 +38,26 @@ pub fn solve_ik(
     right_aim_in_stage: Affine3A,
     left_thumbstick: Vec2,
     right_thumbstick: Vec2,
+    body_parameters: &BodyParameters,
     state: &mut IkState,
-) -> (f32, f32, f32, f32) {
+) {
     puffin::profile_function!();
+    let lower_arm_length = body_parameters.lower_arm_length;
+    let upper_arm_length = body_parameters.upper_arm_length;
+    let collarbone_length = body_parameters.collarbone_length;
+    let shoulder_width = body_parameters.shoulder_width;
+    let sternum_width = body_parameters.sternum_width;
+    let hip_width = body_parameters.hip_width;
+    let sternum_height_in_torso = body_parameters.sternum_height_in_torso;
+    let neck_root_height_in_torso = body_parameters.neck_root_height_in_torso;
+    let lower_back_height_in_torso = body_parameters.lower_back_height_in_torso;
+    let lower_back_height_in_pelvis = body_parameters.lower_back_height_in_pelvis;
+    let hip_height_in_pelvis = body_parameters.hip_height_in_pelvis;
+    let upper_leg_length = body_parameters.upper_leg_length;
+    let lower_leg_length = body_parameters.lower_leg_length;
+    let ankle_height = body_parameters.ankle_height;
+    let foot_height = body_parameters.foot_height;
+
     // Fixed transforms and parameters
     let head_center_in_hmd = Affine3A::from_translation(vec3(0.0, tweak!(0.0), tweak!(0.10)));
     let neck_root_in_head_center = Affine3A::from_translation(vec3(0.0, tweak!(-0.1), tweak!(0.0)));
@@ -28,21 +65,6 @@ pub fn solve_ik(
         Affine3A::from_translation(vec3(tweak!(-0.015), tweak!(-0.01), tweak!(0.065)));
     let right_wrist_in_palm =
         Affine3A::from_translation((left_wrist_in_palm.translation * vec3a(-1.0, 1.0, 1.0)).into());
-    let lower_arm_length = tweak!(0.28);
-    let upper_arm_length = tweak!(0.28);
-    let collarbone_length = tweak!(0.17);
-    let shoulder_width = tweak!(0.40);
-    let sternum_width = tweak!(0.06);
-    let hip_width = tweak!(0.26);
-    let sternum_height_in_torso = tweak!(0.20);
-    let neck_root_height_in_torso = tweak!(0.22);
-    let lower_back_height_in_torso = tweak!(-0.20);
-    let lower_back_height_in_pelvis = tweak!(0.10);
-    let hip_height_in_pelvis = tweak!(-0.07);
-    let upper_leg_length = tweak!(0.40);
-    let lower_leg_length = tweak!(0.40);
-    let ankle_height = tweak!(0.10);
-    let foot_height = tweak!(0.05);
     let wrist_in_lower_arm = vec3a(0.0, 0.0, -lower_arm_length / 2.0);
     let elbow_in_lower_arm = vec3a(0.0, 0.0, lower_arm_length / 2.0);
     let elbow_in_upper_arm = vec3a(0.0, 0.0, -upper_arm_length / 2.0);
@@ -826,12 +848,6 @@ pub fn solve_ik(
             .normalize();
         }
     }
-    (
-        shoulder_width,
-        hip_width,
-        sternum_height_in_torso,
-        hip_height_in_pelvis,
-    )
 }
 
 #[test]

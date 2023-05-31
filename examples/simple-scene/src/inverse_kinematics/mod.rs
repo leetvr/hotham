@@ -18,7 +18,10 @@ use hotham::{
     Engine,
 };
 
-use crate::thumbstick_influence::{left_thumbstick_influence, right_thumbstick_influence};
+use crate::{
+    inverse_kinematics::solve::get_body_parameters,
+    thumbstick_influence::{left_thumbstick_influence, right_thumbstick_influence},
+};
 
 #[cfg(test)]
 mod rr {
@@ -27,6 +30,24 @@ mod rr {
         time::{Time, TimeType, Timeline},
         MsgSender, Session,
     };
+}
+
+pub struct BodyParameters {
+    pub lower_arm_length: f32,
+    pub upper_arm_length: f32,
+    pub collarbone_length: f32,
+    pub shoulder_width: f32,
+    pub sternum_width: f32,
+    pub hip_width: f32,
+    pub sternum_height_in_torso: f32,
+    pub neck_root_height_in_torso: f32,
+    pub lower_back_height_in_torso: f32,
+    pub lower_back_height_in_pelvis: f32,
+    pub hip_height_in_pelvis: f32,
+    pub upper_leg_length: f32,
+    pub lower_leg_length: f32,
+    pub ankle_height: f32,
+    pub foot_height: f32,
 }
 
 #[derive(Copy, Clone, Eq, Hash, Debug, PartialEq, Sequence, Deserialize, Serialize)]
@@ -160,7 +181,8 @@ pub fn inverse_kinematics_system(
     puffin::profile_function!();
     let world = &mut engine.world;
     let input_context = &engine.input_context;
-    let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
+    let body_parameters = get_body_parameters();
+    solve_ik(
         input_context.hmd.hmd_in_stage(),
         input_context.left.stage_from_grip(),
         input_context.left.stage_from_aim(),
@@ -168,6 +190,7 @@ pub fn inverse_kinematics_system(
         input_context.right.stage_from_aim(),
         input_context.left.thumbstick_xy(),
         input_context.right.thumbstick_xy(),
+        &body_parameters,
         state,
     );
 
@@ -199,14 +222,7 @@ pub fn inverse_kinematics_system(
     // Send poses to rerun
     #[cfg(test)]
     if let Some(session) = session {
-        send_poses_to_rerun(
-            session,
-            state,
-            shoulder_width,
-            sternum_height_in_torso,
-            hip_width,
-            hip_height_in_pelvis,
-        );
+        send_poses_to_rerun(session, state, &body_parameters);
     }
 }
 
@@ -262,12 +278,13 @@ fn set_ik_node_from_affine(state: &mut IkState, node_id: &IkNodeID, node_in_stag
 fn send_poses_to_rerun(
     #[cfg(test)] session: &rerun::Session,
     state: &IkState,
-    shoulder_width: f32,
-    sternum_height_in_torso: f32,
-    hip_width: f32,
-    hip_height_in_pelvis: f32,
+    body_parameters: &BodyParameters,
 ) {
     puffin::profile_function!();
+    let shoulder_width = body_parameters.shoulder_width;
+    let sternum_height_in_torso = body_parameters.sternum_height_in_torso;
+    let hip_width = body_parameters.hip_width;
+    let hip_height_in_pelvis = body_parameters.hip_height_in_pelvis;
     let radius = rr::Radius(0.001);
     let log_fn = || -> hotham::anyhow::Result<()> {
         for node_id in all::<IkNodeID>() {

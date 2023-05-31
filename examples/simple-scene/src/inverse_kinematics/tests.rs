@@ -4,6 +4,8 @@ use std::sync::{atomic::AtomicIsize, Mutex};
 
 use hotham::glam::{vec2, Affine3A, Vec2};
 
+use crate::inverse_kinematics::solve::get_body_parameters;
+
 use super::{
     load_snapshot, load_snapshot_subset, send_poses_to_rerun, solve_ik, IkNodeID, IkState,
 };
@@ -130,8 +132,9 @@ fn test_ik_solver(
     let mut state = IkState::default();
     load_snapshot(&mut state, data);
     let (left_thumbstick, right_thumbstick) = thumbsticks.unwrap_or((Vec2::ZERO, Vec2::ZERO));
+    let body_parameters = get_body_parameters();
     for _ in 0..100 {
-        let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
+        solve_ik(
             state.get_affine(IkNodeID::Hmd),
             state.get_affine(IkNodeID::LeftGrip),
             state.get_affine(IkNodeID::LeftAim),
@@ -139,17 +142,11 @@ fn test_ik_solver(
             state.get_affine(IkNodeID::RightAim),
             left_thumbstick,
             right_thumbstick,
+            &body_parameters,
             &mut state,
         );
 
-        send_poses_to_rerun(
-            &session,
-            &state,
-            shoulder_width,
-            sternum_height_in_torso,
-            hip_width,
-            hip_height_in_pelvis,
-        );
+        send_poses_to_rerun(&session, &state, &body_parameters);
     }
     Ok(())
 }
@@ -175,9 +172,9 @@ fn test_ik_solver_transition(
     load_snapshot(&mut state, data1);
 
     let (left_thumbstick1, right_thumbstick1) = thumbsticks1.unwrap_or((Vec2::ZERO, Vec2::ZERO));
-
+    let body_parameters = get_body_parameters();
     for _ in 0..100 {
-        let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
+        solve_ik(
             state.get_affine(IkNodeID::Hmd),
             state.get_affine(IkNodeID::LeftGrip),
             state.get_affine(IkNodeID::LeftAim),
@@ -185,17 +182,11 @@ fn test_ik_solver_transition(
             state.get_affine(IkNodeID::RightAim),
             left_thumbstick1,
             right_thumbstick1,
+            &body_parameters,
             &mut state,
         );
 
-        send_poses_to_rerun(
-            &session,
-            &state,
-            shoulder_width,
-            sternum_height_in_torso,
-            hip_width,
-            hip_height_in_pelvis,
-        );
+        send_poses_to_rerun(&session, &state, &body_parameters);
     }
 
     load_snapshot_subset(
@@ -211,10 +202,10 @@ fn test_ik_solver_transition(
     );
 
     let (left_thumbstick2, right_thumbstick2) = thumbsticks2.unwrap_or((Vec2::ZERO, Vec2::ZERO));
-
+    let body_parameters = get_body_parameters();
     for i in 0..100 {
         let t = (i as f32 / 50.0).min(1.0);
-        let (shoulder_width, hip_width, sternum_height_in_torso, hip_height_in_pelvis) = solve_ik(
+        solve_ik(
             state.get_affine(IkNodeID::Hmd),
             state.get_affine(IkNodeID::LeftGrip),
             state.get_affine(IkNodeID::LeftAim),
@@ -222,17 +213,11 @@ fn test_ik_solver_transition(
             state.get_affine(IkNodeID::RightAim),
             left_thumbstick1.slerp(left_thumbstick2, t),
             right_thumbstick1.slerp(right_thumbstick2, t),
+            &body_parameters,
             &mut state,
         );
 
-        send_poses_to_rerun(
-            &session,
-            &state,
-            shoulder_width,
-            sternum_height_in_torso,
-            hip_width,
-            hip_height_in_pelvis,
-        );
+        send_poses_to_rerun(&session, &state, &body_parameters);
     }
 
     Ok(())
