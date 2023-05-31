@@ -5,26 +5,6 @@ use hotham::{anyhow, components::Collider, hecs::World};
 use super::xpbd_state::XpbdState;
 use crate::InterpolatedTransform;
 
-pub fn init_rerun_session() -> anyhow::Result<rerun::Session> {
-    let session = rerun::SessionBuilder::new("XPBD").connect(rerun::default_server_addr());
-    rerun::MsgSender::new("world")
-        .with_timeless(true)
-        .with_splat(rerun::components::ViewCoordinates::from_up_and_handedness(
-            rerun::coordinates::SignedAxis3::POSITIVE_Y,
-            rerun::coordinates::Handedness::Right,
-        ))?
-        .send(&session)?;
-    rerun::MsgSender::new("stage")
-        .with_timeless(true)
-        .with_splat(rerun::components::ViewCoordinates::from_up_and_handedness(
-            rerun::coordinates::SignedAxis3::POSITIVE_Y,
-            rerun::coordinates::Handedness::Right,
-        ))?
-        .send(&session)?;
-    session.sink().drop_msgs_if_disconnected();
-    Ok(session)
-}
-
 pub fn send_xpbd_state_to_rerun(
     xpbd_state: &XpbdState,
     session: &rerun::Session,
