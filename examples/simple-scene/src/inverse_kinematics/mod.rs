@@ -78,15 +78,6 @@ pub struct IkState {
     pub node_rotations: [Quat; cardinality::<IkNodeID>()],
 }
 
-impl IkState {
-    fn get_affine(&self, node_id: IkNodeID) -> Affine3A {
-        Affine3A::from_rotation_translation(
-            self.node_rotations[node_id as usize],
-            self.node_positions[node_id as usize].into(),
-        )
-    }
-}
-
 #[derive(Clone, Copy)]
 pub enum WeightDistribution {
     LeftPlanted,

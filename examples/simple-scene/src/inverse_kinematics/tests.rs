@@ -2,7 +2,7 @@ use lazy_static::*;
 use std::f32::consts::FRAC_1_SQRT_2;
 use std::sync::{atomic::AtomicIsize, Mutex};
 
-use hotham::glam::{vec2, Vec2};
+use hotham::glam::{vec2, Affine3A, Vec2};
 
 use super::{
     load_snapshot, load_snapshot_subset, send_poses_to_rerun, solve_ik, IkNodeID, IkState,
@@ -96,6 +96,19 @@ impl Slerp for Vec2 {
         let a_factor = (theta * (1.0 - t)).sin() * inv_sin_theta;
         let b_factor = (theta * t).sin() * inv_sin_theta;
         self * a_factor + b * b_factor
+    }
+}
+
+trait GetAffine {
+    fn get_affine(&self, node_id: IkNodeID) -> Affine3A;
+}
+
+impl GetAffine for IkState {
+    fn get_affine(&self, node_id: IkNodeID) -> Affine3A {
+        Affine3A::from_rotation_translation(
+            self.node_rotations[node_id as usize],
+            self.node_positions[node_id as usize].into(),
+        )
     }
 }
 
