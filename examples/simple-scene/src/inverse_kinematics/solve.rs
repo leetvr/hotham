@@ -1,13 +1,13 @@
 use std::f32::consts::{FRAC_1_SQRT_2, FRAC_PI_2, FRAC_PI_4, PI, TAU};
 
-use hotham::glam::{vec3, vec3a, Affine3A, Quat, Vec2, Vec3, Vec3A, Vec4};
+use hotham::glam::{vec3, vec3a, Affine3A, Quat, Vec3, Vec3A, Vec4};
 use inline_tweak::tweak;
 
 use crate::utils::lerp32;
 
 use super::{
     constraints::*, left_thumbstick_influence, right_thumbstick_influence, set_ik_node_from_affine,
-    BodyParameters, IkNodeID, IkState, WeightDistribution,
+    BodyParameters, IkInputs, IkNodeID, IkState, WeightDistribution,
 };
 
 pub fn get_body_parameters() -> BodyParameters {
@@ -31,13 +31,15 @@ pub fn get_body_parameters() -> BodyParameters {
 }
 
 pub fn solve_ik(
-    hmd_in_stage: Affine3A,
-    left_grip_in_stage: Affine3A,
-    left_aim_in_stage: Affine3A,
-    right_grip_in_stage: Affine3A,
-    right_aim_in_stage: Affine3A,
-    left_thumbstick: Vec2,
-    right_thumbstick: Vec2,
+    IkInputs {
+        hmd_in_stage,
+        left_grip_in_stage,
+        left_aim_in_stage,
+        right_grip_in_stage,
+        right_aim_in_stage,
+        left_thumbstick,
+        right_thumbstick,
+    }: IkInputs,
     body_parameters: &BodyParameters,
     state: &mut IkState,
 ) {

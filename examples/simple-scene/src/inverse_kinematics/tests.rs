@@ -5,6 +5,7 @@ use std::sync::{atomic::AtomicIsize, Mutex};
 use hotham::glam::{vec2, Affine3A, Vec2};
 
 use crate::inverse_kinematics::solve::get_body_parameters;
+use crate::inverse_kinematics::IkInputs;
 
 use super::{
     load_snapshot, load_snapshot_subset, send_poses_to_rerun, solve_ik, IkNodeID, IkState,
@@ -135,13 +136,15 @@ fn test_ik_solver(
     let body_parameters = get_body_parameters();
     for _ in 0..100 {
         solve_ik(
-            state.get_affine(IkNodeID::Hmd),
-            state.get_affine(IkNodeID::LeftGrip),
-            state.get_affine(IkNodeID::LeftAim),
-            state.get_affine(IkNodeID::RightGrip),
-            state.get_affine(IkNodeID::RightAim),
-            left_thumbstick,
-            right_thumbstick,
+            IkInputs {
+                hmd_in_stage: state.get_affine(IkNodeID::Hmd),
+                left_grip_in_stage: state.get_affine(IkNodeID::LeftGrip),
+                left_aim_in_stage: state.get_affine(IkNodeID::LeftAim),
+                right_grip_in_stage: state.get_affine(IkNodeID::RightGrip),
+                right_aim_in_stage: state.get_affine(IkNodeID::RightAim),
+                left_thumbstick,
+                right_thumbstick,
+            },
             &body_parameters,
             &mut state,
         );
@@ -175,13 +178,15 @@ fn test_ik_solver_transition(
     let body_parameters = get_body_parameters();
     for _ in 0..100 {
         solve_ik(
-            state.get_affine(IkNodeID::Hmd),
-            state.get_affine(IkNodeID::LeftGrip),
-            state.get_affine(IkNodeID::LeftAim),
-            state.get_affine(IkNodeID::RightGrip),
-            state.get_affine(IkNodeID::RightAim),
-            left_thumbstick1,
-            right_thumbstick1,
+            IkInputs {
+                hmd_in_stage: state.get_affine(IkNodeID::Hmd),
+                left_grip_in_stage: state.get_affine(IkNodeID::LeftGrip),
+                left_aim_in_stage: state.get_affine(IkNodeID::LeftAim),
+                right_grip_in_stage: state.get_affine(IkNodeID::RightGrip),
+                right_aim_in_stage: state.get_affine(IkNodeID::RightAim),
+                left_thumbstick: left_thumbstick1,
+                right_thumbstick: right_thumbstick1,
+            },
             &body_parameters,
             &mut state,
         );
@@ -206,13 +211,15 @@ fn test_ik_solver_transition(
     for i in 0..100 {
         let t = (i as f32 / 50.0).min(1.0);
         solve_ik(
-            state.get_affine(IkNodeID::Hmd),
-            state.get_affine(IkNodeID::LeftGrip),
-            state.get_affine(IkNodeID::LeftAim),
-            state.get_affine(IkNodeID::RightGrip),
-            state.get_affine(IkNodeID::RightAim),
-            left_thumbstick1.slerp(left_thumbstick2, t),
-            right_thumbstick1.slerp(right_thumbstick2, t),
+            IkInputs {
+                hmd_in_stage: state.get_affine(IkNodeID::Hmd),
+                left_grip_in_stage: state.get_affine(IkNodeID::LeftGrip),
+                left_aim_in_stage: state.get_affine(IkNodeID::LeftAim),
+                right_grip_in_stage: state.get_affine(IkNodeID::RightGrip),
+                right_aim_in_stage: state.get_affine(IkNodeID::RightAim),
+                left_thumbstick: left_thumbstick1.slerp(left_thumbstick2, t),
+                right_thumbstick: right_thumbstick1.slerp(right_thumbstick2, t),
+            },
             &body_parameters,
             &mut state,
         );

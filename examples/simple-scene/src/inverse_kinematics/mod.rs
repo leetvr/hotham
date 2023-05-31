@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use hotham::{
     asset_importer::add_model_to_world,
     components::{physics::SharedShape, Collider, LocalTransform, Stage},
-    glam::{Affine3A, Quat, Vec3A},
+    glam::{Affine3A, Quat, Vec2, Vec3A},
     hecs::World,
     Engine,
 };
@@ -30,6 +30,16 @@ mod rr {
         time::{Time, TimeType, Timeline},
         MsgSender, Session,
     };
+}
+
+pub struct IkInputs {
+    pub hmd_in_stage: Affine3A,
+    pub left_grip_in_stage: Affine3A,
+    pub left_aim_in_stage: Affine3A,
+    pub right_grip_in_stage: Affine3A,
+    pub right_aim_in_stage: Affine3A,
+    pub left_thumbstick: Vec2,
+    pub right_thumbstick: Vec2,
 }
 
 pub struct BodyParameters {
@@ -183,13 +193,15 @@ pub fn inverse_kinematics_system(
     let input_context = &engine.input_context;
     let body_parameters = get_body_parameters();
     solve_ik(
-        input_context.hmd.hmd_in_stage(),
-        input_context.left.stage_from_grip(),
-        input_context.left.stage_from_aim(),
-        input_context.right.stage_from_grip(),
-        input_context.right.stage_from_aim(),
-        input_context.left.thumbstick_xy(),
-        input_context.right.thumbstick_xy(),
+        IkInputs {
+            hmd_in_stage: input_context.hmd.hmd_in_stage(),
+            left_grip_in_stage: input_context.left.stage_from_grip(),
+            left_aim_in_stage: input_context.left.stage_from_aim(),
+            right_grip_in_stage: input_context.right.stage_from_grip(),
+            right_aim_in_stage: input_context.right.stage_from_aim(),
+            left_thumbstick: input_context.left.thumbstick_xy(),
+            right_thumbstick: input_context.right.thumbstick_xy(),
+        },
         &body_parameters,
         state,
     );
