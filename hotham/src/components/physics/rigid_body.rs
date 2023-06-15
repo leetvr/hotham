@@ -1,6 +1,6 @@
 use rapier3d::prelude::RigidBodyType as RapierBodyType;
 
-/// A component used to synchronise this entity's position in the game simulation with the physics simulation.
+/// A component used to synchronize this entity's position in the game simulation with the physics simulation.
 ///
 /// You can indicate to [`crate::systems::physics_system`] how you'd like this entity to be treated by changing the `body_type` field
 /// . Setting the `body_type` to [`BodyType::Dynamic`] will result in the entity having its [`crate::components::GlobalTransform`]
