@@ -25,13 +25,11 @@ let
   };
 in
 pkgs.mkShell rec {
-  ANDROID_SDK_ROOT = "${androidComposition.androidsdk}/libexec/android-sdk";
-  ANDROID_NDK_ROOT = "${ANDROID_SDK_ROOT}/ndk-bundle";
-
   buildInputs = with pkgs; [
     rustup ninja cmake
     openssl pkg-config
-    cargo-apk
+
+    cargo-apk adoptopenjdk-bin
 
     shaderc
     vulkan-headers vulkan-loader
@@ -47,9 +45,19 @@ pkgs.mkShell rec {
     renderdoc
   ];
 
+  # the nixpkgs manual lists that ANDROID_HOME is outdated and ANDROID_SDK_ROOT should be used instead
+  # when actually running the android tools, they say the opposite, ANDROID_SDK_ROOT being outdated
+  # so I just set both
+  ANDROID_SDK_ROOT = "${androidComposition.androidsdk}/libexec/android-sdk";
+  ANDROID_HOME = ANDROID_SDK_ROOT;
+  ANDROID_NDK_ROOT = "${ANDROID_SDK_ROOT}/ndk-bundle";
+
   shellHook = ''
     export PATH="$(echo "$ANDROID_SDK_ROOT/cmake/${cmakeVersion}".*/bin):$PATH"
     export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:${builtins.toString (pkgs.lib.makeLibraryPath buildInputs)}";
     export XR_RUNTIME_JSON="${builtins.toFile "hotham-openxr-runtime.json" (builtins.toJSON openXrDropin)}"
+
+    rustup default 1.67 # required due to libunwind having fun
+    rustup target add aarch64-linux-android
   '';
 }
