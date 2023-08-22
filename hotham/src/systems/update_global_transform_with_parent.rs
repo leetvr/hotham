@@ -1,11 +1,8 @@
-use std::collections::HashMap;
-
 use crate::{
     components::{GlobalTransform, Parent},
     Engine,
 };
-use glam::Affine3A;
-use hecs::{Entity, Without, World};
+use hecs::World;
 
 /// Update global transform with parent transform system
 /// Walks through each entity that has a Parent and builds a hierarchy
@@ -16,34 +13,34 @@ pub fn update_global_transform_with_parent_system(engine: &mut Engine) {
 }
 
 pub(crate) fn update_global_transform_with_parent_system_inner(world: &mut World) {
-    // Build hierarchy
-    let mut hierarchy: HashMap<Entity, Vec<Entity>> = HashMap::new();
-    for (entity, parent) in world.query_mut::<&Parent>() {
-        let children = hierarchy.entry(parent.0).or_default();
-        children.push(entity);
-    }
+    // Construct a view for efficient random access into the set of all entities that have
+    // parents. Views allow work like dynamic borrow checking or component storage look-up to be
+    // done once rather than per-entity as in `World::get`.
+    let mut parents = world.query::<&Parent>();
+    let parents = parents.view();
 
-    let mut roots = world.query::<Without<&GlobalTransform, &Parent>>();
-    for (root, root_matrix) in roots.iter() {
-        update_global_transforms_recursively(&root_matrix.0, root, &hierarchy, world);
-    }
-}
+    // View of entities that don't have parents, i.e. roots of the transform hierarchy
+    let mut roots = world.query::<&GlobalTransform>().without::<&Parent>();
+    let roots = roots.view();
 
-fn update_global_transforms_recursively(
-    parent_matrix: &Affine3A,
-    entity: Entity,
-    hierarchy: &HashMap<Entity, Vec<Entity>>,
-    world: &World,
-) {
-    if let Some(children) = hierarchy.get(&entity) {
-        for child in children {
-            {
-                let child_matrix = &mut world.get::<&mut GlobalTransform>(*child).unwrap().0;
-                *child_matrix = *parent_matrix * *child_matrix;
-            }
-            let child_matrix = world.get::<&GlobalTransform>(*child).unwrap().0;
-            update_global_transforms_recursively(&child_matrix, *child, hierarchy, world);
+    // This query can coexist with the `roots` view without illegal aliasing of `GlobalTransform`
+    // references because the inclusion of `&Parent` in the query, and its exclusion from the view,
+    // guarantees that they will never overlap. Similarly, it can coexist with `parents` because
+    // that view does not reference `GlobalTransform`s at all.
+    for (_entity, (parent, absolute)) in world.query::<(&Parent, &mut GlobalTransform)>().iter() {
+        // Walk the hierarchy from this entity to the root, accumulating the entity's absolute
+        // transform. This does a small amount of redundant work for intermediate levels of deeper
+        // hierarchies, but unlike a top-down traversal, avoids tracking entity child lists and is
+        // cache-friendly.
+        let mut relative = parent.from_child;
+        let mut ancestor = parent.entity;
+        while let Some(next) = parents.get(ancestor) {
+            relative = next.from_child * relative;
+            ancestor = next.entity;
         }
+        // The `while` loop terminates when `ancestor` cannot be found in `parents`, i.e. when it
+        // does not have a `Parent` component, and is therefore necessarily a root.
+        absolute.0 = roots.get(ancestor).unwrap().0 * relative;
     }
 }
 
@@ -53,22 +50,35 @@ mod tests {
 
     use approx::{assert_relative_eq, relative_eq};
     use glam::Affine3A;
+    use hecs::Entity;
 
     use crate::{
-        components::{Info, LocalTransform},
-        systems::update_global_transform::update_global_transform_system_inner,
+        components::Info, systems::update_global_transform::update_global_transform_system_inner,
     };
 
     use super::*;
     #[test]
     pub fn test_transform_system() {
         let mut world = World::new();
-        let parent_global_transform =
+        let global_transform =
             GlobalTransform(Affine3A::from_translation([1.0, 1.0, 100.0].into()));
+        let from_child = Affine3A::from_translation([1.0, 1.0, 100.0].into());
 
-        let parent = world.spawn((parent_global_transform,));
-        let child = world.spawn((parent_global_transform, Parent(parent)));
-        let grandchild = world.spawn((parent_global_transform, Parent(child)));
+        let parent = world.spawn((global_transform,));
+        let child = world.spawn((
+            global_transform,
+            Parent {
+                entity: parent,
+                from_child,
+            },
+        ));
+        let grandchild = world.spawn((
+            global_transform,
+            Parent {
+                entity: child,
+                from_child,
+            },
+        ));
 
         tick(&mut world);
 
@@ -105,19 +115,19 @@ mod tests {
                 name: format!("Node {n}"),
                 node_id: n,
             };
-            let local_transform = LocalTransform {
-                translation: [1.0, 1.0, 1.0].into(),
-                ..Default::default()
-            };
-            let matrix = GlobalTransform::default();
-            let entity = world.spawn((info, local_transform, matrix));
+            let global_transform =
+                GlobalTransform(Affine3A::from_translation([1.0, 1.0, 1.0].into()));
+            let entity = world.spawn((info, global_transform));
             node_entity.insert(n, entity);
             entity_node.insert(entity, n);
         }
 
         for (parent, children) in hierarchy.iter() {
             let parent_entity = node_entity.get(parent).unwrap();
-            let parent = Parent(*parent_entity);
+            let parent = Parent {
+                entity: *parent_entity,
+                from_child: Affine3A::from_translation([1.0, 1.0, 1.0].into()),
+            };
             for node_id in children {
                 let entity = node_entity.get(node_id).unwrap();
                 world.insert_one(*entity, parent).unwrap();
@@ -126,8 +136,8 @@ mod tests {
 
         let root_entity = node_entity.get(&0).unwrap();
         {
-            let mut local_transform = world.get::<&mut LocalTransform>(*root_entity).unwrap();
-            local_transform.translation = [100.0, 100.0, 100.0].into();
+            let mut global_transform = world.get::<&mut GlobalTransform>(*root_entity).unwrap();
+            global_transform.0.translation = [100.0, 100.0, 100.0].into();
         }
         tick(&mut world);
 
@@ -136,7 +146,7 @@ mod tests {
         {
             let mut depth = 1;
 
-            let mut parent_entity = parent.0;
+            let mut parent_entity = parent.entity;
             let mut parent_matrices = vec![];
             loop {
                 let parent_global_transform = world.get::<&GlobalTransform>(parent_entity).unwrap();
@@ -145,7 +155,7 @@ mod tests {
                 // Walk up the tree until we find the root.
                 if let Ok(grand_parent) = world.get::<&Parent>(parent_entity) {
                     depth += 1;
-                    parent_entity = grand_parent.0;
+                    parent_entity = grand_parent.entity;
                 } else {
                     let expected_matrix = get_expected_matrix(depth);
                     if !relative_eq!(expected_matrix, global_transform.0) {

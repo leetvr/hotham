@@ -124,8 +124,10 @@ fn create_tracking_entities(world: &mut hecs::World) -> (hecs::Entity, hecs::Ent
     ));
     let hmd_entity = world.spawn((
         HMD {},
-        Parent(stage_entity),
-        LocalTransform::default(),
+        Parent {
+            entity: stage_entity,
+            from_child: Default::default(),
+        },
         GlobalTransform::default(),
     ));
     (stage_entity, hmd_entity)
@@ -401,7 +403,7 @@ fn despawn_children(
     command_buffer: &mut hecs::CommandBuffer,
 ) {
     for (child, p) in world.query::<&Parent>().iter() {
-        if p.0 == parent {
+        if p.entity == parent {
             command_buffer.despawn(child);
             despawn_children(world, child, command_buffer);
         }

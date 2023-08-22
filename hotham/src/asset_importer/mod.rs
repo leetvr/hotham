@@ -408,7 +408,7 @@ fn get_shape_from_mesh(
 
 /// Recursively walk through this node's hierarchy and connect child nodes to their parents by adding a [`Parent`] component.
 ///
-/// **NOTE**: We only support very minimal parent -> child inheritance. At present only visibilty and transforms
+/// **NOTE**: We only support very minimal parent -> child inheritance. At present only visibility and transforms
 ///       are inherited.
 fn build_node_hierarchy(
     node_data: &gltf::Node,
@@ -416,7 +416,10 @@ fn build_node_hierarchy(
     node_entity_map: &mut HashMap<usize, Entity>,
 ) {
     let this_entity = node_entity_map.get(&node_data.index()).unwrap();
-    let parent = Parent(*this_entity);
+    let parent = Parent {
+        entity: *this_entity,
+        from_child: Default::default(),
+    };
     for child_node in node_data.children() {
         let child_id = child_node.index();
         let child_entity = node_entity_map.get(&child_id).unwrap();
@@ -487,9 +490,15 @@ pub fn add_model_to_world(
 
         // If the source entity had a parent, set it to the corresponding entity in the destination world.
         if let Some(parent) = source_entity.get::<&Parent>() {
-            let new_parent = entity_map.get(&parent.0).unwrap();
+            let new_parent = entity_map.get(&parent.entity).unwrap();
             destination_world
-                .insert_one(*destination_entity, Parent(*new_parent))
+                .insert_one(
+                    *destination_entity,
+                    Parent {
+                        entity: *new_parent,
+                        from_child: Default::default(),
+                    },
+                )
                 .unwrap();
         }
 
@@ -502,7 +511,13 @@ pub fn add_model_to_world(
             // TODO: Is this necessary?
             if let Some(parent) = parent {
                 destination_world
-                    .insert_one(*destination_entity, Parent(parent))
+                    .insert_one(
+                        *destination_entity,
+                        Parent {
+                            entity: parent,
+                            from_child: Default::default(),
+                        },
+                    )
                     .unwrap();
             }
         }
@@ -683,7 +698,7 @@ mod tests {
             let mut transforms_with_parents = world.query::<(&LocalTransform, &Parent)>();
             assert_eq!(transforms_with_parents.iter().len(), 26);
             for (_, (_, parent)) in transforms_with_parents.iter() {
-                assert!(world.contains(parent.0));
+                assert!(world.contains(parent.entity));
             }
         }
 

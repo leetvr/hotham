@@ -7,9 +7,9 @@ pub mod systems;
 
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{GlobalTransform, LocalTransform, Mesh, Visible},
+    components::{GlobalTransform, Mesh, Visible},
     contexts::RenderContext,
-    glam::{EulerRot, Quat, Vec3},
+    glam::{vec3, Affine3A, EulerRot, Quat, Vec3},
     hecs::{With, World},
     rendering::{
         light::Light,
@@ -153,8 +153,8 @@ fn init(engine: &mut Engine, test: &StressTest) -> HashMap<String, World> {
             for _ in 0..20 {
                 let e = add_model_to_world("Damaged Helmet", &models, world, None)
                     .expect("Could not find cube?");
-                let mut t = world.get::<&mut LocalTransform>(e).unwrap();
-                t.rotation = Quat::from_axis_angle(Vec3::X, std::f32::consts::FRAC_PI_2);
+                let mut t = world.get::<&mut GlobalTransform>(e).unwrap();
+                t.0 = Affine3A::from_axis_angle(Vec3::X, std::f32::consts::FRAC_PI_2);
             }
             models
         }
@@ -290,18 +290,23 @@ fn model_system(
 }
 
 fn rotate_models(world: &mut World, total_time: f32) {
-    for (_, local_transform) in world.query_mut::<With<&mut LocalTransform, &Mesh>>() {
-        local_transform.rotation = Quat::from_euler(
-            EulerRot::XYZ,
-            90.0_f32.to_radians(),
-            total_time.sin() * 2.,
-            0.,
+    for (_, global_transform) in world.query_mut::<With<&mut GlobalTransform, &Mesh>>() {
+        let (scale, _, translation) = global_transform.to_scale_rotation_translation();
+        global_transform.0 = Affine3A::from_scale_rotation_translation(
+            scale,
+            Quat::from_euler(
+                EulerRot::XYZ,
+                90.0_f32.to_radians(),
+                total_time.sin() * 2.,
+                0.,
+            ),
+            translation,
         );
     }
 }
 
 fn rearrange_models(world: &mut World) {
-    let query = world.query_mut::<With<&mut LocalTransform, &Mesh>>();
+    let query = world.query_mut::<With<&mut GlobalTransform, &Mesh>>();
     let query_iter = query.into_iter();
     let num_models = query_iter.len() as f32;
 
@@ -311,17 +316,17 @@ fn rearrange_models(world: &mut World) {
     let mut row = 0;
     let mut column = 0;
 
-    for (_, local_transform) in query_iter {
+    for (_, global_transform) in query_iter {
         if column >= column_size {
             column = 0;
             row += 1;
         }
 
-        local_transform.translation.x = (column as f32) - half_column_size;
-        local_transform.translation.y = (row as f32) - 0.5;
-        local_transform.translation.z = -4.0;
-
-        local_transform.scale = Vec3::splat(scale);
+        global_transform.0 = Affine3A::from_scale_rotation_translation(
+            Vec3::splat(scale),
+            Quat::IDENTITY,
+            vec3((column as f32) - half_column_size, (row as f32) - 0.5, -4.0),
+        );
 
         column += 1;
     }
@@ -344,17 +349,9 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
         render_context,
     );
     update_mesh(1, &mesh, render_context);
-    let local_transform = LocalTransform {
-        translation: [0., 1., -1.].into(),
-        ..Default::default()
-    };
+    let global_transform = GlobalTransform(Affine3A::from_translation(vec3(0., 1., -1.)));
 
-    world.spawn((
-        Visible {},
-        mesh,
-        local_transform,
-        GlobalTransform::default(),
-    ));
+    world.spawn((Visible {}, mesh, global_transform));
 }
 
 fn update_mesh(step: usize, mesh: &Mesh, render_context: &mut RenderContext) {
