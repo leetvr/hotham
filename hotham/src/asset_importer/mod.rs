@@ -3,8 +3,8 @@ pub mod scene;
 
 use crate::{
     components::{
-        animation_controller::AnimationController, Collider, GlobalTransform, Info, LocalTransform,
-        Mesh, Parent, Root, Skin, Visible,
+        animation_controller::AnimationController, Collider, GlobalTransform, Info, Mesh, Parent,
+        Root, Skin, Visible,
     },
     contexts::{
         physics_context::{self},
@@ -249,8 +249,6 @@ fn load_node(
     is_root: bool,
 ) -> Entity {
     // First, get the transform of the node.
-    let local_transform = LocalTransform::load(node.transform());
-
     let matrix = Mat4::from_cols_array_2d(&node.transform().matrix());
     let global_transform = GlobalTransform(Affine3A::from_mat4(matrix));
 
@@ -264,7 +262,7 @@ fn load_node(
     };
 
     // Now spawn an entity to represent this node and store it in our entity map.
-    let this_entity = world.spawn((local_transform, global_transform, info));
+    let this_entity = world.spawn((global_transform, info));
     import_context
         .node_entity_map
         .insert(node.index(), this_entity);
@@ -415,14 +413,17 @@ fn build_node_hierarchy(
     world: &mut World,
     node_entity_map: &mut HashMap<usize, Entity>,
 ) {
-    let this_entity = node_entity_map.get(&node_data.index()).unwrap();
-    let parent = Parent {
-        entity: *this_entity,
-        from_child: Default::default(),
-    };
+    let this_entity = *node_entity_map.get(&node_data.index()).unwrap();
     for child_node in node_data.children() {
         let child_id = child_node.index();
         let child_entity = node_entity_map.get(&child_id).unwrap();
+        let parent = Parent {
+            entity: this_entity,
+            from_child: Affine3A::from_mat4(Mat4::from_cols_array_2d(
+                &child_node.transform().matrix(),
+            )),
+        };
+
         world.insert_one(*child_entity, parent).unwrap();
         build_node_hierarchy(&child_node, world, node_entity_map);
     }
@@ -451,12 +452,6 @@ pub fn add_model_to_world(
     // Go through each entity in the source world and clone its components into the new world.
     for (source_entity, destination_entity) in &entity_map {
         let source_entity = source_world.entity(*source_entity).unwrap();
-
-        if let Some(local_transform) = source_entity.get::<&LocalTransform>() {
-            destination_world
-                .insert_one(*destination_entity, *local_transform)
-                .unwrap();
-        }
 
         if let Some(global_transform) = source_entity.get::<&GlobalTransform>() {
             destination_world
@@ -496,7 +491,7 @@ pub fn add_model_to_world(
                     *destination_entity,
                     Parent {
                         entity: *new_parent,
-                        from_child: Default::default(),
+                        from_child: parent.from_child,
                     },
                 )
                 .unwrap();
@@ -573,7 +568,7 @@ pub fn add_model_to_world(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::{LocalTransform, Root};
+    use crate::components::{GlobalTransform, Root};
     use approx::assert_relative_eq;
     use glam::Quat;
 
@@ -611,7 +606,7 @@ mod tests {
             ),
         ];
 
-        for (name, id, indices_count, translation, rotation) in &test_data {
+        for (name, id, indices_count, expected_translation, expected_rotation) in &test_data {
             let _ = models
                 .get(*name)
                 .unwrap_or_else(|| panic!("Unable to find model with name {name}"));
@@ -621,8 +616,8 @@ mod tests {
             assert!(model.is_some(), "Model {name} could not be added");
 
             let model = model.unwrap();
-            let (info, local_transform, mesh, ..) = world
-                .query_one_mut::<(&Info, &LocalTransform, &Mesh, &GlobalTransform, &Root)>(model)
+            let (info, global_transform, mesh, ..) = world
+                .query_one_mut::<(&Info, &GlobalTransform, &Mesh, &Root)>(model)
                 .unwrap();
             let mesh = render_context.resources.mesh_data.get(mesh.handle).unwrap();
             let primitive = &mesh.primitives[0];
@@ -648,8 +643,9 @@ mod tests {
             }
 
             // Ensure the transform was populated correctly
-            assert_relative_eq!(local_transform.translation, *translation,);
-            assert_relative_eq!(local_transform.rotation, *rotation,);
+            let (_, rotation, translation) = global_transform.0.to_scale_rotation_translation();
+            assert_relative_eq!(translation, *expected_translation,);
+            assert_relative_eq!(rotation, *expected_rotation,);
             assert_eq!(&info.name, *name);
             assert_eq!(&info.node_id, id, "Node {name} has wrong ID");
         }
@@ -674,30 +670,28 @@ mod tests {
 
         // Make sure there is only one root
         let mut roots = world
-            .query_mut::<(&Root, &Info, &LocalTransform)>()
+            .query_mut::<(&Root, &Info, &GlobalTransform)>()
             .into_iter();
         assert_eq!(roots.len(), 1);
         let root = roots.next().unwrap().1;
         assert_eq!(&root.1.name, "Left Hand");
 
         // Make sure its transform is correct
-        assert_relative_eq!(root.2.translation, [0.0, 0.0, 0.0].into());
+        assert_relative_eq!(root.2 .0.translation, [0.0, 0.0, 0.0].into());
 
         // Make sure we imported the mesh
-        let meshes = world
-            .query_mut::<(&Mesh, &LocalTransform, &GlobalTransform)>()
-            .into_iter();
+        let meshes = world.query_mut::<(&Mesh, &GlobalTransform)>().into_iter();
         assert_eq!(meshes.len(), 1);
 
         // Make sure we got all the nodes
-        let transforms = world.query_mut::<&LocalTransform>().into_iter();
+        let transforms = world.query_mut::<&GlobalTransform>().into_iter();
         assert_eq!(transforms.len(), 27);
 
         // Make sure we got all the Parent -> Child relationships
         {
-            let mut transforms_with_parents = world.query::<(&LocalTransform, &Parent)>();
-            assert_eq!(transforms_with_parents.iter().len(), 26);
-            for (_, (_, parent)) in transforms_with_parents.iter() {
+            let mut parents = world.query::<&Parent>();
+            assert_eq!(parents.iter().len(), 26);
+            for (_, parent) in parents.iter() {
                 assert!(world.contains(parent.entity));
             }
         }
