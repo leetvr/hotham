@@ -10,7 +10,7 @@ use hotham::{
         hand::Handedness,
         physics::{ActiveCollisionTypes, BodyType, SharedShape},
         ui_panel::add_ui_panel_to_world,
-        Collider, GlobalTransform, LocalTransform, Pointer, RigidBody, SoundEmitter, Visible,
+        Collider, GlobalTransform, Pointer, RigidBody, SoundEmitter, Visible,
     },
     contexts::{audio_context::MusicTrack, physics_context::DEFAULT_COLLISION_GROUP, AudioContext},
     hecs::{Entity, World},
@@ -224,10 +224,7 @@ pub fn pre_spawn_cube(world: &mut World, models: &HashMap<String, World>) {
     };
 
     let cube = add_model_to_world(model_name, models, world, None).unwrap();
-    let local_transform = LocalTransform {
-        translation: [0., -100., 0.].into(),
-        ..Default::default()
-    };
+    let global_transform = GlobalTransform::from_translation([0., -100., 0.].into());
 
     world.remove_one::<Visible>(cube).unwrap();
     world
@@ -249,8 +246,7 @@ pub fn pre_spawn_cube(world: &mut World, models: &HashMap<String, World>) {
                     offset_from_parent: [0., 0.2, 0.].into(),
                     ..Default::default()
                 },
-                local_transform,
-                GlobalTransform::from(local_transform),
+                global_transform,
             ),
         )
         .unwrap();

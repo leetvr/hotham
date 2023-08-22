@@ -1,7 +1,7 @@
 use hotham::{
     asset_importer::{add_model_to_world, Models},
-    components::LocalTransform,
-    glam::Vec3,
+    components::GlobalTransform,
+    glam::{Mat3A, Vec3},
     hecs::World,
 };
 
@@ -16,11 +16,11 @@ pub fn setup_cubes(world: &mut World, resolution: usize, models: &Models) {
         for row in 0..resolution {
             for column in 0..resolution {
                 let c = add_model_to_world("Cube", models, world, None).unwrap();
-                let mut t = world.get::<&mut LocalTransform>(c).unwrap();
-                t.scale = scale;
-                t.translation.y = floor as f32 / scale_factor;
-                t.translation.x = column as f32 / scale_factor - x_offset;
-                t.translation.z = row as f32 / scale_factor - half_resolution - 2.0;
+                let mut t = world.get::<&mut GlobalTransform>(c).unwrap();
+                t.0.matrix3 = Mat3A::from_diagonal(scale);
+                t.0.translation.y = floor as f32 / scale_factor;
+                t.0.translation.x = column as f32 / scale_factor - x_offset;
+                t.0.translation.z = row as f32 / scale_factor - half_resolution - 2.0;
             }
         }
     }

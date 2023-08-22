@@ -1,5 +1,7 @@
+use glam::Affine3A;
+
 use crate::{
-    components::{animation_controller::AnimationController, LocalTransform},
+    components::{animation_controller::AnimationController, Parent},
     Engine,
 };
 
@@ -16,13 +18,12 @@ fn animation_system_inner(world: &mut hecs::World) {
         let blend_amount = controller.blend_amount;
 
         for target in &controller.targets {
-            let mut local_transform = world.get::<&mut LocalTransform>(target.target).unwrap();
-            local_transform.translation =
-                target.translations[blend_from].lerp(target.translations[blend_to], blend_amount);
-            local_transform.rotation =
-                target.rotations[blend_from].slerp(target.rotations[blend_to], blend_amount);
-            local_transform.scale =
-                target.scales[blend_from].lerp(target.scales[blend_to], blend_amount);
+            let mut parent = world.get::<&mut Parent>(target.target).unwrap();
+            parent.from_child = Affine3A::from_scale_rotation_translation(
+                target.scales[blend_from].lerp(target.scales[blend_to], blend_amount),
+                target.rotations[blend_from].slerp(target.rotations[blend_to], blend_amount),
+                target.translations[blend_from].lerp(target.translations[blend_to], blend_amount),
+            );
         }
     }
 }
@@ -56,20 +57,20 @@ mod tests {
 
         // Collect all the transforms in the world so we can compare them later.
         let transforms_before = world
-            .query_mut::<&LocalTransform>()
+            .query_mut::<&Parent>()
             .into_iter()
             .map(|r| *r.1)
-            .collect::<Vec<LocalTransform>>();
+            .collect::<Vec<Parent>>();
 
         // Run the animation system
         animation_system_inner(&mut world);
 
         // Collect all the transforms after the system has been run.
         let transforms_after = world
-            .query_mut::<&LocalTransform>()
+            .query_mut::<&Parent>()
             .into_iter()
             .map(|r| *r.1)
-            .collect::<Vec<LocalTransform>>();
+            .collect::<Vec<Parent>>();
 
         // Make sure our transforms have been modified!
         assert_ne!(transforms_before, transforms_after);

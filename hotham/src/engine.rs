@@ -1,6 +1,6 @@
 use crate::{
     asset_importer::{self, add_model_to_world},
-    components::{GlobalTransform, Info, LocalTransform, Parent, Stage, HMD},
+    components::{GlobalTransform, Info, Parent, Stage, HMD},
     contexts::{
         render_context::create_pipeline, AudioContext, GuiContext, HapticContext, InputContext,
         PhysicsContext, RenderContext, VulkanContext, XrContext, XrContextBuilder,
@@ -117,11 +117,7 @@ impl<'a> EngineBuilder<'a> {
 }
 
 fn create_tracking_entities(world: &mut hecs::World) -> (hecs::Entity, hecs::Entity) {
-    let stage_entity = world.spawn((
-        Stage {},
-        LocalTransform::default(),
-        GlobalTransform::default(),
-    ));
+    let stage_entity = world.spawn((Stage {}, GlobalTransform::default()));
     let hmd_entity = world.spawn((
         HMD {},
         Parent {
@@ -216,11 +212,8 @@ impl Engine {
                 // Since the HMD is parented to the Stage, its LocalTransform (ie. its transform with respect to the parent)
                 // is equal to its pose in stage space.
                 let hmd_in_stage = self.input_context.hmd.hmd_in_stage();
-                let mut transform = self
-                    .world
-                    .get::<&mut LocalTransform>(self.hmd_entity)
-                    .unwrap();
-                transform.update_from_affine(&hmd_in_stage);
+                let mut parent = self.world.get::<&mut Parent>(self.hmd_entity).unwrap();
+                parent.from_child = hmd_in_stage;
             }
 
             // Handle any state transitions, as required.

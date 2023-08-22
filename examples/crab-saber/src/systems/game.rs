@@ -8,7 +8,7 @@ use crate::{
 use hotham::{
     components::{
         hand::Handedness, physics::Teleport, sound_emitter::SoundState, ui_panel::UIPanelButton,
-        Collider, LocalTransform, RigidBody, UIPanel, Visible,
+        Collider, GlobalTransform, RigidBody, UIPanel, Visible,
     },
     contexts::{AudioContext, HapticContext},
     glam,
@@ -332,10 +332,10 @@ fn should_spawn_cube(last_spawn_time: Instant, beat_length: Duration) -> bool {
 fn revive_cube(cube_entity: Entity, world: &mut World, song: &Song) {
     // Update its position and velocity
     {
-        let (local_transform, rigid_body) = world
-            .query_one_mut::<(&mut LocalTransform, &mut RigidBody)>(cube_entity)
+        let (global_transform, rigid_body) = world
+            .query_one_mut::<(&mut GlobalTransform, &mut RigidBody)>(cube_entity)
             .unwrap();
-        let translation = &mut local_transform.translation;
+        let translation = &mut global_transform.0.translation;
 
         let mut rng = thread_rng();
         translation.x = CUBE_X_OFFSETS[rng.gen_range(0..4)];
@@ -448,13 +448,13 @@ mod tests {
             assert_score_is(world, game_context, 0);
 
             let mut q = world
-                .query::<(&Color, &RigidBody, &LocalTransform, &Collider)>()
+                .query::<(&Color, &RigidBody, &GlobalTransform, &Collider)>()
                 .with::<(&Visible, &Cube)>();
             let mut i = q.iter();
             assert_eq!(i.len(), 1);
-            let (_, (_, rigid_body, local_transform, _)) = i.next().unwrap();
+            let (_, (_, rigid_body, global_transform, _)) = i.next().unwrap();
 
-            let t = local_transform.translation;
+            let t = global_transform.0.translation;
             assert!(
                 t.x == CUBE_X_OFFSETS[0]
                     || t.x == CUBE_X_OFFSETS[1]

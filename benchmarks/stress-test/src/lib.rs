@@ -19,7 +19,7 @@ use hotham::{
     },
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands_system, physics_system,
-        rendering::rendering_system, skinning::skinning_system, update_global_transform_system,
+        rendering::rendering_system, skinning::skinning_system,
         update_global_transform_with_parent_system,
     },
     xr, Engine, HothamResult, TickData,
@@ -249,7 +249,6 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
         debug_system(engine);
 
         animation_system(engine);
-        update_global_transform_system(engine);
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
     }
@@ -349,7 +348,7 @@ fn create_mesh(render_context: &mut RenderContext, world: &mut World) {
         render_context,
     );
     update_mesh(1, &mesh, render_context);
-    let global_transform = GlobalTransform(Affine3A::from_translation(vec3(0., 1., -1.)));
+    let global_transform = GlobalTransform::from_translation(vec3(0., 1., -1.));
 
     world.spawn((Visible {}, mesh, global_transform));
 }

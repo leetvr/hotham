@@ -52,16 +52,13 @@ mod tests {
     use glam::Affine3A;
     use hecs::Entity;
 
-    use crate::{
-        components::Info, systems::update_global_transform::update_global_transform_system_inner,
-    };
+    use crate::components::Info;
 
     use super::*;
     #[test]
     pub fn test_transform_system() {
         let mut world = World::new();
-        let global_transform =
-            GlobalTransform(Affine3A::from_translation([1.0, 1.0, 100.0].into()));
+        let global_transform = GlobalTransform::from_translation([1.0, 1.0, 100.0].into());
         let from_child = Affine3A::from_translation([1.0, 1.0, 100.0].into());
 
         let parent = world.spawn((global_transform,));
@@ -115,8 +112,7 @@ mod tests {
                 name: format!("Node {n}"),
                 node_id: n,
             };
-            let global_transform =
-                GlobalTransform(Affine3A::from_translation([1.0, 1.0, 1.0].into()));
+            let global_transform = GlobalTransform::from_translation([1.0, 1.0, 1.0].into());
             let entity = world.spawn((info, global_transform));
             node_entity.insert(n, entity);
             entity_node.insert(entity, n);
@@ -186,7 +182,6 @@ mod tests {
     }
 
     fn tick(world: &mut World) {
-        update_global_transform_system_inner(world);
         update_global_transform_with_parent_system_inner(world);
     }
 }

@@ -17,7 +17,7 @@ use crate::contexts::GuiContext;
 use crate::contexts::{RenderContext, VulkanContext};
 use crate::rendering::legacy_buffer::Buffer;
 
-use super::{Collider, GlobalTransform, LocalTransform, Visible};
+use super::{Collider, GlobalTransform, Visible};
 
 /// A component added to an entity to display a 2D "panel" in space
 /// Used by `panels_system`
@@ -120,11 +120,7 @@ pub fn add_ui_panel_to_world(
             raw_input,
             buttons,
         },
-        LocalTransform {
-            translation,
-            ..Default::default()
-        },
-        GlobalTransform::default(),
+        GlobalTransform::from_translation(translation),
         Visible {},
     );
 

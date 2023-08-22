@@ -60,7 +60,7 @@ impl Light {
         inner_cone_angle: f32,
         outer_cone_angle: f32,
     ) -> Self {
-        let (scale, offset) = get_offet_and_scale(inner_cone_angle, outer_cone_angle);
+        let (scale, offset) = get_offset_and_scale(inner_cone_angle, outer_cone_angle);
 
         let falloff = get_falloff(range);
 
@@ -132,7 +132,7 @@ impl Light {
     }
 }
 
-fn get_offet_and_scale(inner_cone_angle: f32, outer_cone_angle: f32) -> (f32, f32) {
+fn get_offset_and_scale(inner_cone_angle: f32, outer_cone_angle: f32) -> (f32, f32) {
     let inner_cone_angle = inner_cone_angle
         .abs()
         .clamp(0.5_f32.to_radians(), std::f32::consts::FRAC_PI_2);

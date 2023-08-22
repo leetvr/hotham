@@ -2,7 +2,7 @@ use hotham::{
     asset_importer::{add_model_to_world, Models},
     components::{
         physics::{BodyType, SharedShape},
-        stage, Collider, LocalTransform, RigidBody,
+        stage, Collider, GlobalTransform, RigidBody,
     },
     contexts::InputContext,
     glam::Affine3A,
@@ -30,8 +30,8 @@ fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
     // Create a transform from local space to grip space.
     let grip_from_local = Affine3A::from_rotation_translation(ROTATION_OFFSET, POSITION_OFFSET);
 
-    for (_, (color, local_transform)) in
-        world.query_mut::<With<(&Color, &mut LocalTransform), &Saber>>()
+    for (_, (color, global_transform)) in
+        world.query_mut::<With<(&Color, &mut GlobalTransform), &Saber>>()
     {
         // Get our the space and path of the hand.
         let stage_from_grip = match color {
@@ -41,7 +41,7 @@ fn sabers_system_inner(world: &mut World, input_context: &InputContext) {
 
         // Apply transform
         let global_from_local = global_from_stage * stage_from_grip * grip_from_local;
-        local_transform.update_from_affine(&global_from_local);
+        global_transform.0 = global_from_local;
     }
 }
 
@@ -78,21 +78,16 @@ mod tests {
 
     #[test]
     fn test_sabers() {
-        use hotham::components::{GlobalTransform, LocalTransform};
+        use hotham::components::GlobalTransform;
 
         let mut world = World::new();
         let input_context = InputContext::testing();
-        let saber = world.spawn((
-            Color::Red,
-            Saber {},
-            LocalTransform::default(),
-            GlobalTransform::default(),
-        ));
+        let saber = world.spawn((Color::Red, Saber {}, GlobalTransform::default()));
         sabers_system_inner(&mut world, &input_context);
 
-        let local_transform = world.get::<&LocalTransform>(saber).unwrap();
+        let global_transform = world.get::<&GlobalTransform>(saber).unwrap();
         approx::assert_relative_eq!(
-            local_transform.translation,
+            global_transform.0.translation,
             [-0.2, 1.3258567, -0.47001815].into()
         );
     }

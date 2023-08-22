@@ -80,7 +80,6 @@ mod tests {
         rendering::{image::Image, swapchain::SwapchainInfo},
         systems::{
             rendering::rendering_system_inner,
-            update_global_transform::update_global_transform_system_inner,
             update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
         },
         util::save_image_to_disk,
@@ -173,9 +172,6 @@ mod tests {
 
         // Reset the haptic context each frame - do this instead of having to create an OpenXR context etc.
         haptic_context.right_hand_amplitude_this_frame = 0.;
-
-        // Update transforms, etc.
-        update_global_transform_system_inner(world);
 
         // Update parent transform matrix
         update_global_transform_with_parent_system_inner(world);

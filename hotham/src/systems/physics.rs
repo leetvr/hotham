@@ -5,7 +5,7 @@ use crate::{
     components::{
         physics::Impulse,
         physics::{AdditionalMass, BodyType, RigidBody, Teleport},
-        Collider, GlobalTransform, LocalTransform, Parent,
+        Collider, GlobalTransform, Parent,
     },
     contexts::physics_context,
     util::{glam_vec_from_na, na_vector_from_glam},
@@ -29,7 +29,7 @@ struct ColliderHandle(rapier3d::prelude::ColliderHandle);
 ///
 /// You can indicate to [`physics_system`] how you'd like this entity to be treated by changing the `body_type` field
 /// on a [`RigidBody`]. Setting the `body_type` to [`BodyType::Dynamic`] will result in the entity having its [`GlobalTransform`]
-/// overwritten by its position in the physics simulation - any updates to [`LocalTransform`] or [`GlobalTransform`] will be overwritten.
+/// overwritten by its position in the physics simulation - any updates to [`GlobalTransform`] will be overwritten.
 ///
 /// Any other kind of body is treated as *game controlled* - that is, updating the entity's [`LocalTransform`] will not be overwritten
 /// and the position of the entity in the physics simulation will be updated based on its [`GlobalTransform`] (all transforms in the
@@ -275,15 +275,15 @@ fn update_colliders_from_world(physics_context: &mut PhysicsContext, world: &mut
 }
 
 fn update_world_from_physics(physics_context: &PhysicsContext, world: &mut hecs::World) {
-    for (_, (rigid_body_handle, rigid_body_component, local_transform)) in
-        world.query_mut::<(&RigidBodyHandle, &mut RigidBody, &mut LocalTransform)>()
+    for (_, (rigid_body_handle, rigid_body_component, global_transform)) in
+        world.query_mut::<(&RigidBodyHandle, &mut RigidBody, &mut GlobalTransform)>()
     {
         let rigid_body = &physics_context.rigid_bodies[rigid_body_handle.0];
 
         if rigid_body_component.body_type == BodyType::Dynamic
             || rigid_body_component.body_type == BodyType::KinematicVelocityBased
         {
-            local_transform.update_from_isometry(rigid_body.position());
+            global_transform.update_from_isometry(rigid_body.position());
         }
 
         // Update the component's linear velocity.
@@ -321,14 +321,14 @@ fn update_collisions(physics_context: &PhysicsContext, world: &hecs::World) {
 #[cfg(test)]
 mod tests {
     use approx::{assert_relative_eq, assert_relative_ne};
-    use glam::{Affine3A, Quat, Vec3};
+    use glam::{Quat, Vec3, Vec3A};
     use rapier3d::prelude::ActiveCollisionTypes;
 
     use crate::{
         components::{
             physics::Impulse,
             physics::{AdditionalMass, BodyType, RigidBody, Teleport},
-            Collider, GlobalTransform, LocalTransform,
+            Collider, GlobalTransform,
         },
         contexts::PhysicsContext,
         systems::physics::{ColliderHandle, RigidBodyHandle},
@@ -342,7 +342,7 @@ mod tests {
         let mut world = hecs::World::default();
         let mut physics_context = PhysicsContext::default();
 
-        let expected_transform = GlobalTransform(Affine3A::from_translation([1., 2., 3.].into()));
+        let expected_transform = GlobalTransform::from_translation([1., 2., 3.].into());
 
         // Create our test entity.
         let rigid_body_entity = world.spawn((
@@ -368,7 +368,7 @@ mod tests {
         let mut world = hecs::World::default();
         let mut physics_context = PhysicsContext::default();
 
-        let expected_transform = GlobalTransform(Affine3A::from_translation([1., 2., 3.].into()));
+        let expected_transform = GlobalTransform::from_translation([1., 2., 3.].into());
 
         // Create our test entity.
         let collider_entity = world.spawn((Collider::default(), expected_transform));
@@ -388,7 +388,7 @@ mod tests {
         let mut world = hecs::World::default();
         let mut physics_context = PhysicsContext::default();
         let expected_transform =
-            LocalTransform::from_rotation_translation(Quat::default(), [1., 2., 3.].into());
+            GlobalTransform::from_rotation_translation(Quat::default(), [1., 2., 3.].into());
 
         // Create our test entity.
         let rigid_body_entity = world.spawn((
@@ -397,7 +397,6 @@ mod tests {
                 ..Default::default()
             },
             expected_transform,
-            GlobalTransform::from(expected_transform),
         ));
 
         // Run the system
@@ -409,13 +408,15 @@ mod tests {
             let rigid_body = &physics_context.rigid_bodies[handle.0];
             assert_relative_eq!(rigid_body.position(), &expected_transform.to_isometry());
 
-            let mut local_transform = world.get::<&mut LocalTransform>(rigid_body_entity).unwrap();
+            let mut global_transform = world
+                .get::<&mut GlobalTransform>(rigid_body_entity)
+                .unwrap();
 
             // Make sure the local transform has not been changed yet:
-            assert_relative_eq!(local_transform.to_affine(), expected_transform.to_affine());
+            assert_relative_eq!(global_transform.0, expected_transform.0);
 
             // Now the local transform back to default - this change will be ignored.
-            *local_transform = LocalTransform::default();
+            *global_transform = GlobalTransform::default();
         }
 
         // Run the system again
@@ -423,9 +424,9 @@ mod tests {
 
         // Get the local transform
         {
-            let local_transform = world.get::<&LocalTransform>(rigid_body_entity).unwrap();
+            let global_transform = world.get::<&GlobalTransform>(rigid_body_entity).unwrap();
             // Make sure it has *NOT* been changed.
-            assert_relative_eq!(local_transform.to_affine(), expected_transform.to_affine());
+            assert_relative_eq!(global_transform.0, expected_transform.0);
 
             // Now add some velocity to the rigid body
             let mut rigid_body = world.get::<&mut RigidBody>(rigid_body_entity).unwrap();
@@ -437,10 +438,10 @@ mod tests {
 
         // The body should now have moved, and the linear velocity should be unchanged as there are no forces affecting it.
         {
-            let local_transform = world.get::<&LocalTransform>(rigid_body_entity).unwrap();
+            let global_transform = world.get::<&GlobalTransform>(rigid_body_entity).unwrap();
             // Make sure it has actually moved
-            assert_relative_ne!(local_transform.to_affine(), expected_transform.to_affine());
-            assert_ne!(*local_transform, LocalTransform::default());
+            assert_relative_ne!(global_transform.0, expected_transform.0);
+            assert_ne!(*global_transform, GlobalTransform::default());
 
             // Make sure the velocity has not changed
             let rigid_body = world.get::<&RigidBody>(rigid_body_entity).unwrap();
@@ -450,8 +451,10 @@ mod tests {
         // Now change it to a kinematic position-based rigid body and update its transform
         let expected_translation = [1., 2., 3.].into();
         {
-            let mut local_transform = world.get::<&mut LocalTransform>(rigid_body_entity).unwrap();
-            local_transform.translation = expected_translation;
+            let mut global_transform = world
+                .get::<&mut GlobalTransform>(rigid_body_entity)
+                .unwrap();
+            global_transform.0.translation = expected_translation;
 
             let mut rigid_body = world.get::<&mut RigidBody>(rigid_body_entity).unwrap();
             rigid_body.body_type = BodyType::KinematicPositionBased;
@@ -460,11 +463,11 @@ mod tests {
         // Run the system again
         physics_system_inner(&mut physics_context, &mut world);
 
-        let local_transform = world.get::<&LocalTransform>(rigid_body_entity).unwrap();
-        assert_relative_eq!(local_transform.translation, expected_translation);
+        let global_transform = world.get::<&GlobalTransform>(rigid_body_entity).unwrap();
+        assert_relative_eq!(global_transform.0.translation, expected_translation);
     }
 
-    /// Test adding "one shot" components to add a specific behaviour to an entity, once
+    /// Test adding "one shot" components to add a specific behavior to an entity, once
     #[test]
     pub fn test_one_shot_components() {
         let mut physics_context = PhysicsContext::default();
@@ -477,7 +480,6 @@ mod tests {
             AdditionalMass::new(100.),
             Impulse::new(Vec3::X * 1000.),
             GlobalTransform::default(),
-            LocalTransform::default(),
         ));
 
         physics_system_inner(&mut physics_context, &mut world);
@@ -488,8 +490,8 @@ mod tests {
             assert!(!entity.has::<Impulse>());
             assert!(!entity.has::<AdditionalMass>());
 
-            let local_transform = entity.get::<&LocalTransform>().unwrap();
-            assert!(local_transform.translation != Vec3::ZERO);
+            let global_transform = entity.get::<&GlobalTransform>().unwrap();
+            assert!(global_transform.0.translation != Vec3A::ZERO);
 
             let rigid_body = entity.get::<&RigidBody>().unwrap();
             assert_eq!(rigid_body.mass, 100.);
@@ -499,10 +501,8 @@ mod tests {
         // Now teleport it
         {
             world.insert_one(entity, Teleport {}).unwrap();
-            let mut local_transform = world.get::<&mut LocalTransform>(entity).unwrap();
-            local_transform.translation = [1., 2., 3.].into();
             let mut global_transform = world.get::<&mut GlobalTransform>(entity).unwrap();
-            *global_transform = (*local_transform).into();
+            global_transform.0.translation = [1., 2., 3.].into();
 
             // Slow the entity down so it doesn't just move away
             let mut rigid_body = world.get::<&mut RigidBody>(entity).unwrap();
@@ -515,8 +515,8 @@ mod tests {
         {
             let entity = world.entity(entity).unwrap();
             assert!(!entity.has::<Teleport>());
-            let local_transform = entity.get::<&LocalTransform>().unwrap();
-            assert_relative_eq!(local_transform.translation, [1., 2., 3.].into());
+            let global_transform = entity.get::<&GlobalTransform>().unwrap();
+            assert_relative_eq!(global_transform.0.translation, [1., 2., 3.].into());
         }
     }
 
@@ -524,8 +524,8 @@ mod tests {
     pub fn test_collision() {
         let mut physics_context = PhysicsContext::default();
         let mut world = hecs::World::default();
-        let local_transform =
-            LocalTransform::from_rotation_translation(Quat::IDENTITY, [0.5, 0., 0.].into());
+        let global_transform =
+            GlobalTransform::from_rotation_translation(Quat::IDENTITY, [0.5, 0., 0.].into());
 
         let a = world.spawn((
             Collider {
@@ -533,8 +533,7 @@ mod tests {
                 active_collision_types: ActiveCollisionTypes::FIXED_FIXED,
                 ..Default::default()
             },
-            local_transform,
-            GlobalTransform::from(local_transform),
+            global_transform,
         ));
         let b = world.spawn((
             Collider {
@@ -542,8 +541,7 @@ mod tests {
                 active_collision_types: ActiveCollisionTypes::FIXED_FIXED,
                 ..Default::default()
             },
-            local_transform,
-            GlobalTransform::from(local_transform),
+            global_transform,
         ));
 
         // // do something that would cause a and b to collide

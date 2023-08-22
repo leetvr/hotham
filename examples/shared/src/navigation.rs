@@ -1,5 +1,5 @@
 use hotham::{
-    components::{Collider, Hand, LocalTransform},
+    components::{Collider, GlobalTransform, Hand},
     contexts::InputContext,
     glam::{Affine3A, Vec3},
     hecs::{self, World},
@@ -41,8 +41,8 @@ fn navigation_system_inner(
     }
 
     // Get the stage transform.
-    let mut stage_transform = world.get::<&mut LocalTransform>(stage_entity).unwrap();
-    let global_from_stage = stage_transform.to_affine();
+    let mut stage_transform = world.get::<&mut GlobalTransform>(stage_entity).unwrap();
+    let global_from_stage = stage_transform.0;
 
     // Get the hand transforms.
     let stage_from_left_grip = input_context.left.stage_from_grip();
@@ -76,21 +76,15 @@ fn navigation_system_inner(
         state.scale,
     ) {
         (Some(global_from_stored_left_grip), None, None) => {
-            stage_transform.update_from_affine(
-                &(global_from_stored_left_grip * stage_from_left_grip.inverse()),
-            );
+            stage_transform.0 = global_from_stored_left_grip * stage_from_left_grip.inverse();
         }
         (Some(global_from_stored_left_grip), None, Some(scale)) => {
-            stage_transform.update_from_affine(
-                &(global_from_stored_left_grip
-                    * Affine3A::from_scale(Vec3::new(scale, scale, scale))
-                    * stage_from_left_grip.inverse()),
-            );
+            stage_transform.0 = global_from_stored_left_grip
+                * Affine3A::from_scale(Vec3::new(scale, scale, scale))
+                * stage_from_left_grip.inverse();
         }
         (None, Some(global_from_stored_right_grip), _) => {
-            stage_transform.update_from_affine(
-                &(global_from_stored_right_grip * stage_from_right_grip.inverse()),
-            );
+            stage_transform.0 = global_from_stored_right_grip * stage_from_right_grip.inverse();
         }
         (Some(global_from_stored_left_grip), Some(global_from_stored_right_grip), _) => {
             // Gripping with both hands allows scaling the scene
@@ -119,11 +113,9 @@ fn navigation_system_inner(
             let stored_left_grip_from_left_grip =
                 Affine3A::from_scale(Vec3::new(scale, scale, scale));
 
-            stage_transform.update_from_affine(
-                &(global_from_stored_left_grip
-                    * stored_left_grip_from_left_grip
-                    * stage_from_left_grip.inverse()),
-            );
+            stage_transform.0 = global_from_stored_left_grip
+                * stored_left_grip_from_left_grip
+                * stage_from_left_grip.inverse();
         }
         (None, None, _) => (),
     };

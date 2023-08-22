@@ -3,14 +3,15 @@ use hotham::{
     components::{
         hand::Handedness,
         physics::{BodyType, SharedShape},
-        Collider, LocalTransform, RigidBody,
+        Collider, GlobalTransform, RigidBody,
     },
+    glam::Vec3,
     hecs::World,
     na,
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, rendering::rendering_system, skinning::skinning_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
+        update_global_transform_with_parent_system,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -47,7 +48,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, _state: &mut State) {
         grabbing_system(engine);
         physics_system(engine);
         animation_system(engine);
-        update_global_transform_system(engine);
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
         debug_system(engine);
@@ -86,7 +86,6 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_model_to_world("Cube", &models, world, None);
 
     // Update global transforms from local transforms before physics_system gets confused
-    update_global_transform_system(engine);
     update_global_transform_with_parent_system(engine);
 
     Ok(())
@@ -107,10 +106,15 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
         .expect("Could not find Damaged Helmet");
 
     {
-        let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
-        local_transform.translation.z = -1.;
-        local_transform.translation.y = 1.4;
-        local_transform.scale = [0.5, 0.5, 0.5].into();
+        let mut global_transform = world.get::<&mut GlobalTransform>(helmet).unwrap();
+        let (_, rotation, mut translation) = global_transform.to_scale_rotation_translation();
+        translation.z = -1.;
+        translation.y = 1.4;
+        global_transform.update_from_scale_rotation_translation(
+            Vec3::splat(0.5),
+            rotation,
+            translation,
+        );
     }
 
     let collider = Collider::new(SharedShape::ball(0.35));

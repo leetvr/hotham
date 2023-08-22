@@ -294,13 +294,10 @@ mod tests {
 
     use crate::{
         asset_importer,
-        components::{stage::Stage, LocalTransform},
+        components::{stage::Stage, GlobalTransform},
         contexts::RenderContext,
         rendering::{image::Image, light::Light, scene_data},
-        systems::{
-            update_global_transform::update_global_transform_system_inner,
-            update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
-        },
+        systems::update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
         util::{affine_from_posef, posef_from_affine, save_image_to_disk},
     };
     use glam::{Quat, Vec3};
@@ -318,17 +315,11 @@ mod tests {
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform
-        let stage_local_transform = LocalTransform {
-            translation: [0.1, 0.2, 0.3].into(),
-            rotation: Quat::from_scaled_axis(Vec3::Y * (std::f32::consts::TAU * 0.1)),
-            ..Default::default()
-        };
-        let global_from_stage = stage_local_transform.to_affine();
-        world.spawn((
-            Stage {},
-            stage_local_transform,
-            GlobalTransform(global_from_stage),
-        ));
+        let global_from_stage = Affine3A::from_rotation_translation(
+            Quat::from_axis_angle(Vec3::Y, std::f32::consts::TAU * 0.1),
+            [0.1, 0.2, 0.3].into(),
+        );
+        world.spawn((Stage {}, GlobalTransform(global_from_stage)));
 
         // Set views
         let position = Vector3f {
@@ -439,17 +430,11 @@ mod tests {
         let (_, mut world) = models.drain().next().unwrap();
 
         // Add stage transform
-        let stage_local_transform = LocalTransform {
-            translation: [0.1, 0.2, 0.3].into(),
-            rotation: Quat::from_scaled_axis(Vec3::Y * (std::f32::consts::TAU * 0.1)),
-            ..Default::default()
-        };
-        let global_from_stage = stage_local_transform.to_affine();
-        world.spawn((
-            Stage {},
-            stage_local_transform,
-            GlobalTransform(global_from_stage),
-        ));
+        let global_from_stage = Affine3A::from_rotation_translation(
+            Quat::from_axis_angle(Vec3::Y, std::f32::consts::TAU * 0.1),
+            [0.1, 0.2, 0.3].into(),
+        );
+        world.spawn((Stage {}, GlobalTransform(global_from_stage)));
 
         // Set views
         let rotation: mint::Quaternion<f32> =
@@ -583,7 +568,6 @@ mod tests {
         render_context.scene_data.params.z = debug_shader_inputs;
         render_context.scene_data.params.x = debug_ibl_intensity;
         render_context.scene_data.lights[0] = light.clone();
-        update_global_transform_system_inner(world);
         update_global_transform_with_parent_system_inner(world);
         rendering_system_inner(world, vulkan_context, render_context, views, 0);
         render_context.end_frame(vulkan_context);

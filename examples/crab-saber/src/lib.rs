@@ -7,8 +7,7 @@ use hotham::{
     hecs::{Entity, World},
     systems::{
         audio_system, draw_gui_system, haptics_system, physics_system, pointers_system,
-        rendering_system, update_global_transform_system,
-        update_global_transform_with_parent_system,
+        rendering_system, update_global_transform_with_parent_system,
     },
     xr::{self, SessionState},
     Engine, HothamResult, TickData,
@@ -52,7 +51,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, game_context: &mut GameContext
 
         // Update world
         update_global_transform_with_parent_system(engine);
-        update_global_transform_system(engine);
 
         // Sync world with output contexts
         haptics_system(engine);

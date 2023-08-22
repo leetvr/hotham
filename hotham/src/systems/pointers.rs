@@ -8,11 +8,10 @@ use rapier3d::prelude::{InteractionGroups, QueryFilter, Ray};
 pub const POSITION_OFFSET: Vec3 = Vec3::new(4.656613e-10, 0.029968515, 0.0741747);
 pub const ROTATION_OFFSET: Quat = Quat::from_xyzw(0.8274912, 0.03413791, -0.050611533, -0.5581499);
 
+use crate::components::GlobalTransform;
 use crate::util::na_vector_from_glam;
 use crate::{
-    components::{
-        hand::Handedness, panel::PanelInput, stage, Info, LocalTransform, Panel, Pointer, Visible,
-    },
+    components::{hand::Handedness, panel::PanelInput, stage, Info, Panel, Pointer, Visible},
     contexts::{InputContext, PhysicsContext},
     Engine,
 };
@@ -36,13 +35,13 @@ pub fn pointers_system_inner(
     let global_from_stage = stage::get_global_from_stage(world);
 
     // Create a transform from local space to grip space.
-    // NOTE: This is most likely *WRONG* as the order for these transforms was not recoreded correctly.
+    // NOTE: This is most likely *WRONG* as the order for these transforms was not recorded correctly.
     // TODO: Make these correct.
 
     let grip_from_local = Affine3A::from_rotation_translation(ROTATION_OFFSET, POSITION_OFFSET);
 
-    for (_, (pointer, local_transform)) in world
-        .query::<With<(&mut Pointer, &mut LocalTransform), &Visible>>()
+    for (_, (pointer, global_transform)) in world
+        .query::<With<(&mut Pointer, &mut GlobalTransform), &Visible>>()
         .iter()
     {
         // Get the position of the pointer in stage space.
@@ -59,14 +58,14 @@ pub fn pointers_system_inner(
 
         // Compose transform
         let global_from_local = global_from_stage * stage_from_grip * grip_from_local;
-        local_transform.update_from_affine(&global_from_local);
+        global_transform.0 = global_from_local;
 
         // Get trigger value
         pointer.trigger_value = trigger_value;
 
         // Get the direction and position of the ray.
-        let ray_direction = na_vector_from_glam(local_transform.rotation * Vec3::Y);
-        let ray_origin = na_vector_from_glam(local_transform.translation);
+        let ray_direction = na_vector_from_glam(global_transform.0.matrix3 * Vec3::Y);
+        let ray_origin = na_vector_from_glam(global_transform.0.translation.into());
 
         // Sweet baby ray
         let ray = Ray::new(ray_origin.into(), ray_direction);
@@ -164,7 +163,7 @@ mod tests {
     #[cfg(windows)]
     pub fn test_pointers_system() {
         use crate::{
-            components::{Collider, GlobalTransform, LocalTransform, Panel},
+            components::{Collider, GlobalTransform, Panel},
             contexts::{physics_context::PANEL_COLLISION_GROUP, RenderContext},
         };
         use rapier3d::prelude::SharedShape;
@@ -194,17 +193,12 @@ mod tests {
             collision_filter: PANEL_COLLISION_GROUP,
             ..Default::default()
         };
-        let local_transform = LocalTransform::from_rotation_translation(
+        let global_transform = GlobalTransform::from_rotation_translation(
             glam::Quat::from_axis_angle(Vec3::X, std::f32::consts::FRAC_PI_2 * 3.),
             [-0.2, 2., POINTER_Z].into(),
         );
 
-        let panel_entity = world.spawn((
-            panel,
-            collider,
-            local_transform,
-            GlobalTransform::from(local_transform),
-        ));
+        let panel_entity = world.spawn((panel, collider, global_transform));
 
         // Add a decoy collider to ensure we're using collision groups correctly.
         let collider = Collider {
@@ -213,15 +207,15 @@ mod tests {
             ..Default::default()
         };
 
-        let local_transform = LocalTransform::from_rotation_translation(
+        let global_transform = GlobalTransform::from_rotation_translation(
             glam::Quat::default(),
             [-0.2, 1.5, POINTER_Z].into(),
         );
 
         world.spawn((
             collider,
-            local_transform,
-            GlobalTransform::from(local_transform),
+            global_transform,
+            GlobalTransform::from(global_transform),
         ));
 
         let pointer_entity = world.spawn((
@@ -230,16 +224,16 @@ mod tests {
                 handedness: Handedness::Left,
                 trigger_value: 0.0,
             },
-            LocalTransform::default(),
+            GlobalTransform::default(),
         ));
 
         tick(&mut physics_context, &mut world, &input_context);
 
-        let local_transform = world.get::<&LocalTransform>(pointer_entity).unwrap();
+        let global_transform = world.get::<&GlobalTransform>(pointer_entity).unwrap();
 
         // Assert that the pointer has moved
         assert_relative_eq!(
-            local_transform.translation,
+            global_transform.0.translation,
             [-0.2, 1.3258567, POINTER_Z].into()
         );
 

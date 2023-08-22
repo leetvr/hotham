@@ -8,14 +8,13 @@ use hologram::{Hologram, HologramData};
 use hotham::{
     asset_importer::{self, add_model_to_world},
     components::{
-        hand::Handedness, physics::SharedShape, Collider, Grabbable, LocalTransform, Mesh,
+        hand::Handedness, physics::SharedShape, Collider, GlobalTransform, Grabbable, Mesh,
     },
     glam::{Mat4, Quat, Vec3},
     hecs::World,
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
-        physics_system, skinning::skinning_system, update_global_transform_system,
-        update_global_transform_with_parent_system,
+        physics_system, skinning::skinning_system, update_global_transform_with_parent_system,
     },
     util::u8_to_u32,
     xr, Engine, HothamResult, TickData,
@@ -63,7 +62,6 @@ fn tick(
         physics_system(engine);
         animation_system(engine);
         navigation_system(engine, state);
-        update_global_transform_system(engine);
         update_global_transform_with_parent_system(engine);
         skinning_system(engine);
         debug_system(engine);
@@ -148,11 +146,11 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_quadric(
         &models,
         world,
-        &LocalTransform {
-            translation: [1.0, 1.4, -1.5].into(),
-            rotation: Quat::IDENTITY,
-            scale: [0.5, 0.5, 0.5].into(),
-        },
+        &GlobalTransform::from_scale_rotation_translation(
+            [0.5, 0.5, 0.5].into(),
+            Quat::IDENTITY,
+            [1.0, 1.4, -1.5].into(),
+        ),
         0.5,
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 1.0, -1.0].into()),
@@ -163,11 +161,11 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_quadric(
         &models,
         world,
-        &LocalTransform {
-            translation: [-1.0, 1.4, -1.5].into(),
-            rotation: Quat::IDENTITY,
-            scale: [0.5, 0.5, 0.5].into(),
-        },
+        &GlobalTransform::from_scale_rotation_translation(
+            [0.5, 0.5, 0.5].into(),
+            Quat::IDENTITY,
+            [-1.0, 1.4, -1.5].into(),
+        ),
         0.5,
         HologramData {
             surface_q_in_local: Mat4::from_diagonal([1.0, 1.0, 0.0, -1.0].into()),
@@ -188,9 +186,13 @@ fn add_helmet(
         .expect("Could not find Damaged Helmet");
 
     {
-        let mut local_transform = world.get::<&mut LocalTransform>(helmet).unwrap();
-        local_transform.translation = translation;
-        local_transform.scale = [0.5, 0.5, 0.5].into();
+        let mut global_transform = world.get::<&mut GlobalTransform>(helmet).unwrap();
+        let (_, rotation, _) = global_transform.to_scale_rotation_translation();
+        global_transform.update_from_scale_rotation_translation(
+            [0.5, 0.5, 0.5].into(),
+            rotation,
+            translation,
+        );
     }
 
     let collider = Collider::new(SharedShape::ball(0.35));
@@ -201,12 +203,12 @@ fn add_helmet(
 fn add_quadric(
     models: &std::collections::HashMap<String, World>,
     world: &mut World,
-    local_transform: &LocalTransform,
+    global_transform: &GlobalTransform,
     ball_radius: f32,
     hologram_data: HologramData,
 ) {
     let entity = add_model_to_world("Sphere", models, world, None).expect("Could not find Sphere");
-    *world.get::<&mut LocalTransform>(entity).unwrap() = *local_transform;
+    *world.get::<&mut GlobalTransform>(entity).unwrap() = *global_transform;
     let collider = Collider::new(SharedShape::ball(ball_radius));
     let hologram_component = Hologram {
         mesh_data_handle: world.get::<&Mesh>(entity).unwrap().handle,
