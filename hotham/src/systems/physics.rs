@@ -31,7 +31,7 @@ struct ColliderHandle(rapier3d::prelude::ColliderHandle);
 /// on a [`RigidBody`]. Setting the `body_type` to [`BodyType::Dynamic`] will result in the entity having its [`GlobalTransform`]
 /// overwritten by its position in the physics simulation - any updates to [`GlobalTransform`] will be overwritten.
 ///
-/// Any other kind of body is treated as *game controlled* - that is, updating the entity's [`LocalTransform`] will not be overwritten
+/// Any other kind of body is treated as *game controlled* - that is, updating the entity's [`GlobalTransform`] will not be overwritten
 /// and the position of the entity in the physics simulation will be updated based on its [`GlobalTransform`] (all transforms in the
 /// physics simulation are in global space).
 ///

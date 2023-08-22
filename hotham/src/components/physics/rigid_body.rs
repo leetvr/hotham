@@ -4,9 +4,9 @@ use rapier3d::prelude::RigidBodyType as RapierBodyType;
 ///
 /// You can indicate to [`crate::systems::physics_system`] how you'd like this entity to be treated by changing the `body_type` field
 /// . Setting the `body_type` to [`BodyType::Dynamic`] will result in the entity having its [`crate::components::GlobalTransform`]
-/// overwritten by its position in the physics simulation - any updates to [`crate::components::LocalTransform`] or [`crate::components::GlobalTransform`] will be overwritten.
+/// overwritten by its position in the physics simulation - any updates to [`crate::components::GlobalTransform`] will be overwritten.
 ///
-/// Any other kind of body is treated as *game controlled* - that is, updating the entity's [`crate::components::LocalTransform`] will not be overwritten
+/// Any other kind of body is treated as *game controlled* - that is, updating the entity's [`crate::components::GlobalTransform`] will not be overwritten
 /// and the position of the entity in the physics simulation will be updated based on its [`crate::components::GlobalTransform`] (all transforms in the
 /// physics simulation are in global space).
 ///

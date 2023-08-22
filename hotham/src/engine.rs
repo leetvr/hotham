@@ -209,7 +209,7 @@ impl Engine {
                 self.xr_context.update_views();
                 self.input_context.update(&self.xr_context);
 
-                // Since the HMD is parented to the Stage, its LocalTransform (ie. its transform with respect to the parent)
+                // Since the HMD is parented to the Stage, its transform with respect to the parent
                 // is equal to its pose in stage space.
                 let hmd_in_stage = self.input_context.hmd.hmd_in_stage();
                 let mut parent = self.world.get::<&mut Parent>(self.hmd_entity).unwrap();
