@@ -15,6 +15,7 @@ use crate::{
 };
 
 mod input;
+mod time;
 use input::Input;
 
 #[derive(Default)]
