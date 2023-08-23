@@ -11,7 +11,7 @@ use hotham::{
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, rendering::rendering_system, skinning::skinning_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
+        update_global_transform_system,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -45,7 +45,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         animation_system(engine);
         navigation_system(engine, state);
         update_global_transform_system(engine);
-        update_global_transform_with_parent_system(engine);
         skinning_system(engine);
         debug_system(engine);
     }
