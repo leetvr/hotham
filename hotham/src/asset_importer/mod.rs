@@ -18,7 +18,7 @@ use glam::{Affine3A, Mat4};
 use gltf::Document;
 use hecs::{Entity, World};
 use itertools::Itertools;
-use rapier3d::prelude::ActiveCollisionTypes;
+use rapier3d::prelude::{ActiveCollisionTypes, Group};
 use std::{borrow::Cow, collections::HashMap, convert::TryInto};
 
 use self::scene::Scene;
@@ -328,7 +328,7 @@ fn get_collider_for_node(
         Collider {
             sensor: false,
             collision_groups: physics_context::WALL_COLLISION_GROUP,
-            collision_filter: u32::MAX,
+            collision_filter: Group::all(),
             shape,
             ..Default::default()
         }
@@ -337,7 +337,7 @@ fn get_collider_for_node(
         Collider {
             sensor: true,
             collision_groups: physics_context::SENSOR_COLLISION_GROUP,
-            collision_filter: u32::MAX,
+            collision_filter: Group::all(),
             active_collision_types: ActiveCollisionTypes::all(),
             shape,
             ..Default::default()

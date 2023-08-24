@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 
 use hecs::Entity;
-pub use rapier3d::prelude::{ActiveCollisionTypes, SharedShape};
+pub use rapier3d::prelude::{ActiveCollisionTypes, Group, SharedShape};
 
 use crate::contexts::physics_context::{DEFAULT_COLLISION_GROUP, HAND_COLLISION_GROUP};
 
@@ -15,9 +15,9 @@ pub struct Collider {
     /// Is this a sensor collider?
     pub sensor: bool,
     /// What collision groups is this a member of?
-    pub collision_groups: u32,
+    pub collision_groups: Group,
     /// What groups can this collider interact with?
-    pub collision_filter: u32,
+    pub collision_filter: Group,
     /// What kinds of colliders can this collider interact with?
     pub active_collision_types: ActiveCollisionTypes,
     /// Should this collider be offset from its parent (if it has one)?

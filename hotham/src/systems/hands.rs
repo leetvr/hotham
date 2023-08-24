@@ -8,7 +8,7 @@ use crate::{
     Engine,
 };
 use hecs::World;
-use rapier3d::prelude::{ActiveCollisionTypes, SharedShape};
+use rapier3d::prelude::{ActiveCollisionTypes, Group, SharedShape};
 
 /// Hands system
 /// Used to allow users to interact with objects using their controllers as representations of their hands
@@ -100,7 +100,7 @@ pub fn add_hand(
         sensor: true,
         active_collision_types: ActiveCollisionTypes::all(),
         collision_groups: HAND_COLLISION_GROUP,
-        collision_filter: u32::MAX,
+        collision_filter: Group::all(),
         ..Default::default()
     };
 

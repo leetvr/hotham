@@ -4,11 +4,11 @@ use rapier3d::{
     prelude::*,
 };
 
-pub const DEFAULT_COLLISION_GROUP: u32 = 0b01;
-pub const PANEL_COLLISION_GROUP: u32 = 0b10;
-pub const HAND_COLLISION_GROUP: u32 = 0b00000100;
-pub const WALL_COLLISION_GROUP: u32 = 0b00001000;
-pub const SENSOR_COLLISION_GROUP: u32 = 0b00010000;
+pub const DEFAULT_COLLISION_GROUP: Group = Group::GROUP_1;
+pub const PANEL_COLLISION_GROUP: Group = Group::GROUP_2;
+pub const HAND_COLLISION_GROUP: Group = Group::GROUP_3;
+pub const WALL_COLLISION_GROUP: Group = Group::GROUP_4;
+pub const SENSOR_COLLISION_GROUP: Group = Group::GROUP_5;
 
 /// TODO: This is *usually* 72fps on the Quest 2, but we may support higher resolutions later.
 pub const DELTA_TIME: f32 = 1. / 72.;
@@ -79,11 +79,9 @@ impl PhysicsContext {
             &mut self.impulse_joints,
             &mut self.multibody_joints,
             &mut self.ccd_solver,
+            Some(&mut self.query_pipeline),
             &(),
             &(),
         );
-
-        self.query_pipeline
-            .update(&self.island_manager, &self.rigid_bodies, &self.colliders);
     }
 }
