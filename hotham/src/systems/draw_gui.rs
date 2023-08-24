@@ -81,7 +81,6 @@ mod tests {
         systems::{
             rendering::rendering_system_inner,
             update_global_transform::update_global_transform_system_inner,
-            update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
         },
         util::save_image_to_disk,
         COLOR_FORMAT,
@@ -176,9 +175,6 @@ mod tests {
 
         // Update transforms, etc.
         update_global_transform_system_inner(world);
-
-        // Update parent transform matrix
-        update_global_transform_with_parent_system_inner(world);
 
         // Render
         render_context.begin_frame(vulkan_context);
