@@ -16,7 +16,6 @@ use hotham::{
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, skinning::skinning_system, update_global_transform_system,
-        update_global_transform_with_parent_system,
     },
     util::u8_to_u32,
     xr, Engine, HothamResult, TickData,
@@ -67,7 +66,6 @@ fn tick(
         navigation_system(engine, state);
         surface_solver_system(engine);
         update_global_transform_system(engine);
-        update_global_transform_with_parent_system(engine);
         skinning_system(engine);
         debug_system(engine);
     }

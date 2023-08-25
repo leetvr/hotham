@@ -13,7 +13,7 @@ use crate::{
     components::{
         hand::Handedness, panel::PanelInput, stage, Info, LocalTransform, Panel, Pointer, Visible,
     },
-    contexts::{InputContext, PhysicsContext},
+    contexts::{physics_context::PANEL_COLLISION_GROUP, InputContext, PhysicsContext},
     Engine,
 };
 
@@ -72,7 +72,7 @@ pub fn pointers_system_inner(
         let ray = Ray::new(ray_origin.into(), ray_direction);
         let max_toi = 40.0;
         let solid = true;
-        let groups = InteractionGroups::new(0b10, 0b10);
+        let groups = InteractionGroups::new(PANEL_COLLISION_GROUP, PANEL_COLLISION_GROUP);
         let filter = QueryFilter::new().groups(groups);
 
         if let Some((handle, toi)) = physics_context.query_pipeline.cast_ray(

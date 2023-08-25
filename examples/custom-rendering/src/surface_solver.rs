@@ -2,7 +2,7 @@ use hotham::{
     components::LocalTransform,
     glam::{Mat4, Vec3},
     hecs::{Entity, World},
-    nalgebra::{ArrayStorage, Matrix, U1, U10, U3},
+    na::{ArrayStorage, Matrix, U1, U10, U3},
     util::na_vector_from_glam,
     Engine,
 };

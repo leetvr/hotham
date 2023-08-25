@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 [dependencies]
 ash = "0.33.2"
 ash-window = "0.7"
-glam = "0.21.3"
+glam = "0.23"
 lazy_static = "1.4.0"
 openxr-sys = "0.9"
 rand = "0.8"
