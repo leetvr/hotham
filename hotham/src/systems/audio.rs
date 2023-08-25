@@ -167,6 +167,7 @@ mod tests {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn tick(
         xr_context: &mut XrContext,
         audio_entity: Entity,
@@ -218,9 +219,8 @@ mod tests {
         tell_me_that_i_cant: MusicTrack,
     ) {
         let mut source = world.get::<&mut SoundEmitter>(entity).unwrap();
-        match source.current_state() {
-            SoundState::Stopped => source.play(),
-            _ => {}
+        if let SoundState::Stopped = source.current_state() {
+            source.play()
         }
 
         if start.elapsed().as_secs() >= 2 && audio_context.current_music_track != Some(right_here) {

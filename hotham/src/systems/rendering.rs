@@ -532,6 +532,7 @@ mod tests {
         assert!(errors.is_empty(), "{errors:#?}");
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_object_with_debug_data(
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,

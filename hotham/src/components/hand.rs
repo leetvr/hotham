@@ -1,3 +1,4 @@
+use glam::Affine3A;
 use hecs::Entity;
 
 /// A component that represents the "side" or "handedness" that an entity is on
@@ -10,6 +11,12 @@ pub enum Handedness {
     Right,
 }
 
+#[derive(Clone)]
+pub struct GrabbedEntity {
+    pub entity: Entity,
+    pub grip_from_local: Affine3A,
+}
+
 /// A component that's added to an entity to represent a "hand" presence.
 /// Used to give the player a feeling of immersion by allowing them to grab objects in the world
 /// Requires `hands_system`
@@ -17,10 +24,12 @@ pub enum Handedness {
 pub struct Hand {
     /// How much has this hand been gripped?
     pub grip_value: f32,
+    /// Did the grip button go from not pressed to pressed this frame?
+    pub grip_button_just_pressed: bool,
     /// Which side is this hand on?
     pub handedness: Handedness,
     /// Have we grabbed something?
-    pub grabbed_entity: Option<Entity>,
+    pub grabbed_entity: Option<GrabbedEntity>,
 }
 
 impl Hand {
@@ -28,6 +37,7 @@ impl Hand {
     pub fn left() -> Hand {
         Hand {
             grip_value: 0.0,
+            grip_button_just_pressed: false,
             handedness: Handedness::Left,
             grabbed_entity: None,
         }
@@ -37,6 +47,7 @@ impl Hand {
     pub fn right() -> Hand {
         Hand {
             grip_value: 0.0,
+            grip_button_just_pressed: false,
             handedness: Handedness::Right,
             grabbed_entity: None,
         }

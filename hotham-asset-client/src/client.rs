@@ -180,7 +180,7 @@ mod tests {
     #[test]
     fn it_works() -> Result<(), Box<dyn std::error::Error>> {
         let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
-        let files: Vec<String> = vec![
+        let files: Vec<String> = [
             "Many",
             "Different",
             "Files",
