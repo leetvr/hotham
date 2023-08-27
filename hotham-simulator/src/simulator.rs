@@ -15,6 +15,7 @@ use ash::{
     Device, Entry as AshEntry, Instance as AshInstance,
 };
 use lazy_static::lazy_static;
+use openxr_sys::platform::LARGE_INTEGER;
 use openxr_sys::GraphicsBindingVulkanKHR;
 use openxr_sys::{
     platform::{VkDevice, VkInstance, VkPhysicalDevice, VkResult},
@@ -85,13 +86,13 @@ pub unsafe extern "C" fn enumerate_instance_extension_properties(
     properties: *mut XrExtensionProperties,
 ) -> XrResult {
     if propertyCapacityInput == 0 {
-        *propertyCountOutput = 2;
+        *propertyCountOutput = 3;
         return Result::SUCCESS.into_raw();
     }
 
     let extension = "XR_KHR_vulkan_enable2";
     let name = str_to_fixed_bytes(extension);
-    let extensions = std::ptr::slice_from_raw_parts_mut(properties, 2);
+    let extensions = std::ptr::slice_from_raw_parts_mut(properties, 3);
     (*extensions)[0] = openxr_loader::XrExtensionProperties {
         type_: StructureType::EXTENSION_PROPERTIES.into_raw(),
         next: ptr::null_mut(),
@@ -106,6 +107,29 @@ pub unsafe extern "C" fn enumerate_instance_extension_properties(
         extensionName: name,
         extensionVersion: 1,
     };
+    #[cfg(windows)]
+    {
+        let extension = "XR_KHR_win32_convert_performance_counter_time";
+        let name = str_to_fixed_bytes(extension);
+        (*extensions)[2] = openxr_loader::XrExtensionProperties {
+            type_: StructureType::EXTENSION_PROPERTIES.into_raw(),
+            next: ptr::null_mut(),
+            extensionName: name,
+            extensionVersion: 1,
+        };
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let extension = "XR_KHR_convert_timespec_time";
+        let name = str_to_fixed_bytes(extension);
+        (*extensions)[2] = openxr_loader::XrExtensionProperties {
+            type_: StructureType::EXTENSION_PROPERTIES.into_raw(),
+            next: ptr::null_mut(),
+            extensionName: name,
+            extensionVersion: 1,
+        };
+    }
+
     Result::SUCCESS.into_raw()
 }
 
@@ -2076,4 +2100,22 @@ pub fn find_memory_type(
     }
 
     panic!("Unable to find suitable memory type")
+}
+
+pub unsafe extern "system" fn convert_time_to_win32_performance_counter(
+    _instance: Instance,
+    xr_time: Time,
+    large_integer: *mut LARGE_INTEGER,
+) -> Result {
+    *large_integer = xr_time.as_nanos();
+    Result::SUCCESS
+}
+
+pub unsafe extern "system" fn convert_win32_performance_counter_to_time(
+    _instance: Instance,
+    large_integer: *const LARGE_INTEGER,
+    xr_time: *mut Time,
+) -> Result {
+    *xr_time = Time::from_nanos(*large_integer);
+    Result::SUCCESS
 }

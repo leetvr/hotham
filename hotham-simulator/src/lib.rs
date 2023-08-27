@@ -155,6 +155,14 @@ pub unsafe extern "C" fn get_instance_proc_addr(
         *function = transmute::<pfn::ApplyHapticFeedback, _>(apply_haptic_feedback);
     } else if name == b"xrEndSession" {
         *function = transmute::<pfn::EndSession, _>(end_session);
+    } else if name == b"xrConvertTimeToWin32PerformanceCounterKHR" {
+        *function = transmute::<pfn::ConvertTimeToWin32PerformanceCounterKHR, _>(
+            convert_time_to_win32_performance_counter,
+        );
+    } else if name == b"xrConvertWin32PerformanceCounterToTimeKHR" {
+        *function = transmute::<pfn::ConvertWin32PerformanceCounterToTimeKHR, _>(
+            convert_win32_performance_counter_to_time,
+        );
     } else {
         let _name = String::from_utf8_unchecked(name.to_vec());
         unsafe extern "system" fn bang() -> Result {
