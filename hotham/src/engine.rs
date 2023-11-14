@@ -47,11 +47,29 @@ impl From<u8> for RenderState {
 }
 
 /// Builder for `Engine`.
-#[derive(Default)]
 pub struct EngineBuilder<'a> {
     application_name: Option<&'a str>,
     application_version: Option<u32>,
     openxr_extensions: Option<xr::ExtensionSet>,
+}
+
+impl<'a> Default for EngineBuilder<'a> {
+    fn default() -> Self {
+        let mut extensions = xr::ExtensionSet::default();
+        #[cfg(target_os = "windows")]
+        {
+            extensions.khr_win32_convert_performance_counter_time = true;
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            extensions.khr_convert_timespec_time = true;
+        }
+        Self {
+            application_name: Default::default(),
+            application_version: Default::default(),
+            openxr_extensions: Some(extensions),
+        }
+    }
 }
 
 impl<'a> EngineBuilder<'a> {
