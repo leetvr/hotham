@@ -3,7 +3,7 @@ use crate::{
     components::{GlobalTransform, Info, LocalTransform, Parent, Stage, HMD},
     contexts::{
         render_context::create_pipeline, AudioContext, GuiContext, HapticContext, InputContext,
-        PhysicsContext, RenderContext, VulkanContext, XrContext, XrContextBuilder,
+        PhysicsContext, RenderContext, VulkanContext, XrContext, XrContextBuilder, XrFrameContext,
     },
     util::{u8_to_u32, PerformanceTimer},
     workers::Workers,
@@ -14,8 +14,8 @@ use openxr as xr;
 
 use std::{
     sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
+        atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering},
+        Arc, Mutex,
     },
     thread::sleep,
     time::{Duration, Instant},
@@ -29,6 +29,22 @@ pub static ANDROID_LOOPER_ID_MAIN: u32 = 0;
 pub static ANDROID_LOOPER_NONBLOCKING_TIMEOUT: Duration = Duration::from_millis(0);
 #[cfg(target_os = "android")]
 pub static ANDROID_LOOPER_BLOCKING_TIMEOUT: Duration = Duration::from_millis(i32::MAX as _);
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RenderState {
+    Ready,
+    BeginFrame,
+    BeginRender,
+    FinishRender,
+    EndFrame,
+}
+
+impl From<u8> for RenderState {
+    fn from(x: u8) -> RenderState {
+        unsafe { std::mem::transmute(x) }
+    }
+}
 
 /// Builder for `Engine`.
 #[derive(Default)]
@@ -67,6 +83,8 @@ impl<'a> EngineBuilder<'a> {
         #[allow(unused_mut)] // Only Android mutates this.
         let mut resumed = false;
         let should_quit = Arc::new(AtomicBool::from(false));
+        let render_state = Arc::new(AtomicU8::from(RenderState::Ready as u8));
+        let swapchain_image_index = Arc::new(AtomicUsize::from(0));
 
         // Before we do ANYTHING - we should process android events
         #[cfg(target_os = "android")]
@@ -80,26 +98,64 @@ impl<'a> EngineBuilder<'a> {
         }
 
         // Now initialize the engine.
-        let (xr_context, vulkan_context) = XrContextBuilder::new()
+        let (xr_context, xr_frame_context, vulkan_context) = XrContextBuilder::new()
             .application_name(self.application_name)
             .application_version(self.application_version)
             .required_extensions(self.openxr_extensions)
             .build()
             .expect("!!FATAL ERROR - Unable to initialize OpenXR!!");
-        let render_context = RenderContext::new(&vulkan_context, &xr_context)
+        let render_context = RenderContext::new(&vulkan_context, &xr_frame_context)
             .expect("!!FATAL ERROR - Unable to initialize renderer!");
         let gui_context = GuiContext::new(&vulkan_context);
-
+        let xr_frame_context = Arc::new(Mutex::new(xr_frame_context));
         // Initialize the world with our "tracking" entities, the stage and the HMD.
         let mut world = hecs::World::default();
         let (stage_entity, hmd_entity) = create_tracking_entities(&mut world);
+        let render_thread = {
+            let should_quit = should_quit.clone();
+            let render_state = render_state.clone();
+            let swapchain_image_index = swapchain_image_index.clone();
+            let xr_frame_context = xr_frame_context.clone();
+
+            Some(std::thread::spawn(move || loop {
+                if should_quit.load(Ordering::Acquire) {
+                    return;
+                }
+                match render_state.load(Ordering::SeqCst).into() {
+                    RenderState::BeginFrame => {
+                        let mut xr_frame_context = xr_frame_context.lock().unwrap();
+                        match xr_frame_context.begin_frame() {
+                            Err(HothamError::NotRendering) => {
+                                render_state.store(RenderState::Ready as u8, Ordering::SeqCst);
+                            }
+                            Ok(i) => {
+                                xr_frame_context.update_views();
+                                swapchain_image_index.store(i, Ordering::SeqCst);
+                                render_state
+                                    .store(RenderState::BeginRender as u8, Ordering::SeqCst);
+                            }
+                            err => panic!("Error beginning frame: {err:?}"),
+                        };
+                    }
+                    RenderState::EndFrame => {
+                        xr_frame_context.lock().unwrap().end_frame().unwrap();
+                        render_state.store(RenderState::Ready as u8, Ordering::SeqCst);
+                    }
+                    _ => {}
+                }
+            }))
+        };
 
         Engine {
             world,
             should_quit,
+            render_state,
+            swapchain_image_index,
+            render_thread,
             resumed,
             event_data_buffer: Default::default(),
             xr_context,
+            xr_frame_context,
             vulkan_context,
             render_context,
             audio_context: Default::default(),
@@ -136,6 +192,9 @@ fn create_tracking_entities(world: &mut hecs::World) -> (hecs::Entity, hecs::Ent
 /// **IMPORTANT**: make sure you call `update` each tick
 pub struct Engine {
     should_quit: Arc<AtomicBool>,
+    render_state: Arc<AtomicU8>,
+    swapchain_image_index: Arc<AtomicUsize>,
+    render_thread: Option<std::thread::JoinHandle<()>>,
     #[allow(dead_code)]
     resumed: bool,
     event_data_buffer: EventDataBuffer,
@@ -143,6 +202,8 @@ pub struct Engine {
     pub world: hecs::World,
     /// OpenXR context
     pub xr_context: XrContext,
+    /// OpenXR context with frame related data
+    pub xr_frame_context: Arc<Mutex<XrFrameContext>>,
     /// Vulkan context
     pub vulkan_context: VulkanContext,
     /// Renderer context
@@ -176,7 +237,7 @@ pub struct TickData {
     /// The current XR state.
     pub current_state: xr::SessionState,
     /// The index of the currently acquired image on the OpenXR swapchain
-    pub swapchain_image_index: usize,
+    pub swapchain_image_index: Option<usize>,
 }
 
 impl Engine {
@@ -206,21 +267,6 @@ impl Engine {
                 (previous_state, current_state)
             };
 
-            // If we're in the FOCUSSED state, process input.
-            if current_state == SessionState::FOCUSED {
-                self.xr_context.update_views();
-                self.input_context.update(&self.xr_context);
-
-                // Since the HMD is parented to the Stage, its LocalTransform (ie. its transform with respect to the parent)
-                // is equal to its pose in stage space.
-                let hmd_in_stage = self.input_context.hmd.hmd_in_stage();
-                let mut transform = self
-                    .world
-                    .get::<&mut LocalTransform>(self.hmd_entity)
-                    .unwrap();
-                transform.update_from_affine(&hmd_in_stage);
-            }
-
             // Handle any state transitions, as required.
             match (previous_state, current_state) {
                 (SessionState::STOPPING, SessionState::IDLE) => {
@@ -243,42 +289,69 @@ impl Engine {
                     self.xr_context.end_session()?;
                     continue;
                 }
+                (_, SessionState::FOCUSED) => {
+                    // If we're in the FOCUSSED state, process input.
+                    let active_action_set =
+                        xr::ActiveActionSet::new(&self.xr_context.input.action_set);
+                    self.xr_context.session.sync_actions(&[active_action_set])?;
+                    self.input_context.update(&self.xr_context);
+
+                    // Since the HMD is parented to the Stage, its LocalTransform (ie. its transform with respect to the parent)
+                    // is equal to its pose in stage space.
+                    let hmd_in_stage = self.input_context.hmd.hmd_in_stage();
+                    let mut transform = self
+                        .world
+                        .get::<&mut LocalTransform>(self.hmd_entity)
+                        .unwrap();
+                    transform.update_from_affine(&hmd_in_stage);
+                }
                 _ => {}
             }
 
             // Check to see if there are any messages from our workers:
             self.check_for_worker_messages();
 
-            let vulkan_context = &self.vulkan_context;
-            let render_context = &mut self.render_context;
+            self.performance_timer.start();
 
-            // In any other state, begin the frame loop.
-            match self.xr_context.begin_frame() {
-                Err(HothamError::NotRendering) => continue,
-                Ok(swapchain_image_index) => {
-                    render_context.begin_frame(vulkan_context);
-                    self.performance_timer.start();
+            // Signal that we're ready to render.
+            match self.render_state.load(Ordering::SeqCst).into() {
+                RenderState::Ready => {
+                    self.render_state
+                        .store(RenderState::BeginFrame as u8, Ordering::SeqCst);
+                }
+                RenderState::BeginRender => {
+                    let swapchain_image_index = self.swapchain_image_index.load(Ordering::SeqCst);
+                    self.render_context.begin_frame(&self.vulkan_context);
+                    self.render_state
+                        .store(RenderState::FinishRender as u8, Ordering::SeqCst);
                     return Ok(TickData {
                         previous_state,
                         current_state,
-                        swapchain_image_index,
+                        swapchain_image_index: Some(swapchain_image_index),
                     });
                 }
-                err => panic!("Error beginning frame: {err:?}"),
-            };
+                _ => {}
+            }
+            return Ok(TickData {
+                previous_state,
+                current_state,
+                swapchain_image_index: None,
+            });
         }
     }
 
     /// Call this after update
     pub fn finish(&mut self) -> xr::Result<()> {
         self.performance_timer.end();
-        let vulkan_context = &self.vulkan_context;
-        let render_context = &mut self.render_context;
-
-        if self.xr_context.frame_state.should_render {
-            render_context.end_frame(vulkan_context);
+        match self.render_state.load(Ordering::SeqCst).into() {
+            RenderState::FinishRender => {
+                self.render_context.end_frame(&self.vulkan_context);
+                self.render_state
+                    .store(RenderState::EndFrame as u8, Ordering::SeqCst);
+            }
+            _ => {}
         }
-        self.xr_context.end_frame()
+        Ok(())
     }
 
     /// Watch some assets, just for fun.
@@ -411,6 +484,15 @@ fn despawn_children(
 impl Default for Engine {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl Drop for Engine {
+    fn drop(&mut self) {
+        self.should_quit.store(true, Ordering::Release);
+        if let Some(render_thread) = self.render_thread.take() {
+            render_thread.join().unwrap();
+        }
     }
 }
 

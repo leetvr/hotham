@@ -15,4 +15,4 @@ pub use input_context::InputContext;
 pub use physics_context::PhysicsContext;
 pub use render_context::RenderContext;
 pub use vulkan_context::VulkanContext;
-pub use xr_context::{XrContext, XrContextBuilder};
+pub use xr_context::{XrContext, XrContextBuilder, XrFrameContext};

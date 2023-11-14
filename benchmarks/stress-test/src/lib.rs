@@ -253,7 +253,9 @@ fn tick(tick_props: &mut TickProps, tick_data: TickData) {
     }
 
     // Rendering!
-    rendering_system(engine, tick_data.swapchain_image_index);
+    if let Some(swapchain_image_index) = tick_data.swapchain_image_index {
+        rendering_system(engine, swapchain_image_index);
+    }
 }
 
 fn subdivide_mesh_system(engine: &mut Engine, timer: &mut Timer) {

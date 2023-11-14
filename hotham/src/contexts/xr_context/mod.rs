@@ -51,7 +51,7 @@ impl<'a> XrContextBuilder<'a> {
         self
     }
 
-    pub fn build(&mut self) -> Result<(XrContext, VulkanContext)> {
+    pub fn build(&mut self) -> Result<(XrContext, XrFrameContext, VulkanContext)> {
         let application_name = self.application_name.unwrap_or("Hotham Application");
         let application_version = self.application_version.unwrap_or(1);
         let (instance, system) = create_xr_instance(
@@ -68,10 +68,15 @@ pub struct XrContext {
     pub instance: openxr::Instance,
     pub session: Session<Vulkan>,
     pub session_state: SessionState,
-    pub swapchain: Swapchain<Vulkan>,
     pub stage_space: Space,
     pub view_space: Space,
     pub input: Input,
+}
+
+pub struct XrFrameContext {
+    pub session: Session<Vulkan>,
+    pub stage_space: Space,
+    pub swapchain: Swapchain<Vulkan>,
     pub swapchain_resolution: vk::Extent2D,
     pub frame_waiter: FrameWaiter,
     pub frame_stream: FrameStream<Vulkan>,
@@ -81,16 +86,18 @@ pub struct XrContext {
 }
 
 impl XrContext {
-    pub fn new() -> Result<(XrContext, VulkanContext)> {
+    pub fn new() -> Result<(XrContext, XrFrameContext, VulkanContext)> {
         XrContextBuilder::new().build()
     }
 
-    pub fn new_from_path<P: AsRef<std::path::Path>>(path: P) -> Result<(XrContext, VulkanContext)> {
+    pub fn new_from_path<P: AsRef<std::path::Path>>(
+        path: P,
+    ) -> Result<(XrContext, XrFrameContext, VulkanContext)> {
         XrContextBuilder::new().path(Some(path.as_ref())).build()
     }
 
     #[cfg(test)]
-    pub fn testing() -> (XrContext, VulkanContext) {
+    pub fn testing() -> (XrContext, XrFrameContext, VulkanContext) {
         XrContext::new_from_path("../openxr_loader.dll").unwrap()
     }
 
@@ -99,13 +106,15 @@ impl XrContext {
         system: xr::SystemId,
         application_name: &str,
         application_version: u32,
-    ) -> Result<(XrContext, VulkanContext)> {
+    ) -> Result<(XrContext, XrFrameContext, VulkanContext)> {
         let vulkan_context =
             create_vulkan_context(&instance, system, application_name, application_version)?;
 
         let (session, frame_waiter, frame_stream) =
             create_xr_session(&instance, system, &vulkan_context)?;
         let stage_space =
+            session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
+        let stage_space2 =
             session.create_reference_space(ReferenceSpaceType::STAGE, xr::Posef::IDENTITY)?;
         let view_space =
             session.create_reference_space(ReferenceSpaceType::VIEW, xr::Posef::IDENTITY)?;
@@ -125,12 +134,16 @@ impl XrContext {
 
         let xr_context = XrContext {
             instance,
-            session,
+            session: session.clone(),
             session_state: SessionState::IDLE,
-            swapchain,
             stage_space,
             view_space,
             input,
+        };
+        let xr_frame_context = XrFrameContext {
+            session,
+            stage_space: stage_space2,
+            swapchain,
             swapchain_resolution,
             frame_waiter,
             frame_stream,
@@ -139,7 +152,7 @@ impl XrContext {
             view_state_flags: ViewStateFlags::EMPTY,
         };
 
-        Ok((xr_context, vulkan_context))
+        Ok((xr_context, xr_frame_context, vulkan_context))
     }
 
     pub(crate) fn poll_xr_event(
@@ -162,6 +175,15 @@ impl XrContext {
         Ok(self.session_state)
     }
 
+    pub(crate) fn end_session(&mut self) -> anyhow::Result<()> {
+        println!("[HOTHAM_XR] - Ending session..");
+        self.session.end()?;
+        println!("[HOTHAM_XR] - ..done!");
+        Ok(())
+    }
+}
+
+impl XrFrameContext {
     pub(crate) fn begin_frame(&mut self) -> HothamResult<usize> {
         self.frame_state = self.frame_waiter.wait()?;
         self.frame_stream.begin()?;
@@ -172,9 +194,6 @@ impl XrContext {
 
         let image_index = self.swapchain.acquire_image()? as _;
         self.swapchain.wait_image(openxr::Duration::INFINITE)?;
-
-        let active_action_set = xr::ActiveActionSet::new(&self.input.action_set);
-        self.session.sync_actions(&[active_action_set])?;
 
         Ok(image_index)
     }
@@ -246,13 +265,6 @@ impl XrContext {
 
         let layers = [&*layer_projection];
         self.frame_stream.end(display_time, BLEND_MODE, &layers)
-    }
-
-    pub(crate) fn end_session(&mut self) -> anyhow::Result<()> {
-        println!("[HOTHAM_XR] - Ending session..");
-        self.session.end()?;
-        println!("[HOTHAM_XR] - ..done!");
-        Ok(())
     }
 }
 

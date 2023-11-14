@@ -27,7 +27,8 @@ pub fn rendering_system(engine: &mut Engine, swapchain_image_index: usize) {
     let render_context = &mut engine.render_context;
 
     // Update views just before rendering.
-    let views = engine.xr_context.update_views();
+    let mut xr_frame_context = engine.xr_frame_context.lock().unwrap();
+    let views = xr_frame_context.update_views();
 
     rendering_system_inner(
         world,

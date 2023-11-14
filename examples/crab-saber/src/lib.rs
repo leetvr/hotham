@@ -59,7 +59,9 @@ fn tick(tick_data: TickData, engine: &mut Engine, game_context: &mut GameContext
     }
 
     // Draw objects
-    rendering_system(engine, tick_data.swapchain_image_index);
+    if let Some(swapchain_image_index) = tick_data.swapchain_image_index {
+        rendering_system(engine, swapchain_image_index);
+    }
 }
 
 fn handle_state_change(tick_data: &TickData, engine: &mut Engine, game_context: &mut GameContext) {

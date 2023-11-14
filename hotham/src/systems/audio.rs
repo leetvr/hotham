@@ -25,10 +25,7 @@ fn audio_system_inner(world: &mut World, audio_context: &mut AudioContext, xr_co
     // First, where is the listener?
     let (stage_from_listener, listener_velocity_in_stage) = xr_context
         .view_space
-        .relate(
-            &xr_context.stage_space,
-            xr_context.frame_state.predicted_display_time, // TODO: Use "now" instead.
-        )
+        .relate(&xr_context.stage_space, xr_context.now().unwrap())
         .unwrap();
 
     if !is_space_valid(&stage_from_listener) {
@@ -110,7 +107,7 @@ mod tests {
     const DURATION_SECS: u32 = 3;
 
     use crate::{
-        contexts::{audio_context::MusicTrack, PhysicsContext, XrContext},
+        contexts::{audio_context::MusicTrack, PhysicsContext, XrContext, XrFrameContext},
         HothamError, VIEW_TYPE,
     };
 
@@ -119,7 +116,7 @@ mod tests {
     #[test]
     pub fn test_audio_system() {
         // Create resources
-        let (mut xr_context, _) = XrContext::testing();
+        let (mut xr_context, mut xr_frame_context, _) = XrContext::testing();
         let mut audio_context = AudioContext::default();
         let mut physics_context = PhysicsContext::default();
 
@@ -156,6 +153,7 @@ mod tests {
 
             tick(
                 &mut xr_context,
+                &mut xr_frame_context,
                 audio_entity,
                 &mut world,
                 &mut audio_context,
@@ -170,6 +168,7 @@ mod tests {
     #[allow(clippy::too_many_arguments)]
     fn tick(
         xr_context: &mut XrContext,
+        xr_frame_context: &mut XrFrameContext,
         audio_entity: Entity,
         world: &mut World,
         audio_context: &mut AudioContext,
@@ -178,7 +177,7 @@ mod tests {
         tell_me_that_i_cant: MusicTrack,
         physics_context: &mut PhysicsContext,
     ) {
-        update_xr(xr_context);
+        update_xr(xr_frame_context);
         update_audio(
             audio_entity,
             world,
@@ -188,26 +187,26 @@ mod tests {
             tell_me_that_i_cant,
         );
         physics_context.update();
-        xr_context.end_frame().unwrap();
+        xr_frame_context.end_frame().unwrap();
         audio_system_inner(world, audio_context, xr_context);
     }
 
-    fn update_xr(xr_context: &mut XrContext) {
-        match xr_context.begin_frame() {
+    fn update_xr(xr_frame_context: &mut XrFrameContext) {
+        match xr_frame_context.begin_frame() {
             Err(HothamError::NotRendering) => (),
             Ok(_) => (),
             err => panic!("Error beginning frame: {err:?}"),
         };
-        let (view_state_flags, views) = xr_context
+        let (view_state_flags, views) = xr_frame_context
             .session
             .locate_views(
                 VIEW_TYPE,
-                xr_context.frame_state.predicted_display_time,
-                &xr_context.stage_space,
+                xr_frame_context.frame_state.predicted_display_time,
+                &xr_frame_context.stage_space,
             )
             .unwrap();
-        xr_context.views = views;
-        xr_context.view_state_flags = view_state_flags;
+        xr_frame_context.views = views;
+        xr_frame_context.view_state_flags = view_state_flags;
     }
 
     fn update_audio(

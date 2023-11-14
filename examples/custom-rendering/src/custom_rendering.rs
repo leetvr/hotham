@@ -45,7 +45,8 @@ pub fn custom_rendering_system(
     let render_context = &mut engine.render_context;
 
     // Update views just before rendering.
-    let views = engine.xr_context.update_views();
+    let mut xr_frame_context = engine.xr_frame_context.lock().unwrap();
+    let views = xr_frame_context.update_views();
 
     custom_rendering_system_inner(
         world,

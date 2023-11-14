@@ -70,11 +70,9 @@ fn tick(
         debug_system(engine);
     }
 
-    custom_rendering_system(
-        engine,
-        custom_render_context,
-        tick_data.swapchain_image_index,
-    );
+    if let Some(swapchain_image_index) = tick_data.swapchain_image_index {
+        custom_rendering_system(engine, custom_render_context, swapchain_image_index);
+    }
 }
 
 fn hot_reloading_system(engine: &mut Engine, custom_render_context: &mut CustomRenderContext) {

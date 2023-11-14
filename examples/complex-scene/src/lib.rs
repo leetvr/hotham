@@ -49,7 +49,9 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         debug_system(engine);
     }
 
-    rendering_system(engine, tick_data.swapchain_image_index);
+    if let Some(swapchain_image_index) = tick_data.swapchain_image_index {
+        rendering_system(engine, swapchain_image_index);
+    }
 }
 
 fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {

@@ -23,7 +23,7 @@ const RESOLVE_ATTACHMENT: u32 = 3;
 const RESOLVE_ATTACHMENT: u32 = 2;
 
 use crate::{
-    contexts::{VulkanContext, XrContext},
+    contexts::{VulkanContext, XrFrameContext},
     rendering::{
         camera::{extract_planes_from_frustum, Camera, Frustum},
         descriptors::Descriptors,
@@ -102,10 +102,10 @@ impl Shaders {
 }
 
 impl RenderContext {
-    pub fn new(vulkan_context: &VulkanContext, xr_context: &XrContext) -> Result<Self> {
+    pub fn new(vulkan_context: &VulkanContext, xr_frame_context: &XrFrameContext) -> Result<Self> {
         println!("[HOTHAM_RENDERER] Creating renderer..");
-        let xr_swapchain = &xr_context.swapchain;
-        let swapchain_resolution = xr_context.swapchain_resolution;
+        let xr_swapchain = &xr_frame_context.swapchain;
+        let swapchain_resolution = xr_frame_context.swapchain_resolution;
 
         // Build swapchain
         let swapchain = SwapchainInfo::from_openxr_swapchain(xr_swapchain, swapchain_resolution)?;
