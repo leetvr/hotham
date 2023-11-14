@@ -23,6 +23,8 @@
     "egui",
     "emath",
     "epaint",
+    "Foveated",
+    "Foveation",
     "Fovf",
     "framebuffer",
     "framebuffers",
