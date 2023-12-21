@@ -31,7 +31,7 @@ pkgs.mkShell rec {
 
     cargo-apk adoptopenjdk-bin
 
-    shaderc
+    shaderc python3
     vulkan-headers vulkan-loader
     vulkan-tools vulkan-tools-lunarg
     vulkan-validation-layers vulkan-extension-layer
