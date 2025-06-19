@@ -2,16 +2,17 @@ use crate::{
     components::{GlobalTransform, LocalTransform, Parent},
     Engine,
 };
-use hecs::World;
+use hecs::{Entity, World};
 
 /// Update global transform system
 /// Updates [`GlobalTransform`] based on [`LocalTransform`] and the hierarchy of [`Parent`]s.
 pub fn update_global_transform_system(engine: &mut Engine) {
     let world = &mut engine.world;
-    update_global_transform_system_inner(world);
+    let graveyard = &mut engine.graveyard;
+    update_global_transform_system_inner(world, graveyard);
 }
 
-pub(crate) fn update_global_transform_system_inner(world: &mut World) {
+pub(crate) fn update_global_transform_system_inner(world: &mut World, graveyard: &mut Vec<Entity>) {
     // Update GlobalTransform of roots
     for (_, (local_transform, global_transform)) in world
         .query_mut::<(&LocalTransform, &mut GlobalTransform)>()
@@ -34,7 +35,7 @@ pub(crate) fn update_global_transform_system_inner(world: &mut World) {
     // references because the inclusion of `&Parent` in the query, and its exclusion from the view,
     // guarantees that they will never overlap. Similarly, it can coexist with `parents` because
     // that view does not reference `GlobalTransform`s at all.
-    for (_entity, (parent, local_transform, global_transform)) in world
+    for (entity, (parent, local_transform, global_transform)) in world
         .query::<(&Parent, &LocalTransform, &mut GlobalTransform)>()
         .iter()
     {
@@ -44,6 +45,12 @@ pub(crate) fn update_global_transform_system_inner(world: &mut World) {
         // cache-friendly.
         let mut relative = local_transform.to_affine();
         let mut ancestor = parent.0;
+
+        if !world.contains(ancestor) {
+            graveyard.push(entity);
+            continue;
+        }
+
         while let Some((next, next_local)) = parents.get(ancestor) {
             relative = next_local.to_affine() * relative;
             ancestor = next.0;
@@ -69,6 +76,8 @@ mod tests {
     #[test]
     pub fn test_transform_system() {
         let mut world = World::new();
+        let mut graveyard = Vec::new();
+
         let parent_local_transform = LocalTransform {
             translation: [1.0, 1.0, 100.0].into(),
             ..Default::default()
@@ -88,7 +97,7 @@ mod tests {
             Parent(child),
         ));
 
-        update_global_transform_system_inner(&mut world);
+        update_global_transform_system_inner(&mut world, &mut graveyard);
 
         {
             let global_transform = world.get::<&GlobalTransform>(grandchild).unwrap();
@@ -106,6 +115,8 @@ mod tests {
     #[test]
     pub fn test_transform_system_extensive() {
         let mut world = World::new();
+        let mut graveyard = Vec::new();
+
         let mut hierarchy: HashMap<usize, Vec<usize>> = HashMap::new();
         let mut node_entity: HashMap<usize, Entity> = HashMap::new();
         let mut entity_node: HashMap<Entity, usize> = HashMap::new();
@@ -147,7 +158,7 @@ mod tests {
             let mut local_transform = world.get::<&mut LocalTransform>(*root_entity).unwrap();
             local_transform.translation = [100.0, 100.0, 100.0].into();
         }
-        update_global_transform_system_inner(&mut world);
+        update_global_transform_system_inner(&mut world, &mut graveyard);
 
         for (_, (global_transform, parent, info)) in
             world.query::<(&GlobalTransform, &Parent, &Info)>().iter()
@@ -190,7 +201,7 @@ mod tests {
     pub fn test_entities_without_transforms() {
         let mut world = World::new();
         world.spawn((0,));
-        update_global_transform_system_inner(&mut world);
+        update_global_transform_system_inner(&mut world, &mut Default::default());
     }
 
     #[test]
@@ -216,7 +227,7 @@ mod tests {
             local_transform.scale = test_translation;
         }
 
-        update_global_transform_system_inner(&mut world);
+        update_global_transform_system_inner(&mut world, &mut Default::default());
 
         let expected_matrix = Affine3A::from_scale_rotation_translation(
             [5.0, 1.0, 2.0].into(),

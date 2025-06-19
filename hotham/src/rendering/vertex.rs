@@ -1,6 +1,5 @@
 use ash::vk;
 use glam::{Vec2, Vec3, Vec4};
-// const VERTEX_FORMAT: vk::Format = vk::Format::R16G16B16_SFLOAT;
 const VERTEX_FORMAT: vk::Format = vk::Format::R32G32B32_SFLOAT;
 
 /// Representation of a single vertex, usually imported from a glTF file.
@@ -33,7 +32,7 @@ impl Vertex {
 
     /// Create a new vertex from a zip - useful when importing from glTF
     // Clippy warning suppressed for adjudication separately
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
+    #[allow(clippy::type_complexity)]
     pub fn from_zip(t: (Vec3, Vec2, [u8; 4], Vec4)) -> Self {
         // Normalize weights to 0 <= w <= 255 while avoiding division with zero.
         let max_weight = t.3.max_element().max(f32::EPSILON);

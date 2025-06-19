@@ -151,6 +151,7 @@ use ash::vk;
 use std::marker::PhantomData;
 
 #[cfg(test)]
+/// Does what it says
 pub unsafe fn get_from_device_memory<'a, T: Sized>(
     vulkan_context: &VulkanContext,
     buffer: &'a Buffer<T>,
@@ -168,6 +169,7 @@ pub unsafe fn get_from_device_memory<'a, T: Sized>(
 }
 
 #[cfg(test)]
+/// Does what it says
 pub fn test_buffer<T>() -> Buffer<T> {
     Buffer {
         handle: vk::Buffer::null(),

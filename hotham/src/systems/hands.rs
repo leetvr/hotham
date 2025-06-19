@@ -88,7 +88,7 @@ pub fn add_hand(
     models: &std::collections::HashMap<String, World>,
     handedness: Handedness,
     world: &mut World,
-) {
+) -> hecs::Entity {
     let (hand_component, model_name) = match handedness {
         Handedness::Left => (Hand::left(), "Left Hand"),
         Handedness::Right => (Hand::right(), "Right Hand"),
@@ -116,6 +116,8 @@ pub fn add_hand(
     world
         .insert(hand_entity, (collider, hand_component))
         .unwrap();
+
+    hand_entity
 }
 
 #[cfg(test)]

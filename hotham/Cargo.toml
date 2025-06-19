@@ -26,7 +26,7 @@ id-arena = "2.2.1"
 image = {version = "0.24.3", default-features = false, features = ["jpeg", "png"]}
 itertools = "0.10.0"
 # ktx2 = "0.3"
-ktx2 = {git = "https://github.com/BVE-Reborn/ktx2"}
+ktx2 = {git = "https://github.com/BVE-Reborn/ktx2", rev="be27131c716686a416e6a805a26384f74a7353ff"}
 memoffset = "0.8.0"
 mint = "0.5.6"
 notify-debouncer-mini = "0.2.1"
@@ -49,8 +49,8 @@ serde_json = "1.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.19.0"
-ndk = "0.6"
-ndk-glue = "0.6"
+ndk = "0.7"
+ndk-glue = "0.7"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = {version = "0.48", features = ["Win32_Foundation", "Win32_System_Performance"]}

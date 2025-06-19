@@ -51,6 +51,7 @@ pub struct CustomRenderContext {
     /// Data for the holographic primitives that will be drawn this frame, indexed by gl_InstanceId
     pub quadrics_data_buffer: Buffer<QuadricData>,
     /// Descriptors for quadrics pipeline
+    #[allow(unused)]
     pub quadrics_descriptor_set_layout: vk::DescriptorSetLayout,
     pub quadrics_descriptor_set: vk::DescriptorSet,
 

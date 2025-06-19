@@ -36,11 +36,10 @@ use rand::random;
 use std::{
     ffi::{CStr, CString},
     fmt::Debug,
-    intrinsics::{copy_nonoverlapping, transmute},
     io::Cursor,
-    mem::size_of,
+    mem::{size_of, transmute},
     os::raw::c_char,
-    ptr::{self, null_mut},
+    ptr::{self, copy_nonoverlapping, null_mut},
     slice,
     sync::{atomic::Ordering::Relaxed, mpsc::channel, Mutex, MutexGuard},
     thread,

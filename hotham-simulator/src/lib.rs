@@ -36,7 +36,7 @@ pub unsafe extern "C" fn get_instance_proc_addr(
     name: *const i8,
     function: *mut PFN_xrVoidFunction,
 ) -> XrResult {
-    use std::{ffi::CStr, intrinsics::transmute};
+    use std::{ffi::CStr, mem::transmute};
 
     let name = CStr::from_ptr(name);
     let name = name.to_bytes();
