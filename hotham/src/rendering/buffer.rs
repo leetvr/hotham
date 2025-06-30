@@ -38,7 +38,7 @@ impl<T: Sized> Buffer<T> {
 
         let buffer = device
             .create_buffer(
-                &vk::BufferCreateInfo::builder().usage(usage).size(size),
+                &vk::BufferCreateInfo::default().usage(usage).size(size),
                 None,
             )
             .unwrap();
@@ -144,7 +144,7 @@ impl<T: Sized> Buffer<T> {
         descriptor_set: vk::DescriptorSet,
         binding: u32,
     ) {
-        let buffer_info = vk::DescriptorBufferInfo::builder()
+        let buffer_info = vk::DescriptorBufferInfo::default()
             .buffer(self.buffer)
             .offset(0)
             .range(vk::WHOLE_SIZE);
@@ -155,7 +155,7 @@ impl<T: Sized> Buffer<T> {
             vk::DescriptorType::STORAGE_BUFFER
         };
 
-        let write = vk::WriteDescriptorSet::builder()
+        let write = vk::WriteDescriptorSet::default()
             .buffer_info(std::slice::from_ref(&buffer_info))
             .dst_set(descriptor_set)
             .dst_binding(binding)

@@ -57,40 +57,35 @@ impl Vertex {
 impl Vertex {
     /// Get the vertex attributes to be used in the Vertex Shader
     pub fn attribute_descriptions() -> Vec<vk::VertexInputAttributeDescription> {
-        let position = vk::VertexInputAttributeDescription::builder()
+        let position = vk::VertexInputAttributeDescription::default()
             .binding(0)
             .location(0)
             .format(VERTEX_FORMAT)
-            .offset(0)
-            .build();
+            .offset(0);
 
-        let normal = vk::VertexInputAttributeDescription::builder()
+        let normal = vk::VertexInputAttributeDescription::default()
             .binding(1)
             .location(1)
             .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, normal) as _)
-            .build();
+            .offset(std::mem::offset_of!(Vertex, normal) as _);
 
-        let texture_coords = vk::VertexInputAttributeDescription::builder()
+        let texture_coords = vk::VertexInputAttributeDescription::default()
             .binding(1)
             .location(2)
             .format(vk::Format::R32G32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, texture_coords) as _)
-            .build();
+            .offset(std::mem::offset_of!(Vertex, texture_coords) as _);
 
-        let joint_indices = vk::VertexInputAttributeDescription::builder()
+        let joint_indices = vk::VertexInputAttributeDescription::default()
             .binding(1)
             .location(3)
             .format(vk::Format::R32_UINT)
-            .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
-            .build();
+            .offset(std::mem::offset_of!(Vertex, joint_indices) as _);
 
-        let joint_weights = vk::VertexInputAttributeDescription::builder()
+        let joint_weights = vk::VertexInputAttributeDescription::default()
             .binding(1)
             .location(4)
             .format(vk::Format::R32_UINT)
-            .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
-            .build();
+            .offset(std::mem::offset_of!(Vertex, joint_weights) as _);
 
         vec![
             position,

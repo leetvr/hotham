@@ -1,5 +1,5 @@
 [package]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "custom-rendering-example"
 version = "0.2.0"
@@ -12,8 +12,8 @@ name = "hotham_custom_rendering_example"
 path = "src/main.rs"
 
 [dependencies]
-hotham = {path = "../../hotham"}
-hotham-examples = {path = "../shared"}
+hotham = { path = "../../hotham" }
+hotham-examples = { path = "../shared" }
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.6"
@@ -50,7 +50,10 @@ value = "vr_only"
 
 [[package.metadata.android.application.activity.intent_filter]]
 actions = ["android.intent.action.MAIN"]
-categories = ["com.oculus.intent.category.VR", "android.intent.category.LAUNCHER"]
+categories = [
+    "com.oculus.intent.category.VR",
+    "android.intent.category.LAUNCHER",
+]
 
 [[package.metadata.android.application.activity.meta_data]]
 name = "com.oculus.vr.focusaware"

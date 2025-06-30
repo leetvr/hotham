@@ -62,13 +62,12 @@ impl Descriptors {
         };
 
         let texture_writes = self.sets.map(|set| {
-            vk::WriteDescriptorSet::builder()
+            vk::WriteDescriptorSet::default()
                 .image_info(std::slice::from_ref(&image_info))
                 .dst_binding(TEXTURE_BINDING)
                 .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .dst_array_element(array_index)
                 .dst_set(set)
-                .build()
         });
 
         vulkan_context
@@ -90,13 +89,12 @@ impl Descriptors {
         };
 
         let texture_writes = self.sets.map(|set| {
-            vk::WriteDescriptorSet::builder()
+            vk::WriteDescriptorSet::default()
                 .image_info(std::slice::from_ref(&image_info))
                 .dst_binding(CUBE_TEXTURE_BINDING)
                 .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                 .dst_array_element(array_index)
                 .dst_set(set)
-                .build()
         });
 
         vulkan_context
@@ -115,7 +113,7 @@ unsafe fn allocate_descriptor_sets(
     vulkan_context
         .device
         .allocate_descriptor_sets(
-            &vk::DescriptorSetAllocateInfo::builder()
+            &vk::DescriptorSetAllocateInfo::default()
                 .descriptor_pool(pool)
                 .set_layouts(&layouts),
         )
@@ -135,7 +133,7 @@ unsafe fn allocate_compute_descriptor_sets(
     vulkan_context
         .device
         .allocate_descriptor_sets(
-            &vk::DescriptorSetAllocateInfo::builder()
+            &vk::DescriptorSetAllocateInfo::default()
                 .descriptor_pool(pool)
                 .set_layouts(&layouts),
         )
@@ -219,12 +217,12 @@ unsafe fn create_descriptor_layouts(
         flags,
         flags,
     ];
-    let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
+    let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::default()
         .binding_flags(&descriptor_flags);
 
     let graphics_layout = device
         .create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder()
+            &vk::DescriptorSetLayoutCreateInfo::default()
                 .bindings(&graphics_bindings)
                 .push_next(&mut binding_flags),
             None,
@@ -233,7 +231,7 @@ unsafe fn create_descriptor_layouts(
 
     let compute_layout = device
         .create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&compute_bindings),
+            &vk::DescriptorSetLayoutCreateInfo::default().bindings(&compute_bindings),
             None,
         )
         .unwrap();
@@ -258,7 +256,7 @@ unsafe fn create_descriptor_pool(device: &ash::Device) -> vk::DescriptorPool {
     ];
     device
         .create_descriptor_pool(
-            &vk::DescriptorPoolCreateInfo::builder()
+            &vk::DescriptorPoolCreateInfo::default()
                 .pool_sizes(&pool_sizes)
                 .max_sets(1000),
             None,

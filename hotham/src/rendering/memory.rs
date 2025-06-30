@@ -20,7 +20,7 @@ pub(crate) unsafe fn allocate_memory(
     println!("[HOTHAM_VULKAN] Using memory type {memory_type_index}");
     device
         .allocate_memory(
-            &vk::MemoryAllocateInfo::builder()
+            &vk::MemoryAllocateInfo::default()
                 .allocation_size(memory_requirements.size)
                 .memory_type_index(memory_type_index as _),
             None,

@@ -8,8 +8,8 @@ use crate::openxr_loader::{self, XrExtensionProperties, XrResult};
 use crate::space_state::SpaceState;
 use crate::state::State;
 
+use crate::windowing;
 use ash::{
-    extensions::khr,
     util::read_spv,
     vk::{self, DeviceCreateInfo, Handle},
     Device, Entry as AshEntry, Instance as AshInstance,
@@ -41,27 +41,10 @@ use std::{
     os::raw::c_char,
     ptr::{self, copy_nonoverlapping, null_mut},
     slice,
-    sync::{atomic::Ordering::Relaxed, mpsc::channel, Mutex, MutexGuard},
-    thread,
-};
-use winit::event::DeviceEvent;
-
-#[cfg(any(target_os = "windows", target_os = "linux"))]
-use winit::{
-    dpi::PhysicalSize,
-    event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
-    platform::run_return::EventLoopExtRunReturn,
-    window::WindowBuilder,
+    sync::{mpsc::channel, Mutex},
 };
 
-#[cfg(target_os = "windows")]
-use winit::platform::windows::EventLoopExtWindows;
-
-#[cfg(target_os = "linux")]
-use winit::platform::unix::EventLoopExtUnix;
-
-static SWAPCHAIN_COLOR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
+pub static SWAPCHAIN_COLOR_FORMAT: vk::Format = vk::Format::B8G8R8A8_SRGB;
 pub const NUM_VIEWS: usize = 2; // TODO: Make dynamic
 pub const VIEWPORT_HEIGHT: u32 = 1000;
 pub const VIEWPORT_WIDTH: u32 = 1000;
@@ -125,6 +108,7 @@ pub unsafe extern "system" fn create_vulkan_instance(
     vulkan_instance: *mut VkInstance,
     vulkan_result: *mut VkResult,
 ) -> Result {
+    let mut state = STATE.lock().unwrap();
     let vulkan_create_info: &ash::vk::InstanceCreateInfo =
         transmute(&(*create_info).vulkan_create_info);
     let get_instance_proc_addr = (*create_info).pfn_get_instance_proc_addr.unwrap();
@@ -132,44 +116,40 @@ pub unsafe extern "system" fn create_vulkan_instance(
     let create_instance: vk::PFN_vkCreateInstance =
         transmute(get_instance_proc_addr(ptr::null(), vk_create_instance));
     let mut instance = vk::Instance::null();
-
-    let event_loop: EventLoop<()> = EventLoop::new_any_thread();
-    let window = WindowBuilder::new()
-        .with_visible(false)
-        .build(&event_loop)
-        .unwrap();
-
     let mut create_info = *vulkan_create_info;
-    let mut enabled_extensions = ash_window::enumerate_required_extensions(&window).unwrap();
-    let xr_extensions = slice::from_raw_parts(
+
+    // Start with our window extensions
+    let mut enabled_extensions: Vec<*const c_char> = windowing::get_window_extensions()
+        .iter()
+        .map(|ext| ext.as_ptr())
+        .collect();
+
+    // Get the extensions the user gave us
+    let user_supplied_extensions = slice::from_raw_parts(
         create_info.pp_enabled_extension_names,
         create_info.enabled_extension_count as usize,
     );
-    for ext in xr_extensions {
-        enabled_extensions.push(CStr::from_ptr(*ext));
+
+    // Add them into our list
+    for ext in user_supplied_extensions {
+        enabled_extensions.push(*ext);
     }
 
-    let enabled_extensions = enabled_extensions
-        .iter()
-        .map(|e| e.as_ptr())
-        .collect::<Vec<_>>();
     create_info.enabled_extension_count = enabled_extensions.len() as _;
     create_info.pp_enabled_extension_names = enabled_extensions.as_ptr();
 
-    let entry = AshEntry::new().unwrap();
+    let entry = AshEntry::load().unwrap();
     let result = create_instance(&create_info, ptr::null(), &mut instance);
     *vulkan_result = result.as_raw();
     if result != vk::Result::SUCCESS {
         return Result::ERROR_VALIDATION_FAILURE;
     }
-    let static_fn = vk::StaticFn {
+    let static_fn = ash::StaticFn {
         get_instance_proc_addr: transmute(get_instance_proc_addr),
     };
     let ash_instance = AshInstance::load(&static_fn, instance);
 
     *vulkan_instance = transmute(instance);
-
-    let mut state = STATE.lock().unwrap();
 
     state.vulkan_entry.replace(entry);
     state.vulkan_instance.replace(ash_instance);
@@ -192,7 +172,7 @@ pub unsafe extern "system" fn create_vulkan_device(
         create_info.enabled_extension_count as usize,
     )
     .to_vec();
-    extensions.push(khr::Swapchain::name().as_ptr());
+    extensions.push(ash::khr::swapchain::NAME.as_ptr());
     create_info.pp_enabled_extension_names = extensions.as_ptr();
     create_info.enabled_extension_count = extensions.len() as u32;
 
@@ -220,11 +200,11 @@ pub unsafe extern "system" fn create_vulkan_device(
 }
 
 unsafe fn create_and_store_device(device: ash::Device, queue_family_index: u32, state: &mut State) {
-    let info = vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED);
+    let info = vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED);
     state.swapchain_fence = device.create_fence(&info, None).unwrap();
     state.command_pool = device
         .create_command_pool(
-            &vk::CommandPoolCreateInfo::builder()
+            &vk::CommandPoolCreateInfo::default()
                 .queue_family_index(queue_family_index)
                 .flags(
                     vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
@@ -245,7 +225,7 @@ unsafe fn create_and_store_device(device: ash::Device, queue_family_index: u32, 
 }
 
 unsafe fn create_semaphores(device: &Device) -> Vec<vk::Semaphore> {
-    let semaphore_info = vk::SemaphoreCreateInfo::builder();
+    let semaphore_info = vk::SemaphoreCreateInfo::default();
     (0..3)
         .map(|_| {
             device
@@ -285,7 +265,7 @@ pub unsafe extern "system" fn get_vulkan_physical_device(
     vk_physical_device: *mut VkPhysicalDevice,
 ) -> Result {
     // Create an entry
-    let entry = AshEntry::new().unwrap();
+    let entry = AshEntry::load().unwrap();
 
     // Create an instance wrapping the instance we were passed
     let ash_instance = AshInstance::load(entry.static_fn(), transmute(vk_instance));
@@ -383,9 +363,9 @@ pub unsafe extern "system" fn create_session(
     Result::SUCCESS
 }
 
-fn create_pipeline_layout(state: &MutexGuard<State>) -> vk::PipelineLayout {
+fn create_pipeline_layout(state: &mut State) -> vk::PipelineLayout {
     let layouts = &[state.descriptor_set_layout];
-    let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::builder().set_layouts(layouts);
+    let pipeline_layout_create_info = vk::PipelineLayoutCreateInfo::default().set_layouts(layouts);
 
     unsafe {
         state
@@ -397,10 +377,10 @@ fn create_pipeline_layout(state: &MutexGuard<State>) -> vk::PipelineLayout {
     }
 }
 
-unsafe fn create_render_pass(state: &MutexGuard<State>) -> vk::RenderPass {
+unsafe fn create_render_pass(state: &mut State) -> vk::RenderPass {
     let device = state.device.as_ref().unwrap();
 
-    let color_attachment = vk::AttachmentDescription::builder()
+    let color_attachment = vk::AttachmentDescription::default()
         .format(SWAPCHAIN_COLOR_FORMAT)
         .load_op(vk::AttachmentLoadOp::CLEAR)
         .store_op(vk::AttachmentStoreOp::STORE)
@@ -408,35 +388,31 @@ unsafe fn create_render_pass(state: &MutexGuard<State>) -> vk::RenderPass {
         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(vk::ImageLayout::PRESENT_SRC_KHR)
-        .samples(vk::SampleCountFlags::TYPE_1)
-        .build();
+        .samples(vk::SampleCountFlags::TYPE_1);
 
-    let color_attachment_ref = vk::AttachmentReference::builder()
+    let color_attachment_ref = vk::AttachmentReference::default()
         .attachment(0)
-        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-        .build();
+        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
     let color_attachment_refs = [color_attachment_ref];
 
     let attachments = [color_attachment];
 
-    let subpass = vk::SubpassDescription::builder()
+    let subpass = vk::SubpassDescription::default()
         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-        .color_attachments(&color_attachment_refs)
-        .build();
+        .color_attachments(&color_attachment_refs);
     let subpasses = [subpass];
 
-    let dependency = vk::SubpassDependency::builder()
+    let dependency = vk::SubpassDependency::default()
         .src_subpass(vk::SUBPASS_EXTERNAL)
         .dst_subpass(0)
         .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
         .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
         .src_access_mask(vk::AccessFlags::empty())
-        .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
-        .build();
+        .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE);
     let dependencies = [dependency];
 
-    let create_info = vk::RenderPassCreateInfo::builder()
+    let create_info = vk::RenderPassCreateInfo::default()
         .attachments(&attachments)
         .subpasses(&subpasses)
         .dependencies(&dependencies);
@@ -446,11 +422,11 @@ unsafe fn create_render_pass(state: &MutexGuard<State>) -> vk::RenderPass {
         .expect("Unable to create render pass")
 }
 
-fn create_pipelines(state: &MutexGuard<State>) -> Vec<vk::Pipeline> {
+fn create_pipelines(state: &mut State) -> Vec<vk::Pipeline> {
     vec![create_pipeline(state, 0), create_pipeline(state, 1)]
 }
 
-fn create_pipeline(state: &MutexGuard<State>, i: usize) -> vk::Pipeline {
+fn create_pipeline(state: &mut State, i: usize) -> vk::Pipeline {
     let device = state.device.as_ref().unwrap();
     let pipeline_layout = state.pipeline_layout;
     let render_pass = state.render_pass;
@@ -466,20 +442,20 @@ fn create_pipeline(state: &MutexGuard<State>, i: usize) -> vk::Pipeline {
     let name = CString::new("main").unwrap();
     let vertex_shader_module = unsafe {
         device.create_shader_module(
-            &vk::ShaderModuleCreateInfo::builder().code(&vert_shader_code),
+            &vk::ShaderModuleCreateInfo::default().code(&vert_shader_code),
             None,
         )
     }
     .unwrap();
     let frag_shader_module = unsafe {
         device.create_shader_module(
-            &vk::ShaderModuleCreateInfo::builder().code(&frag_shader_code),
+            &vk::ShaderModuleCreateInfo::default().code(&frag_shader_code),
             None,
         )
     }
     .unwrap();
 
-    let rasterizer_create_info = vk::PipelineRasterizationStateCreateInfo::builder()
+    let rasterizer_create_info = vk::PipelineRasterizationStateCreateInfo::default()
         .depth_clamp_enable(false)
         .rasterizer_discard_enable(false)
         .polygon_mode(vk::PolygonMode::FILL)
@@ -488,94 +464,88 @@ fn create_pipeline(state: &MutexGuard<State>, i: usize) -> vk::Pipeline {
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .depth_bias_enable(false);
 
-    let vertex_shader_stage_info = vk::PipelineShaderStageCreateInfo::builder()
-        .stage(vk::ShaderStageFlags::VERTEX)
-        .module(vertex_shader_module)
-        .name(name.as_c_str())
-        .build();
-
-    let map_entries = vk::SpecializationMapEntry::builder()
-        .size(size_of::<f32>())
-        .build();
-
-    let input_assembly_create_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
+    let input_assembly_create_info = vk::PipelineInputAssemblyStateCreateInfo::default()
         .topology(vk::PrimitiveTopology::TRIANGLE_LIST)
         .primitive_restart_enable(false);
 
-    let viewport_state_create_info = vk::PipelineViewportStateCreateInfo::builder()
+    let viewport_state_create_info = vk::PipelineViewportStateCreateInfo::default()
         .viewport_count(1)
         .scissor_count(1);
 
-    let multisampling_create_info = vk::PipelineMultisampleStateCreateInfo::builder()
+    let multisampling_create_info = vk::PipelineMultisampleStateCreateInfo::default()
         .sample_shading_enable(false)
         .rasterization_samples(vk::SampleCountFlags::TYPE_1)
         .min_sample_shading(1.0);
 
-    let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
+    let color_blend_attachment = vk::PipelineColorBlendAttachmentState::default()
         .color_write_mask(
             vk::ColorComponentFlags::R
                 | vk::ColorComponentFlags::G
                 | vk::ColorComponentFlags::B
                 | vk::ColorComponentFlags::A,
         )
-        .blend_enable(false)
-        .build();
+        .blend_enable(false);
 
     let color_blend_attachments = [color_blend_attachment];
 
-    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
+    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
         .logic_op_enable(false)
         .attachments(&color_blend_attachments);
 
-    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder().build();
+    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::default();
     let data = i as f32;
-    let specialization_info = vk::SpecializationInfo::builder()
-        .data(&(data.to_ne_bytes()))
-        .map_entries(&[map_entries])
-        .build();
-
-    let frag_shader_stage_info = vk::PipelineShaderStageCreateInfo::builder()
-        .stage(vk::ShaderStageFlags::FRAGMENT)
-        .module(frag_shader_module)
-        .name(name.as_c_str())
-        .specialization_info(&specialization_info)
-        .build();
-
-    let shader_stages = [vertex_shader_stage_info, frag_shader_stage_info];
     let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
 
-    let dynamic_state_info = vk::PipelineDynamicStateCreateInfo::builder()
-        .dynamic_states(&dynamic_states)
-        .build();
+    let dynamic_state_info =
+        vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
 
-    let info = vk::GraphicsPipelineCreateInfo::builder()
-        .stages(&shader_stages)
-        .vertex_input_state(&vertex_input_state)
-        .input_assembly_state(&input_assembly_create_info)
-        .viewport_state(&viewport_state_create_info)
-        .rasterization_state(&rasterizer_create_info)
-        .multisample_state(&multisampling_create_info)
-        .color_blend_state(&color_blend_state)
-        .dynamic_state(&dynamic_state_info)
-        .layout(pipeline_layout)
-        .render_pass(render_pass)
-        .subpass(0)
-        .build();
-
-    let create_infos = [info];
     let device = state.device.as_ref().unwrap();
-    let pipeline =
-        unsafe { device.create_graphics_pipelines(vk::PipelineCache::null(), &create_infos, None) }
-            .expect("Unable to create pipeline")
-            .pop()
-            .unwrap();
+    let pipeline = unsafe {
+        device.create_graphics_pipelines(
+            vk::PipelineCache::null(),
+            &[vk::GraphicsPipelineCreateInfo::default()
+                .stages(&[
+                    // Vertex
+                    vk::PipelineShaderStageCreateInfo::default()
+                        .stage(vk::ShaderStageFlags::VERTEX)
+                        .module(vertex_shader_module)
+                        .name(name.as_c_str()),
+                    // Fragment
+                    vk::PipelineShaderStageCreateInfo::default()
+                        .stage(vk::ShaderStageFlags::FRAGMENT)
+                        .module(frag_shader_module)
+                        .name(name.as_c_str())
+                        .specialization_info(
+                            &vk::SpecializationInfo::default()
+                                .data(&(data.to_ne_bytes()))
+                                .map_entries(&[
+                                    vk::SpecializationMapEntry::default().size(size_of::<f32>())
+                                ]),
+                        ),
+                ])
+                .vertex_input_state(&vertex_input_state)
+                .input_assembly_state(&input_assembly_create_info)
+                .viewport_state(&viewport_state_create_info)
+                .rasterization_state(&rasterizer_create_info)
+                .multisample_state(&multisampling_create_info)
+                .color_blend_state(&color_blend_state)
+                .dynamic_state(&dynamic_state_info)
+                .layout(pipeline_layout)
+                .render_pass(render_pass)
+                .subpass(0)],
+            None,
+        )
+    }
+    .expect("Unable to create pipeline")
+    .pop()
+    .unwrap();
 
     unsafe { device.destroy_shader_module(vertex_shader_module, None) };
     unsafe { device.destroy_shader_module(frag_shader_module, None) };
     pipeline
 }
 
-unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBuffer> {
+unsafe fn create_command_buffers(state: &mut State) -> Vec<vk::CommandBuffer> {
     let device = state.device.as_ref().unwrap();
     let command_pool = state.command_pool;
     let layout = state.pipeline_layout;
@@ -583,13 +553,12 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
     let pipelines = &state.pipelines;
     let framebuffers = &state.framebuffers;
 
-    let allocate_info = vk::CommandBufferAllocateInfo::builder()
+    let allocate_info = vk::CommandBufferAllocateInfo::default()
         .command_pool(command_pool)
         .level(vk::CommandBufferLevel::PRIMARY)
-        .command_buffer_count(3)
-        .build();
+        .command_buffer_count(3);
     let command_buffers = device.allocate_command_buffers(&allocate_info).unwrap();
-    let begin_info = vk::CommandBufferBeginInfo::builder().build();
+    let begin_info = vk::CommandBufferBeginInfo::default();
     let extent = vk::Extent2D {
         width: VIEWPORT_WIDTH as _,
         height: VIEWPORT_HEIGHT as _,
@@ -607,7 +576,7 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
         device
             .begin_command_buffer(*command_buffer, &begin_info)
             .expect("Unable to begin command buffer!");
-        let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
+        let render_pass_begin_info = vk::RenderPassBeginInfo::default()
             .clear_values(&[vk::ClearValue {
                 color: vk::ClearColorValue {
                     float32: [0.0, 0.0, 0.0, 1.0],
@@ -615,21 +584,19 @@ unsafe fn create_command_buffers(state: &MutexGuard<State>) -> Vec<vk::CommandBu
             }])
             .render_area(render_area)
             .framebuffer(*framebuffer)
-            .render_pass(render_pass)
-            .build();
+            .render_pass(render_pass);
         device.cmd_begin_render_pass(
             *command_buffer,
             &render_pass_begin_info,
             vk::SubpassContents::INLINE,
         );
 
-        let viewport = vk::Viewport::builder()
+        let viewport = vk::Viewport::default()
             .height(extent.height as _)
             // .width((extent.width / (NUM_VIEWS as u32)) as _)
             .width(extent.width as _)
             .max_depth(1.)
-            .min_depth(0.)
-            .build();
+            .min_depth(0.);
         let scissor = vk::Rect2D {
             extent,
             ..Default::default()
@@ -958,15 +925,15 @@ pub unsafe extern "system" fn create_xr_swapchain(
     let mut state = STATE.lock().unwrap();
     let format = vk::Format::from_raw((*create_info).format as _);
     let (multiview_images, multiview_images_memory) =
-        create_multiview_images(&state, &(*create_info));
+        create_multiview_images(&mut *state, &(*create_info));
     println!("[HOTHAM_SIMULATOR] ..done.");
 
     state.multiview_images = multiview_images;
     state.multiview_images_memory = multiview_images_memory;
-    state.multiview_image_views = create_multiview_image_views(&state, format);
+    state.multiview_image_views = create_multiview_image_views(&mut *state, format);
 
     println!("[HOTHAM_SIMULATOR] Building windows swapchain..");
-    let windows_swapchain = build_swapchain(&mut state);
+    let windows_swapchain = build_swapchain(&mut *state);
     println!("[HOTHAM_SIMULATOR] ..done");
     let s = Swapchain::from_raw(windows_swapchain.as_raw());
     println!("[HOTHAM_SIMULATOR] Returning with {s:?}");
@@ -974,25 +941,21 @@ pub unsafe extern "system" fn create_xr_swapchain(
     Result::SUCCESS
 }
 
-fn create_multiview_image_views(
-    state: &MutexGuard<State>,
-    format: vk::Format,
-) -> Vec<vk::ImageView> {
+fn create_multiview_image_views(state: &mut State, format: vk::Format) -> Vec<vk::ImageView> {
     let device = state.device.as_ref().unwrap();
     let aspect_mask = vk::ImageAspectFlags::COLOR;
     state
         .multiview_images
         .iter()
         .map(|image| {
-            let subresource_range = vk::ImageSubresourceRange::builder()
+            let subresource_range = vk::ImageSubresourceRange::default()
                 .aspect_mask(aspect_mask)
                 .base_mip_level(0)
                 .level_count(1)
                 .base_array_layer(0)
-                .layer_count(NUM_VIEWS as _)
-                .build();
+                .layer_count(NUM_VIEWS as _);
 
-            let create_info = vk::ImageViewCreateInfo::builder()
+            let create_info = vk::ImageViewCreateInfo::default()
                 .image(*image)
                 .view_type(vk::ImageViewType::TYPE_2D_ARRAY)
                 .format(format)
@@ -1008,127 +971,34 @@ fn create_multiview_image_views(
 }
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
-    use winit::event::{ElementState, MouseButton};
-
+unsafe fn build_swapchain(state: &mut State) -> vk::SwapchainKHR {
+    // Extract the data we need
     let entry = state.vulkan_entry.as_ref().unwrap().clone();
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
     let device = state.device.as_ref().unwrap();
-    let physical_device = state.physical_device;
-    let swapchain_ext = khr::Swapchain::new(&instance, device);
-    let queue_family_index = state.present_queue_family_index;
+    let swapchain_ext = ash::khr::swapchain::Device::new(&instance, device);
     let close_window = state.close_window.clone();
 
+    // Build our channels
     let (swapchain_tx, swapchain_rx) = channel();
     let (mouse_event_tx, mouse_event_rx) = channel();
     let (keyboard_event_tx, keyboard_event_rx) = channel();
-    let window_thread_handle = thread::spawn(move || {
-        let mut event_loop: EventLoop<()> = EventLoop::new_any_thread();
-        let visible = true;
-        println!("[HOTHAM_SIMULATOR] Creating window with visible {visible}..");
-        let window = WindowBuilder::new()
-            .with_inner_size(PhysicalSize::new(VIEWPORT_WIDTH, VIEWPORT_HEIGHT))
-            .with_title("Hotham Simulator")
-            .with_visible(visible)
-            // .with_drag_and_drop(false)
-            .build(&event_loop)
-            .unwrap();
-        println!("WINDOW SCALE FACTOR, {:?}", window.scale_factor());
-        println!("[HOTHAM_SIMULATOR] ..done.");
-        let extent = vk::Extent2D {
-            height: VIEWPORT_HEIGHT,
-            width: VIEWPORT_WIDTH,
-        };
 
-        println!("[HOTHAM_SIMULATOR] Creating surface..");
-        let surface = ash_window::create_surface(&entry, &instance, &window, None).unwrap();
-        println!("[HOTHAM_SIMULATOR] ..done");
-        let swapchain_support_details = SwapChainSupportDetails::query_swap_chain_support(
-            &entry,
-            &instance,
-            physical_device,
-            surface,
-            queue_family_index,
-        );
+    let window_thread_handle = windowing::create_window_thread(
+        entry,
+        instance,
+        swapchain_ext,
+        close_window,
+        swapchain_tx,
+        mouse_event_tx,
+        keyboard_event_tx,
+    );
 
-        let create_info = vk::SwapchainCreateInfoKHR::builder()
-            .min_image_count(3)
-            .surface(surface)
-            .image_format(SWAPCHAIN_COLOR_FORMAT)
-            .image_color_space(vk::ColorSpaceKHR::SRGB_NONLINEAR)
-            .image_array_layers(1)
-            .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
-            .image_extent(extent)
-            .queue_family_indices(&[])
-            .pre_transform(swapchain_support_details.capabilities.current_transform)
-            .composite_alpha(vk::CompositeAlphaFlagsKHR::OPAQUE)
-            .present_mode(vk::PresentModeKHR::IMMEDIATE)
-            .clipped(true)
-            .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT);
-
-        println!("[HOTHAM_SIMULATOR] About to create swapchain..");
-        let swapchain = swapchain_ext.create_swapchain(&create_info, None).unwrap();
-        println!("[HOTHAM_SIMULATOR] Created swapchain: {swapchain:?}. Sending..");
-        swapchain_tx.send((surface, swapchain)).unwrap();
-
-        if !visible {
-            return;
-        }
-        let cl2 = close_window.clone();
-
-        let mut mouse_pressed = false;
-
-        event_loop.run_return(move |event, _, control_flow| {
-            *control_flow = ControlFlow::Poll;
-
-            if close_window.load(Relaxed) {
-                println!("[HOTHAM_SIMULATOR] Closed called!");
-                *control_flow = ControlFlow::Exit;
-            }
-
-            match event {
-                Event::WindowEvent { event, window_id } => match event {
-                    WindowEvent::CloseRequested => {
-                        if window_id == window.id() {
-                            *control_flow = ControlFlow::Exit
-                        }
-                    }
-                    WindowEvent::KeyboardInput { input, .. } => {
-                        keyboard_event_tx.send(input).unwrap()
-                    }
-                    WindowEvent::MouseInput {
-                        button: MouseButton::Left,
-                        state,
-                        ..
-                    } => {
-                        mouse_pressed = state == ElementState::Pressed;
-                    }
-                    _ => {}
-                },
-                Event::LoopDestroyed => {}
-                Event::MainEventsCleared => {
-                    window.request_redraw();
-                }
-                Event::RedrawRequested(_window_id) => {}
-
-                Event::DeviceEvent { event, .. } => {
-                    if mouse_pressed {
-                        if let DeviceEvent::MouseMotion { delta } = event {
-                            mouse_event_tx.send(delta).unwrap();
-                        }
-                    }
-                }
-                _ => (),
-            }
-        });
-
-        cl2.store(true, Relaxed);
-    });
     let (surface, swapchain) = swapchain_rx.recv().unwrap();
 
     println!("[HOTHAM_SIMULATOR] Received swapchain: {swapchain:?}");
     let instance = state.vulkan_instance.as_ref().unwrap().clone();
-    let swapchain_ext = khr::Swapchain::new(&instance, device);
+    let swapchain_ext = ash::khr::swapchain::Device::new(&instance, device);
 
     state.mouse_event_rx = Some(mouse_event_rx);
     state.keyboard_event_rx = Some(keyboard_event_rx);
@@ -1154,38 +1024,33 @@ unsafe fn build_swapchain(state: &mut MutexGuard<State>) -> vk::SwapchainKHR {
     swapchain
 }
 
-unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::DescriptorSet> {
+unsafe fn create_descriptor_sets(state: &mut State) -> Vec<vk::DescriptorSet> {
     let device = state.device.as_ref().unwrap();
     let image_views = &state.multiview_image_views;
     // descriptor pool
     let descriptor_pool = device
         .create_descriptor_pool(
-            &vk::DescriptorPoolCreateInfo::builder()
-                .pool_sizes(&[vk::DescriptorPoolSize::builder()
+            &vk::DescriptorPoolCreateInfo::default()
+                .pool_sizes(&[vk::DescriptorPoolSize::default()
                     .descriptor_count(9)
-                    .ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-                    .build()])
-                .max_sets(9)
-                .build(),
+                    .ty(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)])
+                .max_sets(9),
             None,
         )
         .expect("Unable to create descriptor pool");
 
     println!("[HOTHAM_SIMULATOR] Created descriptor pool {descriptor_pool:?}");
 
-    let bindings = [vk::DescriptorSetLayoutBinding::builder()
+    let bindings = [vk::DescriptorSetLayoutBinding::default()
         .binding(0)
         .descriptor_count(1)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-        .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-        .build()];
+        .stage_flags(vk::ShaderStageFlags::FRAGMENT)];
 
     // descriptor layout
     let layout = device
         .create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder()
-                .bindings(&bindings)
-                .build(),
+            &vk::DescriptorSetLayoutCreateInfo::default().bindings(&bindings),
             None,
         )
         .expect("Unable to create descriptor set layouts");
@@ -1197,14 +1062,13 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
     // allocate
     let descriptor_sets = device
         .allocate_descriptor_sets(
-            &vk::DescriptorSetAllocateInfo::builder()
+            &vk::DescriptorSetAllocateInfo::default()
                 .descriptor_pool(descriptor_pool)
-                .set_layouts(&set_layouts)
-                .build(),
+                .set_layouts(&set_layouts),
         )
         .expect("Unable to create descriptor sets");
 
-    let create_info = vk::SamplerCreateInfo::builder()
+    let create_info = vk::SamplerCreateInfo::default()
         .mag_filter(vk::Filter::LINEAR)
         .min_filter(vk::Filter::LINEAR)
         .address_mode_u(vk::SamplerAddressMode::REPEAT)
@@ -1219,8 +1083,7 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
         .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
         .mip_lod_bias(0.0)
         .min_lod(0.0)
-        .max_lod(0.0)
-        .build();
+        .max_lod(0.0);
 
     let sampler = device
         .create_sampler(&create_info, None)
@@ -1228,21 +1091,18 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
 
     for i in 0..descriptor_sets.len() {
         let descriptor_set = descriptor_sets[i];
-        let image_info = vk::DescriptorImageInfo::builder()
-            .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-            .image_view(image_views[i])
-            .sampler(sampler)
-            .build();
-
-        let sampler_descriptor_write = vk::WriteDescriptorSet::builder()
-            .dst_set(descriptor_set)
-            .dst_binding(0)
-            .dst_array_element(0)
-            .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
-            .image_info(&[image_info])
-            .build();
-
-        device.update_descriptor_sets(&[sampler_descriptor_write], &[])
+        device.update_descriptor_sets(
+            &[vk::WriteDescriptorSet::default()
+                .dst_set(descriptor_set)
+                .dst_binding(0)
+                .dst_array_element(0)
+                .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
+                .image_info(&[vk::DescriptorImageInfo::default()
+                    .image_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
+                    .image_view(image_views[i])
+                    .sampler(sampler)])],
+            &[],
+        )
     }
 
     // return
@@ -1254,22 +1114,21 @@ unsafe fn create_descriptor_sets(state: &mut MutexGuard<State>) -> Vec<vk::Descr
     descriptor_sets
 }
 
-fn create_swapchain_image_views(state: &mut MutexGuard<State>) -> Vec<vk::ImageView> {
+fn create_swapchain_image_views(state: &mut State) -> Vec<vk::ImageView> {
     let device = state.device.as_ref().unwrap();
     let aspect_mask = vk::ImageAspectFlags::COLOR;
     state
         .internal_swapchain_images
         .iter()
         .map(|image| {
-            let subresource_range = vk::ImageSubresourceRange::builder()
+            let subresource_range = vk::ImageSubresourceRange::default()
                 .aspect_mask(aspect_mask)
                 .base_mip_level(0)
                 .level_count(1)
                 .base_array_layer(0)
-                .layer_count(1)
-                .build();
+                .layer_count(1);
 
-            let create_info = vk::ImageViewCreateInfo::builder()
+            let create_info = vk::ImageViewCreateInfo::default()
                 .image(*image)
                 .view_type(vk::ImageViewType::TYPE_2D)
                 .format(SWAPCHAIN_COLOR_FORMAT)
@@ -1284,7 +1143,7 @@ fn create_swapchain_image_views(state: &mut MutexGuard<State>) -> Vec<vk::ImageV
         .collect::<Vec<_>>()
 }
 
-fn create_framebuffers(state: &mut MutexGuard<State>) -> Vec<vk::Framebuffer> {
+fn create_framebuffers(state: &mut State) -> Vec<vk::Framebuffer> {
     let device = state.device.as_ref().unwrap();
     let render_pass = state.render_pass;
     state
@@ -1292,7 +1151,7 @@ fn create_framebuffers(state: &mut MutexGuard<State>) -> Vec<vk::Framebuffer> {
         .iter()
         .map(|image_view| {
             let attachments = &[*image_view];
-            let create_info = vk::FramebufferCreateInfo::builder()
+            let create_info = vk::FramebufferCreateInfo::default()
                 .render_pass(render_pass)
                 .attachments(attachments)
                 .width(VIEWPORT_WIDTH)
@@ -1333,7 +1192,7 @@ pub unsafe extern "system" fn enumerate_swapchain_images(
 }
 
 fn create_multiview_images(
-    state: &MutexGuard<State>,
+    state: &mut State,
     create_info: &SwapchainCreateInfo,
 ) -> (Vec<vk::Image>, Vec<vk::DeviceMemory>) {
     let device = state.device.as_ref().unwrap();
@@ -1350,7 +1209,7 @@ fn create_multiview_images(
     let usage = vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED;
     let properties = vk::MemoryPropertyFlags::DEVICE_LOCAL;
 
-    let create_info = vk::ImageCreateInfo::builder()
+    let create_info = vk::ImageCreateInfo::default()
         .image_type(vk::ImageType::TYPE_2D)
         .extent(extent)
         .mip_levels(1)
@@ -1378,7 +1237,7 @@ fn create_multiview_images(
             memory_requirements.memory_type_bits,
             properties,
         );
-        let alloc_info = vk::MemoryAllocateInfo::builder()
+        let alloc_info = vk::MemoryAllocateInfo::default()
             .allocation_size(memory_requirements.size)
             .memory_type_index(memory_type_index);
 
@@ -1418,7 +1277,7 @@ pub unsafe extern "system" fn acquire_swapchain_image(
     let mut state = STATE.lock().unwrap();
     let swapchain = vk::SwapchainKHR::from_raw(swapchain.into_raw());
     let device = state.device.as_ref().unwrap();
-    let ext = khr::Swapchain::new(state.vulkan_instance.as_ref().unwrap(), device);
+    let ext = ash::khr::swapchain::Device::new(state.vulkan_instance.as_ref().unwrap(), device);
     let fence = state.swapchain_fence;
 
     device.wait_for_fences(&[fence], true, u64::MAX).unwrap();
@@ -1575,10 +1434,9 @@ pub unsafe extern "system" fn end_frame(
     let image_indices = [index as u32];
     let render_complete = [state.render_complete_semaphores[index]];
 
-    let submit_info = vk::SubmitInfo::builder()
+    let submit_info = vk::SubmitInfo::default()
         .command_buffers(&command_buffers)
-        .signal_semaphores(&render_complete)
-        .build();
+        .signal_semaphores(&render_complete);
 
     let submits = [submit_info];
 
@@ -1586,12 +1444,12 @@ pub unsafe extern "system" fn end_frame(
         .queue_submit(state.present_queue, &submits, vk::Fence::null())
         .expect("Unable to submit to queue");
 
-    let present_info = vk::PresentInfoKHR::builder()
+    let present_info = vk::PresentInfoKHR::default()
         .wait_semaphores(&render_complete)
         .swapchains(&swapchains)
         .image_indices(&image_indices);
 
-    let ext = khr::Swapchain::new(instance, device);
+    let ext = ash::khr::swapchain::Device::new(instance, device);
 
     match ext.queue_present(queue, &present_info) {
         Ok(_) => {
@@ -1758,34 +1616,33 @@ pub unsafe extern "system" fn get_vulkan_instance_extensions(
     buffer_count_output: *mut u32,
     buffer: *mut c_char,
 ) -> Result {
-    let event_loop: EventLoop<()> = EventLoop::new_any_thread();
-    let window = WindowBuilder::new()
-        // .with_drag_and_drop(false)
-        .with_visible(false)
-        .build(&event_loop)
-        .unwrap();
-    let enabled_extensions = ash_window::enumerate_required_extensions(&window).unwrap();
-    let extensions = enabled_extensions
+    // OpenXR expects us to give it a null terminated string of extensions separated by spaces.
+    // First we start by getting the extensions the windowing system needs
+    let enabled_extensions = windowing::get_window_extensions();
+
+    // Then we convert them into `str`s and join them into a single `String` separated by spaces
+    let extensions_separated_by_spaces = enabled_extensions
         .iter()
         .map(|e| e.to_str().unwrap())
         .collect::<Vec<&str>>()
-        .join(" ")
-        .into_bytes();
+        .join(" ");
 
-    let length = extensions.len() + 1;
-
+    // Next we do our normal buffer resizing dance.
+    // NOTE: The +1 here is for the trailing null byte that we'll append to the end of the string
+    let output_buffer_size = extensions_separated_by_spaces.len() + 1;
     if buffer_capacity_input == 0 {
-        (*buffer_count_output) = length as _;
+        (*buffer_count_output) = output_buffer_size as _;
         return Result::SUCCESS;
     }
 
-    let extensions = CString::from_vec_unchecked(extensions);
-
-    let buffer = slice::from_raw_parts_mut(buffer, length);
-    let bytes = extensions.as_bytes_with_nul();
-    for i in 0..length {
-        buffer[i] = bytes[i] as _;
+    // Now write each of the string bytes into the output buffer
+    let output_buffer = std::slice::from_raw_parts_mut(buffer, output_buffer_size);
+    for (i, string_byte) in extensions_separated_by_spaces.as_bytes().iter().enumerate() {
+        output_buffer[i] = *string_byte as c_char;
     }
+
+    // And finally write the null byte at the very end
+    output_buffer[output_buffer_size - 1] = 0;
 
     Result::SUCCESS
 }
@@ -1797,7 +1654,7 @@ pub unsafe extern "system" fn get_vulkan_device_extensions(
     buffer_count_output: *mut u32,
     buffer: *mut c_char,
 ) -> Result {
-    let extensions = khr::Swapchain::name();
+    let extensions = ash::khr::swapchain::NAME;
     let bytes = extensions.to_bytes_with_nul();
     let length = bytes.len();
     if buffer_capacity_input == 0 {
@@ -1822,55 +1679,6 @@ fn str_to_fixed_bytes(string: &str) -> [i8; 128] {
     name
 }
 
-pub struct SwapChainSupportDetails {
-    pub capabilities: vk::SurfaceCapabilitiesKHR,
-    pub surface_formats: Vec<vk::SurfaceFormatKHR>,
-    pub present_modes: Vec<vk::PresentModeKHR>,
-}
-
-impl SwapChainSupportDetails {
-    pub fn query_swap_chain_support(
-        entry: &AshEntry,
-        instance: &AshInstance,
-        physical_device: vk::PhysicalDevice,
-        surface: vk::SurfaceKHR,
-        queue_family_index: u32,
-    ) -> SwapChainSupportDetails {
-        let surface_ext = khr::Surface::new(entry, instance);
-        let capabilities = unsafe {
-            surface_ext
-                .get_physical_device_surface_capabilities(physical_device, surface)
-                .expect("unable to get capabilities")
-        };
-        let surface_formats = unsafe {
-            surface_ext
-                .get_physical_device_surface_formats(physical_device, surface)
-                .expect("unable to get surface formats")
-        };
-        let present_modes = unsafe {
-            surface_ext
-                .get_physical_device_surface_present_modes(physical_device, surface)
-                .expect("unable to get present modes")
-        };
-
-        let support = unsafe {
-            surface_ext.get_physical_device_surface_support(
-                physical_device,
-                queue_family_index,
-                surface,
-            )
-        }
-        .expect("Unable to get surface support");
-        assert!(support, "This device does not support a surface!");
-
-        SwapChainSupportDetails {
-            capabilities,
-            surface_formats,
-            present_modes,
-        }
-    }
-}
-
 pub fn transition_image_layout(
     device: &Device,
     queue: vk::Queue,
@@ -1881,18 +1689,17 @@ pub fn transition_image_layout(
 ) {
     // println!("[HOTHAM_SIMULATOR] Transitioning image {:?}", image);
     let command_buffer = begin_single_time_commands(device, command_pool);
-    let subresource_range = vk::ImageSubresourceRange::builder()
+    let subresource_range = vk::ImageSubresourceRange::default()
         .aspect_mask(vk::ImageAspectFlags::COLOR)
         .base_mip_level(0)
         .level_count(1)
         .base_array_layer(0)
-        .layer_count(NUM_VIEWS as _)
-        .build();
+        .layer_count(NUM_VIEWS as _);
 
     let (src_access_mask, dst_access_mask, src_stage, dst_stage) =
         get_stage(old_layout, new_layout);
 
-    let barrier = vk::ImageMemoryBarrier::builder()
+    let barrier = vk::ImageMemoryBarrier::default()
         .old_layout(old_layout)
         .new_layout(new_layout)
         .src_access_mask(src_access_mask)
@@ -1900,8 +1707,7 @@ pub fn transition_image_layout(
         .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
         .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
         .subresource_range(subresource_range)
-        .image(image)
-        .build();
+        .image(image);
 
     let dependency_flags = vk::DependencyFlags::empty();
     let image_memory_barriers = &[barrier];
@@ -1925,7 +1731,7 @@ pub fn begin_single_time_commands(
     device: &Device,
     command_pool: vk::CommandPool,
 ) -> vk::CommandBuffer {
-    let alloc_info = vk::CommandBufferAllocateInfo::builder()
+    let alloc_info = vk::CommandBufferAllocateInfo::default()
         .command_buffer_count(1)
         .level(vk::CommandBufferLevel::PRIMARY)
         .command_pool(command_pool);
@@ -1938,7 +1744,7 @@ pub fn begin_single_time_commands(
     };
 
     let begin_info =
-        vk::CommandBufferBeginInfo::builder().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+        vk::CommandBufferBeginInfo::default().flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
     unsafe {
         device
@@ -1963,9 +1769,7 @@ pub fn end_single_time_commands(
 
     let command_buffers = &[command_buffer];
 
-    let submit_info = vk::SubmitInfo::builder()
-        .command_buffers(command_buffers)
-        .build();
+    let submit_info = vk::SubmitInfo::default().command_buffers(command_buffers);
 
     let submit_info = &[submit_info];
 

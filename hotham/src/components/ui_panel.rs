@@ -95,7 +95,7 @@ pub fn add_ui_panel_to_world(
         vulkan_context
             .device
             .create_framebuffer(
-                &vk::FramebufferCreateInfo::builder()
+                &vk::FramebufferCreateInfo::default()
                     .render_pass(gui_context.render_pass)
                     .attachments(attachments)
                     .width(resolution.width)

@@ -13,6 +13,7 @@ pub mod state;
 mod action_state;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub mod inputs;
+mod windowing;
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use crate::openxr_loader::{
@@ -161,7 +162,6 @@ pub unsafe extern "C" fn get_instance_proc_addr(
             panic!("BAD BAD ADB ADB BAD");
         }
         *function = transmute::<DummyFn, _>(bang);
-        // return Result::ERROR_HANDLE_INVALID.into_raw();
     }
     Result::SUCCESS.into_raw()
 }

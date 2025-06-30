@@ -1,12 +1,11 @@
 use ash::{
-    extensions::khr,
     vk::{self, Handle, SwapchainKHR},
     Device, Entry as AshEntry, Instance as AshInstance,
 };
 
 use glam::{Quat, Vec3};
 use openxr_sys::{Action, Bool32, Path, Posef, SessionState, Space, Vector3f};
-use winit::event::KeyboardInput;
+use winit::event::KeyEvent;
 
 use std::{
     collections::HashMap,
@@ -68,7 +67,7 @@ pub struct State {
     pub left_hand_space: u64,
     pub right_hand_space: u64,
     pub view_poses: Vec<Posef>,
-    pub keyboard_event_rx: Option<Receiver<KeyboardInput>>,
+    pub keyboard_event_rx: Option<Receiver<KeyEvent>>,
     pub mouse_event_rx: Option<Receiver<(f64, f64)>>,
     pub input_state: Inputs,
     pub last_frame_time: Instant,
@@ -168,10 +167,10 @@ impl State {
             self.close_window.store(true, Relaxed);
             self.window_thread_handle.take().unwrap().join().unwrap();
 
-            let swapchain_ext = khr::Swapchain::new(&instance, &device);
+            let swapchain_ext = ash::khr::swapchain::Device::new(&instance, &device);
             swapchain_ext.destroy_swapchain(self.internal_swapchain, None);
 
-            let surface_ext = khr::Surface::new(&entry, &instance);
+            let surface_ext = ash::khr::surface::Instance::new(&entry, &instance);
             surface_ext.destroy_surface(self.surface, None);
         }
         // device.queue_wait_idle(self.present_queue).unwrap();
@@ -242,33 +241,33 @@ impl State {
         let movement_speed = 2f32 * dt;
         for pressed in self.input_state.pressed.iter() {
             match pressed {
-                winit::event::VirtualKeyCode::W => {
+                winit::keyboard::KeyCode::KeyW => {
                     position.x -= forward.x * movement_speed;
                     position.y -= forward.y * movement_speed;
                     position.z -= forward.z * movement_speed;
                 }
-                winit::event::VirtualKeyCode::S => {
+                winit::keyboard::KeyCode::KeyS => {
                     position.x += forward.x * movement_speed;
                     position.y += forward.y * movement_speed;
                     position.z += forward.z * movement_speed;
                 }
-                winit::event::VirtualKeyCode::A => {
+                winit::keyboard::KeyCode::KeyA => {
                     position.x -= right.x * movement_speed;
                     position.y -= right.y * movement_speed;
                     position.z -= right.z * movement_speed;
                 }
-                winit::event::VirtualKeyCode::D => {
+                winit::keyboard::KeyCode::KeyD => {
                     position.x += right.x * movement_speed;
                     position.y += right.y * movement_speed;
                     position.z += right.z * movement_speed;
                 }
-                winit::event::VirtualKeyCode::Space => {
+                winit::keyboard::KeyCode::Space => {
                     position.y += up.y * movement_speed;
                 }
-                winit::event::VirtualKeyCode::LShift => {
+                winit::keyboard::KeyCode::ShiftLeft => {
                     position.y -= up.y * movement_speed;
                 }
-                winit::event::VirtualKeyCode::Q | winit::event::VirtualKeyCode::Escape => {
+                winit::keyboard::KeyCode::KeyQ | winit::keyboard::KeyCode::Escape => {
                     self.session_state = SessionState::EXITING;
                     self.has_event = true;
                 }
@@ -326,16 +325,16 @@ impl State {
         // Clone to get around mutate after borrow
         for pressed in &self.input_state.clone().pressed {
             match pressed {
-                winit::event::VirtualKeyCode::Key1 => {
+                winit::keyboard::KeyCode::Digit1 => {
                     self.press(X_INPUT);
                 }
-                winit::event::VirtualKeyCode::Key2 => {
+                winit::keyboard::KeyCode::Digit2 => {
                     self.press(Y_INPUT);
                 }
-                winit::event::VirtualKeyCode::Key3 => {
+                winit::keyboard::KeyCode::Digit3 => {
                     self.press(B_INPUT);
                 }
-                winit::event::VirtualKeyCode::Key4 => {
+                winit::keyboard::KeyCode::Digit4 => {
                     self.press(A_INPUT);
                 }
                 _ => {}
