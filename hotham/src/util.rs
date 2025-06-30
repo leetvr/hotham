@@ -151,6 +151,7 @@ use ash::vk;
 use std::marker::PhantomData;
 
 #[cfg(test)]
+/// Does what it says
 pub unsafe fn get_from_device_memory<'a, T: Sized>(
     vulkan_context: &VulkanContext,
     buffer: &'a Buffer<T>,
@@ -164,10 +165,13 @@ pub unsafe fn get_from_device_memory<'a, T: Sized>(
             ash::vk::MemoryMapFlags::empty(),
         )
         .unwrap();
+
+    #[allow(clippy::missing_transmute_annotations)]
     std::slice::from_raw_parts(std::mem::transmute(memory), buffer.size as _)
 }
 
 #[cfg(test)]
+/// Does what it says
 pub fn test_buffer<T>() -> Buffer<T> {
     Buffer {
         handle: vk::Buffer::null(),
@@ -249,7 +253,7 @@ pub(crate) unsafe fn save_image_to_disk(
         RgbaImage::from_raw(resolution.width, resolution.height, image_bytes).unwrap(),
     );
     let known_good_path = format!("../test_assets/render_{name}_known_good.jpg");
-    if env::var("UPDATE_IMAGES").map_or(false, |s| {
+    if env::var("UPDATE_IMAGES").is_ok_and(|s| {
         s.eq_ignore_ascii_case("true")
             || s.eq_ignore_ascii_case("t")
             || s.eq_ignore_ascii_case("yes")

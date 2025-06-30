@@ -1,6 +1,5 @@
 use ash::vk;
 use glam::{Vec2, Vec3, Vec4};
-// const VERTEX_FORMAT: vk::Format = vk::Format::R16G16B16_SFLOAT;
 const VERTEX_FORMAT: vk::Format = vk::Format::R32G32B32_SFLOAT;
 
 /// Representation of a single vertex, usually imported from a glTF file.
@@ -33,7 +32,7 @@ impl Vertex {
 
     /// Create a new vertex from a zip - useful when importing from glTF
     // Clippy warning suppressed for adjudication separately
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::type_complexity))]
+    #[allow(clippy::type_complexity)]
     pub fn from_zip(t: (Vec3, Vec2, [u8; 4], Vec4)) -> Self {
         // Normalize weights to 0 <= w <= 255 while avoiding division with zero.
         let max_weight = t.3.max_element().max(f32::EPSILON);
@@ -58,40 +57,35 @@ impl Vertex {
 impl Vertex {
     /// Get the vertex attributes to be used in the Vertex Shader
     pub fn attribute_descriptions() -> Vec<vk::VertexInputAttributeDescription> {
-        let position = vk::VertexInputAttributeDescription::builder()
+        let position = vk::VertexInputAttributeDescription::default()
             .binding(0)
             .location(0)
             .format(VERTEX_FORMAT)
-            .offset(0)
-            .build();
+            .offset(0);
 
-        let normal = vk::VertexInputAttributeDescription::builder()
+        let normal = vk::VertexInputAttributeDescription::default()
             .binding(1)
             .location(1)
             .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, normal) as _)
-            .build();
+            .offset(std::mem::offset_of!(Vertex, normal) as _);
 
-        let texture_coords = vk::VertexInputAttributeDescription::builder()
+        let texture_coords = vk::VertexInputAttributeDescription::default()
             .binding(1)
             .location(2)
             .format(vk::Format::R32G32_SFLOAT)
-            .offset(memoffset::offset_of!(Vertex, texture_coords) as _)
-            .build();
+            .offset(std::mem::offset_of!(Vertex, texture_coords) as _);
 
-        let joint_indices = vk::VertexInputAttributeDescription::builder()
+        let joint_indices = vk::VertexInputAttributeDescription::default()
             .binding(1)
             .location(3)
             .format(vk::Format::R32_UINT)
-            .offset(memoffset::offset_of!(Vertex, joint_indices) as _)
-            .build();
+            .offset(std::mem::offset_of!(Vertex, joint_indices) as _);
 
-        let joint_weights = vk::VertexInputAttributeDescription::builder()
+        let joint_weights = vk::VertexInputAttributeDescription::default()
             .binding(1)
             .location(4)
             .format(vk::Format::R32_UINT)
-            .offset(memoffset::offset_of!(Vertex, joint_weights) as _)
-            .build();
+            .offset(std::mem::offset_of!(Vertex, joint_weights) as _);
 
         vec![
             position,

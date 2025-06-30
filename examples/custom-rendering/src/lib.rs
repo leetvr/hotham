@@ -298,7 +298,7 @@ fn add_quadric(
     hologram_data: HologramData,
 ) -> Entity {
     let entity = add_model_to_world(model_name, models, world, None)
-        .unwrap_or_else(|| panic!("Could not find {}", model_name));
+        .unwrap_or_else(|| panic!("Could not find {model_name}"));
     *world.get::<&mut LocalTransform>(entity).unwrap() = *local_transform;
     let collider = Collider::new(SharedShape::ball(ball_radius));
     let hologram_component = Hologram {
@@ -312,7 +312,7 @@ fn add_quadric(
 
     // Add second entity for the back surface
     let second_entity = add_model_to_world(model_name, models, world, Some(entity))
-        .unwrap_or_else(|| panic!("Could not find {}", model_name));
+        .unwrap_or_else(|| panic!("Could not find {model_name}"));
     // Negate Q to flip the surface normal
     let mut hologram_component = hologram_component;
     hologram_component.hologram_data.surface_q_in_local *= -1.0;

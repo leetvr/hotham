@@ -23,7 +23,7 @@ pub enum Message<'a> {
 }
 
 impl<'a> Message<'a> {
-    pub fn parse(message_type: MessageType, buffer: &'a [u8]) -> Result<Message> {
+    pub fn parse(message_type: MessageType, buffer: &'a [u8]) -> Result<Message<'a>> {
         let message = match message_type {
             MessageType::GetAsset => Message::GetAsset(std::str::from_utf8(buffer)?),
             MessageType::WatchAsset => Message::WatchAsset(std::str::from_utf8(buffer)?),

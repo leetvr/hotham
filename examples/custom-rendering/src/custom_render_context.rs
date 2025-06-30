@@ -51,6 +51,7 @@ pub struct CustomRenderContext {
     /// Data for the holographic primitives that will be drawn this frame, indexed by gl_InstanceId
     pub quadrics_data_buffer: Buffer<QuadricData>,
     /// Descriptors for quadrics pipeline
+    #[allow(unused)]
     pub quadrics_descriptor_set_layout: vk::DescriptorSetLayout,
     pub quadrics_descriptor_set: vk::DescriptorSet,
 
@@ -69,7 +70,7 @@ impl CustomRenderContext {
             render_context.descriptors.graphics_layout,
             quadrics_descriptor_set_layout,
         ];
-        let create_info = &vk::PipelineLayoutCreateInfo::builder().set_layouts(&layouts);
+        let create_info = &vk::PipelineLayoutCreateInfo::default().set_layouts(&layouts);
         let quadrics_pipeline_layout =
             unsafe { device.create_pipeline_layout(create_info, None).unwrap() };
         let vertex_shader_code: Vec<u32> = QUADRIC_VERT.into();
@@ -87,7 +88,7 @@ impl CustomRenderContext {
             vulkan_context
                 .device
                 .allocate_descriptor_sets(
-                    &vk::DescriptorSetAllocateInfo::builder()
+                    &vk::DescriptorSetAllocateInfo::default()
                         .descriptor_pool(render_context.descriptors.pool)
                         .set_layouts(slice::from_ref(&quadrics_descriptor_set_layout)),
                 )
@@ -133,12 +134,12 @@ fn create_quadrics_descriptor_set_layout(device: &ash::Device) -> vk::Descriptor
     ];
 
     let descriptor_flags = [vk::DescriptorBindingFlags::empty()];
-    let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::builder()
+    let mut binding_flags = vk::DescriptorSetLayoutBindingFlagsCreateInfoEXT::default()
         .binding_flags(&descriptor_flags);
 
     unsafe {
         device.create_descriptor_set_layout(
-            &vk::DescriptorSetLayoutCreateInfo::builder()
+            &vk::DescriptorSetLayoutCreateInfo::default()
                 .bindings(&quadrics_bindings)
                 .push_next(&mut binding_flags)
                 .flags(vk::DescriptorSetLayoutCreateFlags::UPDATE_AFTER_BIND_POOL),
@@ -174,25 +175,23 @@ pub fn create_quadrics_pipeline(
     let stages = [vertex_stage, fragment_stage];
 
     // Vertex input state
-    let position_binding_description = vk::VertexInputBindingDescription::builder()
+    let position_binding_description = vk::VertexInputBindingDescription::default()
         .binding(0)
         .stride(size_of::<Vec3>() as _)
-        .input_rate(vk::VertexInputRate::VERTEX)
-        .build();
-    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
+        .input_rate(vk::VertexInputRate::VERTEX);
+    let vertex_binding_description = vk::VertexInputBindingDescription::default()
         .binding(1)
         .stride(size_of::<Vertex>() as _)
-        .input_rate(vk::VertexInputRate::VERTEX)
-        .build();
+        .input_rate(vk::VertexInputRate::VERTEX);
     let vertex_binding_descriptions = [position_binding_description, vertex_binding_description];
     let vertex_attribute_descriptions = Vertex::attribute_descriptions();
 
-    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
+    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::default()
         .vertex_attribute_descriptions(&vertex_attribute_descriptions)
         .vertex_binding_descriptions(&vertex_binding_descriptions);
 
     // Input assembly state
-    let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::builder()
+    let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::default()
         .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
 
     // Viewport State
@@ -209,12 +208,12 @@ pub fn create_quadrics_pipeline(
     // Scissors
     let scissors = [*render_area];
 
-    let viewport_state = vk::PipelineViewportStateCreateInfo::builder()
+    let viewport_state = vk::PipelineViewportStateCreateInfo::default()
         .viewports(&viewports)
         .scissors(&scissors);
 
     // Rasterization state
-    let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
+    let rasterization_state = vk::PipelineRasterizationStateCreateInfo::default()
         .polygon_mode(vk::PolygonMode::FILL)
         .cull_mode(vk::CullModeFlags::BACK)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
@@ -227,11 +226,11 @@ pub fn create_quadrics_pipeline(
         .line_width(1.0);
 
     // Multisample state
-    let multisample_state = vk::PipelineMultisampleStateCreateInfo::builder()
+    let multisample_state = vk::PipelineMultisampleStateCreateInfo::default()
         .rasterization_samples(vk::SampleCountFlags::TYPE_4);
 
     // Depth stencil state
-    let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
+    let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::default()
         .depth_test_enable(true)
         .depth_write_enable(true)
         .depth_compare_op(vk::CompareOp::GREATER)
@@ -241,23 +240,22 @@ pub fn create_quadrics_pipeline(
         .stencil_test_enable(false);
 
     // Color blend state
-    let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
+    let color_blend_attachment = vk::PipelineColorBlendAttachmentState::default()
         .color_write_mask(
             vk::ColorComponentFlags::R
                 | vk::ColorComponentFlags::G
                 | vk::ColorComponentFlags::B
                 | vk::ColorComponentFlags::A,
         )
-        .blend_enable(false)
-        .build();
+        .blend_enable(false);
 
     let color_blend_attachments = [color_blend_attachment];
 
-    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
+    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
         .logic_op_enable(false)
         .attachments(&color_blend_attachments);
 
-    let create_info = vk::GraphicsPipelineCreateInfo::builder()
+    let create_info = vk::GraphicsPipelineCreateInfo::default()
         .stages(&stages)
         .vertex_input_state(&vertex_input_state)
         .input_assembly_state(&input_assembly_state)
@@ -268,8 +266,7 @@ pub fn create_quadrics_pipeline(
         .color_blend_state(&color_blend_state)
         .layout(pipeline_layout)
         .render_pass(render_pass)
-        .subpass(0)
-        .build();
+        .subpass(0);
 
     let create_infos = [create_info];
 

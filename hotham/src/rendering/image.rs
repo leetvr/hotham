@@ -24,7 +24,7 @@ pub struct Image {
 impl Image {
     /// Create a new image
     /// TODO: At the moment the "logic" for this function is handled by `vulkan_context`. We should change that.
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         handle: vk::Image,
         view: vk::ImageView,

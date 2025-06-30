@@ -1,5 +1,5 @@
 #![allow(deprecated)]
-use ash::vk::{self, Handle};
+use ash::vk;
 use vk_shader_macros::include_glsl;
 
 /// How much the GUI should be scaled by
@@ -34,13 +34,12 @@ impl GuiContext {
         let descriptor_set_layout = unsafe {
             device
                 .create_descriptor_set_layout(
-                    &vk::DescriptorSetLayoutCreateInfo::builder().bindings(&[
-                        vk::DescriptorSetLayoutBinding::builder()
+                    &vk::DescriptorSetLayoutCreateInfo::default().bindings(&[
+                        vk::DescriptorSetLayoutBinding::default()
                             .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)
                             .descriptor_count(1)
                             .binding(0)
-                            .stage_flags(vk::ShaderStageFlags::FRAGMENT)
-                            .build(),
+                            .stage_flags(vk::ShaderStageFlags::FRAGMENT),
                     ]),
                     None,
                 )
@@ -48,7 +47,7 @@ impl GuiContext {
         };
         let font_texture_descriptor_sets = unsafe {
             device.allocate_descriptor_sets(
-                &vk::DescriptorSetAllocateInfo::builder()
+                &vk::DescriptorSetAllocateInfo::default()
                     .descriptor_pool(vulkan_context.descriptor_pool)
                     .set_layouts(&[descriptor_set_layout]),
             )
@@ -58,32 +57,29 @@ impl GuiContext {
         // Create PipelineLayout
         let pipeline_layout = unsafe {
             device.create_pipeline_layout(
-                &vk::PipelineLayoutCreateInfo::builder()
+                &vk::PipelineLayoutCreateInfo::default()
                     .set_layouts(&[descriptor_set_layout])
-                    .push_constant_ranges(&[vk::PushConstantRange::builder()
-                        .stage_flags(vk::ShaderStageFlags::VERTEX)
-                        .offset(0)
-                        .size(std::mem::size_of::<f32>() as u32 * 2) // screen size
-                        .build()]),
+                    .push_constant_ranges(&[
+                        vk::PushConstantRange::default()
+                            .stage_flags(vk::ShaderStageFlags::VERTEX)
+                            .offset(0)
+                            .size(std::mem::size_of::<f32>() as u32 * 2), // screen size
+                    ]),
                 None,
             )
         }
         .expect("Failed to create pipeline layout.");
 
         vulkan_context
-            .set_debug_name(
-                vk::ObjectType::PIPELINE_LAYOUT,
-                pipeline_layout.as_raw(),
-                "GUI Pipeline Layout",
-            )
+            .set_debug_name(pipeline_layout, "GUI Pipeline Layout")
             .unwrap();
 
         // Create render pass
         // TODO: This is *TERRIBLE*!!!
         let render_pass = unsafe {
             device.create_render_pass(
-                &vk::RenderPassCreateInfo::builder()
-                    .attachments(&[vk::AttachmentDescription::builder()
+                &vk::RenderPassCreateInfo::default()
+                    .attachments(&[vk::AttachmentDescription::default()
                         .format(COLOR_FORMAT)
                         .samples(vk::SampleCountFlags::TYPE_1)
                         .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -91,16 +87,13 @@ impl GuiContext {
                         .stencil_load_op(vk::AttachmentLoadOp::DONT_CARE)
                         .stencil_store_op(vk::AttachmentStoreOp::DONT_CARE)
                         .initial_layout(vk::ImageLayout::UNDEFINED)
-                        .final_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)
-                        .build()])
-                    .subpasses(&[vk::SubpassDescription::builder()
+                        .final_layout(vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL)])
+                    .subpasses(&[vk::SubpassDescription::default()
                         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
-                        .color_attachments(&[vk::AttachmentReference::builder()
+                        .color_attachments(&[vk::AttachmentReference::default()
                             .attachment(0)
-                            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-                            .build()])
-                        .build()])
-                    .dependencies(&[vk::SubpassDependency::builder()
+                            .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)])])
+                    .dependencies(&[vk::SubpassDependency::default()
                         .src_subpass(0)
                         .dst_subpass(vk::SUBPASS_EXTERNAL)
                         .src_access_mask(
@@ -110,8 +103,7 @@ impl GuiContext {
                             vk::AccessFlags::MEMORY_READ | vk::AccessFlags::MEMORY_WRITE,
                         )
                         .src_stage_mask(vk::PipelineStageFlags::ALL_GRAPHICS)
-                        .dst_stage_mask(vk::PipelineStageFlags::ALL_GRAPHICS)
-                        .build()]),
+                        .dst_stage_mask(vk::PipelineStageFlags::ALL_GRAPHICS)]),
                 None,
             )
         }
@@ -119,36 +111,32 @@ impl GuiContext {
 
         // Create Pipeline
         let pipeline = {
-            let bindings = [vk::VertexInputBindingDescription::builder()
+            let bindings = [vk::VertexInputBindingDescription::default()
                 .binding(0)
                 .input_rate(vk::VertexInputRate::VERTEX)
                 .stride(
                     4 * std::mem::size_of::<f32>() as u32 + 4 * std::mem::size_of::<u8>() as u32,
-                )
-                .build()];
+                )];
 
             let attributes = [
                 // position
-                vk::VertexInputAttributeDescription::builder()
+                vk::VertexInputAttributeDescription::default()
                     .binding(0)
                     .offset(0)
                     .location(0)
-                    .format(vk::Format::R32G32_SFLOAT)
-                    .build(),
+                    .format(vk::Format::R32G32_SFLOAT),
                 // uv
-                vk::VertexInputAttributeDescription::builder()
+                vk::VertexInputAttributeDescription::default()
                     .binding(0)
                     .offset(8)
                     .location(1)
-                    .format(vk::Format::R32G32_SFLOAT)
-                    .build(),
+                    .format(vk::Format::R32G32_SFLOAT),
                 // color
-                vk::VertexInputAttributeDescription::builder()
+                vk::VertexInputAttributeDescription::default()
                     .binding(0)
                     .offset(16)
                     .location(2)
-                    .format(vk::Format::R8G8B8A8_UNORM)
-                    .build(),
+                    .format(vk::Format::R8G8B8A8_UNORM),
             ];
 
             // Vertex shader stage
@@ -169,12 +157,12 @@ impl GuiContext {
 
             let pipeline_shader_stages = [vertex_stage, fragment_stage];
 
-            let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::builder()
+            let input_assembly_info = vk::PipelineInputAssemblyStateCreateInfo::default()
                 .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
-            let viewport_info = vk::PipelineViewportStateCreateInfo::builder()
+            let viewport_info = vk::PipelineViewportStateCreateInfo::default()
                 .viewport_count(1)
                 .scissor_count(1);
-            let rasterization_info = vk::PipelineRasterizationStateCreateInfo::builder()
+            let rasterization_info = vk::PipelineRasterizationStateCreateInfo::default()
                 .depth_clamp_enable(false)
                 .rasterizer_discard_enable(false)
                 .polygon_mode(vk::PolygonMode::FILL)
@@ -182,12 +170,11 @@ impl GuiContext {
                 .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
                 .depth_bias_enable(false)
                 .line_width(1.0);
-            let stencil_op = vk::StencilOpState::builder()
+            let stencil_op = vk::StencilOpState::default()
                 .fail_op(vk::StencilOp::KEEP)
                 .pass_op(vk::StencilOp::KEEP)
-                .compare_op(vk::CompareOp::ALWAYS)
-                .build();
-            let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::builder()
+                .compare_op(vk::CompareOp::ALWAYS);
+            let depth_stencil_info = vk::PipelineDepthStencilStateCreateInfo::default()
                 .depth_test_enable(false)
                 .depth_write_enable(false)
                 .depth_compare_op(vk::CompareOp::ALWAYS)
@@ -195,7 +182,7 @@ impl GuiContext {
                 .stencil_test_enable(false)
                 .front(stencil_op)
                 .back(stencil_op);
-            let color_blend_attachments = [vk::PipelineColorBlendAttachmentState::builder()
+            let color_blend_attachments = [vk::PipelineColorBlendAttachmentState::default()
                 .color_write_mask(
                     vk::ColorComponentFlags::R
                         | vk::ColorComponentFlags::G
@@ -204,20 +191,19 @@ impl GuiContext {
                 )
                 .blend_enable(true)
                 .src_color_blend_factor(vk::BlendFactor::ONE)
-                .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)
-                .build()];
-            let color_blend_info = vk::PipelineColorBlendStateCreateInfo::builder()
+                .dst_color_blend_factor(vk::BlendFactor::ONE_MINUS_SRC_ALPHA)];
+            let color_blend_info = vk::PipelineColorBlendStateCreateInfo::default()
                 .attachments(&color_blend_attachments);
             let dynamic_states = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
             let dynamic_state_info =
-                vk::PipelineDynamicStateCreateInfo::builder().dynamic_states(&dynamic_states);
-            let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
+                vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_states);
+            let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::default()
                 .vertex_attribute_descriptions(&attributes)
                 .vertex_binding_descriptions(&bindings);
-            let multisample_info = vk::PipelineMultisampleStateCreateInfo::builder()
+            let multisample_info = vk::PipelineMultisampleStateCreateInfo::default()
                 .rasterization_samples(vk::SampleCountFlags::TYPE_1);
 
-            let pipeline_create_info = [vk::GraphicsPipelineCreateInfo::builder()
+            let pipeline_create_info = [vk::GraphicsPipelineCreateInfo::default()
                 .stages(&pipeline_shader_stages)
                 .vertex_input_state(&vertex_input_state)
                 .input_assembly_state(&input_assembly_info)
@@ -229,8 +215,7 @@ impl GuiContext {
                 .dynamic_state(&dynamic_state_info)
                 .layout(pipeline_layout)
                 .render_pass(render_pass)
-                .subpass(0)
-                .build()];
+                .subpass(0)];
 
             let pipeline = unsafe {
                 device.create_graphics_pipelines(
@@ -245,7 +230,7 @@ impl GuiContext {
                 device.destroy_shader_module(fragment_shader, None);
             }
             vulkan_context
-                .set_debug_name(vk::ObjectType::PIPELINE, pipeline.as_raw(), "GUI Pipeline")
+                .set_debug_name(pipeline, "GUI Pipeline")
                 .unwrap();
             pipeline
         };
@@ -339,11 +324,11 @@ impl GuiContext {
         unsafe {
             device.cmd_begin_render_pass(
                 command_buffer,
-                &vk::RenderPassBeginInfo::builder()
+                &vk::RenderPassBeginInfo::default()
                     .render_pass(self.render_pass)
                     .framebuffer(framebuffer)
                     .clear_values(&[CLEAR_VALUES[0]])
-                    .render_area(vk::Rect2D::builder().extent(extent).build()),
+                    .render_area(vk::Rect2D::default().extent(extent)),
                 vk::SubpassContents::INLINE,
             );
             device.cmd_bind_pipeline(
@@ -361,14 +346,13 @@ impl GuiContext {
             device.cmd_set_viewport(
                 command_buffer,
                 0,
-                &[vk::Viewport::builder()
+                &[vk::Viewport::default()
                     .x(0.0)
                     .y(0.0)
                     .width(extent.width as f32)
                     .height(extent.height as f32)
                     .min_depth(0.0)
-                    .max_depth(1.0)
-                    .build()],
+                    .max_depth(1.0)],
             );
 
             // Set push constants
@@ -435,20 +419,17 @@ impl GuiContext {
                 device.cmd_set_scissor(
                     command_buffer,
                     0,
-                    &[vk::Rect2D::builder()
+                    &[vk::Rect2D::default()
                         .offset(
-                            vk::Offset2D::builder()
+                            vk::Offset2D::default()
                                 .x(min.x.round() as i32)
-                                .y(min.y.round() as i32)
-                                .build(),
+                                .y(min.y.round() as i32),
                         )
                         .extent(
-                            vk::Extent2D::builder()
+                            vk::Extent2D::default()
                                 .width((max.x.round() - min.x) as u32)
-                                .height((max.y.round() - min.y) as u32)
-                                .build(),
-                        )
-                        .build()],
+                                .height((max.y.round() - min.y) as u32),
+                        )],
                 );
 
                 device.cmd_draw_indexed(command_buffer, mesh.indices.len() as u32, 1, 0, 0, 0);
@@ -528,7 +509,7 @@ fn update_font_texture(
         image_layout: vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL,
     };
 
-    let texture_write = vk::WriteDescriptorSet::builder()
+    let texture_write = vk::WriteDescriptorSet::default()
         .image_info(std::slice::from_ref(&image_info))
         .dst_binding(0)
         .descriptor_type(vk::DescriptorType::COMBINED_IMAGE_SAMPLER)

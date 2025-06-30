@@ -10,6 +10,7 @@ pub(crate) enum WorkerMessage {
 
 #[derive(Debug, Clone)]
 pub(crate) enum WorkerError {
+    #[allow(unused)]
     TaskFailed(String),
 }
 

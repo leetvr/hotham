@@ -39,7 +39,7 @@ pub enum TextureUsage {
 }
 
 /// Texture index to indicate to the shader that this material does not have a texture of the given type
-pub static NO_TEXTURE: u32 = std::u32::MAX;
+pub static NO_TEXTURE: u32 = u32::MAX;
 
 impl Texture {
     /// Creates a new texture

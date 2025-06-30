@@ -241,7 +241,7 @@ fn load_skins(node: gltf::Node, import_context: &mut ImportContext) {
     }
 }
 
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
+#[allow(clippy::too_many_arguments)]
 fn load_node(
     node: &gltf::Node,
     import_context: &mut ImportContext,

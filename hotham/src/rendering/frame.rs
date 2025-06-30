@@ -51,15 +51,15 @@ impl Frame {
 
         let fence = unsafe {
             device.create_fence(
-                &vk::FenceCreateInfo::builder().flags(vk::FenceCreateFlags::SIGNALED),
+                &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
                 None,
             )
         }?;
-        let compute_fence = unsafe { device.create_fence(&vk::FenceCreateInfo::builder(), None) }?;
+        let compute_fence = unsafe { device.create_fence(&vk::FenceCreateInfo::default(), None) }?;
 
         let command_buffers = unsafe {
             device.allocate_command_buffers(
-                &vk::CommandBufferAllocateInfo::builder()
+                &vk::CommandBufferAllocateInfo::default()
                     .command_buffer_count(2)
                     .level(vk::CommandBufferLevel::PRIMARY)
                     .command_pool(command_pool),

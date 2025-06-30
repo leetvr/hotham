@@ -1,31 +1,31 @@
 [package]
-edition = "2018"
+edition = "2021"
 license = "MIT OR Apache-2.0"
 name = "crab-saber"
 version = "0.2.0"
 
 [lib]
-crate-type = ["lib", "cdylib"]
+crate-type = ["rlib", "cdylib"]
 
 [[bin]]
 name = "hotham_crab_saber"
 path = "src/main.rs"
 
 [dependencies]
-hotham = {path = "../../hotham"}
+hotham = { path = "../../hotham" }
 rand = "0.8.0"
 
 [dev-dependencies]
 approx = "0.5"
 
 [target.'cfg(target_os = "android")'.dependencies]
-ndk-glue = "0.6"
+ndk-glue = "0.7"
 
 [package.metadata.android]
 apk_label = "Crab Saber"
 fullscreen = true
 runtime_libs = "../common_lib"
-target_sdk_version = 29
+target_sdk_version = 33
 
 [[package.metadata.android.uses_permission]]
 name = "android.permission.INTERNET"
@@ -53,7 +53,10 @@ value = "vr_only"
 
 [[package.metadata.android.application.activity.intent_filter]]
 actions = ["android.intent.action.MAIN"]
-categories = ["com.oculus.intent.category.VR", "android.intent.category.LAUNCHER"]
+categories = [
+    "com.oculus.intent.category.VR",
+    "android.intent.category.LAUNCHER",
+]
 
 [[package.metadata.android.application.activity.meta_data]]
 name = "com.oculus.vr.focusaware"

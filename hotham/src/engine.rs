@@ -9,6 +9,7 @@ use crate::{
     workers::Workers,
     HothamError, HothamResult, VIEW_TYPE,
 };
+use hecs::Entity;
 use hotham_asset_client::AssetUpdatedMessage;
 use openxr as xr;
 
@@ -110,6 +111,7 @@ impl<'a> EngineBuilder<'a> {
             stage_entity,
             hmd_entity,
             performance_timer: PerformanceTimer::new("Application Tick"),
+            graveyard: Default::default(),
             recently_updated_assets: Default::default(),
             workers: Workers::new(Default::default()),
         }
@@ -163,6 +165,8 @@ pub struct Engine {
     pub hmd_entity: hecs::Entity,
     /// Performance timers
     pub performance_timer: PerformanceTimer,
+    /// Entity graveyard
+    pub graveyard: Vec<Entity>,
     /// Files that were hot reloaded this frame
     recently_updated_assets: Vec<AssetUpdatedMessage>,
     /// Workers
@@ -271,6 +275,7 @@ impl Engine {
 
     /// Call this after update
     pub fn finish(&mut self) -> xr::Result<()> {
+        self.empty_graveyard();
         self.performance_timer.end();
         let vulkan_context = &self.vulkan_context;
         let render_context = &mut self.render_context;
@@ -301,7 +306,7 @@ impl Engine {
                     let render_context = &mut self.render_context;
                     let world = &mut self.world;
 
-                    let file_type = asset_updated.asset_id.split('.').last().unwrap();
+                    let file_type = asset_updated.asset_id.split('.').next_back().unwrap();
                     match (asset_updated.asset_id.as_str(), file_type) {
                         (_, "glb") => update_models(
                             vulkan_context,
@@ -328,6 +333,13 @@ impl Engine {
                     panic!("[HOTHAM_ENGINE] Worker encountered error: {e:?}");
                 }
             }
+        }
+    }
+
+    fn empty_graveyard(&mut self) {
+        let world = &mut self.world;
+        for entity_to_despawn in self.graveyard.drain(..) {
+            let _ = world.despawn(entity_to_despawn);
         }
     }
 }
@@ -427,14 +439,6 @@ pub fn process_android_events(resumed: &mut bool, should_quit: &Arc<AtomicBool>)
             }
             ndk_glue::Event::Pause => *resumed = false,
             _ => {}
-        }
-    }
-
-    if let Some(ref input_queue) = *ndk_glue::input_queue() {
-        while let Some(event) = input_queue.get_event() {
-            if let Some(event) = input_queue.pre_dispatch(event) {
-                input_queue.finish_event(event, false);
-            }
         }
     }
 }
