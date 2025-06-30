@@ -124,7 +124,7 @@ fn get_cursor_location_for_panel(
 
     // Adjust the point such that 0,0 is the panel's top left
     let x = (transformed_hit_point.x + 1.) * 0.5;
-    let y = ((transformed_hit_point.y * -1.) * 0.5) + 0.5;
+    let y = (-transformed_hit_point.y * 0.5) + 0.5;
 
     // Convert to screen coordinates
     let x_points = x * panel_extent.width as f32;
