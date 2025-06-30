@@ -3,6 +3,10 @@
 #![allow(clippy::missing_transmute_annotations)]
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
+mod action_state;
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+pub mod inputs;
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 pub mod openxr_loader;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub mod simulator;
@@ -10,10 +14,7 @@ pub mod simulator;
 pub mod space_state;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 pub mod state;
-
-mod action_state;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
-pub mod inputs;
 mod windowing;
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
