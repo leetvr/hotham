@@ -61,6 +61,8 @@ impl VulkanContext {
         }
 
         let entry = unsafe { Entry::load() }?;
+
+        #[allow(clippy::missing_transmute_annotations)]
         let get_instance_proc_addr =
             unsafe { std::mem::transmute(entry.static_fn().get_instance_proc_addr) };
 
@@ -985,9 +987,11 @@ fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
     println!("[HOTHAM_VULKAN] Trying to use layers: {:?}", unsafe {
         parse_raw_strings(&layer_names)
     });
-    let extensions = vec![(ash::ext::debug_utils::NAME.to_owned())];
 
-    let extension_names = extensions.iter().map(|e| e.as_ptr()).collect::<Vec<_>>();
+    let extension_names = [(ash::ext::debug_utils::NAME.to_owned())]
+        .iter()
+        .map(|e| e.as_ptr())
+        .collect::<Vec<_>>();
 
     let app_info = vk::ApplicationInfo::default()
         .application_name(&app_name)

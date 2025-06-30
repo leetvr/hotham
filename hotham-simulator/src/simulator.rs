@@ -112,9 +112,10 @@ pub unsafe extern "system" fn create_vulkan_instance(
     let vulkan_create_info: &ash::vk::InstanceCreateInfo =
         transmute(&(*create_info).vulkan_create_info);
     let get_instance_proc_addr = (*create_info).pfn_get_instance_proc_addr.unwrap();
-    let vk_create_instance = CStr::from_bytes_with_nul_unchecked(b"vkCreateInstance\0").as_ptr();
-    let create_instance: vk::PFN_vkCreateInstance =
-        transmute(get_instance_proc_addr(ptr::null(), vk_create_instance));
+    let create_instance: vk::PFN_vkCreateInstance = transmute(get_instance_proc_addr(
+        ptr::null(),
+        c"vkCreateInstance".as_ptr(),
+    ));
     let mut instance = vk::Instance::null();
     let mut create_info = *vulkan_create_info;
 
@@ -925,15 +926,15 @@ pub unsafe extern "system" fn create_xr_swapchain(
     let mut state = STATE.lock().unwrap();
     let format = vk::Format::from_raw((*create_info).format as _);
     let (multiview_images, multiview_images_memory) =
-        create_multiview_images(&mut *state, &(*create_info));
+        create_multiview_images(&mut state, &(*create_info));
     println!("[HOTHAM_SIMULATOR] ..done.");
 
     state.multiview_images = multiview_images;
     state.multiview_images_memory = multiview_images_memory;
-    state.multiview_image_views = create_multiview_image_views(&mut *state, format);
+    state.multiview_image_views = create_multiview_image_views(&mut state, format);
 
     println!("[HOTHAM_SIMULATOR] Building windows swapchain..");
-    let windows_swapchain = build_swapchain(&mut *state);
+    let windows_swapchain = build_swapchain(&mut state);
     println!("[HOTHAM_SIMULATOR] ..done");
     let s = Swapchain::from_raw(windows_swapchain.as_raw());
     println!("[HOTHAM_SIMULATOR] Returning with {s:?}");

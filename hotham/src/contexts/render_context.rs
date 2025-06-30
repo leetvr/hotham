@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::CStr, mem::size_of, slice::from_ref as slice_from_ref};
+use std::{collections::HashMap, mem::size_of, slice::from_ref as slice_from_ref};
 
 pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
@@ -804,7 +804,6 @@ pub fn create_shader<'a>(
     stage: vk::ShaderStageFlags,
     vulkan_context: &VulkanContext,
 ) -> Result<(vk::ShaderModule, vk::PipelineShaderStageCreateInfo<'a>)> {
-    let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
     let create_info = vk::ShaderModuleCreateInfo::default().code(shader_code);
     let shader_module = unsafe {
         vulkan_context
@@ -813,7 +812,7 @@ pub fn create_shader<'a>(
     }?;
     let shader_stage = vk::PipelineShaderStageCreateInfo::default()
         .stage(stage)
-        .name(<&std::ffi::CStr>::clone(&main))
+        .name(<&std::ffi::CStr>::clone(&c"main"))
         .module(shader_module);
 
     Ok((shader_module, shader_stage))
@@ -864,7 +863,6 @@ fn create_compute_pipeline(
     layouts: &[vk::DescriptorSetLayout],
 ) -> (vk::Pipeline, vk::PipelineLayout) {
     unsafe {
-        let shader_entry_name = CStr::from_bytes_with_nul_unchecked(b"main\0");
         let compute_module = device
             .create_shader_module(&vk::ShaderModuleCreateInfo::default().code(COMPUTE), None)
             .unwrap();
@@ -877,7 +875,7 @@ fn create_compute_pipeline(
             .stage(vk::PipelineShaderStageCreateInfo {
                 stage: vk::ShaderStageFlags::COMPUTE,
                 module: compute_module,
-                p_name: shader_entry_name.as_ptr(),
+                p_name: c"main".as_ptr(),
                 ..Default::default()
             })
             .layout(layout);

@@ -60,13 +60,14 @@ impl<T: Sized> Buffer<T> {
             )
             .unwrap();
 
-        // Transmute the pointer into GPU memory so that we can easily access it again.
-        let memory_address = std::mem::transmute(memory_address);
+        // Stash the pointer so that we can easily access it again.
+        let memory_address = std::mem::transmute::<*mut std::ffi::c_void, *mut T>(memory_address);
+        let memory_address = std::ptr::NonNull::new_unchecked(memory_address);
 
         Self {
             buffer,
             device_memory,
-            memory_address: std::ptr::NonNull::new_unchecked(memory_address),
+            memory_address,
             len: 0,
             max_len,
             usage,

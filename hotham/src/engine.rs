@@ -306,7 +306,7 @@ impl Engine {
                     let render_context = &mut self.render_context;
                     let world = &mut self.world;
 
-                    let file_type = asset_updated.asset_id.split('.').last().unwrap();
+                    let file_type = asset_updated.asset_id.split('.').next_back().unwrap();
                     match (asset_updated.asset_id.as_str(), file_type) {
                         (_, "glb") => update_models(
                             vulkan_context,
