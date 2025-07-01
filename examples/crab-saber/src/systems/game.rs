@@ -147,10 +147,7 @@ fn transition(
             panel.text = format!("Game Over\n{message}");
             panel.buttons = vec![UIPanelButton::new("Back to main menu")];
         }
-        _ => panic!(
-            "Invalid state transition {:?} -> {:?}",
-            current_state, next_state
-        ),
+        _ => panic!("Invalid state transition {current_state:?} -> {next_state:?}",),
     }
 
     game_context.state = next_state;

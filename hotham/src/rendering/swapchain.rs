@@ -227,7 +227,7 @@ fn create_framebuffers(
                 swapchain_image_view,
             ];
 
-            let frame_buffer_create_info = vk::FramebufferCreateInfo::builder()
+            let frame_buffer_create_info = vk::FramebufferCreateInfo::default()
                 .render_pass(render_pass)
                 .attachments(&msaa_attachments)
                 .width(swapchain_info.resolution.width)
@@ -269,7 +269,7 @@ fn create_framebuffers(
         .map(|swapchain_image_view| {
             let msaa_attachments = [color_image.view, depth_image.view, swapchain_image_view];
 
-            let frame_buffer_create_info = vk::FramebufferCreateInfo::builder()
+            let frame_buffer_create_info = vk::FramebufferCreateInfo::default()
                 .render_pass(render_pass)
                 .attachments(&msaa_attachments)
                 .width(swapchain_info.resolution.width)

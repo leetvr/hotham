@@ -64,7 +64,7 @@ impl UIPanelButton {
 }
 
 /// Convenience function to create a panel and add it to a World
-#[cfg_attr(feature = "cargo-clippy", allow(clippy::too_many_arguments))]
+#[allow(clippy::too_many_arguments)]
 pub fn add_ui_panel_to_world(
     text: &str,
     resolution: vk::Extent2D,
@@ -95,7 +95,7 @@ pub fn add_ui_panel_to_world(
         vulkan_context
             .device
             .create_framebuffer(
-                &vk::FramebufferCreateInfo::builder()
+                &vk::FramebufferCreateInfo::default()
                     .render_pass(gui_context.render_pass)
                     .attachments(attachments)
                     .width(resolution.width)

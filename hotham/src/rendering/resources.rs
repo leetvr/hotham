@@ -282,7 +282,7 @@ impl StagingBuffer {
         unsafe {
             let buffer = device
                 .create_buffer(
-                    &vk::BufferCreateInfo::builder()
+                    &vk::BufferCreateInfo::default()
                         .usage(
                             vk::BufferUsageFlags::TRANSFER_SRC | vk::BufferUsageFlags::TRANSFER_DST,
                         )

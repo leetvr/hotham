@@ -1,14 +1,16 @@
 use crate::{
     asset_importer::add_model_to_world,
     components::{
-        global_transform::GlobalTransform, hand::Handedness, local_transform::LocalTransform,
+        global_transform::GlobalTransform,
+        hand::{GrabbedEntity, Handedness},
+        local_transform::LocalTransform,
         stage, AnimationController, Collider, Grabbed, Hand,
     },
     contexts::{physics_context::HAND_COLLISION_GROUP, InputContext},
     Engine,
 };
 use hecs::World;
-use rapier3d::prelude::{ActiveCollisionTypes, SharedShape};
+use rapier3d::prelude::{ActiveCollisionTypes, Group, SharedShape};
 
 /// Hands system
 /// Used to allow users to interact with objects using their controllers as representations of their hands
@@ -32,42 +34,49 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
         .iter()
     {
         // Get the position of the hand in stage space.
-        let (stage_from_grip, grip_value) = match hand.handedness {
+        let (stage_from_grip, grip_value, grip_button_just_pressed) = match hand.handedness {
             Handedness::Left => (
                 input_context.left.stage_from_grip(),
                 input_context.left.grip_analog(),
+                input_context.left.grip_button_just_pressed(),
             ),
             Handedness::Right => (
                 input_context.right.stage_from_grip(),
                 input_context.right.grip_analog(),
+                input_context.right.grip_button_just_pressed(),
             ),
         };
 
         // Get global transform
-        let global_from_local = global_from_stage * stage_from_grip;
+        let global_from_grip = global_from_stage * stage_from_grip;
 
         // Apply transform
-        local_transform.update_from_affine(&global_from_local);
-        global_transform.0 = global_from_local;
+        local_transform.update_from_affine(&global_from_grip);
+        global_transform.0 = global_from_grip;
 
         // If we've grabbed something, update its transform, being careful to preserve its scale.
-        if let Some(grabbed_entity) = hand.grabbed_entity {
+        if let Some(GrabbedEntity {
+            entity,
+            grip_from_local,
+        }) = hand.grabbed_entity
+        {
             // We first need to check if some other system has decided that this item should no longer be grabbed.
-            if !world.entity(grabbed_entity).unwrap().has::<Grabbed>() {
+            if !world.entity(entity).unwrap().has::<Grabbed>() {
                 hand.grabbed_entity = None;
             } else {
                 // OK. We are sure that this entity exists, and is being grabbed.
-                let mut local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
+                let global_from_local = global_from_grip * grip_from_local;
+                let mut local_transform = world.get::<&mut LocalTransform>(entity).unwrap();
                 local_transform.update_rotation_translation_from_affine(&global_from_local);
 
-                let mut global_transform =
-                    world.get::<&mut GlobalTransform>(grabbed_entity).unwrap();
+                let mut global_transform = world.get::<&mut GlobalTransform>(entity).unwrap();
                 *global_transform = (*local_transform).into();
             }
         }
 
         // Apply grip value to hand
         hand.grip_value = grip_value;
+        hand.grip_button_just_pressed = grip_button_just_pressed;
 
         // Apply to AnimationController
         animation_controller.blend_amount = grip_value;
@@ -79,7 +88,7 @@ pub fn add_hand(
     models: &std::collections::HashMap<String, World>,
     handedness: Handedness,
     world: &mut World,
-) {
+) -> hecs::Entity {
     let (hand_component, model_name) = match handedness {
         Handedness::Left => (Hand::left(), "Left Hand"),
         Handedness::Right => (Hand::right(), "Right Hand"),
@@ -100,13 +109,15 @@ pub fn add_hand(
         sensor: true,
         active_collision_types: ActiveCollisionTypes::all(),
         collision_groups: HAND_COLLISION_GROUP,
-        collision_filter: u32::MAX,
+        collision_filter: Group::all(),
         ..Default::default()
     };
 
     world
         .insert(hand_entity, (collider, hand_component))
         .unwrap();
+
+    hand_entity
 }
 
 #[cfg(test)]
@@ -139,7 +150,7 @@ mod tests {
         let (mut world, input_context) = setup();
 
         let expected_scale = Vec3::X * 1000.;
-        let grabbed_entity = world.spawn((
+        let entity = world.spawn((
             Grabbed,
             RigidBody::default(),
             LocalTransform {
@@ -148,11 +159,15 @@ mod tests {
             },
             GlobalTransform::default(),
         ));
+        let grabbed_entity = GrabbedEntity {
+            entity,
+            grip_from_local: Default::default(),
+        };
         add_hand_to_world(&mut world, Some(grabbed_entity));
 
         tick(&mut world, &input_context);
 
-        let local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
+        let local_transform = world.get::<&mut LocalTransform>(entity).unwrap();
         assert_relative_eq!(local_transform.translation, [-0.2, 1.4, -0.5].into());
 
         // Make sure that scale gets preserved
@@ -163,16 +178,20 @@ mod tests {
     pub fn test_ungrabbed_object_do_not_move() {
         let (mut world, input_context) = setup();
 
-        let grabbed_entity = world.spawn((
+        let entity = world.spawn((
             RigidBody::default(),
             LocalTransform::default(),
             GlobalTransform::default(),
         ));
+        let grabbed_entity = GrabbedEntity {
+            entity,
+            grip_from_local: Default::default(),
+        };
         add_hand_to_world(&mut world, Some(grabbed_entity));
 
         tick(&mut world, &input_context);
 
-        let local_transform = world.get::<&mut LocalTransform>(grabbed_entity).unwrap();
+        let local_transform = world.get::<&mut LocalTransform>(entity).unwrap();
         assert_relative_eq!(local_transform.translation, Default::default());
         assert_relative_eq!(local_transform.scale, Vec3::ONE);
         assert_relative_eq!(local_transform.rotation, Default::default());
@@ -189,7 +208,7 @@ mod tests {
         hands_system_inner(world, input_context);
     }
 
-    fn add_hand_to_world(world: &mut World, grabbed_entity: Option<Entity>) -> Entity {
+    fn add_hand_to_world(world: &mut World, grabbed_entity: Option<GrabbedEntity>) -> Entity {
         let animation_controller = AnimationController {
             blend_amount: 100.0, // bogus value
             ..Default::default()

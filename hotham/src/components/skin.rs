@@ -2,7 +2,7 @@ use crate::{asset_importer::ImportContext, rendering::resources::MAX_JOINTS};
 use glam::{Affine3A, Mat4};
 use hecs::Entity;
 
-pub static NO_SKIN: u32 = std::u32::MAX;
+pub static NO_SKIN: u32 = u32::MAX;
 
 /// Component added to an entity to point to the joints in the node
 /// Automatically added by `gltf_loader`

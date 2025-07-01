@@ -297,10 +297,7 @@ mod tests {
         components::{stage::Stage, LocalTransform},
         contexts::RenderContext,
         rendering::{image::Image, light::Light, scene_data},
-        systems::{
-            update_global_transform::update_global_transform_system_inner,
-            update_global_transform_with_parent::update_global_transform_with_parent_system_inner,
-        },
+        systems::update_global_transform::update_global_transform_system_inner,
         util::{affine_from_posef, posef_from_affine, save_image_to_disk},
     };
     use glam::{Quat, Vec3};
@@ -535,6 +532,7 @@ mod tests {
         assert!(errors.is_empty(), "{errors:#?}");
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn render_object_with_debug_data(
         vulkan_context: &VulkanContext,
         render_context: &mut RenderContext,
@@ -584,7 +582,6 @@ mod tests {
         render_context.scene_data.params.x = debug_ibl_intensity;
         render_context.scene_data.lights[0] = light.clone();
         update_global_transform_system_inner(world);
-        update_global_transform_with_parent_system_inner(world);
         rendering_system_inner(world, vulkan_context, render_context, views, 0);
         render_context.end_frame(vulkan_context);
     }

@@ -10,6 +10,7 @@ pub(crate) enum WorkerMessage {
 
 #[derive(Debug, Clone)]
 pub(crate) enum WorkerError {
+    #[allow(unused)]
     TaskFailed(String),
 }
 
@@ -53,7 +54,7 @@ impl Workers {
                 .unwrap();
 
             println!("[HOTHAM_WORKER] Runtime starting..");
-            runtime.block_on(async { local_set.await });
+            runtime.block_on(local_set);
             panic!("[HOTHAM_WORKER] RUNTIME FINISHED - THIS SHOULD NOT HAPPEN");
         });
 

@@ -1,12 +1,17 @@
 use hotham::{
     asset_importer::{self, add_model_to_world},
-    components::{hand::Handedness, physics::SharedShape, Collider, Grabbable, LocalTransform},
+    components::{
+        hand::Handedness,
+        physics::{BodyType, SharedShape},
+        Collider, Grabbable, LocalTransform, RigidBody,
+    },
     glam,
     hecs::World,
+    na,
     systems::{
         animation_system, debug::debug_system, grabbing_system, hands::add_hand, hands_system,
         physics_system, rendering::rendering_system, skinning::skinning_system,
-        update_global_transform_system, update_global_transform_with_parent_system,
+        update_global_transform_system,
     },
     xr, Engine, HothamResult, TickData,
 };
@@ -40,7 +45,6 @@ fn tick(tick_data: TickData, engine: &mut Engine, state: &mut State) {
         animation_system(engine);
         navigation_system(engine, state);
         update_global_transform_system(engine);
-        update_global_transform_with_parent_system(engine);
         skinning_system(engine);
         debug_system(engine);
     }
@@ -60,6 +64,7 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     let world = &mut engine.world;
 
     let mut glb_buffers: Vec<&[u8]> = vec![
+        include_bytes!("../../../test_assets/floor.glb"),
         include_bytes!("../../../test_assets/left_hand.glb"),
         include_bytes!("../../../test_assets/right_hand.glb"),
     ];
@@ -78,8 +83,19 @@ fn init(engine: &mut Engine) -> Result<(), hotham::HothamError> {
     add_helmet(&models, world, [1., 1.4, -1.].into());
     add_hand(&models, Handedness::Left, world);
     add_hand(&models, Handedness::Right, world);
+    add_floor(&models, world);
 
     Ok(())
+}
+
+fn add_floor(models: &std::collections::HashMap<String, World>, world: &mut World) {
+    let entity = add_model_to_world("Floor", models, world, None).expect("Could not find Floor");
+    let collider = Collider::new(SharedShape::halfspace(na::Vector3::y_axis()));
+    let rigid_body = RigidBody {
+        body_type: BodyType::Fixed,
+        ..Default::default()
+    };
+    world.insert(entity, (collider, rigid_body)).unwrap();
 }
 
 fn add_helmet(

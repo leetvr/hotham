@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::CStr, mem::size_of, slice::from_ref as slice_from_ref};
+use std::{collections::HashMap, mem::size_of, slice::from_ref as slice_from_ref};
 
 pub static CLEAR_VALUES: [vk::ClearValue; 2] = [
     vk::ClearValue {
@@ -39,7 +39,7 @@ use crate::{
     COLOR_FORMAT, DEPTH_FORMAT, VIEW_COUNT,
 };
 use anyhow::Result;
-use ash::vk::{self, Handle};
+use ash::vk;
 use glam::{Affine3A, Mat4, Vec3, Vec4};
 use openxr as xr;
 use vk_shader_macros::include_glsl;
@@ -307,7 +307,7 @@ impl RenderContext {
             device
                 .begin_command_buffer(
                     command_buffer,
-                    &vk::CommandBufferBeginInfo::builder()
+                    &vk::CommandBufferBeginInfo::default()
                         .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
                 )
                 .unwrap();
@@ -338,7 +338,7 @@ impl RenderContext {
             device
                 .begin_command_buffer(
                     command_buffer,
-                    &vk::CommandBufferBeginInfo::builder()
+                    &vk::CommandBufferBeginInfo::default()
                         .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
                 )
                 .unwrap();
@@ -358,7 +358,7 @@ impl RenderContext {
             device.cmd_dispatch(command_buffer, group_count_x as u32, 1, 1);
             device.end_command_buffer(command_buffer).unwrap();
             let submit_info =
-                vk::SubmitInfo::builder().command_buffers(slice_from_ref(&command_buffer));
+                vk::SubmitInfo::default().command_buffers(slice_from_ref(&command_buffer));
             device
                 .queue_submit(
                     vulkan_context.graphics_queue,
@@ -387,7 +387,7 @@ impl RenderContext {
         let framebuffer = self.swapchain.framebuffers[swapchain_image_index];
 
         // Begin the renderpass.
-        let render_pass_begin_info = vk::RenderPassBeginInfo::builder()
+        let render_pass_begin_info = vk::RenderPassBeginInfo::default()
             .render_pass(self.render_pass)
             .framebuffer(framebuffer)
             .render_area(self.swapchain.render_area)
@@ -452,7 +452,7 @@ impl RenderContext {
             device.end_command_buffer(command_buffer).unwrap();
             let fence = frame.fence;
             let submit_info =
-                vk::SubmitInfo::builder().command_buffers(slice_from_ref(&command_buffer));
+                vk::SubmitInfo::default().command_buffers(slice_from_ref(&command_buffer));
             device
                 .queue_submit(graphics_queue, slice_from_ref(&submit_info), fence)
                 .expect("[HOTHAM_RENDER] @@ GPU CRASH DETECTED @@ - You are probably doing too much work in a compute shader!");
@@ -482,11 +482,7 @@ impl RenderContext {
         offsets: Vec<vk::DeviceSize>,
         texture_image: &Image,
     ) -> Result<u32> {
-        vulkan_context.set_debug_name(
-            vk::ObjectType::IMAGE,
-            texture_image.handle.as_raw(),
-            name,
-        )?;
+        vulkan_context.set_debug_name(texture_image.handle, name)?;
 
         // TODO: This is only necessary on desktop, or if there is data in the buffer!
         if !image_buf.is_empty() {
@@ -537,7 +533,7 @@ pub fn create_push_constant<T: 'static>(p: &T) -> &[u8] {
 fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> {
     // Attachment used for MSAA
     let color_store_op = vk::AttachmentStoreOp::DONT_CARE;
-    let color_attachment = vk::AttachmentDescription::builder()
+    let color_attachment = vk::AttachmentDescription::default()
         .format(COLOR_FORMAT)
         .samples(SAMPLES)
         .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -548,7 +544,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
     // Final attachment to be presented
-    let color_attachment_resolve = vk::AttachmentDescription::builder()
+    let color_attachment_resolve = vk::AttachmentDescription::default()
         .format(COLOR_FORMAT)
         .samples(vk::SampleCountFlags::TYPE_1)
         .load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -559,7 +555,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .final_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
     // Depth buffer
-    let depth_attachment = vk::AttachmentDescription::builder()
+    let depth_attachment = vk::AttachmentDescription::default()
         .format(DEPTH_FORMAT)
         .samples(SAMPLES)
         .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -572,7 +568,7 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
     // Fixed foveated rendering (FFR) attachment
     // Note this only works on Android so we need conditional compilation here.
     #[cfg(target_os = "android")]
-    let ffr_attachment = vk::AttachmentDescription::builder()
+    let ffr_attachment = vk::AttachmentDescription::default()
         .format(vk::Format::R8G8_UNORM)
         .samples(vk::SampleCountFlags::TYPE_1)
         .load_op(vk::AttachmentLoadOp::DONT_CARE)
@@ -582,35 +578,32 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         .initial_layout(vk::ImageLayout::UNDEFINED)
         .final_layout(vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT);
 
-    let color_attachment_reference = vk::AttachmentReference::builder()
+    let color_attachment_reference = vk::AttachmentReference::default()
         .attachment(0)
-        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-        .build();
+        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
     let color_attachment_reference = [color_attachment_reference];
 
-    let depth_stencil_reference = vk::AttachmentReference::builder()
+    let depth_stencil_reference = vk::AttachmentReference::default()
         .attachment(1)
-        .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
-        .build();
+        .layout(vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
     #[cfg(target_os = "android")]
-    let ffr_attachment_reference = vk::AttachmentReference::builder()
+    let ffr_attachment_reference = vk::AttachmentReference::default()
         .attachment(2)
         .layout(vk::ImageLayout::FRAGMENT_DENSITY_MAP_OPTIMAL_EXT);
 
-    let color_attachment_resolve_reference = vk::AttachmentReference::builder()
+    let color_attachment_resolve_reference = vk::AttachmentReference::default()
         .attachment(RESOLVE_ATTACHMENT)
-        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)
-        .build();
+        .layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL);
 
-    let subpass = vk::SubpassDescription::builder()
+    let subpass = vk::SubpassDescription::default()
         .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
         .color_attachments(&color_attachment_reference)
         .resolve_attachments(std::slice::from_ref(&color_attachment_resolve_reference))
         .depth_stencil_attachment(&depth_stencil_reference);
 
-    let dependency = vk::SubpassDependency::builder()
+    let dependency = vk::SubpassDependency::default()
         .src_subpass(vk::SUBPASS_EXTERNAL)
         .dst_subpass(0)
         .src_stage_mask(
@@ -628,31 +621,27 @@ fn create_render_pass(vulkan_context: &VulkanContext) -> Result<vk::RenderPass> 
         );
 
     let view_masks = [!(!0 << VIEW_COUNT)];
-    let mut multiview = vk::RenderPassMultiviewCreateInfo::builder()
+    let mut multiview = vk::RenderPassMultiviewCreateInfo::default()
         .view_masks(&view_masks)
         .correlation_masks(&view_masks);
 
     #[cfg(target_os = "android")]
-    let mut ffr_info = vk::RenderPassFragmentDensityMapCreateInfoEXT::builder()
-        .fragment_density_map_attachment(*ffr_attachment_reference);
+    let mut ffr_info = vk::RenderPassFragmentDensityMapCreateInfoEXT::default()
+        .fragment_density_map_attachment(ffr_attachment_reference);
 
     #[cfg(target_os = "android")]
     let attachments = [
-        *color_attachment,
-        *depth_attachment,
-        *ffr_attachment,
-        *color_attachment_resolve,
+        color_attachment,
+        depth_attachment,
+        ffr_attachment,
+        color_attachment_resolve,
     ];
 
     #[cfg(not(target_os = "android"))]
-    let attachments = [
-        *color_attachment,
-        *depth_attachment,
-        *color_attachment_resolve,
-    ];
+    let attachments = [color_attachment, depth_attachment, color_attachment_resolve];
 
     #[allow(unused_mut)]
-    let mut create_info = vk::RenderPassCreateInfo::builder()
+    let mut create_info = vk::RenderPassCreateInfo::default()
         .attachments(&attachments)
         .subpasses(std::slice::from_ref(&subpass))
         .dependencies(std::slice::from_ref(&dependency))
@@ -692,25 +681,23 @@ pub(crate) fn create_pipeline(
     let stages = [vertex_stage, fragment_stage];
 
     // Vertex input state
-    let position_binding_description = vk::VertexInputBindingDescription::builder()
+    let position_binding_description = vk::VertexInputBindingDescription::default()
         .binding(0)
         .stride(size_of::<Vec3>() as _)
-        .input_rate(vk::VertexInputRate::VERTEX)
-        .build();
-    let vertex_binding_description = vk::VertexInputBindingDescription::builder()
+        .input_rate(vk::VertexInputRate::VERTEX);
+    let vertex_binding_description = vk::VertexInputBindingDescription::default()
         .binding(1)
         .stride(size_of::<Vertex>() as _)
-        .input_rate(vk::VertexInputRate::VERTEX)
-        .build();
+        .input_rate(vk::VertexInputRate::VERTEX);
     let vertex_binding_descriptions = [position_binding_description, vertex_binding_description];
     let vertex_attribute_descriptions = Vertex::attribute_descriptions();
 
-    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::builder()
+    let vertex_input_state = vk::PipelineVertexInputStateCreateInfo::default()
         .vertex_attribute_descriptions(&vertex_attribute_descriptions)
         .vertex_binding_descriptions(&vertex_binding_descriptions);
 
     // Input assembly state
-    let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::builder()
+    let input_assembly_state = vk::PipelineInputAssemblyStateCreateInfo::default()
         .topology(vk::PrimitiveTopology::TRIANGLE_LIST);
 
     // Viewport State
@@ -727,12 +714,12 @@ pub(crate) fn create_pipeline(
     // Scissors
     let scissors = [*render_area];
 
-    let viewport_state = vk::PipelineViewportStateCreateInfo::builder()
+    let viewport_state = vk::PipelineViewportStateCreateInfo::default()
         .viewports(&viewports)
         .scissors(&scissors);
 
     // Rasterization state
-    let rasterization_state = vk::PipelineRasterizationStateCreateInfo::builder()
+    let rasterization_state = vk::PipelineRasterizationStateCreateInfo::default()
         .polygon_mode(vk::PolygonMode::FILL)
         .cull_mode(vk::CullModeFlags::BACK)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
@@ -746,10 +733,10 @@ pub(crate) fn create_pipeline(
 
     // Multisample state
     let multisample_state =
-        vk::PipelineMultisampleStateCreateInfo::builder().rasterization_samples(SAMPLES);
+        vk::PipelineMultisampleStateCreateInfo::default().rasterization_samples(SAMPLES);
 
     // Depth stencil state
-    let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::builder()
+    let depth_stencil_state = vk::PipelineDepthStencilStateCreateInfo::default()
         .depth_test_enable(true)
         .depth_write_enable(true)
         .depth_compare_op(vk::CompareOp::GREATER)
@@ -759,23 +746,22 @@ pub(crate) fn create_pipeline(
         .stencil_test_enable(false);
 
     // Color blend state
-    let color_blend_attachment = vk::PipelineColorBlendAttachmentState::builder()
+    let color_blend_attachment = vk::PipelineColorBlendAttachmentState::default()
         .color_write_mask(
             vk::ColorComponentFlags::R
                 | vk::ColorComponentFlags::G
                 | vk::ColorComponentFlags::B
                 | vk::ColorComponentFlags::A,
         )
-        .blend_enable(false)
-        .build();
+        .blend_enable(false);
 
     let color_blend_attachments = [color_blend_attachment];
 
-    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::builder()
+    let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
         .logic_op_enable(false)
         .attachments(&color_blend_attachments);
 
-    let create_info = vk::GraphicsPipelineCreateInfo::builder()
+    let create_info = vk::GraphicsPipelineCreateInfo::default()
         .stages(&stages)
         .vertex_input_state(&vertex_input_state)
         .input_assembly_state(&input_assembly_state)
@@ -786,8 +772,7 @@ pub(crate) fn create_pipeline(
         .color_blend_state(&color_blend_state)
         .layout(pipeline_layout)
         .render_pass(render_pass)
-        .subpass(0)
-        .build();
+        .subpass(0);
 
     let create_infos = [create_info];
 
@@ -814,23 +799,21 @@ pub(crate) fn create_pipeline(
     Ok(primary_pipeline)
 }
 
-pub fn create_shader(
+pub fn create_shader<'a>(
     shader_code: &[u32],
     stage: vk::ShaderStageFlags,
     vulkan_context: &VulkanContext,
-) -> Result<(vk::ShaderModule, vk::PipelineShaderStageCreateInfo)> {
-    let main = unsafe { CStr::from_bytes_with_nul_unchecked(b"main\0") };
-    let create_info = vk::ShaderModuleCreateInfo::builder().code(shader_code);
+) -> Result<(vk::ShaderModule, vk::PipelineShaderStageCreateInfo<'a>)> {
+    let create_info = vk::ShaderModuleCreateInfo::default().code(shader_code);
     let shader_module = unsafe {
         vulkan_context
             .device
             .create_shader_module(&create_info, None)
     }?;
-    let shader_stage = vk::PipelineShaderStageCreateInfo::builder()
+    let shader_stage = vk::PipelineShaderStageCreateInfo::default()
         .stage(stage)
-        .name(<&std::ffi::CStr>::clone(&main))
-        .module(shader_module)
-        .build();
+        .name(<&std::ffi::CStr>::clone(&c"main"))
+        .module(shader_module);
 
     Ok((shader_module, shader_stage))
 }
@@ -839,12 +822,12 @@ fn create_pipeline_layout(
     vulkan_context: &VulkanContext,
     set_layouts: &[vk::DescriptorSetLayout],
 ) -> Result<vk::PipelineLayout> {
-    let push_constant_range = vk::PushConstantRange::builder()
+    let push_constant_range = vk::PushConstantRange::default()
         .offset(0)
         .size(std::mem::size_of::<Material>() as _)
         .stage_flags(vk::ShaderStageFlags::FRAGMENT);
 
-    let create_info = &vk::PipelineLayoutCreateInfo::builder()
+    let create_info = &vk::PipelineLayoutCreateInfo::default()
         .set_layouts(set_layouts)
         .push_constant_ranges(slice_from_ref(&push_constant_range));
 
@@ -880,20 +863,19 @@ fn create_compute_pipeline(
     layouts: &[vk::DescriptorSetLayout],
 ) -> (vk::Pipeline, vk::PipelineLayout) {
     unsafe {
-        let shader_entry_name = CStr::from_bytes_with_nul_unchecked(b"main\0");
         let compute_module = device
-            .create_shader_module(&vk::ShaderModuleCreateInfo::builder().code(COMPUTE), None)
+            .create_shader_module(&vk::ShaderModuleCreateInfo::default().code(COMPUTE), None)
             .unwrap();
 
-        let create_info = &vk::PipelineLayoutCreateInfo::builder().set_layouts(layouts);
+        let create_info = &vk::PipelineLayoutCreateInfo::default().set_layouts(layouts);
 
         let layout = device.create_pipeline_layout(create_info, None).unwrap();
 
-        let create_info = vk::ComputePipelineCreateInfo::builder()
+        let create_info = vk::ComputePipelineCreateInfo::default()
             .stage(vk::PipelineShaderStageCreateInfo {
                 stage: vk::ShaderStageFlags::COMPUTE,
                 module: compute_module,
-                p_name: shader_entry_name.as_ptr(),
+                p_name: c"main".as_ptr(),
                 ..Default::default()
             })
             .layout(layout);

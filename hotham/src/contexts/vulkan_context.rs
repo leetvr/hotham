@@ -7,10 +7,9 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use ash::{
-    extensions::ext::DebugUtils,
     prelude::VkResult,
     util::Align,
-    vk::{self, Handle, ObjectType},
+    vk::{self, Handle},
     Device, Entry, Instance as AshInstance,
 };
 use openxr as xr;
@@ -40,7 +39,7 @@ pub struct VulkanContext {
     pub graphics_queue: vk::Queue,
     #[deprecated]
     pub descriptor_pool: vk::DescriptorPool,
-    pub debug_utils: DebugUtils,
+    pub debug_utils: ash::ext::debug_utils::Device,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
 }
 
@@ -61,29 +60,22 @@ impl VulkanContext {
             return Err(HothamError::UnsupportedVersionError.into());
         }
 
-        let entry = unsafe { Entry::new() }?;
+        let entry = unsafe { Entry::load() }?;
+
+        #[allow(clippy::missing_transmute_annotations)]
         let get_instance_proc_addr =
             unsafe { std::mem::transmute(entry.static_fn().get_instance_proc_addr) };
 
         let app_name = CString::new(application_name)?;
         let engine_name = CString::new("Hotham")?;
-        let app_info = vk::ApplicationInfo::builder()
+        let app_info = vk::ApplicationInfo::default()
             .api_version(vk::make_api_version(0, 1, 2, 128))
             .application_name(&app_name)
             .application_version(application_version)
             .engine_name(&engine_name)
-            .engine_version(1)
-            .build();
+            .engine_version(1);
 
-        #[cfg(not(debug_assertions))]
-        let instance_extensions = vec![];
-
-        #[cfg(debug_assertions)]
-        let instance_extensions = vec![vk::ExtDebugUtilsFn::name().as_ptr()];
-
-        let create_info = vk::InstanceCreateInfo::builder()
-            .application_info(&app_info)
-            .enabled_extension_names(&instance_extensions);
+        let create_info = vk::InstanceCreateInfo::default().application_info(&app_info);
 
         let instance_handle = unsafe {
             xr_instance.create_vulkan_instance(
@@ -121,25 +113,25 @@ impl VulkanContext {
             .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
 
         let mut descriptor_indexing_features =
-            vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
+            vk::PhysicalDeviceDescriptorIndexingFeatures::default()
                 .shader_sampled_image_array_non_uniform_indexing(true)
                 .descriptor_binding_variable_descriptor_count(true)
                 .descriptor_binding_partially_bound(true)
                 .runtime_descriptor_array(true);
 
-        let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::builder().multiview(true);
+        let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::default().multiview(true);
 
         let mut robust_features =
-            vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
+            vk::PhysicalDeviceRobustness2FeaturesEXT::default().null_descriptor(true);
 
         let mut f16_storage =
-            vk::PhysicalDevice16BitStorageFeatures::builder().storage_buffer16_bit_access(true);
+            vk::PhysicalDevice16BitStorageFeatures::default().storage_buffer16_bit_access(true);
 
-        let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::builder()
+        let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::default()
             .shader_float16(true)
             .shader_int8(true);
 
-        let mut fragment_density = vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT::builder()
+        let mut fragment_density = vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT::default()
             .fragment_density_map_deferred(true);
 
         let queue_family_index = unsafe {
@@ -157,12 +149,11 @@ impl VulkanContext {
                 .unwrap()
         };
 
-        let graphics_queue_create_info = vk::DeviceQueueCreateInfo::builder()
+        let graphics_queue_create_info = vk::DeviceQueueCreateInfo::default()
             .queue_family_index(queue_family_index)
-            .queue_priorities(&[1.0])
-            .build();
+            .queue_priorities(&[1.0]);
 
-        let device_create_info = vk::DeviceCreateInfo::builder()
+        let device_create_info = vk::DeviceCreateInfo::default()
             .enabled_extension_names(&enabled_extensions)
             .queue_create_infos(slice_from_ref(&graphics_queue_create_info))
             .push_next(&mut descriptor_indexing_features)
@@ -242,7 +233,7 @@ impl VulkanContext {
         let command_pool = create_command_pool(&device, queue_family_index).unwrap();
         let descriptor_pool = create_descriptor_pool(&device).unwrap();
 
-        let debug_utils = DebugUtils::new(&entry, &instance);
+        let debug_utils = ash::ext::debug_utils::Device::new(&instance, &device);
         let physical_device_properties =
             unsafe { instance.get_physical_device_properties(physical_device) };
 
@@ -289,7 +280,7 @@ impl VulkanContext {
     ) -> Result<vk::ImageView> {
         let aspect_mask = get_aspect_mask(format);
         let mut astc_decode_mode =
-            vk::ImageViewASTCDecodeModeEXT::builder().decode_mode(vk::Format::R8G8B8A8_UNORM);
+            vk::ImageViewASTCDecodeModeEXT::default().decode_mode(vk::Format::R8G8B8A8_UNORM);
 
         let flags = if format == vk::Format::R8G8_UNORM {
             vk::ImageViewCreateFlags::FRAGMENT_DENSITY_MAP_DEFERRED_EXT
@@ -297,7 +288,7 @@ impl VulkanContext {
             vk::ImageViewCreateFlags::empty()
         };
 
-        let mut create_info = vk::ImageViewCreateInfo::builder()
+        let mut create_info = vk::ImageViewCreateInfo::default()
             .view_type(view_type)
             .format(format)
             .flags(flags)
@@ -377,7 +368,7 @@ impl VulkanContext {
             vk::SampleCountFlags::TYPE_1
         };
 
-        let create_info = vk::ImageCreateInfo::builder()
+        let create_info = vk::ImageCreateInfo::default()
             .format(format)
             .image_type(vk::ImageType::TYPE_2D)
             .extent(vk::Extent3D {
@@ -429,7 +420,7 @@ impl VulkanContext {
         buffer_size: vk::DeviceSize,
     ) -> Result<(vk::Buffer, vk::DeviceMemory, vk::DeviceSize)> {
         let device = &self.device;
-        let buffer_create_info = vk::BufferCreateInfo::builder()
+        let buffer_create_info = vk::BufferCreateInfo::default()
             .size(buffer_size)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .usage(usage);
@@ -548,7 +539,7 @@ impl VulkanContext {
         let memory_type_index =
             self.find_memory_type(memory_requirements.memory_type_bits, properties)?;
 
-        let allocate_info = vk::MemoryAllocateInfo::builder()
+        let allocate_info = vk::MemoryAllocateInfo::default()
             .memory_type_index(memory_type_index)
             .allocation_size(memory_requirements.size);
 
@@ -566,18 +557,17 @@ impl VulkanContext {
         mip_count: u32,
     ) {
         let command_buffer = self.begin_single_time_commands();
-        let subresource_range = vk::ImageSubresourceRange::builder()
+        let subresource_range = vk::ImageSubresourceRange::default()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .base_mip_level(0)
             .level_count(mip_count)
             .base_array_layer(0)
-            .layer_count(layer_count)
-            .build();
+            .layer_count(layer_count);
 
         let (src_access_mask, dst_access_mask, src_stage, dst_stage) =
             get_stage(old_layout, new_layout);
 
-        let barrier = vk::ImageMemoryBarrier::builder()
+        let barrier = vk::ImageMemoryBarrier::default()
             .old_layout(old_layout)
             .new_layout(new_layout)
             .src_access_mask(src_access_mask)
@@ -585,8 +575,7 @@ impl VulkanContext {
             .src_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
             .dst_queue_family_index(vk::QUEUE_FAMILY_IGNORED)
             .subresource_range(subresource_range)
-            .image(image)
-            .build();
+            .image(image);
 
         let dependency_flags = vk::DependencyFlags::empty();
         let image_memory_barriers = &[barrier];
@@ -605,7 +594,7 @@ impl VulkanContext {
         self.end_single_time_commands(command_buffer);
     }
     pub fn begin_single_time_commands(&self) -> vk::CommandBuffer {
-        let alloc_info = vk::CommandBufferAllocateInfo::builder()
+        let alloc_info = vk::CommandBufferAllocateInfo::default()
             .command_buffer_count(1)
             .level(vk::CommandBufferLevel::PRIMARY)
             .command_pool(self.command_pool);
@@ -617,7 +606,7 @@ impl VulkanContext {
                 .expect("Unable to allocate command buffer")
         };
 
-        let begin_info = vk::CommandBufferBeginInfo::builder()
+        let begin_info = vk::CommandBufferBeginInfo::default()
             .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
         unsafe {
@@ -638,9 +627,7 @@ impl VulkanContext {
 
         let command_buffers = &[command_buffer];
 
-        let submit_info = vk::SubmitInfo::builder()
-            .command_buffers(command_buffers)
-            .build();
+        let submit_info = vk::SubmitInfo::default().command_buffers(command_buffers);
 
         let submit_info = &[submit_info];
 
@@ -665,7 +652,7 @@ impl VulkanContext {
         } else {
             vk::BorderColor::FLOAT_TRANSPARENT_BLACK
         };
-        let create_info = vk::SamplerCreateInfo::builder()
+        let create_info = vk::SamplerCreateInfo::default()
             .mag_filter(vk::Filter::LINEAR)
             .min_filter(vk::Filter::LINEAR)
             .address_mode_u(address_mode)
@@ -680,8 +667,7 @@ impl VulkanContext {
             .mipmap_mode(vk::SamplerMipmapMode::LINEAR)
             .mip_lod_bias(0.0)
             .min_lod(0.0)
-            .max_lod(vk::LOD_CLAMP_NONE)
-            .build();
+            .max_lod(vk::LOD_CLAMP_NONE);
 
         unsafe {
             self.device
@@ -705,7 +691,7 @@ impl VulkanContext {
 
         // KR: https://bit.ly/3ABKTFc
         for (mip_level, offset_increment) in offsets.iter().enumerate() {
-            let image_subresource = vk::ImageSubresourceLayers::builder()
+            let image_subresource = vk::ImageSubresourceLayers::default()
                 .aspect_mask(vk::ImageAspectFlags::COLOR)
                 .mip_level(mip_level as _)
                 .base_array_layer(0)
@@ -717,13 +703,12 @@ impl VulkanContext {
                 depth: 1,
             };
 
-            let region = vk::BufferImageCopy::builder()
+            let region = vk::BufferImageCopy::default()
                 .buffer_offset(offset)
                 .buffer_row_length(0)
                 .buffer_image_height(0)
-                .image_subresource(*image_subresource)
-                .image_extent(image_extent)
-                .build();
+                .image_subresource(image_subresource)
+                .image_extent(image_extent);
             regions.push(region);
             offset += offset_increment * u64::from(layer_count);
         }
@@ -750,12 +735,11 @@ impl VulkanContext {
         dst_buffer: vk::Buffer,
     ) {
         let command_buffer = self.begin_single_time_commands();
-        let image_subresource = vk::ImageSubresourceLayers::builder()
+        let image_subresource = vk::ImageSubresourceLayers::default()
             .aspect_mask(vk::ImageAspectFlags::COLOR)
             .mip_level(0)
             .base_array_layer(0)
-            .layer_count(1)
-            .build();
+            .layer_count(1);
 
         let image_extent = vk::Extent3D {
             width: src_image.extent.width,
@@ -763,7 +747,7 @@ impl VulkanContext {
             depth: 1,
         };
 
-        let region = vk::BufferImageCopy::builder()
+        let region = vk::BufferImageCopy::default()
             .buffer_offset(0)
             .buffer_row_length(0)
             .buffer_image_height(0)
@@ -776,7 +760,7 @@ impl VulkanContext {
                 src_image.handle,
                 src_image_layout,
                 dst_buffer,
-                &[*region],
+                &[region],
             )
         };
 
@@ -784,28 +768,24 @@ impl VulkanContext {
     }
 
     #[cfg(not(debug_assertions))]
-    pub fn set_debug_name(
+    pub fn set_debug_name<T: vk::Handle>(
         &self,
-        _object_type: ObjectType,
-        _object_handle: u64,
+        _object_handle: T,
         _object_name: &str,
     ) -> VkResult<()> {
         VkResult::Ok(())
     }
 
     #[cfg(debug_assertions)]
-    pub fn set_debug_name(
+    pub fn set_debug_name<T: vk::Handle>(
         &self,
-        object_type: ObjectType,
-        object_handle: u64,
+        object_handle: T,
         object_name: &str,
     ) -> VkResult<()> {
         let object_name = CString::new(object_name).unwrap();
         unsafe {
-            self.debug_utils.debug_utils_set_object_name(
-                self.device.handle(),
-                &DebugUtilsObjectNameInfoEXT::builder()
-                    .object_type(object_type)
+            self.debug_utils.set_debug_utils_object_name(
+                &DebugUtilsObjectNameInfoEXT::default()
                     .object_handle(object_handle)
                     .object_name(object_name.as_c_str()),
             )
@@ -870,7 +850,7 @@ impl VulkanContext {
 #[allow(unused_variables)]
 #[allow(clippy::ptr_arg)] // https://github.com/rust-lang/rust-clippy/issues/8388
 fn add_device_extension_names(extension_names: &mut Vec<CString>) {
-    extension_names.push(vk::KhrShaderDrawParametersFn::name().to_owned());
+    extension_names.push(ash::khr::shader_draw_parameters::NAME.to_owned());
 
     // Add Multiview extension
     extension_names.push(CString::new("VK_EXT_descriptor_indexing").unwrap());
@@ -887,7 +867,7 @@ fn create_command_pool(
 ) -> Result<vk::CommandPool, anyhow::Error> {
     let command_pool = unsafe {
         device.create_command_pool(
-            &vk::CommandPoolCreateInfo::builder()
+            &vk::CommandPoolCreateInfo::default()
                 .queue_family_index(queue_family_index)
                 .flags(
                     vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER
@@ -904,7 +884,7 @@ fn create_command_pool(
 fn create_descriptor_pool(device: &Device) -> Result<vk::DescriptorPool, anyhow::Error> {
     let descriptor_pool = unsafe {
         device.create_descriptor_pool(
-            &vk::DescriptorPoolCreateInfo::builder()
+            &vk::DescriptorPoolCreateInfo::default()
                 .pool_sizes(&[
                     vk::DescriptorPoolSize {
                         ty: vk::DescriptorType::UNIFORM_BUFFER,
@@ -954,7 +934,7 @@ fn vulkan_init_legacy(
 
     println!("[HOTHAM_VULKAN] Initializing Vulkan..");
     unsafe {
-        let entry = Entry::new()?;
+        let entry = Entry::load()?;
 
         let layers = vec![];
         println!("[HOTHAM_VULKAN] Requesting layers: {layers:?}");
@@ -970,7 +950,7 @@ fn vulkan_init_legacy(
             .collect::<Vec<_>>();
 
         #[cfg(debug_assertions)]
-        vk_instance_exts.push(vk::ExtDebugUtilsFn::name().to_owned());
+        vk_instance_exts.push(ash::ext::debug_utils::NAME.to_owned());
 
         println!("[HOTHAM_VULKAN] Required Vulkan instance extensions: {vk_instance_exts:?}");
         let vk_instance_ext_pointers = vk_instance_exts
@@ -980,7 +960,7 @@ fn vulkan_init_legacy(
 
         let app_name = CString::new(application_name)?;
         let engine_name = CString::new("Hotham")?;
-        let app_info = vk::ApplicationInfo::builder()
+        let app_info = vk::ApplicationInfo::default()
             .application_name(&app_name)
             .application_version(application_version)
             .engine_name(&engine_name)
@@ -989,7 +969,7 @@ fn vulkan_init_legacy(
 
         let instance = entry
             .create_instance(
-                &vk::InstanceCreateInfo::builder()
+                &vk::InstanceCreateInfo::default()
                     .application_info(&app_info)
                     .enabled_extension_names(&vk_instance_ext_pointers)
                     .enabled_layer_names(&layer_names),
@@ -1006,20 +986,22 @@ fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
 
     println!("[HOTHAM_VULKAN] Initializing Vulkan..");
     let app_name = CString::new("Hotham Testing")?;
-    let entry = unsafe { Entry::new()? };
+    let entry = unsafe { Entry::load()? };
     let layers = vec!["VK_LAYER_KHRONOS_validation\0"];
     let layer_names = unsafe { get_raw_strings(layers) };
     println!("[HOTHAM_VULKAN] Trying to use layers: {:?}", unsafe {
         parse_raw_strings(&layer_names)
     });
-    let extensions = vec![(vk::ExtDebugUtilsFn::name().to_owned())];
 
-    let extension_names = extensions.iter().map(|e| e.as_ptr()).collect::<Vec<_>>();
+    let extension_names = [(ash::ext::debug_utils::NAME.to_owned())]
+        .iter()
+        .map(|e| e.as_ptr())
+        .collect::<Vec<_>>();
 
-    let app_info = vk::ApplicationInfo::builder()
+    let app_info = vk::ApplicationInfo::default()
         .application_name(&app_name)
         .api_version(vk::make_api_version(0, 1, 2, 0));
-    let create_info = vk::InstanceCreateInfo::builder()
+    let create_info = vk::InstanceCreateInfo::default()
         .application_info(&app_info)
         .enabled_extension_names(&extension_names)
         .enabled_layer_names(&layer_names);
@@ -1077,30 +1059,29 @@ fn create_vulkan_device(
             .ok_or(HothamError::EmptyListError)?
     };
 
-    let queue_create_info = vk::DeviceQueueCreateInfo::builder()
+    let queue_create_info = vk::DeviceQueueCreateInfo::default()
         .queue_priorities(&queue_priorities)
-        .queue_family_index(graphics_family_index)
-        .build();
+        .queue_family_index(graphics_family_index);
 
-    let mut descriptor_indexing_features = vk::PhysicalDeviceDescriptorIndexingFeatures::builder()
+    let mut descriptor_indexing_features = vk::PhysicalDeviceDescriptorIndexingFeatures::default()
         .shader_sampled_image_array_non_uniform_indexing(true)
         .descriptor_binding_variable_descriptor_count(true)
         .descriptor_binding_partially_bound(true)
         .runtime_descriptor_array(true);
 
-    let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::builder().multiview(true);
+    let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::default().multiview(true);
 
     let mut robust_features =
-        vk::PhysicalDeviceRobustness2FeaturesEXT::builder().null_descriptor(true);
+        vk::PhysicalDeviceRobustness2FeaturesEXT::default().null_descriptor(true);
 
     let mut f16_storage =
-        vk::PhysicalDevice16BitStorageFeatures::builder().storage_buffer16_bit_access(true);
+        vk::PhysicalDevice16BitStorageFeatures::default().storage_buffer16_bit_access(true);
 
-    let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::builder()
+    let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::default()
         .shader_float16(true)
         .shader_int8(true);
 
-    let device_create_info = vk::DeviceCreateInfo::builder()
+    let device_create_info = vk::DeviceCreateInfo::default()
         .queue_create_infos(slice_from_ref(&queue_create_info))
         .enabled_extension_names(&extension_names)
         .push_next(&mut descriptor_indexing_features)

@@ -73,6 +73,7 @@ impl Default for AudioContext {
                         "[HOTHAM_AUDIO_CONTEXT] An error occurred playing the audio stream: {err}"
                     )
                 },
+                None,
             )
             .unwrap();
         stream

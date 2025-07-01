@@ -45,7 +45,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --tests -- -D warnings
       - name: Run cargo clippy (android)
         uses: actions-rs/cargo@v1
         with:

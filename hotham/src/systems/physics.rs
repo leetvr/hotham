@@ -167,7 +167,9 @@ fn update_rigid_bodies_from_world(physics_context: &mut PhysicsContext, world: &
             );
         }
 
-        rigid_body.set_body_type(body_type.into());
+        if rigid_body.body_type() != body_type.into() {
+            rigid_body.set_body_type(body_type.into(), true);
+        }
 
         // We cheat here by just comparing with the first member of the array, as we don't yet support locking
         // individual rotations.

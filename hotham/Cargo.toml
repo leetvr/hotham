@@ -10,35 +10,34 @@ repository = "https://github.com/leetvr/hotham/"
 version = "0.2.0"
 
 [dependencies]
-anyhow = "1.0"
-ash = "0.33.2"
-bitflags = "1.3"
-cpal = "0.13.5"
-ctrlc = {version = "3", features = ["termination"]}
-egui = "0.15"
-generational-arena = "0.2.8"
-glam = {features = ["mint", "serde", "approx"], version = "0.21.3"}
-gltf = {version = "1.0", features = ["KHR_lights_punctual", "KHR_materials_unlit", "names", "utils"], default-features = false}
-half = "2.1.0"
-hecs = "0.9.0"
-hotham-asset-client = {path = "../hotham-asset-client"}
-id-arena = "2.2.1"
-image = {version = "0.24.3", default-features = false, features = ["jpeg", "png"]}
-itertools = "0.10.0"
-# ktx2 = "0.3"
-ktx2 = {git = "https://github.com/BVE-Reborn/ktx2"}
-memoffset = "0.6.5"
-mint = "0.5.6"
-notify-debouncer-mini = "0.2.1"
-oddio = "0.5"
-openxr = {features = ["loaded", "mint"], version = "0.17"}
-rapier3d = "0.14.0"
-ruzstd = "0.3"
-serde = {version = "1.0", features = ["derive"]}
-symphonia = {version = "0.5", default-features = false, features = ["mp3"]}
-thiserror = "1.0"
-tokio = {version = "1.0.1", default-features = false, features = ["rt"]}
-vk-shader-macros = "0.2.8"
+hotham-asset-client = { path = "../hotham-asset-client" }
+
+ash.workspace = true
+anyhow.workspace = true
+bitflags.workspace = true
+cpal.workspace = true
+ctrlc.workspace = true
+egui.workspace = true
+generational-arena.workspace = true
+glam.workspace = true
+gltf.workspace = true
+half.workspace = true
+hecs.workspace = true
+id-arena.workspace = true
+image.workspace = true
+itertools.workspace = true
+ktx2.workspace = true
+mint.workspace = true
+notify-debouncer-mini.workspace = true
+oddio.workspace = true
+openxr.workspace = true
+rapier3d.workspace = true
+ruzstd.workspace = true
+serde.workspace = true
+symphonia.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+vk-shader-macros.workspace = true
 
 [features]
 editor = []
@@ -52,5 +51,14 @@ serde_json = "1.0"
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = "0.19.0"
-ndk = "0.6"
-ndk-glue = "0.6"
+ndk = "0.7"
+ndk-glue = "0.7"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.48", features = [
+    "Win32_Foundation",
+    "Win32_System_Performance",
+] }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+libc = "0.2"
