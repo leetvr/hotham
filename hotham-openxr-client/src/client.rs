@@ -37,9 +37,15 @@ use std::{
     ffi::{c_char, CStr},
     mem::transmute,
     ptr::null_mut,
+    sync::OnceLock,
 };
 use std::{ptr, slice, time::Instant};
+
+#[cfg(windows)]
 use uds_windows::UnixStream;
+
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 
 type PartialVulkan = (ash::Entry, ash::Instance);
 type SpaceMap = HashMap<u64, SpaceState>;
@@ -48,7 +54,7 @@ type PathToStringMap = HashMap<Path, String>;
 type BindingMap = HashMap<Path, Action>;
 
 // Used during the init phase
-static mut PARTIAL_VULKAN: OnceCell<PartialVulkan> = OnceCell::new();
+static mut PARTIAL_VULKAN: OnceLock<PartialVulkan> = OnceLock::new();
 static INSTANCE: OnceCell<Instance> = OnceCell::new();
 static SESSION: OnceCell<Session> = OnceCell::new();
 static VULKAN_CONTEXT: OnceCell<VulkanContext> = OnceCell::new();
@@ -167,6 +173,8 @@ pub unsafe extern "system" fn create_vulkan_instance(
     let (entry, instance) = lazy_vulkan::vulkan_context::init(&mut extension_names.to_vec());
     *vulkan_instance = instance.handle().as_raw() as *const _;
 
+    #[allow(static_mut_refs)]
+    // SAFETY: the reference is immediately dropped
     let _ = PARTIAL_VULKAN.set((entry, instance));
 
     *vulkan_result = vk::Result::SUCCESS.as_raw();
@@ -179,6 +187,9 @@ pub unsafe extern "system" fn get_vulkan_graphics_device_2(
     vulkan_physical_device: *mut VkPhysicalDevice,
 ) -> Result {
     trace!("get_vulkan_graphics_device_2");
+
+    #[allow(static_mut_refs)]
+    // SAFETY: immutable reference
     let (_, instance) = PARTIAL_VULKAN.get().unwrap();
     let physical_device = lazy_vulkan::vulkan_context::get_physical_device(instance, None, None).0;
     trace!("Physical device: {physical_device:?}");
@@ -193,13 +204,18 @@ pub unsafe extern "system" fn create_vulkan_device(
     vulkan_result: *mut VkResult,
 ) -> Result {
     trace!("create_vulkan_device");
+
+    #[allow(static_mut_refs)]
+    // SAFETY: immutable reference
     let (_, instance) = PARTIAL_VULKAN.get().unwrap();
+
     let create_info = &*create_info;
     let physical_device: vk::PhysicalDevice =
         vk::PhysicalDevice::from_raw(create_info.vulkan_physical_device as u64);
     let device_create_info: &mut vk::DeviceCreateInfo =
         &mut *create_info.vulkan_create_info.cast_mut().cast(); // evil? probably
-    let mut extension_names = std::slice::from_raw_parts(
+
+    let extension_names = std::slice::from_raw_parts(
         device_create_info.pp_enabled_extension_names,
         device_create_info.enabled_extension_count as _,
     )
@@ -286,6 +302,9 @@ pub unsafe extern "system" fn create_session(
     *session = Session::from_raw(rand::random());
     let _ = SESSION.set(*session); // TODO: I'm not sure if it should be an error to create a new session again
     let graphics_binding = &*((*create_info).next as *const GraphicsBindingVulkanKHR);
+
+    #[allow(static_mut_refs)]
+    // SAFETY: Mutable reference is immediately dropped, never used again
     let (entry, instance) = PARTIAL_VULKAN.take().unwrap();
     let physical_device = vk::PhysicalDevice::from_raw(graphics_binding.physical_device as u64);
     let device = ash::Device::load(instance.fp_v1_0(), transmute(graphics_binding.device));
@@ -337,10 +356,14 @@ pub unsafe extern "system" fn suggest_interaction_profile_bindings(
         suggested_bindings.count_suggested_bindings as _,
     );
 
-    let bindings_map = BINDINGS.get_mut().unwrap();
+    #[allow(static_mut_refs)]
+    // SAFETY: Short lived reference
+    {
+        let bindings_map = BINDINGS.get_mut().unwrap();
 
-    for binding in bindings {
-        bindings_map.insert(binding.binding, binding.action);
+        for binding in bindings {
+            bindings_map.insert(binding.binding, binding.action);
+        }
     }
 
     Result::SUCCESS
@@ -352,6 +375,8 @@ pub unsafe extern "system" fn string_to_path(
     path_out: *mut Path,
 ) -> Result {
     trace!("string_to_path");
+    #[allow(static_mut_refs)]
+    // SAFETY: References are immediately dropped
     match CStr::from_ptr(path_string).to_str() {
         Ok(path_string) => {
             let path = Path::from_raw(rand::random());
@@ -386,12 +411,18 @@ pub unsafe extern "system" fn create_action_space(
     space_out: *mut Space,
 ) -> Result {
     trace!("create_action_space");
+    let space = Space::from_raw(rand::random());
+
+    #[allow(static_mut_refs)]
+    // SAFETY: References is immediately dropped
     let path_string = PATH_TO_STRING
         .get()
         .unwrap()
         .get(&(*create_info).subaction_path)
         .map(|s| s.as_str());
-    let space = Space::from_raw(rand::random());
+
+    #[allow(static_mut_refs)]
+    // SAFETY: Short lived reference
     let spaces = SPACES.get_mut().unwrap();
 
     match path_string {
@@ -461,6 +492,8 @@ pub unsafe extern "system" fn create_reference_space(
     space_state.position = create_info.pose_in_reference_space.position;
     space_state.orientation = create_info.pose_in_reference_space.orientation;
 
+    #[allow(static_mut_refs)]
+    // SAFETY: References is immediately dropped
     SPACES
         .get_mut()
         .unwrap()
@@ -528,6 +561,8 @@ pub unsafe extern "system" fn wait_frame(
         return Result::SUCCESS;
     }
 
+    #[allow(static_mut_refs)]
+    // SAFETY: References is immediately dropped
     let client = EDITOR_CLIENT.get_mut().unwrap();
     client.request(&requests::WaitFrame).unwrap();
 

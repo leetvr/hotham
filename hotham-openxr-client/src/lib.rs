@@ -2,6 +2,7 @@
 
 mod action_state;
 mod client;
+mod client_state;
 mod space_state;
 
 use crate::client::*;

@@ -3,7 +3,7 @@ use hotham::{
     components::{
         hand::Handedness,
         physics::{BodyType, SharedShape},
-        Collider, LocalTransform, RigidBody,
+        Collider, GlobalTransform, Info, LocalTransform, Mesh, RigidBody,
     },
     hecs::World,
     na,
@@ -16,6 +16,12 @@ use hotham::{
 };
 use hotham_editor_protocol::scene::{EditorEntity, EditorUpdates, Transform};
 use log::{debug, info};
+
+#[cfg(windows)]
+use uds_windows::UnixStream;
+
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 
 #[derive(Clone, Debug, Default)]
 /// Most Hotham applications will want to keep track of some sort of state.
@@ -41,7 +47,7 @@ pub fn real_main() -> HothamResult<()> {
     #[cfg(feature = "editor")]
     let mut editor = {
         use hotham_editor_protocol::EditorClient;
-        use uds_windows::UnixStream;
+
         info!("Connecting to editor..");
         let stream = UnixStream::connect("hotham_editor.socket")?;
         EditorClient::new(stream)
@@ -69,7 +75,7 @@ pub fn real_main() -> HothamResult<()> {
 
 fn sync_with_editor(
     world: &mut World,
-    editor: &mut hotham_editor_protocol::EditorClient<uds_windows::UnixStream>,
+    editor: &mut hotham_editor_protocol::EditorClient<UnixStream>,
 ) -> HothamResult<()> {
     use hotham::hecs::Entity;
     let entities = world

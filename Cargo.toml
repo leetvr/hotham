@@ -22,6 +22,7 @@ bitflags = "1.3"
 cpal = "0.15.2"
 ctrlc = { version = "3", features = ["termination"] }
 egui = "0.15"
+env_logger = "0.11"
 generational-arena = "0.2.8"
 glam = { features = ["mint", "serde", "approx"], version = "0.23" }
 gltf = { version = "1.0", features = [
@@ -40,6 +41,7 @@ image = { version = "0.24.3", default-features = false, features = [
 ] }
 itertools = "0.10.0"
 ktx2 = { git = "https://github.com/BVE-Reborn/ktx2", rev = "be27131c716686a416e6a805a26384f74a7353ff" }
+log = "0.4"
 mint = "0.5.6"
 notify-debouncer-mini = "0.2.1"
 oddio = "0.5"

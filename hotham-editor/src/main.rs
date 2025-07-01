@@ -4,7 +4,6 @@ mod input_context;
 
 use anyhow::{bail, Result};
 use ash::vk;
-
 use glam::Vec2;
 use hotham_editor_protocol::{responses, scene::EditorUpdates, EditorServer, RequestType};
 use lazy_vulkan::{
@@ -12,15 +11,19 @@ use lazy_vulkan::{
     LazyRenderer, LazyVulkan, SwapchainInfo, Vertex,
 };
 use log::{debug, info, trace};
-use yakui_winit::YakuiWinit;
-
 use std::time::Instant;
-use uds_windows::{UnixListener, UnixStream};
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::ControlFlow,
     platform::run_return::EventLoopExtRunReturn,
 };
+use yakui_winit::YakuiWinit;
+
+#[cfg(windows)]
+use uds_windows::{UnixListener, UnixStream};
+
+#[cfg(unix)]
+use std::os::unix::net::{UnixListener, UnixStream};
 
 use crate::{
     camera::Camera,
