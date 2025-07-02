@@ -8,7 +8,17 @@ version = "0.2.0"
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-hotham = { path = "../../hotham" }
+env_logger.workspace = true
+log.workspace = true
+hotham = { path = "../../hotham", features = ["editor"] }
+hotham-editor-protocol = { path = "../../hotham-editor-protocol", optional = true }
+
+[features]
+default = ["editor"]
+editor = ["dep:uds_windows", "dep:hotham-editor-protocol"]
+
+[target.'cfg(windows)'.dependencies]
+uds_windows = { version = "1.0.2", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 ndk-glue = "0.7"
@@ -75,5 +85,5 @@ version = 1
 #
 # !! IMPORTANT !!
 [package.metadata.android.signing.release]
-path = "../hotham_examples.keystore"
 keystore_password = "chomsky-vigilant-spa"
+path = "../hotham_examples.keystore"

@@ -256,7 +256,7 @@ impl XrContext {
     }
 }
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", feature = "editor"))]
 pub(crate) fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
@@ -273,7 +273,7 @@ pub(crate) fn create_vulkan_context(
     Ok(vulkan_context)
 }
 
-#[cfg(not(target_os = "android"))]
+#[cfg(all(not(target_os = "android"), not(feature = "editor")))]
 fn create_vulkan_context(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
@@ -464,7 +464,11 @@ fn enable_xr_extensions(required_extensions: &mut xr::ExtensionSet) {
 
 #[cfg(not(target_os = "android"))]
 fn enable_xr_extensions(required_extensions: &mut xr::ExtensionSet) {
-    required_extensions.khr_vulkan_enable = true;
+    if cfg!(feature = "editor") {
+        required_extensions.khr_vulkan_enable2 = true;
+    } else {
+        required_extensions.khr_vulkan_enable = true;
+    }
 }
 
 #[cfg(target_os = "windows")]

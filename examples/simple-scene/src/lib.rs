@@ -3,7 +3,7 @@ use hotham::{
     components::{
         hand::Handedness,
         physics::{BodyType, SharedShape},
-        Collider, LocalTransform, RigidBody,
+        Collider, GlobalTransform, Info, LocalTransform, Mesh, RigidBody,
     },
     hecs::World,
     na,
@@ -14,6 +14,14 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
+use hotham_editor_protocol::scene::{EditorEntity, EditorUpdates, Transform};
+use log::{debug, info};
+
+#[cfg(windows)]
+use uds_windows::UnixStream;
+
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
 
 #[derive(Clone, Debug, Default)]
 /// Most Hotham applications will want to keep track of some sort of state.
@@ -29,13 +37,79 @@ pub fn main() {
 }
 
 pub fn real_main() -> HothamResult<()> {
+    env_logger::builder()
+        .filter_module("hotham-openxr-client", log::LevelFilter::Trace)
+        .filter_module("simple_scene_example", log::LevelFilter::Trace)
+        .init();
+
+    info!("Initialising Simple Scene example..");
+
+    #[cfg(feature = "editor")]
+    let mut editor = {
+        use hotham_editor_protocol::EditorClient;
+
+        info!("Connecting to editor..");
+        let stream = UnixStream::connect("hotham_editor.socket")?;
+        EditorClient::new(stream)
+    };
+
+    info!("Building engine..");
     let mut engine = Engine::new();
+    info!("..done!");
+
+    info!("Initialising app..");
     let mut state = Default::default();
     init(&mut engine)?;
+    info!("Done! Entering main loop..");
 
     while let Ok(tick_data) = engine.update() {
+        #[cfg(feature = "editor")]
+        sync_with_editor(&mut engine.world, &mut editor)?;
+
         tick(tick_data, &mut engine, &mut state);
         engine.finish()?;
+    }
+
+    Ok(())
+}
+
+fn sync_with_editor(
+    world: &mut World,
+    editor: &mut hotham_editor_protocol::EditorClient<UnixStream>,
+) -> HothamResult<()> {
+    use hotham::hecs::Entity;
+    let entities = world
+        .query_mut::<(&GlobalTransform, &Info)>()
+        .with::<&Mesh>()
+        .into_iter()
+        .map(|(entity, (transform, info))| {
+            let (_, _, translation) = transform.to_scale_rotation_translation();
+            EditorEntity {
+                name: info.name.clone(),
+                id: entity.to_bits().get(),
+                transform: Transform {
+                    translation: translation.into(),
+                },
+            }
+        })
+        .collect();
+
+    let scene = hotham_editor_protocol::scene::Scene {
+        name: "Simple Scene".to_string(),
+        entities,
+    };
+
+    editor.send_json(&scene).unwrap(); // TODO: error types
+
+    let editor_updates: EditorUpdates = editor.get_json().unwrap(); // TODO: error types
+    for entity in editor_updates.entity_updates {
+        debug!("Received update: {entity:?}");
+        let mut entity_transform = world
+            .entity(Entity::from_bits(entity.id).unwrap())
+            .unwrap()
+            .get::<&mut LocalTransform>()
+            .unwrap();
+        entity_transform.translation = entity.transform.translation.into();
     }
 
     Ok(())
@@ -113,7 +187,5 @@ fn add_helmet(models: &std::collections::HashMap<String, World>, world: &mut Wor
 
     let collider = Collider::new(SharedShape::ball(0.35));
 
-    world
-        .insert(helmet, (collider, RigidBody::default()))
-        .unwrap();
+    world.insert_one(helmet, collider).unwrap();
 }
