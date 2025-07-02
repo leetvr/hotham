@@ -7,7 +7,7 @@ mod space_state;
 
 use crate::client::*;
 use openxr_sys::{loader, pfn, Instance, Result};
-use std::ffi::c_char;
+use std::{ffi::c_char, mem::transmute};
 
 type DummyFn = unsafe extern "system" fn() -> Result;
 
@@ -16,7 +16,7 @@ pub unsafe extern "system" fn get_instance_proc_addr(
     name: *const c_char,
     function: *mut Option<pfn::VoidFunction>,
 ) -> Result {
-    use std::{ffi::CStr, intrinsics::transmute};
+    use std::ffi::CStr;
 
     let name = CStr::from_ptr(name);
     let name = name.to_bytes();
