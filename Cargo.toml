@@ -8,7 +8,6 @@ members = [
     "examples/simple-scene",
     "hotham-asset-client",
     "hotham-asset-server",
-    "hotham-editor",
     "hotham-editor-protocol",
     "hotham-openxr-client",
     "hotham",

@@ -21,7 +21,7 @@ use log::{debug, info};
 use uds_windows::UnixStream;
 
 use std::io::{Read, Write};
-#[cfg(unix)]
+#[cfg(target_os = "android")]
 use std::os::unix::net::UnixStream;
 
 #[derive(Clone, Debug, Default)]
