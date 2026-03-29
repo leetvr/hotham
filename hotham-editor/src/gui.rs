@@ -10,7 +10,7 @@ pub fn gui(gui_state: &mut GuiState) {
     let updates = &mut gui_state.updates;
     row(|| {
         column(|| {
-            image(gui_state.texture_id, Vec2::new(500., 500.));
+            // image(gui_state.texture_id, Vec2::new(500., 500.));
         });
         pad(Pad::all(20.0), || {
             let mut column = List::column();
@@ -50,7 +50,7 @@ pub fn gui(gui_state: &mut GuiState) {
 }
 
 pub struct GuiState {
-    pub texture_id: TextureId,
+    // pub texture_id: TextureId,
     pub scene: hotham_editor_protocol::scene::Scene,
     pub updates: Vec<EditorEntity>,
 }

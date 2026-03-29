@@ -5,13 +5,17 @@ mod input_context;
 use anyhow::{bail, Result};
 use ash::vk;
 use glam::Vec2;
-use hotham_editor_protocol::{responses, scene::EditorUpdates, EditorServer, RequestType};
+use hotham_editor_protocol::{
+    responses,
+    scene::{EditorUpdates, Scene},
+    EditorClient, EditorServer, RequestType,
+};
 use lazy_vulkan::{
     find_memorytype_index, vulkan_context::VulkanContext, vulkan_texture::VulkanTexture,
     LazyRenderer, LazyVulkan, SwapchainInfo, Vertex,
 };
 use log::{debug, info, trace};
-use std::time::Instant;
+use std::{net::TcpListener, time::Instant};
 use winit::{
     event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::ControlFlow,
@@ -34,6 +38,12 @@ static FRAGMENT_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.frag.spv");
 static VERTEX_SHADER: &'_ [u8] = include_bytes!("shaders/triangle.vert.spv");
 const SWAPCHAIN_FORMAT: vk::Format = vk::Format::R8G8B8A8_SRGB; // OpenXR really, really wants us to use sRGB swapchains
 static UNIX_SOCKET_PATH: &'_ str = "hotham_editor.socket";
+static EDITOR_PORT: u32 = 4242;
+
+pub enum EditorMode {
+    Local,
+    Remote,
+}
 
 pub fn main() -> Result<()> {
     env_logger::builder()
@@ -56,19 +66,25 @@ pub fn main() -> Result<()> {
     };
 
     // Let's do something totally normal and wait for a TCP connection
-    if std::fs::remove_file(UNIX_SOCKET_PATH).is_ok() {
-        debug!("Removed pre-existing unix socket at {UNIX_SOCKET_PATH}");
-    }
+    let listener = TcpListener::bind(format!("0:{EDITOR_PORT}")).unwrap();
+    info!("Waiting for game client to connect on port {EDITOR_PORT}..");
+    // let (stream, addr) = listener.accept().unwrap();
+    // let mut game_server = EditorClient::new(stream);
+    // info!("{addr:?} connected!");
 
-    let listener = UnixListener::bind(UNIX_SOCKET_PATH).unwrap();
-    info!("Listening on {UNIX_SOCKET_PATH}: waiting for game client..");
-    let (stream, _) = listener.accept().unwrap();
-    let mut game_server = EditorServer::new(stream);
+    // if std::fs::remove_file(UNIX_SOCKET_PATH).is_ok() {
+    //     debug!("Removed pre-existing unix socket at {UNIX_SOCKET_PATH}");
+    // }
 
-    info!("Game connected! Waiting for OpenXR client..",);
-    let (stream, _) = listener.accept().unwrap();
-    let mut openxr_server = EditorServer::new(stream);
-    info!("OpenXR client connected! Opening window and doing OpenXR setup");
+    // let listener = UnixListener::bind(UNIX_SOCKET_PATH).unwrap();
+    // info!("Listening on {UNIX_SOCKET_PATH}: waiting for game client..");
+    // let (stream, _) = listener.accept().unwrap();
+    // let mut game_server = EditorServer::new(stream);
+
+    // info!("Game connected! Waiting for OpenXR client..",);
+    // let (stream, _) = listener.accept().unwrap();
+    // let mut openxr_server = EditorServer::new(stream);
+    // info!("OpenXR client connected! Opening window and doing OpenXR setup");
 
     // Alright, let's build some stuff
     let (mut lazy_vulkan, mut lazy_renderer, mut event_loop) = LazyVulkan::builder()
@@ -79,6 +95,8 @@ pub fn main() -> Result<()> {
         .with_present(true)
         .window_size(window_size)
         .build();
+
+    info!("Created a window");
     let swapchain_info = SwapchainInfo {
         image_count: lazy_vulkan.surface.desired_image_count,
         resolution: vk::Extent2D {
@@ -87,13 +105,15 @@ pub fn main() -> Result<()> {
         },
         format: SWAPCHAIN_FORMAT,
     };
-    let xr_swapchain = do_openxr_setup(&mut openxr_server, lazy_vulkan.context(), &swapchain_info)?;
+
+    // let xr_swapchain = do_openxr_setup(&mut openxr_server, lazy_vulkan.context(), &swapchain_info)?;
+    // let swapchain = do_swapchain_setup(lazy_vulkan.context(), &swapchain_info);
     info!("..done!");
-    let mut yak_images = create_render_textures(
-        lazy_vulkan.context(),
-        &mut lazy_renderer,
-        xr_swapchain.images,
-    );
+    // let mut yak_images = create_render_textures(
+    //     lazy_vulkan.context(),
+    //     &mut lazy_renderer,
+    //     xr_swapchain.images,
+    // );
 
     let window = &lazy_vulkan.window;
 
@@ -104,7 +124,7 @@ pub fn main() -> Result<()> {
     let mut yak = yakui::Yakui::new();
     let mut yakui_window = YakuiWinit::new(window);
 
-    let (mut yakui_vulkan, yak_images) = {
+    let mut yakui_vulkan = {
         let context = lazy_vulkan.context();
         let yakui_vulkan_context = yakui_vulkan::VulkanContext::new(
             &context.device,
@@ -118,17 +138,14 @@ pub fn main() -> Result<()> {
             format: lazy_vulkan.surface.surface_format.format,
             image_views: lazy_renderer.render_surface.image_views.clone(),
         };
-        let mut yakui_vulkan =
-            yakui_vulkan::YakuiVulkan::new(&yakui_vulkan_context, render_surface);
-        let yak_images = yak_images
-            .drain(..)
-            .map(|t| {
-                let yak_texture = lazy_to_yak(&yakui_vulkan_context, yakui_vulkan.descriptors(), t);
-                yakui_vulkan.add_user_texture(yak_texture)
-            })
-            .collect::<Vec<_>>();
-
-        (yakui_vulkan, yak_images)
+        yakui_vulkan::YakuiVulkan::new(&yakui_vulkan_context, render_surface)
+        // let yak_images = yak_images
+        //     .drain(..)
+        //     .map(|t| {
+        //         let yak_texture = lazy_to_yak(&yakui_vulkan_context, yakui_vulkan.descriptors(), t);
+        //         yakui_vulkan.add_user_texture(yak_texture)
+        //     })
+        //     .collect::<Vec<_>>();
     };
 
     // Off we go!
@@ -139,6 +156,7 @@ pub fn main() -> Result<()> {
         entity_updates: vec![],
     };
 
+    info!("Starting main loop");
     event_loop.run_return(|event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
         yakui_window.handle_event(&mut yak, &event);
@@ -179,33 +197,35 @@ pub fn main() -> Result<()> {
                 keyboard_events.clear();
                 mouse_events.clear();
 
-                check_request(&mut openxr_server, RequestType::LocateView).unwrap();
-                openxr_server.send_response(&camera.as_pose()).unwrap();
+                // check_request(&mut openxr_server, RequestType::LocateView).unwrap();
+                // openxr_server.send_response(&camera.as_pose()).unwrap();
 
-                check_request(&mut openxr_server, RequestType::WaitFrame).unwrap();
-                openxr_server.send_response(&0).unwrap();
+                // check_request(&mut openxr_server, RequestType::WaitFrame).unwrap();
+                // openxr_server.send_response(&0).unwrap();
 
-                check_request(&mut openxr_server, RequestType::AcquireSwapchainImage).unwrap();
-                openxr_server.send_response(&framebuffer_index).unwrap();
+                // check_request(&mut openxr_server, RequestType::AcquireSwapchainImage).unwrap();
+                // openxr_server.send_response(&framebuffer_index).unwrap();
 
-                let scene: hotham_editor_protocol::scene::Scene = game_server.get_json().unwrap();
-                let mut gui_state = GuiState { texture_id: yak_images[framebuffer_index as usize], scene, updates: vec![] };
-                game_server
-                    .send_json(&updates)
-                    .unwrap();
-
-                updates.entity_updates.clear();
+                // info!("Getting scene from client..");
+                // let scene: hotham_editor_protocol::scene::Scene = game_server.get_json().unwrap();
+                // info!("..done! Sending updates to client..");
+                // game_server
+                //     .send_json(&updates)
+                //     .unwrap();
+                // info!("..done!");
+                // updates.entity_updates.clear();
 
                 // game has finished rendering its frame here
+                // check_request(&mut openxr_server, RequestType::LocateView).unwrap();
+                // openxr_server.send_response(&camera.as_pose()).unwrap();
 
-                check_request(&mut openxr_server, RequestType::LocateView).unwrap();
-                openxr_server.send_response(&camera.as_pose()).unwrap();
-
-                check_request(&mut openxr_server, RequestType::EndFrame).unwrap();
-                openxr_server.send_response(&0).unwrap();
+                // check_request(&mut openxr_server, RequestType::EndFrame).unwrap();
+                // openxr_server.send_response(&0).unwrap();
 
 
                 yak.start();
+                // let mut gui_state = GuiState { texture_id: yak_images[framebuffer_index as usize], scene, updates: vec![] };
+                let mut gui_state = GuiState { scene: Scene { name: "Yeah".into(), entities: vec![] }, updates: vec![] };
                 gui(&mut gui_state);
                 yak.finish();
 
@@ -223,10 +243,10 @@ pub fn main() -> Result<()> {
 
                 yakui_vulkan.paint(&mut yak, &yakui_vulkan_context, framebuffer_index);
 
-                let semaphore = xr_swapchain.semaphores[framebuffer_index as usize];
+                // let semaphore = swapchain.semaphores[framebuffer_index as usize];
                 lazy_vulkan.render_end(
                     framebuffer_index,
-                    &[semaphore, lazy_vulkan.rendering_complete_semaphore],
+                    &[lazy_vulkan.rendering_complete_semaphore],
                 );
                 last_frame_time = Instant::now();
                 right_mouse_clicked = false;
@@ -320,6 +340,15 @@ pub fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn do_swapchain_setup(
+    vulkan_context: &VulkanContext,
+    swapchain_info: &SwapchainInfo,
+) -> XrSwapchain {
+    let (images, _) = unsafe { create_render_images(vulkan_context, swapchain_info) };
+    let (semaphores, _) = unsafe { create_semaphores(vulkan_context, swapchain_info.image_count) };
+    XrSwapchain { images, semaphores }
 }
 
 fn lazy_to_yak(
@@ -481,7 +510,7 @@ unsafe fn create_render_images(
     (0..(*image_count))
         .map(|_| {
             let mut handle_info =
-                vk::ExternalMemoryImageCreateInfo::builder().handle_types(handle_type);
+                vk::ExternalMemoryImageCreateInfo::default().handle_types(handle_type);
             let image = device
                 .create_image(
                     &vk::ImageCreateInfo {

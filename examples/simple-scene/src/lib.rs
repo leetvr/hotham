@@ -20,6 +20,7 @@ use log::{debug, info};
 #[cfg(windows)]
 use uds_windows::UnixStream;
 
+use std::io::{Read, Write};
 #[cfg(unix)]
 use std::os::unix::net::UnixStream;
 
@@ -46,10 +47,12 @@ pub fn real_main() -> HothamResult<()> {
 
     #[cfg(feature = "editor")]
     let mut editor = {
+        use std::net::TcpStream;
+
         use hotham_editor_protocol::EditorClient;
 
         info!("Connecting to editor..");
-        let stream = UnixStream::connect("hotham_editor.socket")?;
+        let stream = TcpStream::connect("192.168.4.136:4242").unwrap();
         EditorClient::new(stream)
     };
 
@@ -73,9 +76,9 @@ pub fn real_main() -> HothamResult<()> {
     Ok(())
 }
 
-fn sync_with_editor(
+fn sync_with_editor<S: Write + Read>(
     world: &mut World,
-    editor: &mut hotham_editor_protocol::EditorClient<UnixStream>,
+    editor: &mut hotham_editor_protocol::EditorClient<S>,
 ) -> HothamResult<()> {
     use hotham::hecs::Entity;
     let entities = world
@@ -99,8 +102,10 @@ fn sync_with_editor(
         entities,
     };
 
+    println!("[HOTHAM_EDITOR_CLIENT] Sending scene to editor..");
     editor.send_json(&scene).unwrap(); // TODO: error types
 
+    println!("[HOTHAM_EDITOR_CLIENT] Done! Getting updates from editor..");
     let editor_updates: EditorUpdates = editor.get_json().unwrap(); // TODO: error types
     for entity in editor_updates.entity_updates {
         debug!("Received update: {entity:?}");
@@ -111,6 +116,7 @@ fn sync_with_editor(
             .unwrap();
         entity_transform.translation = entity.transform.translation.into();
     }
+    println!("[HOTHAM_EDITOR_CLIENT] ..done!");
 
     Ok(())
 }
