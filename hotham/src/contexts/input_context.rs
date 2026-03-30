@@ -47,6 +47,11 @@ pub struct LeftInputContext {
 }
 
 impl LeftInputContext {
+    /// Provides the controller's position in Globally Orientated Stage Space
+    pub fn position(&self) -> glam::Vec3 {
+        self.stage_from_grip().translation.into()
+    }
+
     pub fn x_button(&self) -> bool {
         self.x_button
     }
@@ -320,6 +325,10 @@ impl RightInputContext {
     pub fn stage_from_aim(&self) -> Affine3A {
         self.stage_from_aim
     }
+
+    pub fn position(&self) -> Vec3 {
+        self.stage_from_grip.translation.into()
+    }
 }
 
 #[derive(Debug, Default)]
@@ -339,8 +348,12 @@ impl HmdInputContext {
     }
 
     /// The pose of the HMD in the real world (stage space)
-    pub(crate) fn hmd_in_stage(&self) -> Affine3A {
+    pub fn hmd_in_stage(&self) -> Affine3A {
         lerp_slerp(&self.left_eye_in_stage, &self.right_eye_in_stage, 0.5)
+    }
+
+    pub fn position(&self) -> Vec3 {
+        self.hmd_in_stage().translation.into()
     }
 }
 

@@ -16,7 +16,7 @@ hotham = { path = "../../hotham" }
 hotham-examples = { path = "../shared" }
 
 [target.'cfg(target_os = "android")'.dependencies]
-ndk-glue = "0.6"
+ndk-glue = "0.7"
 
 [package.metadata.android]
 apk_label = "Hotham Complex Scene Example"
@@ -58,11 +58,6 @@ categories = [
 [[package.metadata.android.application.activity.meta_data]]
 name = "com.oculus.vr.focusaware"
 value = "true"
-
-[[package.metadata.android.uses_feature]]
-name = "android.hardware.vulkan.level"
-required = true
-version = 1
 
 [[package.metadata.android.uses_feature]]
 name = "android.hardware.vr.headtracking"

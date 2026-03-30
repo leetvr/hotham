@@ -14,6 +14,8 @@ use hotham::{
     },
     xr, Engine, HothamResult, TickData,
 };
+
+#[cfg(feature = "editor")]
 use hotham_editor_protocol::scene::{EditorEntity, EditorUpdates, Transform};
 use log::{debug, info};
 
@@ -76,6 +78,7 @@ pub fn real_main() -> HothamResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "editor")]
 fn sync_with_editor<S: Write + Read>(
     world: &mut World,
     editor: &mut hotham_editor_protocol::EditorClient<S>,

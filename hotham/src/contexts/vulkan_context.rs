@@ -41,6 +41,7 @@ pub struct VulkanContext {
     pub descriptor_pool: vk::DescriptorPool,
     pub debug_utils: ash::ext::debug_utils::Device,
     pub physical_device_properties: vk::PhysicalDeviceProperties,
+    pub memory_properties: vk::PhysicalDeviceMemoryProperties,
 }
 
 impl VulkanContext {
@@ -51,7 +52,7 @@ impl VulkanContext {
         application_version: u32,
     ) -> Result<Self> {
         println!("[HOTHAM_VULKAN] Creating VulkanContext..");
-        let vk_target_version_xr = xr::Version::new(1, 2, 128);
+        let vk_target_version_xr = xr::Version::new(1, 3, 295);
 
         let requirements = xr_instance.graphics_requirements::<XrVulkan>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
@@ -236,6 +237,8 @@ impl VulkanContext {
         let debug_utils = ash::ext::debug_utils::Device::new(&instance, &device);
         let physical_device_properties =
             unsafe { instance.get_physical_device_properties(physical_device) };
+        let memory_properties =
+            unsafe { instance.get_physical_device_memory_properties(physical_device) };
 
         Self {
             entry,
@@ -248,6 +251,7 @@ impl VulkanContext {
             descriptor_pool,
             debug_utils,
             physical_device_properties,
+            memory_properties,
         }
     }
 
@@ -845,6 +849,8 @@ impl VulkanContext {
 
         println!("[HOTHAM_VULKAN] ..done!");
     }
+
+    pub fn set_debug_label(&self, handle: vk::Buffer, arg: &str) {}
 }
 
 #[allow(unused_variables)]
