@@ -13,12 +13,12 @@
 #include "pbr.glsl"
 
 // Inputs
-layout (location = 0) in vec3 inGosPos;
-layout (location = 1) in vec2 inUV;
-layout (location = 2) in vec3 inNormal;
+layout(location = 0) in vec4 inGosPos;
+layout(location = 1) in vec2 inUV;
+layout(location = 2) in vec3 inNormal;
 
 // Outputs
-layout (location = 0) out vec4 outColor;
+layout(location = 0) out vec4 outColor;
 
 // Get normal, tangent and bitangent vectors.
 vec3 getNormal() {
@@ -38,8 +38,8 @@ vec3 getNormal() {
     // and a little bit about why it is better than using precomputed tangents.
     // Note however that we are using a slightly different formulation with coordinates in
     // globally oriented stage space instead of view space and we rely on the UV map not being too distorted.
-    vec3 dGosPosDx = dFdx(inGosPos);
-    vec3 dGosPosDy = dFdy(inGosPos);
+    vec3 dGosPosDx = dFdx(inGosPos.xyz);
+    vec3 dGosPosDy = dFdy(inGosPos.xyz);
     vec2 dUvDx = dFdx(inUV);
     vec2 dUvDy = dFdy(inUV);
 
@@ -70,8 +70,8 @@ void main() {
     }
 
     // Set globals that are read inside functions for lighting etc.
-    pos = inGosPos;
-    v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - inGosPos);
+    pos = inGosPos.xyz;
+    v = normalize(sceneData.cameraPosition[gl_ViewIndex].xyz - pos);
     n = getNormal();
     uv = inUV;
 
@@ -89,28 +89,28 @@ void main() {
         switch (index) {
             // Base Color Texture
             case 1:
-                outColor.rgb = baseColor;
-                break;
+            outColor.rgb = baseColor;
+            break;
             // Normal
             case 2:
-                outColor.rgb = n * 0.5 + 0.5;
-                break;
+            outColor.rgb = n * 0.5 + 0.5;
+            break;
             // Occlusion
             case 3:
-                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).rrr;
-                break;
+            outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_AO_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).rrr;
+            break;
             // Emission
             case 4:
-                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], inUV).rgb;
-                break;
+            outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_EMISSION_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 3], inUV).rgb;
+            break;
             // Roughness
             case 5:
-                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).ggg;
-                break;
+            outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).ggg;
+            break;
             // Metallic
             case 6:
-                outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).bbb;
-                break;
+            outColor.rgb = ((materialFlags & MATERIAL_FLAG_HAS_METALLIC_ROUGHNESS_TEXTURE) != 0) ? ERROR_MAGENTA.rgb : texture(textures[baseTextureID + 1], inUV).bbb;
+            break;
         }
         outColor = outColor;
     }

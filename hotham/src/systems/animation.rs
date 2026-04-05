@@ -11,18 +11,12 @@ pub fn animation_system(engine: &mut Engine) {
 
 fn animation_system_inner(world: &mut hecs::World) {
     for (_, controller) in world.query::<&AnimationController>().iter() {
-        let blend_from = controller.blend_from;
-        let blend_to = controller.blend_to;
-        let blend_amount = controller.blend_amount;
+        let Some(animation_state) = controller.current_animation() else {
+            continue;
+        };
 
-        for target in &controller.targets {
+        for target in &animation_state.targets {
             let mut local_transform = world.get::<&mut LocalTransform>(target.target).unwrap();
-            local_transform.translation =
-                target.translations[blend_from].lerp(target.translations[blend_to], blend_amount);
-            local_transform.rotation =
-                target.rotations[blend_from].slerp(target.rotations[blend_to], blend_amount);
-            local_transform.scale =
-                target.scales[blend_from].lerp(target.scales[blend_to], blend_amount);
         }
     }
 }

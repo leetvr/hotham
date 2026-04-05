@@ -291,7 +291,7 @@ fn create_vulkan_context(
     Ok(vulkan_context)
 }
 
-pub(crate) fn get_swapchain_resolution(
+pub fn get_swapchain_resolution(
     xr_instance: &xr::Instance,
     system: xr::SystemId,
 ) -> Result<vk::Extent2D> {

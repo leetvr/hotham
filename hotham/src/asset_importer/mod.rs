@@ -518,9 +518,13 @@ pub fn add_model_to_world(
 
             // Go through each of the joints and map them to their new entities.
             new_animation_controller
-                .targets
-                .iter_mut()
-                .for_each(|t| t.target = entity_map.get(&t.target).cloned().unwrap());
+                .animations
+                .values_mut()
+                .for_each(|a| {
+                    a.targets
+                        .iter_mut()
+                        .for_each(|t| t.target = entity_map.get(&t.target).cloned().unwrap())
+                });
 
             destination_world
                 .insert_one(*destination_entity, new_animation_controller)

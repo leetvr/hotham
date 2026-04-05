@@ -79,7 +79,9 @@ pub fn hands_system_inner(world: &mut World, input_context: &InputContext) {
         hand.grip_button_just_pressed = grip_button_just_pressed;
 
         // Apply to AnimationController
-        animation_controller.blend_amount = grip_value;
+        let animation_state = animation_controller.current_animation_mut().unwrap();
+        // animation_state.blend_amount = grip_value;
+        // TODO: This needs its own bespoke "hands animation" system
     }
 }
 
@@ -99,8 +101,7 @@ pub fn add_hand(
 
     // Modify the animation controller
     let mut animation_controller = world.get::<&mut AnimationController>(hand_entity).unwrap();
-    animation_controller.blend_from = 0;
-    animation_controller.blend_to = 1;
+    let animation_state = animation_controller.current_animation_mut().unwrap();
     drop(animation_controller);
 
     // Give it a collider
@@ -127,7 +128,7 @@ mod tests {
     use glam::Vec3;
     use hecs::Entity;
 
-    use crate::components::{LocalTransform, RigidBody};
+    use crate::components::{animation_controller::AnimationState, LocalTransform, RigidBody};
 
     #[test]
     pub fn test_hands_system() {
@@ -142,7 +143,6 @@ mod tests {
 
         assert_relative_eq!(hand.grip_value, 0.0);
         assert_relative_eq!(local_transform.translation, [-0.2, 1.4, -0.5].into());
-        assert_relative_eq!(animation_controller.blend_amount, 0.0);
     }
 
     #[test]
@@ -210,9 +210,16 @@ mod tests {
 
     fn add_hand_to_world(world: &mut World, grabbed_entity: Option<GrabbedEntity>) -> Entity {
         let animation_controller = AnimationController {
-            blend_amount: 100.0, // bogus value
+            animations: [(
+                "Test".to_string(),
+                AnimationState {
+                    ..Default::default()
+                },
+            )]
+            .into(),
             ..Default::default()
         };
+
         let hand = Hand {
             grip_value: 100.0, // bogus value
             grabbed_entity,

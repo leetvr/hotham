@@ -23,7 +23,7 @@ ctrlc = { version = "3", features = ["termination"] }
 egui = "0.15"
 env_logger = "0.11"
 generational-arena = "0.2.8"
-glam = { features = ["mint", "serde", "approx"], version = "0.23" }
+glam = { features = ["mint", "serde", "approx"], version = "0.30" }
 gltf = { version = "1.0", features = [
     "KHR_lights_punctual",
     "KHR_materials_unlit",

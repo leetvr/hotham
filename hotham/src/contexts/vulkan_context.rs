@@ -52,7 +52,7 @@ impl VulkanContext {
         application_version: u32,
     ) -> Result<Self> {
         println!("[HOTHAM_VULKAN] Creating VulkanContext..");
-        let vk_target_version_xr = xr::Version::new(1, 3, 295);
+        let vk_target_version_xr = xr::Version::new(1, 1, 0);
 
         let requirements = xr_instance.graphics_requirements::<XrVulkan>(system)?;
         if vk_target_version_xr < requirements.min_api_version_supported
@@ -70,19 +70,26 @@ impl VulkanContext {
         let app_name = CString::new(application_name)?;
         let engine_name = CString::new("Hotham")?;
         let app_info = vk::ApplicationInfo::default()
-            .api_version(vk::make_api_version(0, 1, 2, 128))
+            .api_version(vk::make_api_version(0, 1, 3, 295))
             .application_name(&app_name)
             .application_version(application_version)
             .engine_name(&engine_name)
             .engine_version(1);
 
-        let create_info = vk::InstanceCreateInfo::default().application_info(&app_info);
+        #[cfg(not(debug_assertions))]
+        let instance_extensions = [];
+
+        #[cfg(debug_assertions)]
+        let instance_extensions = [ash::ext::debug_utils::NAME.as_ptr()];
 
         let instance_handle = unsafe {
             xr_instance.create_vulkan_instance(
                 system,
                 get_instance_proc_addr,
-                &create_info as *const _ as *const _,
+                &vk::InstanceCreateInfo::default()
+                    .application_info(&app_info)
+                    .enabled_extension_names(&instance_extensions) as *const _
+                    as *const _,
             )
         }?
         .map_err(vk::Result::from_raw)?;
@@ -104,8 +111,8 @@ impl VulkanContext {
         #[cfg(target_os = "android")]
         let enabled_extensions = [
             "VK_EXT_astc_decode_mode",
-            "VK_EXT_descriptor_indexing",
-            "VK_KHR_shader_float16_int8",
+            "VK_EXT_fragment_density_map",
+            "VK_EXT_fragment_density_map2",
         ]
         .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
 
@@ -113,27 +120,30 @@ impl VulkanContext {
         let enabled_extensions = ["VK_EXT_descriptor_indexing", "VK_KHR_shader_float16_int8"]
             .map(|s| CString::new(s).unwrap().into_raw() as *const c_char);
 
-        let mut descriptor_indexing_features =
-            vk::PhysicalDeviceDescriptorIndexingFeatures::default()
-                .shader_sampled_image_array_non_uniform_indexing(true)
-                .descriptor_binding_variable_descriptor_count(true)
-                .descriptor_binding_partially_bound(true)
-                .runtime_descriptor_array(true);
-
-        let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::default().multiview(true);
-
         let mut robust_features =
             vk::PhysicalDeviceRobustness2FeaturesEXT::default().null_descriptor(true);
 
-        let mut f16_storage =
-            vk::PhysicalDevice16BitStorageFeatures::default().storage_buffer16_bit_access(true);
-
-        let mut f16_arithmetic = vk::PhysicalDeviceShaderFloat16Int8Features::default()
-            .shader_float16(true)
-            .shader_int8(true);
-
         let mut fragment_density = vk::PhysicalDeviceFragmentDensityMap2FeaturesEXT::default()
             .fragment_density_map_deferred(true);
+
+        let mut vulkan_11_features = vk::PhysicalDeviceVulkan11Features::default()
+            .shader_draw_parameters(true)
+            .storage_buffer16_bit_access(true)
+            .multiview(true);
+
+        let mut vulkan_12_features = vk::PhysicalDeviceVulkan12Features::default()
+            .buffer_device_address(true)
+            .shader_float16(true)
+            .shader_int8(true)
+            .descriptor_indexing(true)
+            .scalar_block_layout(true)
+            .shader_sampled_image_array_non_uniform_indexing(true)
+            .descriptor_binding_variable_descriptor_count(true)
+            .descriptor_binding_partially_bound(true)
+            .descriptor_binding_storage_buffer_update_after_bind(true)
+            .descriptor_binding_storage_image_update_after_bind(true)
+            .descriptor_binding_sampled_image_update_after_bind(true)
+            .runtime_descriptor_array(true);
 
         let queue_family_index = unsafe {
             instance
@@ -157,12 +167,10 @@ impl VulkanContext {
         let device_create_info = vk::DeviceCreateInfo::default()
             .enabled_extension_names(&enabled_extensions)
             .queue_create_infos(slice_from_ref(&graphics_queue_create_info))
-            .push_next(&mut descriptor_indexing_features)
             .push_next(&mut robust_features)
-            .push_next(&mut multiview_features)
-            .push_next(&mut f16_storage)
-            .push_next(&mut f16_arithmetic)
-            .push_next(&mut fragment_density);
+            .push_next(&mut fragment_density)
+            .push_next(&mut vulkan_11_features)
+            .push_next(&mut vulkan_12_features);
 
         let device_handle = unsafe {
             xr_instance.create_vulkan_device(
@@ -971,7 +979,7 @@ fn vulkan_init_legacy(
             .application_version(application_version)
             .engine_name(&engine_name)
             .engine_version(1)
-            .api_version(vk::make_api_version(0, 1, 2, 0));
+            .api_version(vk::make_api_version(0, 1, 3, 0));
 
         let instance = entry
             .create_instance(
@@ -1006,7 +1014,7 @@ fn vulkan_init_test() -> Result<(AshInstance, Entry)> {
 
     let app_info = vk::ApplicationInfo::default()
         .application_name(&app_name)
-        .api_version(vk::make_api_version(0, 1, 2, 0));
+        .api_version(vk::make_api_version(0, 1, 3, 0));
     let create_info = vk::InstanceCreateInfo::default()
         .application_info(&app_info)
         .enabled_extension_names(&extension_names)
@@ -1073,6 +1081,9 @@ fn create_vulkan_device(
         .shader_sampled_image_array_non_uniform_indexing(true)
         .descriptor_binding_variable_descriptor_count(true)
         .descriptor_binding_partially_bound(true)
+        .descriptor_binding_storage_buffer_update_after_bind(true)
+        .descriptor_binding_storage_image_update_after_bind(true)
+        .descriptor_binding_sampled_image_update_after_bind(true)
         .runtime_descriptor_array(true);
 
     let mut multiview_features = vk::PhysicalDeviceMultiviewFeatures::default().multiview(true);
@@ -1087,6 +1098,9 @@ fn create_vulkan_device(
         .shader_float16(true)
         .shader_int8(true);
 
+    let mut vulkan_12_features =
+        vk::PhysicalDeviceVulkan12Features::default().buffer_device_address(true);
+
     let device_create_info = vk::DeviceCreateInfo::default()
         .queue_create_infos(slice_from_ref(&queue_create_info))
         .enabled_extension_names(&extension_names)
@@ -1094,7 +1108,8 @@ fn create_vulkan_device(
         .push_next(&mut robust_features)
         .push_next(&mut multiview_features)
         .push_next(&mut f16_storage)
-        .push_next(&mut f16_arithmetic);
+        .push_next(&mut f16_arithmetic)
+        .push_next(&mut vulkan_12_features);
 
     let device =
         unsafe { vulkan_instance.create_device(physical_device, &device_create_info, None) }?;
