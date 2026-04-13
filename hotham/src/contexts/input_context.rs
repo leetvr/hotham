@@ -3,7 +3,7 @@ use crate::{
     util::{affine_from_posef, is_space_valid, lerp_slerp},
     xr,
 };
-use glam::{Affine3A, Vec2, Vec3};
+use glam::{Affine3A, Quat, Vec2, Vec3};
 
 #[derive(Debug, Default)]
 pub struct LeftInputContext {
@@ -48,8 +48,20 @@ pub struct LeftInputContext {
 
 impl LeftInputContext {
     /// Provides the controller's position in Globally Orientated Stage Space
-    pub fn position(&self) -> glam::Vec3 {
+    pub fn grip_position(&self) -> glam::Vec3 {
         self.stage_from_grip().translation.into()
+    }
+
+    pub fn grip_rotation(&self) -> glam::Quat {
+        self.stage_from_grip().to_scale_rotation_translation().1
+    }
+
+    pub fn aim_position(&self) -> Vec3 {
+        self.stage_from_aim.translation.into()
+    }
+
+    pub fn aim_rotation(&self) -> glam::Quat {
+        self.stage_from_aim.to_scale_rotation_translation().1
     }
 
     pub fn x_button(&self) -> bool {
@@ -214,6 +226,22 @@ pub struct RightInputContext {
 }
 
 impl RightInputContext {
+    pub fn grip_position(&self) -> Vec3 {
+        self.stage_from_grip.translation.into()
+    }
+
+    pub fn grip_rotation(&self) -> glam::Quat {
+        self.stage_from_grip.to_scale_rotation_translation().1
+    }
+
+    pub fn aim_position(&self) -> Vec3 {
+        self.stage_from_aim.translation.into()
+    }
+
+    pub fn aim_rotation(&self) -> glam::Quat {
+        self.stage_from_aim.to_scale_rotation_translation().1
+    }
+
     pub fn a_button(&self) -> bool {
         self.a_button
     }
@@ -325,10 +353,6 @@ impl RightInputContext {
     pub fn stage_from_aim(&self) -> Affine3A {
         self.stage_from_aim
     }
-
-    pub fn position(&self) -> Vec3 {
-        self.stage_from_grip.translation.into()
-    }
 }
 
 #[derive(Debug, Default)]
@@ -354,6 +378,10 @@ impl HmdInputContext {
 
     pub fn position(&self) -> Vec3 {
         self.hmd_in_stage().translation.into()
+    }
+
+    pub fn rotation(&self) -> Quat {
+        self.hmd_in_stage().to_scale_rotation_translation().1
     }
 }
 

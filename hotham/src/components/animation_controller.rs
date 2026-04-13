@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use gltf::animation::util::ReadOutputs;
 use itertools::Itertools;
@@ -41,8 +41,17 @@ impl AnimationController {
     }
 
     pub fn set_current_animation(&mut self, new_current_animation: impl Into<String>) {
-        self.current_animation.replace(new_current_animation.into());
+        let new = new_current_animation.into();
+        if let Some(old) = self.current_animation.replace(new.clone()) {
+            if old != new {
+                self.reset_animation();
+            }
+        }
+    }
+
+    pub fn reset_animation(&mut self) {
         let Some(current) = self.current_animation_mut() else {
+            println!("Cowardly refusing to advance when there's no animation playing");
             return;
         };
 
@@ -51,10 +60,11 @@ impl AnimationController {
 
     pub fn advance_animation(&mut self) {
         let Some(current) = self.current_animation_mut() else {
+            println!("Cowardly refusing to advance when there's no animation playing");
             return;
         };
 
-        current.elapsed += DELTA_TIME;
+        current.elapsed = (current.elapsed + DELTA_TIME).rem_euclid(current.duration);
     }
 
     pub(crate) fn load(
@@ -77,7 +87,6 @@ impl AnimationController {
             let mut targets = Vec::new();
             let mut duration = 0.;
             for channel in animation.channels() {
-                println!("Loading channel {}", channel.index());
                 let target = *node_entity_map
                     .get(&channel.target().node().index())
                     .unwrap();
