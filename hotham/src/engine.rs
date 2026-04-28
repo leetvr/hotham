@@ -71,7 +71,7 @@ impl<'a> EngineBuilder<'a> {
 
         // Before we do ANYTHING - we should process android events
         #[cfg(target_os = "android")]
-        process_android_events(&mut resumed, &should_quit);
+        process_android_events(&mut resumed, false, &should_quit);
 
         // On desktop, register a Ctrl-C handler.
         #[cfg(not(target_os = "android"))]
@@ -194,7 +194,7 @@ impl Engine {
     pub fn update(&mut self) -> HothamResult<TickData> {
         loop {
             #[cfg(target_os = "android")]
-            process_android_events(&mut self.resumed, &self.should_quit);
+            process_android_events(&mut self.resumed, true, &self.should_quit);
 
             // TODO: We *STILL* don't handle being shut down correctly. Something very odd is going on.
             // https://github.com/leetvr/hotham/issues/220
@@ -427,43 +427,151 @@ impl Default for Engine {
 }
 
 #[cfg(target_os = "android")]
-pub fn process_android_events(resumed: &mut bool, should_quit: &Arc<AtomicBool>) {
-    while let Some(event) = poll_android_events(*resumed) {
-        println!("[HOTHAM_ANDROID] Received event {:?}", event);
-        match event {
-            ndk_glue::Event::Resume => *resumed = true,
-            ndk_glue::Event::Destroy => {
-                println!("[HOTHAM_ANDROID] !! DESTROY CALLED! DESTROY EVERYTHING! DESTROY!!!!");
-                should_quit.store(true, Ordering::Release);
+pub fn process_android_events(
+    resumed: &mut bool,
+    session_active: bool,
+    should_quit: &Arc<AtomicBool>,
+) {
+    use ndk::looper::{Poll, ThreadLooper};
+    use std::sync::atomic::Ordering;
+
+    let thread_looper =
+        ThreadLooper::for_thread().expect("Android NativeActivity thread should have a looper");
+
+    loop {
+        let should_block_until_event =
+            !*resumed && !session_active && !should_quit.load(Ordering::Acquire);
+
+        let timeout = if should_block_until_event {
+            ANDROID_LOOPER_BLOCKING_TIMEOUT
+        } else {
+            ANDROID_LOOPER_NONBLOCKING_TIMEOUT
+        };
+
+        // This is tricky business!
+        //
+        // NDK glue handles lifecycle events differently than the classic Android looper.
+        //
+        // - Importantly, there are two separate event sources: the NDK glue event pipe, and the input queue.
+        // - We must process *all* events that are in the queue each tick, so we loop until there are no
+        //   more events to process.
+        match thread_looper.poll_once_timeout(timeout) {
+            // Queue is empty, nothing to do.
+            Ok(Poll::Timeout) => {
                 return;
             }
-            ndk_glue::Event::Pause => *resumed = false,
-            _ => {}
+
+            // There is an event! Let's see which pipe it came from
+            Ok(Poll::Event { ident, .. }) => {
+                match ident {
+                    // We've been told that there's an NDK lifecycle event waiting for us.
+                    //
+                    // IMPORTANT: We can only process this *one* event.
+                    ndk_glue::NDK_GLUE_LOOPER_EVENT_PIPE_IDENT => {
+                        process_one_android_lifecycle_event(resumed, should_quit);
+
+                        // If processing the event resulted in a quit signal, we're done.
+                        if should_quit.load(Ordering::Acquire) {
+                            return;
+                        }
+                    }
+
+                    // We have been told that there are one or more input events waiting for us,
+                    // so we drain them all.
+                    ndk_glue::NDK_GLUE_LOOPER_INPUT_QUEUE_IDENT => {
+                        drain_and_drop_android_input_events();
+                    }
+
+                    unknown_ident => {
+                        println!(
+                            "[HOTHAM_ANDROID] Ignoring unknown Android looper ident: {:?}",
+                            unknown_ident
+                        );
+                    }
+                }
+
+                // Important:
+                //
+                // ALooper_pollOnce() docs say that when polling in a loop, all
+                // return values must be treated as if they also indicate wake.
+                //
+                // So after handling this event, continue looping until timeout
+                // or error. Do not assume "handled one event" means the queue is
+                // empty.
+                continue;
+            }
+
+            // None of our business.
+            Ok(Poll::Callback) => {
+                continue;
+            }
+
+            // OK?
+            Ok(Poll::Wake) => {
+                continue;
+            }
+
+            Err(error) => {
+                println!("[HOTHAM_ANDROID] Android looper poll error: {:?}", error);
+                return;
+            }
         }
     }
 }
 
+/// IMPORTANTO:
+///
+/// `ndk_glue::poll_events` is a blocking call; it just does a libc::read on the event socket.
+///
+/// As such, we can't use it to drain the event queue on its own; we must rely on the outer loop
+/// calling this method when it is ready to process events.
 #[cfg(target_os = "android")]
-pub fn poll_android_events(resumed: bool) -> Option<ndk_glue::Event> {
-    use ndk::looper::{Poll, ThreadLooper};
+fn process_one_android_lifecycle_event(resumed: &mut bool, should_quit: &Arc<AtomicBool>) {
+    use std::sync::atomic::Ordering;
 
-    let looper = ThreadLooper::for_thread().unwrap();
-    let timeout = if resumed {
-        ANDROID_LOOPER_NONBLOCKING_TIMEOUT
-    } else {
-        ANDROID_LOOPER_BLOCKING_TIMEOUT
+    let Some(event) = ndk_glue::poll_events() else {
+        println!("[HOTHAM_ANDROID] process_one_android_lifecycle_event was called, but no event is available?");
+        return;
     };
-    let result = looper.poll_all_timeout(timeout);
 
-    match result {
-        Ok(Poll::Event { ident, .. }) => {
-            let ident = ident as u32;
-            if ident == ANDROID_LOOPER_ID_MAIN {
-                ndk_glue::poll_events()
-            } else {
-                None
-            }
+    println!("[HOTHAM_ANDROID] Received Android event {:?}", event);
+
+    match event {
+        ndk_glue::Event::Resume => {
+            *resumed = true;
         }
-        _ => None,
+
+        ndk_glue::Event::Pause => {
+            *resumed = false;
+        }
+
+        ndk_glue::Event::Destroy => {
+            println!("[HOTHAM_ANDROID] !! DESTROY CALLED! DESTROY EVERYTHING! DESTROY!!!!");
+
+            should_quit.store(true, Ordering::Release);
+            return;
+        }
+
+        _ => {}
+    }
+}
+
+#[cfg(target_os = "android")]
+fn drain_and_drop_android_input_events() {
+    let Some(input_queue) = ndk_glue::input_queue() else {
+        println!("[HOTHAM_ANDROID] drain_and_drop_android_input_events was called, but no input queue is available?");
+        return;
+    };
+
+    // IMPORTANT:
+    // Android gets really mad if we don't process all the input events it gives us, even if
+    // OpenXR owns input. So we just loop through the queue and tell the system we're done with
+    // each event.
+    loop {
+        let Ok(Some(discarded)) = input_queue.get_event() else {
+            return;
+        };
+
+        input_queue.finish_event(discarded, true);
     }
 }

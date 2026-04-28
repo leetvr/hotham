@@ -155,6 +155,9 @@ impl XrContext {
             Some(xr::Event::InstanceLossPending(_)) => {
                 println!("[HOTHAM_POLL_EVENT] Instance loss pending!");
             }
+            Some(xr::Event::ReferenceSpaceChangePending(_)) => {
+                println!("[HOTHAM_POLL_EVENT] Reference space change pending!");
+            }
             Some(_) => println!("[HOTHAM_POLL_EVENT] Received some other event"),
             None => {}
         }

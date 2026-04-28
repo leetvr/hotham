@@ -30,3 +30,6 @@ sponza*
 
 # Ignore vscode settings
 .vscode/settings.json
+
+# Ignore zed settings
+.zed/
